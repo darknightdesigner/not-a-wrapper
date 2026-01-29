@@ -1,6 +1,6 @@
 # Claude-Specific Context
 
-This file contains Claude-specific behaviors, preferences, and context for the vid0 project.
+This file contains Claude-specific behaviors, preferences, and context for the Not A Wrapper project.
 
 > See `@AGENTS.md` for universal guidelines that apply to all AI agents.
 
@@ -43,10 +43,10 @@ This file contains Claude-specific behaviors, preferences, and context for the v
 This project uses the following memory structure:
 
 ```
-CLAUDE.md (this file)     → Project-level Claude context
-├── app/CLAUDE.md         → App-specific patterns (TODO: create when needed)
-├── lib/CLAUDE.md         → Library patterns (TODO: create when needed)
-└── ~/.claude/CLAUDE.md   → Personal user preferences
+CLAUDE.md (this file) → Project-level Claude context
+├── app/CLAUDE.md → App-specific patterns
+├── lib/CLAUDE.md → Library patterns
+└── ~/.claude/CLAUDE.md → Personal user preferences
 ```
 
 ## Import Syntax for Context
@@ -54,11 +54,10 @@ CLAUDE.md (this file)     → Project-level Claude context
 When you need additional context, use the `@` import syntax:
 
 ```markdown
-@AGENTS.md                           # Project overview, commands, permissions
-@docs/agents-research.md             # Tech stack decisions, sub-agent architecture
-@docs/youtube-transcript-evaluation.md # YouTube API research
-@docs/workflows.md                   # Development workflows (four-phase cycle, TDD)
-@lib/config.ts                       # Centralized configuration constants
+@AGENTS.md # Project overview, commands, permissions
+@docs/agents-research.md # Tech stack decisions, sub-agent architecture
+@docs/workflows.md # Development workflows (four-phase cycle, TDD)
+@lib/config.ts # Centralized configuration constants
 ```
 
 ## Development Workflow
@@ -101,18 +100,16 @@ When sessions get long:
 
 See `@docs/workflows.md` for detailed workflows and examples.
 
-## Sub-Agent Architecture (Future)
-
-<!-- TODO: Implement after Convex migration -->
+## Sub-Agent Architecture
 
 When the sub-agent architecture is implemented, Claude should route tasks:
 
 | Task Type | Agent | Model |
 |-----------|-------|-------|
-| Transcript analysis | Transcript Analyzer | Haiku 4.5 |
-| Title generation | Title/SEO Optimizer | Sonnet 4.5 |
-| Thumbnail feedback | Thumbnail Advisor | Sonnet 4.5 + Vision |
-| Analytics interpretation | Analytics Interpreter | Sonnet 4.5 |
+| Code assistance | Code Assistant | Haiku 4.5 |
+| Writing/editing | Writing Editor | Sonnet 4.5 |
+| Research tasks | Research Analyst | Sonnet 4.5 |
+| Data analysis | Data Analyst | Sonnet 4.5 |
 | General conversation | Main Orchestrator | Opus 4.5 |
 
 ## Context Compaction
@@ -172,8 +169,6 @@ When debugging issues:
 5. **Fix at source**: Never suggest disabling checks as a solution
 
 ## Common Gotchas
-
-<!-- Add project-specific issues as discovered -->
 
 - **Streaming responses**: Must use `StreamingTextResponse` from AI SDK
 - **Server Components**: Cannot use hooks; use Client Components wrapper

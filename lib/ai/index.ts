@@ -39,10 +39,10 @@ export {
   Orchestrator,
   DEFAULT_SUB_AGENT_CONFIGS,
   // Placeholder agents
-  TranscriptAnalyzer,
-  TitleOptimizer,
-  ThumbnailAdvisor,
-  AnalyticsInterpreter,
+  CodeAssistant,
+  WritingEditor,
+  ResearchAnalyst,
+  DataAnalyst,
   // Types
   type SubAgentType,
   type SubAgentConfig,

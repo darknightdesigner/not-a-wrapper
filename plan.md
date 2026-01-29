@@ -81,20 +81,20 @@ Living document for tracking current work and next steps.
   - [ ] **Phase 6**: Final verification (typecheck, lint, build)
 
 ### 📋 Next Up
-- [ ] YouTube Data API v3 integration
-  - [ ] Set up Google Cloud project
-  - [ ] Enable YouTube Data API v3
-  - [ ] Create YouTube service layer in `lib/youtube/`
-  - [ ] Implement video metadata retrieval
-- [ ] Transcript extraction (`youtube-transcript` package)
-- [ ] Competitor video analysis tools
+- [ ] Model comparison analytics
+  - [ ] Response time tracking
+  - [ ] Token usage comparison
+  - [ ] Cost analysis per response
+- [ ] Smart model routing
+  - [ ] Task-based auto-selection
+  - [ ] Cost/quality optimization
 
 ### 🔮 Backlog
 - [ ] Sub-agent architecture implementation
-- [ ] YouTube Analytics API (OAuth 2.0)
-- [ ] Title generation & A/B suggestions
-- [ ] Thumbnail analysis (vision model)
+- [ ] Model chains and workflow automation
+- [ ] Advanced multi-model UI (diff view, voting)
 - [ ] Flowglad payment setup
+- [ ] API access for developers
 
 ---
 
@@ -113,8 +113,8 @@ Living document for tracking current work and next steps.
 <!-- Decisions that need to be made -->
 
 1. **Loader naming**: Keep both `loader.tsx` (12+ variants) and `loader-dots.tsx` (simple)?
-2. **YouTube quota management**: How to handle 10K units/day limit?
-3. **Transcript caching**: Cache duration for video transcripts?
+2. **Model routing**: How to automatically select best model for task?
+3. **Response caching**: Cache identical prompts for cost savings?
 
 ---
 
@@ -212,9 +212,9 @@ bun run build        # Production build
 - 📋 Update existing components to latest
 
 ### Sprint 5 (Next)
-- 📋 YouTube Data API v3 integration
-- 📋 Transcript extraction
-- 📋 Competitor analysis tools
+- 📋 Model comparison analytics
+- 📋 Smart model routing
+- 📋 Multi-model UI enhancements
 
 ---
 
@@ -223,25 +223,25 @@ bun run build        # Production build
 ### JSX Preview Component
 
 - **Description**: prompt-kit has a `jsx-preview.tsx` component that renders JSX strings as React components dynamically
-- **Potential use cases for vid0**:
-  - AI-generated YouTube thumbnail previews (render mock thumbnails from LLM output)
-  - Interactive script visualization (render formatted scripts with highlights)
+- **Potential use cases for Not A Wrapper**:
+  - Dynamic code previews from AI responses
+  - Interactive component visualization
   - Generative UI features (dynamic component rendering from AI responses)
 - **Considerations**:
   - Security: Requires careful sanitization of JSX strings before rendering
   - Bundle size: Adds ~50KB for JSX parsing/rendering runtime
   - Performance: Needs debouncing for streaming responses to avoid excessive re-renders
-- **Status**: Evaluate when implementing thumbnail generation or generative UI features
+- **Status**: Evaluate when implementing generative UI features
 - **Reference**: https://prompt-kit.com/docs and `docs/prompt-kit-analysis.md`
 
 ### LLM Context Files
 
 - **Description**: prompt-kit provides `llms.txt` and `llms-full.txt` for AI-assisted development
 - **Purpose**: Gives AI assistants (Claude, Copilot, etc.) context about component APIs and usage patterns
-- **Potential for vid0**:
-  - Create `/public/llms.txt` documenting vid0's customized prompt-kit components
+- **Potential for Not A Wrapper**:
+  - Create `/public/llms.txt` documenting customized prompt-kit components
   - Include component customizations, upgrade notes, and usage examples
-  - Help AI assistants understand vid0-specific patterns vs upstream prompt-kit
+  - Help AI assistants understand project-specific patterns vs upstream prompt-kit
 - **Status**: Consider when AI-assisted development becomes a priority
 - **Reference**: https://prompt-kit.com/llms.txt
 

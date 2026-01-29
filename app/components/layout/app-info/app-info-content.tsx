@@ -2,12 +2,12 @@ export function AppInfoContent() {
   return (
     <div className="space-y-4">
       <p className="text-foreground leading-relaxed">
-        <span className="font-medium">vid0</span> is an AI-powered
-        assistant for YouTube creators.
+        <span className="font-medium">Not A Wrapper</span> is an open-source
+        multi-AI chat application.
         <br />
-        Get help with video ideas, titles, scripts, SEO, and growth strategies.
+        Access 100+ models from OpenAI, Claude, Gemini, Mistral, and more.
         <br />
-        Multi-model, BYOK-ready, and fully self-hostable.
+        Multi-model comparison, BYOK-ready, and fully self-hostable.
         <br />
       </p>
       <p className="text-foreground leading-relaxed">

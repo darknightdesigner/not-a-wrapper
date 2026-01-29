@@ -1,36 +1,38 @@
 ---
 allowed-tools: Read, Grep, Glob, WebSearch
-description: Analyze YouTube content for optimization insights
+description: Analyze content for insights and recommendations
 model: claude-sonnet-4-5-20250929
 ---
 
-Analyze the provided YouTube content (transcript, title, thumbnail description, or analytics) and provide actionable insights.
+Analyze the provided content (code, text, data, or document) and provide actionable insights.
 
 ## Analysis Types
 
-### Transcript Analysis
-- Extract key hooks and retention points
-- Identify strong/weak segments
-- Suggest script improvements
-- Find quotable moments for clips
+### Code Analysis
+- Review code quality and structure
+- Identify potential bugs or issues
+- Suggest performance improvements
+- Recommend best practices
+- Check for security concerns
 
-### Title/SEO Analysis
-- Evaluate click-through potential
-- Check keyword optimization
-- Suggest A/B test variants
-- Compare to successful patterns
-
-### Thumbnail Analysis (if image URL provided)
-- Evaluate visual hierarchy
-- Check text readability
+### Text/Document Analysis
+- Summarize key points
+- Evaluate clarity and structure
 - Suggest improvements
-- Recommend color/contrast adjustments
+- Check for consistency
+- Identify gaps or areas to expand
 
-### Analytics Interpretation
-- Identify performance trends
-- Benchmark against niche averages
-- Prioritize improvement areas
-- Provide actionable recommendations
+### Data Analysis
+- Identify patterns and trends
+- Highlight key metrics
+- Suggest visualizations
+- Provide data-driven recommendations
+
+### Research Analysis
+- Synthesize information
+- Compare perspectives
+- Identify gaps in research
+- Suggest follow-up questions
 
 ## Output Format
 

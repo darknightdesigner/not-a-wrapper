@@ -1,6 +1,6 @@
-# vid0
+# Not A Wrapper
 
-AI-powered chat platform for YouTube content creators. Data-driven recommendations for scripts, titles, and thumbnails.
+Open-source multi-AI chat application with unified model interface. Supports 100+ models across 8 providers with multi-model comparison, BYOK, and local model support.
 
 ## Tech Stack
 
@@ -10,19 +10,19 @@ AI-powered chat platform for YouTube content creators. Data-driven recommendatio
 | Database | Convex (reactive DB + built-in RAG) |
 | Auth | Clerk |
 | Payments | Flowglad |
-| AI | Vercel AI SDK → Claude Opus 4.5 (primary) |
+| AI | Vercel AI SDK → Multi-provider (OpenAI, Claude, Gemini, etc.) |
 | State | Zustand + TanStack Query |
 | UI | Shadcn/Radix + Tailwind 4 |
 
 ## Commands
 
 ```bash
-bun install           # Install deps
-bun run dev           # Dev server (:3000)
-bun run lint          # ESLint
-bun run typecheck     # tsc --noEmit
-bun run build         # Production build
-bun run test          # Vitest (critical paths)
+bun install # Install deps
+bun run dev # Dev server (:3000)
+bun run lint # ESLint
+bun run typecheck # tsc --noEmit
+bun run build # Production build
+bun run test # Vitest (critical paths)
 ```
 
 ## Development Workflow
@@ -46,19 +46,20 @@ See `docs/workflows.md` for complete workflow documentation.
 ## Directory Structure
 
 ```
-app/                  # Next.js App Router
-├── api/              # API routes (streaming)
-├── auth/             # Auth pages/actions
-├── components/chat/  # Chat UI
-└── (app)/            # Main routes
+app/ # Next.js App Router
+├── api/ # API routes (streaming)
+├── auth/ # Auth pages/actions
+├── components/chat/ # Chat UI
+└── (app)/ # Main routes
 
-lib/                  # Shared utilities
-├── chat-store/       # Chat state
-├── config.ts         # Constants
-└── openproviders/    # AI provider abstraction
+lib/ # Shared utilities
+├── chat-store/ # Chat state
+├── config.ts # Constants
+├── models/ # AI model definitions
+└── openproviders/ # AI provider abstraction
 
-components/           # Shadcn UI components
-convex/               # Convex DB schema & functions
+components/ # Shadcn UI components
+convex/ # Convex DB schema & functions
 ```
 
 ## Gold Standard Examples
@@ -111,18 +112,13 @@ Follow these patterns when creating new code:
 
 **Never log:** OAuth tokens, API keys, credentials, session tokens
 
-**Encrypt at rest:** OAuth refresh tokens, user-provided keys
+**Encrypt at rest:** User-provided API keys (BYOK)
 
 ## Testing Strategy
 
-Critical paths only: auth flows, OAuth handling, message persistence, rate limiting, transcripts.
+Critical paths only: auth flows, OAuth handling, message persistence, rate limiting.
 
 Skip: UI rendering tests, animations, AI response quality.
-
-## YouTube Integration <!-- TODO -->
-
-- **MVP:** YouTube Data API v3 (public data, 10K units/day)
-- **Phase 2:** YouTube Analytics API (creator metrics, OAuth)
 
 ## Environment Variables
 

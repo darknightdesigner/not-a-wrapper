@@ -82,7 +82,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
               Thank you for your time!
             </p>
             <p className="text-muted-foreground text-sm">
-              Your feedback makes vid0 better.
+              Your feedback makes Not A Wrapper better.
             </p>
           </motion.div>
         ) : (
@@ -108,7 +108,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
               }}
               className="text-muted-foreground pointer-events-none absolute top-3.5 left-4 text-sm leading-[1.4] select-none"
             >
-              What would make vid0 better for you?
+              What would make Not A Wrapper better for you?
             </motion.span>
             <textarea
               className="text-foreground h-full w-full resize-none rounded-md bg-transparent px-4 py-3.5 text-sm outline-hidden"

@@ -64,7 +64,7 @@ const formatted = formatNote(note)
 
 ## Sub-Agent Architecture
 
-Multi-agent system for YouTube content analysis:
+Multi-agent system for specialized task handling:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -75,9 +75,9 @@ Multi-agent system for YouTube content analysis:
         ┌─────────────┼─────────────┬─────────────┐
         ▼             ▼             ▼             ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│  TRANSCRIPT   │ │   TITLE/SEO   │ │  THUMBNAIL    │ │  ANALYTICS    │
-│   ANALYZER    │ │   OPTIMIZER   │ │   ADVISOR     │ │  INTERPRETER  │
-│  (Haiku 4.5)  │ │ (Sonnet 4.5)  │ │(Sonnet+Vision)│ │ (Sonnet 4.5)  │
+│     CODE      │ │   WRITING     │ │   RESEARCH    │ │     DATA      │
+│   ASSISTANT   │ │    EDITOR     │ │   ANALYST     │ │   ANALYST     │
+│  (Haiku 4.5)  │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │
 └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
@@ -86,8 +86,8 @@ Multi-agent system for YouTube content analysis:
 ```typescript
 import { classifyTask } from '@/lib/ai'
 
-const result = classifyTask("Generate titles for my gaming video")
-// { type: 'title-optimizer', confidence: 0.8, parameters: {} }
+const result = classifyTask("Help me debug this React component")
+// { type: 'code-assistant', confidence: 0.8, parameters: {} }
 ```
 
 ### Orchestrator Usage
@@ -97,7 +97,7 @@ import { createOrchestrator } from '@/lib/ai'
 
 const orchestrator = createOrchestrator()
 const result = await orchestrator.process({
-  userRequest: "Analyze this transcript and find the best hooks"
+  userRequest: "Help me write documentation for this function"
 })
 ```
 

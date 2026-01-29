@@ -5,10 +5,10 @@
  * based on task classification. Implements Anthropic's sub-agent pattern
  * to prevent context pollution and optimize token usage.
  *
- * @see AI_CONTEXT_SETUP_GUIDE.md - Sub-Agent Architecture section
+ * @see CLAUDE.md - Sub-Agent Architecture section
  * @see docs/agents-research.md - Implementation rationale
  *
- * TODO: Implement after Convex migration is complete
+ * TODO: Implement after core features are stable
  * TODO: Add streaming support for real-time responses
  */
 
@@ -27,77 +27,76 @@ import type {
 // ============================================================================
 
 /**
- * Default sub-agent configurations for YouTube content analysis.
+ * Default sub-agent configurations for general-purpose assistance.
  *
  * Model selection rationale:
- * - Haiku: Fast, cheap for transcript processing
- * - Sonnet: Balanced for SEO/analytics tasks
- * - Sonnet + Vision: Required for thumbnail analysis
+ * - Haiku: Fast, cheap for simple coding tasks
+ * - Sonnet: Balanced for writing, research, data analysis
  */
 export const DEFAULT_SUB_AGENT_CONFIGS: Record<SubAgentType, SubAgentConfig> = {
-  "transcript-analyzer": {
-    type: "transcript-analyzer",
-    name: "Transcript Analyzer",
+  "code-assistant": {
+    type: "code-assistant",
+    name: "Code Assistant",
     model: "claude-haiku-4-5-20250929",
-    systemPrompt: `You are a YouTube transcript analyzer. Your job is to:
-- Summarize video content concisely
-- Extract key points and hooks
-- Identify strong and weak retention segments
-- Find quotable moments for clips/shorts
-- Suggest script improvements
+    systemPrompt: `You are an expert programming assistant. Your job is to:
+- Help write, debug, and optimize code
+- Explain programming concepts clearly
+- Review code for issues and improvements
+- Suggest best practices and patterns
+- Help with documentation
 
-Focus on actionable insights that help creators improve their content.`,
+Focus on clean, maintainable, and efficient code. Consider edge cases and error handling.`,
     maxTokens: 4096,
     temperature: 0.3,
     tools: ["search", "read"],
   },
 
-  "title-optimizer": {
-    type: "title-optimizer",
-    name: "Title/SEO Optimizer",
+  "writing-editor": {
+    type: "writing-editor",
+    name: "Writing Editor",
     model: "claude-sonnet-4-5-20250929",
-    systemPrompt: `You are a YouTube title and SEO optimizer. Your job is to:
-- Generate click-worthy titles that deliver on promises
-- Create SEO-optimized tags and descriptions
-- Suggest A/B test variants
-- Analyze keyword opportunities
-- Balance clickability with accuracy (no misleading clickbait)
+    systemPrompt: `You are a skilled writing editor and content creator. Your job is to:
+- Help write compelling and clear content
+- Edit and improve existing text
+- Adapt tone and style for different audiences
+- Ensure proper grammar, spelling, and structure
+- Create outlines and drafts
 
-Consider the creator's niche, target audience, and current trends.`,
-    maxTokens: 2048,
+Focus on clarity, engagement, and meeting the user's goals for the content.`,
+    maxTokens: 4096,
     temperature: 0.7,
     tools: ["search"],
   },
 
-  "thumbnail-advisor": {
-    type: "thumbnail-advisor",
-    name: "Thumbnail Advisor",
-    model: "claude-sonnet-4-5-20250929", // Uses vision capabilities
-    systemPrompt: `You are a YouTube thumbnail design advisor. Your job is to:
-- Analyze thumbnail visual hierarchy
-- Evaluate text readability and placement
-- Assess color contrast and emotional impact
-- Suggest specific improvements
-- Compare against successful thumbnails in the niche
+  "research-analyst": {
+    type: "research-analyst",
+    name: "Research Analyst",
+    model: "claude-sonnet-4-5-20250929",
+    systemPrompt: `You are a thorough research analyst. Your job is to:
+- Research topics comprehensively
+- Synthesize information from multiple perspectives
+- Identify key insights and patterns
+- Provide balanced, well-sourced analysis
+- Highlight limitations and uncertainties
 
-Focus on CTR optimization while maintaining brand consistency.`,
-    maxTokens: 2048,
+Focus on accuracy, depth, and providing actionable insights.`,
+    maxTokens: 4096,
     temperature: 0.5,
-    tools: ["vision"],
+    tools: ["search", "web"],
   },
 
-  "analytics-interpreter": {
-    type: "analytics-interpreter",
-    name: "Analytics Interpreter",
+  "data-analyst": {
+    type: "data-analyst",
+    name: "Data Analyst",
     model: "claude-sonnet-4-5-20250929",
-    systemPrompt: `You are a YouTube analytics interpreter. Your job is to:
-- Explain metrics in plain language
-- Identify trends and patterns
-- Benchmark against niche averages
-- Prioritize improvement areas
-- Provide actionable recommendations
+    systemPrompt: `You are an expert data analyst. Your job is to:
+- Analyze datasets and identify patterns
+- Explain metrics and trends in plain language
+- Provide data-driven recommendations
+- Suggest visualizations and presentations
+- Help with statistical analysis
 
-Focus on insights that lead to tangible growth, not vanity metrics.`,
+Focus on actionable insights and clear communication of findings.`,
     maxTokens: 3072,
     temperature: 0.4,
     tools: ["calculate"],
@@ -115,41 +114,62 @@ Focus on insights that lead to tangible growth, not vanity metrics.`,
  * TODO: Replace with LLM-based classification for better accuracy
  */
 const TASK_KEYWORDS: Record<SubAgentType, string[]> = {
-  "transcript-analyzer": [
-    "transcript",
-    "video content",
-    "summarize",
-    "hook",
-    "retention",
-    "script",
-    "clip",
-    "short",
+  "code-assistant": [
+    "code",
+    "program",
+    "function",
+    "bug",
+    "debug",
+    "error",
+    "implement",
+    "algorithm",
+    "api",
+    "database",
+    "javascript",
+    "python",
+    "typescript",
+    "react",
+    "sql",
   ],
-  "title-optimizer": [
-    "title",
-    "seo",
-    "tag",
-    "keyword",
-    "description",
-    "clickbait",
-    "a/b test",
+  "writing-editor": [
+    "write",
+    "edit",
+    "draft",
+    "blog",
+    "article",
+    "email",
+    "content",
+    "copy",
+    "document",
+    "proofread",
+    "grammar",
+    "tone",
   ],
-  "thumbnail-advisor": [
-    "thumbnail",
-    "image",
-    "visual",
-    "design",
-    "ctr",
-    "click-through",
+  "research-analyst": [
+    "research",
+    "analyze",
+    "compare",
+    "evaluate",
+    "investigate",
+    "study",
+    "review",
+    "explore",
+    "learn about",
+    "what is",
+    "how does",
   ],
-  "analytics-interpreter": [
-    "analytics",
+  "data-analyst": [
+    "data",
     "metrics",
-    "views",
-    "watch time",
-    "retention",
-    "subscribers",
-    "performance",
+    "statistics",
+    "chart",
+    "graph",
+    "trend",
+    "analysis",
+    "dashboard",
+    "csv",
+    "spreadsheet",
+    "numbers",
   ],
 }
 
@@ -166,10 +186,10 @@ export function classifyTask(userRequest: string): TaskClassification {
   const lowerRequest = userRequest.toLowerCase()
 
   const scores: Record<SubAgentType, number> = {
-    "transcript-analyzer": 0,
-    "title-optimizer": 0,
-    "thumbnail-advisor": 0,
-    "analytics-interpreter": 0,
+    "code-assistant": 0,
+    "writing-editor": 0,
+    "research-analyst": 0,
+    "data-analyst": 0,
   }
 
   // Simple keyword scoring
@@ -217,7 +237,7 @@ export function classifyTask(userRequest: string): TaskClassification {
  * @param config - Orchestrator configuration
  * @returns Orchestrator instance
  *
- * TODO: Implement actual API calls after Convex migration
+ * TODO: Implement actual API calls
  */
 export function createOrchestrator(
   config: Partial<OrchestratorConfig> = {}
@@ -341,7 +361,7 @@ class Orchestrator {
       tokenUsage: { input: 0, output: 0, total: 0 },
       data: {
         message: `[Placeholder] ${agentConfig.name} response not yet implemented.`,
-        note: "Implement after Convex migration. See lib/ai/sub-agents/types.ts for response structures.",
+        note: "Implement when sub-agent architecture is ready. See lib/ai/sub-agents/types.ts for response structures.",
       },
     }
   }
@@ -351,7 +371,7 @@ class Orchestrator {
    */
   private synthesizeResponse(result: SubAgentResponse): string {
     if (!result.success) {
-      return `I encountered an error while analyzing your request: ${result.error}`
+      return `I encountered an error while processing your request: ${result.error}`
     }
 
     // TODO: Use LLM to synthesize natural language response

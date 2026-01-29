@@ -7,7 +7,7 @@ export const addUTM = (url: string) => {
       return url // Return original URL for non-http(s) URLs
     }
 
-    u.searchParams.set("utm_source", "vid0.chat")
+    u.searchParams.set("utm_source", "not-a-wrapper.com")
     u.searchParams.set("utm_medium", "research")
     return u.toString()
   } catch {

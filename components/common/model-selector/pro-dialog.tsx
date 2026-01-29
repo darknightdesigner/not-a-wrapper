@@ -62,7 +62,7 @@ export function ProModelDialog({
       <div className="flex-grow overflow-y-auto">
         <div className="px-6 py-4">
           <p className="text-muted-foreground">
-            To use it, connect your own API key. vid0 supports BYOK via{" "}
+            To use it, connect your own API key. Not A Wrapper supports BYOK via{" "}
             <span className="text-primary inline-flex font-medium">
               OpenRouter
             </span>

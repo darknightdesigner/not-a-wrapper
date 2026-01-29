@@ -1,6 +1,6 @@
 # Auth Module — Claude Context
 
-This directory handles authentication for vid0.
+This directory handles authentication for Not A Wrapper.
 
 > ✅ **Migration Complete**: Using Clerk for authentication with native Convex integration.
 
@@ -112,4 +112,3 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
 
 - User data is synced from Clerk to Convex via webhooks
 - JWT tokens are validated by Convex using Clerk's issuer domain
-- YouTube OAuth for analytics is planned for Phase 2

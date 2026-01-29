@@ -1,12 +1,12 @@
 # Project Specification
 
-vid0 — AI-powered platform for YouTube content creators.
+Not A Wrapper — Open-source multi-AI chat application with unified model interface.
 
 ---
 
 ## Product Vision
 
-Help YouTube creators make data-driven decisions about their content through AI-powered analysis of transcripts, titles, thumbnails, and analytics.
+Provide a powerful, self-hostable AI chat interface that lets users interact with any AI model through a unified experience, with support for multi-model comparison, BYOK, and local models.
 
 ---
 
@@ -19,19 +19,22 @@ Help YouTube creators make data-driven decisions about their content through AI-
 - [x] Multi-model AI chat (Vercel AI SDK)
 - [x] Chat history persistence
 - [x] Streaming responses
-- [ ] Migrate to Convex database
+- [x] Convex database integration
+- [x] Multi-model comparison (side-by-side)
+- [x] BYOK (Bring Your Own Key) support
+- [x] Ollama local model integration
 
-#### Phase 2: YouTube Integration
-- [ ] YouTube Data API v3 integration
-- [ ] Video metadata retrieval
-- [ ] Transcript extraction and analysis
-- [ ] Competitor analysis tools
+#### Phase 2: Enhanced Features
+- [ ] Model performance analytics
+- [ ] Response quality comparison tools
+- [ ] Smart model routing (cost/speed optimization)
+- [ ] Model chains and workflows
 
-#### Phase 3: Creator Tools
-- [ ] Title generation and A/B testing suggestions
-- [ ] Thumbnail analysis (vision model)
-- [ ] Script improvement recommendations
-- [ ] Analytics interpretation
+#### Phase 3: Advanced Capabilities
+- [ ] Custom system prompts per model
+- [ ] Conversation branching
+- [ ] Export/import conversations
+- [ ] API access for developers
 
 #### Phase 4: Monetization
 - [ ] Flowglad payment integration
@@ -53,7 +56,7 @@ Help YouTube creators make data-driven decisions about their content through AI-
 
 ### Database: Convex
 
-**Decision**: Migrate from Supabase to Convex
+**Decision**: Use Convex for real-time data
 
 **Rationale**:
 - Built-in RAG and vector search for AI memory
@@ -74,7 +77,7 @@ Help YouTube creators make data-driven decisions about their content through AI-
 **Rationale**:
 - Pre-built UI components
 - Native integrations: Convex, Flowglad
-- Handles OAuth complexity (for YouTube API later)
+- Handles OAuth complexity
 - Good free tier for MVP
 
 ### AI: Multi-Provider via Vercel AI SDK
@@ -91,7 +94,7 @@ Help YouTube creators make data-driven decisions about their content through AI-
 |----------|-------|--------|
 | Primary chat | Claude Opus 4.5 | Best reasoning, 1M context |
 | Fast tasks | Claude Haiku 4.5 | Speed, cost efficiency |
-| Vision (thumbnails) | Claude Sonnet 4.5 | Good balance, vision support |
+| Vision tasks | Claude Sonnet 4.5 | Good balance, vision support |
 
 ### Payments: Flowglad
 
@@ -101,16 +104,16 @@ Help YouTube creators make data-driven decisions about their content through AI-
 - Open-source
 - Native Clerk integration
 - Better DX for subscription management
-- Growing ecosystem
+- Designed for AI usage-based billing
 
 ---
 
 ## Data Models
 
-### Core Entities (Post-Convex Migration)
+### Core Entities
 
 ```typescript
-// convex/schema.ts (TODO: Create after Convex setup)
+// convex/schema.ts
 
 // User - Managed by Clerk, synced to Convex
 interface User {
@@ -126,6 +129,7 @@ interface Chat {
   _id: Id<"chats">
   userId: string
   title: string
+  model?: string
   createdAt: number
   updatedAt: number
 }
@@ -141,14 +145,13 @@ interface Message {
   createdAt: number
 }
 
-// YouTubeVideo (Phase 2)
-interface YouTubeVideo {
-  _id: Id<"videos">
-  videoId: string  // YouTube video ID
-  title: string
-  channelId: string
-  transcript?: string
-  analyzedAt?: number
+// UserKeys (BYOK)
+interface UserKey {
+  _id: Id<"userKeys">
+  userId: string
+  provider: string
+  encryptedKey: string
+  createdAt: number
 }
 ```
 
@@ -157,7 +160,7 @@ interface YouTubeVideo {
 ```
 User (1) ──→ (n) Chat
 Chat (1) ──→ (n) Message
-User (1) ──→ (n) YouTubeVideo (saved analyses)
+User (1) ──→ (n) UserKey
 ```
 
 ---
@@ -176,7 +179,7 @@ Stream a chat completion.
     role: "user" | "assistant" | "system"
     content: string
   }>
-  model?: string  // Default: claude-opus-4.5
+  model?: string  // Default: gpt-4.1-nano
   chatId?: string // For persistence
 }
 ```
@@ -195,35 +198,6 @@ Get user's chat history.
     lastMessage: string
     updatedAt: string
   }>
-}
-```
-
-### YouTube API (Phase 2)
-
-#### POST /api/youtube/analyze
-Analyze a YouTube video.
-
-**Request**:
-```typescript
-{
-  videoId: string  // or URL
-  analysisType: "transcript" | "metadata" | "full"
-}
-```
-
-**Response**:
-```typescript
-{
-  video: {
-    title: string
-    description: string
-    transcript?: string
-  }
-  analysis: {
-    summary: string
-    hooks: string[]
-    suggestions: string[]
-  }
 }
 ```
 
@@ -253,15 +227,15 @@ Analyze a YouTube video.
 
 ## Success Criteria
 
-### MVP (Phase 1-2)
-- [ ] Users can sign up and chat with AI
-- [ ] Chat history persists across sessions
-- [ ] Basic YouTube video analysis works
-- [ ] Response time < 500ms to first token
+### MVP (Phase 1)
+- [x] Users can sign up and chat with AI
+- [x] Chat history persists across sessions
+- [x] Multiple AI models available
+- [x] Response time < 500ms to first token
 
-### Product-Market Fit (Phase 3-4)
+### Growth (Phase 2-3)
 - [ ] 1,000 active users
-- [ ] 10% free-to-paid conversion
+- [ ] Multi-model comparison feature adoption
 - [ ] < 5% monthly churn
 - [ ] NPS > 40
 
@@ -269,12 +243,10 @@ Analyze a YouTube video.
 
 ## Open Questions
 
-<!-- Capture questions that need answers -->
-
-1. **Quota management**: How to handle YouTube API quota limits (10K/day)?
-2. **Caching strategy**: Cache video transcripts? For how long?
+1. **Model routing**: How to automatically select best model for task?
+2. **Caching strategy**: Cache responses for identical prompts?
 3. **Privacy**: How long to retain user chat data?
-4. **International**: Support for non-English transcripts?
+4. **International**: Multi-language UI support timeline?
 
 ---
 

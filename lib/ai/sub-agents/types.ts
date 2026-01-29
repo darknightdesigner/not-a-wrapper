@@ -4,7 +4,7 @@
  * Defines the type system for the multi-agent architecture
  * used to delegate specialized tasks to purpose-built agents.
  *
- * @see AI_CONTEXT_SETUP_GUIDE.md - Sub-Agent Architecture section
+ * @see CLAUDE.md - Sub-Agent Architecture section
  * @see docs/agents-research.md - Detailed research on sub-agent patterns
  */
 
@@ -13,13 +13,13 @@
 // ============================================================================
 
 /**
- * Available sub-agent types for YouTube content analysis
+ * Available sub-agent types for task specialization
  */
 export type SubAgentType =
-  | "transcript-analyzer"
-  | "title-optimizer"
-  | "thumbnail-advisor"
-  | "analytics-interpreter"
+  | "code-assistant"
+  | "writing-editor"
+  | "research-analyst"
+  | "data-analyst"
 
 /**
  * Claude model identifiers for different agent tiers
@@ -91,7 +91,7 @@ export interface SubAgentTaskInput {
  * Attachment types supported by sub-agents
  */
 export interface SubAgentAttachment {
-  type: "transcript" | "image" | "analytics" | "text"
+  type: "code" | "document" | "data" | "image" | "text"
   content: string
   mimeType?: string
   metadata?: Record<string, unknown>
@@ -102,68 +102,46 @@ export interface SubAgentAttachment {
 // ============================================================================
 
 /**
- * Input for transcript analysis tasks
+ * Input for code assistance tasks
  */
-export interface TranscriptAnalysisInput extends SubAgentTaskInput {
-  transcript: string
-  videoMetadata?: {
-    title?: string
-    duration?: number
-    publishDate?: string
+export interface CodeAssistanceInput extends SubAgentTaskInput {
+  code?: string
+  language?: string
+  context?: {
+    fileName?: string
+    projectType?: string
+    framework?: string
   }
 }
 
 /**
- * Input for title/SEO optimization tasks
+ * Input for writing/editing tasks
  */
-export interface TitleOptimizationInput extends SubAgentTaskInput {
-  topic: string
-  keywords?: string[]
-  niche?: string
-  currentTitle?: string
-  competitorTitles?: string[]
-}
-
-/**
- * Input for thumbnail analysis tasks
- */
-export interface ThumbnailAnalysisInput extends SubAgentTaskInput {
-  imageUrl?: string
-  imageBase64?: string
-  thumbnailDescription?: string
+export interface WritingEditInput extends SubAgentTaskInput {
+  content?: string
+  style?: "formal" | "casual" | "technical" | "creative"
+  purpose?: "blog" | "documentation" | "email" | "social" | "other"
   targetAudience?: string
 }
 
 /**
- * Input for analytics interpretation tasks
+ * Input for research tasks
  */
-export interface AnalyticsInterpretationInput extends SubAgentTaskInput {
-  metrics: AnalyticsMetrics
-  dateRange?: {
-    start: string
-    end: string
-  }
-  benchmarks?: Record<string, number>
+export interface ResearchInput extends SubAgentTaskInput {
+  topic: string
+  depth?: "overview" | "detailed" | "comprehensive"
+  sources?: string[]
+  constraints?: string[]
 }
 
 /**
- * YouTube Analytics metrics structure
+ * Input for data analysis tasks
  */
-export interface AnalyticsMetrics {
-  views?: number
-  watchTime?: number
-  averageViewDuration?: number
-  averagePercentageViewed?: number
-  subscribersGained?: number
-  subscribersLost?: number
-  likes?: number
-  comments?: number
-  shares?: number
-  impressions?: number
-  clickThroughRate?: number
-  uniqueViewers?: number
-  returningViewers?: number
-  [key: string]: number | undefined
+export interface DataAnalysisInput extends SubAgentTaskInput {
+  data?: string
+  dataType?: "csv" | "json" | "table" | "text"
+  analysisType?: "summary" | "trends" | "comparison" | "prediction"
+  metrics?: string[]
 }
 
 // ============================================================================
@@ -198,71 +176,63 @@ export interface SubAgentResponse<T = unknown> {
 }
 
 /**
- * Transcript analysis response
+ * Code assistance response
  */
-export interface TranscriptAnalysisResponse {
-  summary: string
-  keyPoints: string[]
-  hooks: {
-    timestamp: string
-    text: string
-    strength: "strong" | "medium" | "weak"
+export interface CodeAssistanceResponse {
+  code?: string
+  explanation: string
+  suggestions?: string[]
+  issues?: {
+    severity: "error" | "warning" | "info"
+    message: string
+    line?: number
   }[]
-  retentionAnalysis: {
-    strongSegments: { start: string; end: string; reason: string }[]
-    weakSegments: { start: string; end: string; suggestion: string }[]
-  }
-  quotableClips: string[]
-  improvements: string[]
+  documentation?: string
 }
 
 /**
- * Title optimization response
+ * Writing/editing response
  */
-export interface TitleOptimizationResponse {
-  titles: {
+export interface WritingEditResponse {
+  content: string
+  changes?: {
+    original: string
+    revised: string
+    reason: string
+  }[]
+  suggestions?: string[]
+  readabilityScore?: number
+}
+
+/**
+ * Research response
+ */
+export interface ResearchResponse {
+  summary: string
+  keyFindings: string[]
+  sources?: {
     title: string
-    score: number
-    reasoning: string
+    url?: string
+    relevance: string
   }[]
-  tags: string[]
-  description: string
-  seoInsights: string[]
+  recommendations?: string[]
+  limitations?: string[]
 }
 
 /**
- * Thumbnail analysis response
+ * Data analysis response
  */
-export interface ThumbnailAnalysisResponse {
-  overallScore: number
-  analysis: {
-    visualHierarchy: { score: number; feedback: string }
-    textReadability: { score: number; feedback: string }
-    colorContrast: { score: number; feedback: string }
-    emotionalImpact: { score: number; feedback: string }
-  }
-  improvements: string[]
-  competitorComparison?: string
-}
-
-/**
- * Analytics interpretation response
- */
-export interface AnalyticsInterpretationResponse {
+export interface DataAnalysisResponse {
   summary: string
-  keyInsights: string[]
-  trends: {
+  insights: string[]
+  trends?: {
     metric: string
     direction: "up" | "down" | "stable"
-    change: number
+    change?: number
     significance: string
   }[]
-  recommendations: {
-    priority: "high" | "medium" | "low"
-    action: string
-    expectedImpact: string
-  }[]
-  benchmarkComparison?: string
+  recommendations?: string[]
+  visualizationSuggestions?: string[]
 }
 
 // ============================================================================

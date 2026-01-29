@@ -1,38 +1,29 @@
-# vid0
+# Not A Wrapper
 
-**vid0** is an AI-powered chat assistant designed to help YouTube creators make better videos. Get help with video ideas, titles, descriptions, scripts, SEO optimization, thumbnail concepts, and more.
+**Not A Wrapper** is an open-source, Next.js-based AI chat application that provides a unified interface for multiple models, including OpenAI, Mistral, Claude, and Gemini. It supports BYOK (Bring Your Own Key) via OpenRouter, offers file uploads, and features a responsive UI with light/dark themes.
 
-Built on top of [Zola](https://github.com/ibelick/zola), the open-source chat interface.
+Forked from [Zola](https://github.com/ibelick/zola) and updated with state-of-the-art technologies like Convex and Flowglad.
 
 ## Features
 
-- 🎬 **YouTube-focused AI assistance** - Get help with every aspect of your YouTube content
-- 🤖 **Multi-model support** - OpenAI, Claude, Gemini, Mistral, Ollama (local models)
-- 🔑 **Bring your own API key (BYOK)** - Use your own keys via OpenRouter
-- 📎 **File uploads** - Share scripts, thumbnails, and more for AI feedback
+- 🤖 **Multi-model support** - OpenAI, Claude, Gemini, Mistral, Perplexity, xAI, and 100+ models
+- 🔄 **Multi-model comparison** - Send the same prompt to multiple models and compare responses side-by-side
+- 🔑 **Bring your own API key (BYOK)** - Use your own keys via OpenRouter or direct provider APIs
+- 📎 **File uploads** - Share documents, images, and code for AI analysis
 - 🎨 **Clean, responsive UI** - Light/dark themes with modern design
 - 🏠 **Self-hostable** - Full control over your data
 - ⚙️ **Customizable** - User system prompts, multiple layout options
 - 🖥️ **Local AI with Ollama** - Run models locally with automatic detection
+- 💳 **Usage-based billing ready** - Flowglad integration for AI usage metering
 - 🔌 **MCP support** (work in progress)
-
-## What Can vid0 Help With?
-
-- **Video Ideas** - Brainstorm content ideas based on your niche and audience
-- **Titles & Thumbnails** - Craft click-worthy titles and thumbnail concepts
-- **Scripts & Outlines** - Structure your videos for maximum engagement
-- **SEO Optimization** - Improve descriptions, tags, and discoverability
-- **Content Strategy** - Plan your upload schedule and content calendar
-- **Audience Growth** - Get tips on community building and engagement
-- **Analytics Insights** - Understand what's working and what to improve
 
 ## Quick Start
 
 ### Option 1: With OpenAI (Cloud)
 
 ```bash
-git clone https://github.com/batmn-dev/vid0.git
-cd vid0
+git clone https://github.com/your-username/not-a-wrapper.git
+cd not-a-wrapper
 bun install
 echo "OPENAI_API_KEY=your-key" > .env.local
 bun dev
@@ -45,33 +36,47 @@ bun dev
 curl -fsSL https://ollama.ai/install.sh | sh
 ollama pull llama3.2  # or any model you prefer
 
-# Clone and run vid0
-git clone https://github.com/batmn-dev/vid0.git
-cd vid0
+# Clone and run
+git clone https://github.com/your-username/not-a-wrapper.git
+cd not-a-wrapper
 bun install
 bun dev
 ```
 
-vid0 will automatically detect your local Ollama models!
+Not A Wrapper will automatically detect your local Ollama models!
 
 ### Option 3: Docker with Ollama
 
 ```bash
-git clone https://github.com/batmn-dev/vid0.git
-cd vid0
+git clone https://github.com/your-username/not-a-wrapper.git
+cd not-a-wrapper
 docker-compose -f docker-compose.ollama.yml up
 ```
 
 To unlock features like auth, file uploads, see [INSTALL.md](./INSTALL.md).
 
+## Supported AI Providers
+
+| Provider | Models | Features |
+|----------|--------|----------|
+| **OpenAI** | GPT-4.1, GPT-4o, O1, O3-mini | Vision, Tools |
+| **Anthropic** | Claude 3.5/3.7 Sonnet, Claude 3 Opus | Extended context, Vision |
+| **Google** | Gemini 2.0 Flash, Gemini 1.5/2.5 Pro | Vision, Multimodal |
+| **Mistral** | Mistral Large, Pixtral, Mixtral | Vision |
+| **xAI** | Grok-3, Grok-2 Vision | Vision |
+| **Perplexity** | Sonar Pro, Deep Research | Web search |
+| **Ollama** | Any local model | Local, Private |
+| **OpenRouter** | 100+ models | Aggregator |
+
 ## Built With
 
-- [prompt-kit](https://prompt-kit.com/) — AI components
-- [shadcn/ui](https://ui.shadcn.com) — core components
-- [motion-primitives](https://motion-primitives.com) — animated components
-- [vercel ai sdk](https://vercel.com/blog/introducing-the-vercel-ai-sdk) — model integration, AI features
-- [convex](https://convex.dev) — real-time database
-- [clerk](https://clerk.com) — authentication
+- [Next.js 16](https://nextjs.org/) — React framework with App Router
+- [Convex](https://convex.dev) — Real-time database with built-in RAG
+- [Clerk](https://clerk.com) — Authentication
+- [Vercel AI SDK](https://sdk.vercel.ai/) — Model integration
+- [Flowglad](https://flowglad.com) — Usage-based payments
+- [Shadcn/ui](https://ui.shadcn.com) — UI components
+- [Motion Primitives](https://motion-primitives.com) — Animations
 
 ## Based On
 
