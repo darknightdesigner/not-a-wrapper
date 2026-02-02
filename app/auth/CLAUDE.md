@@ -112,3 +112,4 @@ NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/
 
 - User data is synced from Clerk to Convex via webhooks
 - JWT tokens are validated by Convex using Clerk's issuer domain
+- YouTube OAuth integration is planned for future analytics features

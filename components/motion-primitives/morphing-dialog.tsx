@@ -1,7 +1,8 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import {
   AnimatePresence,
   motion,
@@ -410,7 +411,7 @@ function MorphingDialogClose({
       exit="exit"
       variants={variants}
     >
-      {children || <X size={24} />}
+      {children || <HugeiconsIcon icon={Cancel01Icon} size={24} />}
     </motion.button>
   )
 }

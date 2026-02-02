@@ -1,6 +1,11 @@
 "use client"
 
-import { CheckCircle, Info, Warning } from "@phosphor-icons/react/dist/ssr"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  CheckmarkCircle01Icon,
+  InformationCircleIcon,
+  Alert01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { toast as sonnerToast } from "sonner"
 import { Button } from "./button"
 
@@ -20,13 +25,13 @@ function Toast({ title, description, button, id, status }: ToastProps) {
     <div className="border-input bg-popover flex items-center overflow-hidden rounded-xl border p-4 shadow-xs backdrop-blur-xl">
       <div className="flex flex-1 items-center">
         {status === "error" ? (
-          <Warning className="text-primary mr-3 size-4" />
+          <HugeiconsIcon icon={Alert01Icon} size={16} className="text-primary mr-3" />
         ) : null}
         {status === "info" ? (
-          <Info className="text-primary mr-3 size-4" />
+          <HugeiconsIcon icon={InformationCircleIcon} size={16} className="text-primary mr-3" />
         ) : null}
         {status === "success" ? (
-          <CheckCircle className="text-primary mr-3 size-4" />
+          <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-primary mr-3" />
         ) : null}
         <div className="w-full">
           <p className="text-foreground text-sm font-medium">{title}</p>

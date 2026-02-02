@@ -16,12 +16,19 @@ export async function syncRecentMessages(
     const updated = [...prev]
     let changed = false
 
+    // Track which local indices have been updated to avoid assigning
+    // the same DB ID to multiple local messages
+    const updatedIndices = new Set<number>()
+
     // Pair from the end; for each DB message (last to first),
     for (let d = lastFromDb.length - 1; d >= 0; d--) {
       const dbMsg = lastFromDb[d]
       const dbRole = dbMsg.role
 
       for (let i = updated.length - 1; i >= 0; i--) {
+        // Skip indices that have already been updated
+        if (updatedIndices.has(i)) continue
+
         const local = updated[i]
         if (local.role !== dbRole) continue
 
@@ -33,6 +40,7 @@ export async function syncRecentMessages(
           }
           changed = true
         }
+        updatedIndices.add(i)
         break
       }
     }

@@ -4,12 +4,13 @@ import { useModel } from "@/lib/model-store/provider"
 import { ModelConfig } from "@/lib/models/types"
 import { PROVIDERS } from "@/lib/providers"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  DotsSixVerticalIcon,
-  MinusIcon,
-  PlusIcon,
+  DragDropVerticalIcon,
+  MinusSignIcon,
+  Add01Icon,
   StarIcon,
-} from "@phosphor-icons/react"
+} from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion, Reorder } from "framer-motion"
 import { useMemo, useState } from "react"
 import { useFavoriteModels } from "./use-favorite-models"
@@ -144,7 +145,7 @@ export function ModelsSettings() {
                     <div className="border-border flex items-center gap-3 rounded-lg border bg-transparent p-3">
                       {/* Drag Handle */}
                       <div className="text-muted-foreground cursor-grab opacity-60 transition-opacity group-hover:opacity-100 active:cursor-grabbing">
-                        <DotsSixVerticalIcon className="size-4" />
+                        <HugeiconsIcon icon={DragDropVerticalIcon} size={16} />
                       </div>
 
                       {/* Provider Icon */}
@@ -181,7 +182,7 @@ export function ModelsSettings() {
                             : "Remove from favorites"
                         }
                       >
-                        <MinusIcon className="size-4" />
+                        <HugeiconsIcon icon={MinusSignIcon} size={16} />
                       </button>
                     </div>
                   </Reorder.Item>
@@ -195,7 +196,7 @@ export function ModelsSettings() {
               className="border-border text-muted-foreground flex h-32 items-center justify-center rounded-lg border-2 border-dashed"
             >
               <div className="text-center">
-                <StarIcon className="mx-auto mb-2 size-8 opacity-50" />
+                <HugeiconsIcon icon={StarIcon} size={32} className="mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No favorite models yet</p>
                 <p className="text-xs">Add models from the list below</p>
               </div>
@@ -274,7 +275,7 @@ export function ModelsSettings() {
                             className="text-muted-foreground hover:text-foreground border-border rounded-md border p-1 transition-colors"
                             title="Add to favorites"
                           >
-                            <PlusIcon className="size-4" />
+                            <HugeiconsIcon icon={Add01Icon} size={16} />
                           </button>
                         </motion.div>
                       )

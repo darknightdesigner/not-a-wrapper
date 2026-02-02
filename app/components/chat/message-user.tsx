@@ -19,12 +19,13 @@ import { toast } from "@/components/ui/toast"
 import { isConvexId } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
 import { Message as MessageType } from "@ai-sdk/react"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Check,
-  Copy,
-  PencilSimpleIcon,
-  PencilSimpleSlashIcon,
-} from "@phosphor-icons/react"
+  Tick02Icon,
+  Copy01Icon,
+  PencilEdit01Icon,
+  PencilEdit02Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
 
@@ -222,10 +223,10 @@ export function MessageUser({
             onClick={copyToClipboard}
             type="button"
           >
-            {copied ? (
-              <Check className="size-4" />
+{copied ? (
+              <HugeiconsIcon icon={Tick02Icon} size={16} />
             ) : (
-              <Copy className="size-4" />
+              <HugeiconsIcon icon={Copy01Icon} size={16} />
             )}
           </button>
         </MessageAction>
@@ -243,9 +244,9 @@ export function MessageUser({
               type="button"
             >
               {isEditing ? (
-                <PencilSimpleSlashIcon className="size-4" />
+                <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
               ) : (
-                <PencilSimpleIcon className="size-4" />
+                <HugeiconsIcon icon={PencilEdit01Icon} size={16} />
               )}
             </button>
           </MessageAction>

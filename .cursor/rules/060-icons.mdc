@@ -1,0 +1,69 @@
+---
+description: "Icon system using HugeIcons Pro as primary library"
+globs: ["**/*.tsx", "**/*.ts"]
+---
+
+# Icon System
+
+## Primary Library: HugeIcons Pro
+
+```typescript
+// ✅ Standard usage with HugeiconsIcon wrapper
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Cancel01Icon, ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
+
+<HugeiconsIcon icon={Tick02Icon} size={16} />
+<HugeiconsIcon icon={Cancel01Icon} size={16} className="text-red-500" />
+```
+
+## Re-exported Icons (Convenience)
+
+```typescript
+// Common icons re-exported from lib/icons
+import { HugeiconsIcon, PinIcon, PinOffIcon, PanelLeftIcon, GripVerticalIcon } from "@/lib/icons"
+```
+
+## Brand Icons
+
+```typescript
+// Provider brand icons (custom)
+import { ClaudeIcon, OpenAIIcon } from "@/components/icons/claude"
+import { GeminiIcon } from "@/components/icons/gemini"
+import { AnthropicIcon } from "@/components/icons/anthropic"
+
+// All brand icons support size prop
+<ClaudeIcon size={24} />
+<OpenAIIcon size={32} className="text-primary" />
+```
+
+## Creating Custom Icons
+
+```typescript
+// Use createIcon factory for simple path-based icons
+import { createIcon } from "@/lib/icons"
+
+export const MyIcon = createIcon(
+  <path d="..." fill="currentColor" />,
+  { viewBox: "0 0 24 24", displayName: "MyIcon" }
+)
+```
+
+## Common Icons Quick Reference
+
+| Purpose | HugeIcon |
+|---------|----------|
+| Checkmark | `Tick02Icon` |
+| Close/X | `Cancel01Icon` |
+| Search | `Search01Icon` |
+| Settings | `Settings01Icon` |
+| User | `User02Icon` |
+| Copy | `Copy01Icon` |
+| Edit | `PencilEdit01Icon` |
+| Delete | `Delete01Icon` |
+| Add | `Add01Icon` |
+| Chat | `Chat01Icon` |
+
+## Documentation
+
+- Full reference: `components/icons/README.md`
+- Migration mapping: `.agents/archive/icon-mapping-phosphor-hugeicons.md`

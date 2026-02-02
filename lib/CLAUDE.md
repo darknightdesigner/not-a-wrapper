@@ -161,6 +161,15 @@ import { api } from "@/convex/_generated/api"
 // Query data
 const chats = useQuery(api.chats.list, { userId })
 
+// ✅ Use "skip" for conditional queries
+const messages = useQuery(
+  api.messages.get,
+  isValidId ? { chatId } : "skip"
+)
+
+// ❌ Don't pass undefined/null IDs - may cause errors
+// const messages = useQuery(api.messages.get, { chatId: undefined })
+
 // Mutate data
 const createChat = useMutation(api.chats.create)
 await createChat({ title: "New Chat", userId })

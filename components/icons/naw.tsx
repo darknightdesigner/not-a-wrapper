@@ -19,11 +19,7 @@ export const NawIcon = forwardRef<SVGSVGElement, NawIconProps>(
       strokeLinejoin="round"
       {...props}
     >
-      {/* Chat bubble with multiple dots representing multi-model */}
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-      <circle cx="8" cy="10" r="1" fill="currentColor" />
-      <circle cx="12" cy="10" r="1" fill="currentColor" />
-      <circle cx="16" cy="10" r="1" fill="currentColor" />
+      <circle cx="12" cy="12" r="10" fill="currentColor" stroke="none" />
     </svg>
   )
 )

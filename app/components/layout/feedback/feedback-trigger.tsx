@@ -6,7 +6,8 @@ import { FeedbackForm } from "@/components/common/feedback-form"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { Question } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { HelpCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 
 export function FeedbackTrigger() {
@@ -20,7 +21,7 @@ export function FeedbackTrigger() {
 
   const trigger = (
     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-      <Question className="size-4" />
+      <HugeiconsIcon icon={HelpCircleIcon} size={16} />
       <span>Feedback</span>
     </DropdownMenuItem>
   )

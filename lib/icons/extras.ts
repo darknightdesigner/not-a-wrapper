@@ -1,15 +1,15 @@
 /**
- * Icons from other libraries that don't have Phosphor equivalents.
- * Document why each icon is here.
+ * Re-exports for commonly used icons that were previously exceptions.
+ * Now all icons come from HugeIcons Pro.
  *
- * @see .agents/archive/icon-system-migration-plan-2026-01.md for migration details
+ * @see .agents/archive/icon-mapping-phosphor-hugeicons.md for mapping details
  */
 
-// Pin icons - Phosphor's PushPin has different visual style
-export { Pin, PinOff } from "lucide-react"
+// Pin icons - exported with both new and legacy names
+export { Pin02Icon as PinIcon, Pin02Icon as Pin, PinOffIcon, PinOffIcon as PinOff } from "@hugeicons-pro/core-stroke-rounded"
 
-// Panel icons - Used by Shadcn sidebar, Phosphor's SidebarSimple differs
-export { PanelLeft } from "lucide-react"
+// Panel/Sidebar icons - Used by Shadcn sidebar
+export { SidebarLeftIcon as PanelLeftIcon, SidebarLeftIcon as PanelLeft } from "@hugeicons-pro/core-stroke-rounded"
 
-// Grip icons - Used by react-resizable-panels
-export { GripVertical } from "lucide-react"
+// Drag icons - Used by react-resizable-panels
+export { DragDropVerticalIcon as GripVerticalIcon, DragDropVerticalIcon as GripVertical } from "@hugeicons-pro/core-stroke-rounded"

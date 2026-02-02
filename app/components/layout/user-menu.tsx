@@ -23,7 +23,8 @@ import { useMessages } from "@/lib/chat-store/messages/provider"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useUser } from "@/lib/user-store/provider"
 import { useClerk } from "@clerk/nextjs"
-import { CaretUpDown, SignOut } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
 import { AppInfoTrigger } from "./app-info/app-info-trigger"
@@ -83,7 +84,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
         onClick={handleSignOut}
         className="flex items-center gap-2"
       >
-        <SignOut className="size-4" />
+        <HugeiconsIcon icon={Logout01Icon} size={16} />
         <span>Sign out</span>
       </DropdownMenuItem>
     </>
@@ -100,14 +101,19 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
             modal={false}
           >
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton size="lg" className="w-full">
-                <Avatar className="size-8 bg-emerald-600">
+              <SidebarMenuButton
+                size="lg"
+                className="w-full"
+                tooltip={user?.display_name || "Account"}
+              >
+                <Avatar className="size-8 group-data-[collapsible=icon]:size-6 bg-emerald-600 motion-safe:transition-[width,height]">
                   <AvatarImage src={user?.profile_image ?? undefined} />
-                  <AvatarFallback className="bg-emerald-600 text-sm text-white">
+                  <AvatarFallback className="bg-emerald-600 text-sm group-data-[collapsible=icon]:text-xs text-white">
                     {user?.display_name?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
                   <span className="truncate font-semibold">
                     {user?.display_name}
                   </span>
@@ -115,7 +121,11 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                     {user?.premium ? "Plus" : "Free"}
                   </span>
                 </div>
-                <CaretUpDown className="text-muted-foreground ml-auto size-4" />
+                <HugeiconsIcon
+                  icon={UnfoldLessIcon}
+                  size={16}
+                  className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent

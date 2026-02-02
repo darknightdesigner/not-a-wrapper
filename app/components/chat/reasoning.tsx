@@ -1,6 +1,7 @@
 import { Markdown } from "@/components/ui/markdown"
 import { cn } from "@/lib/utils"
-import { CaretDownIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
 import { useState } from "react"
 
@@ -32,7 +33,9 @@ export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
         type="button"
       >
         <span>Reasoning</span>
-        <CaretDownIcon
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          size={12}
           className={cn(
             "size-3 transition-transform",
             isExpanded ? "rotate-180" : ""

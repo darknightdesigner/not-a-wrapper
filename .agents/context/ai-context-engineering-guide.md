@@ -337,12 +337,12 @@ The main context file that all AI agents should read. Include:
 
 ## Commands
 Be explicit about exact command syntax:
-- Build: `npm run build` or `bun run build`
+- Build: `bun run build`
 - Type check: `tsc --noEmit [path/to/file.ts]`
 - Run tests: `bun test [path/to/file.test.ts]`
 - Format: `prettier --write [path]`
 - Lint: `eslint [path]`
-- Dev server: `npm run dev`
+- Dev server: `bun run dev`
 
 ## Agent Permissions
 ### CAN do without asking:
@@ -696,10 +696,10 @@ Level 3: Task-specific context (in prompts)
 Start with overview, provide details on demand:
 ```markdown
 ## Database
-We use Supabase PostgreSQL.
-- Schema: See `.agents/context/database.md`
-- Queries: See `src/lib/queries.ts`
-- Migrations: See `supabase/migrations/`
+We use Convex (reactive document-relational database).
+- Schema: See `convex/schema.ts`
+- Queries: See `convex/*.ts` functions
+- Documentation: See `.agents/context/database.md`
 ```
 
 **3. Pattern Libraries**
@@ -1424,7 +1424,7 @@ Clear permission boundaries prevent accidental modifications:
 #### ✅ AI CAN do freely:
 - Read any source file
 - Run: `tsc --noEmit`, `eslint`, `prettier`
-- Run: `npm run dev`, `npm run build`, tests
+- Run: `bun run dev`, `bun run build`, tests
 - Search codebase, create files in `app/`, `lib/`, `components/`
 
 #### ⚠️ AI MUST ASK before:

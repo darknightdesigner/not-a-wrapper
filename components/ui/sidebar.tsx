@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { PanelLeft } from "@/lib/icons"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -31,6 +32,14 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+// Helper to read sidebar state from cookie (only call after mount)
+function getSidebarStateFromCookie(): boolean | undefined {
+  if (typeof document === "undefined") return undefined
+  const match = document.cookie.match(new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`))
+  if (match) return match[1] === "true"
+  return undefined
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -71,8 +80,19 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
+  // Initialize with defaultOpen to ensure server/client match during hydration
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
+
+  // Sync with cookie value after mount to avoid hydration mismatch
+  React.useEffect(() => {
+    const cookieValue = getSidebarStateFromCookie()
+    if (cookieValue !== undefined && cookieValue !== _open) {
+      _setOpen(cookieValue)
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
@@ -218,7 +238,7 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
+          "relative w-(--sidebar-width) bg-transparent motion-safe:transition-[width] duration-200 ease-linear",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -229,7 +249,7 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) motion-safe:transition-[left,right,width] duration-200 ease-linear md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -258,7 +278,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, state } = useSidebar()
 
   return (
     <Button
@@ -266,14 +286,21 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7", className)}
+      className={cn(
+        "size-9 rounded-lg",
+        // Resize cursor indicates expandability
+        state === "collapsed" 
+          ? "cursor-e-resize rtl:cursor-w-resize" 
+          : "cursor-w-resize rtl:cursor-e-resize",
+        className
+      )}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
     >
-      <PanelLeft />
+      <HugeiconsIcon icon={PanelLeft} size={20} className="size-5" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )

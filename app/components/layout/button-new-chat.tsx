@@ -6,7 +6,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { NotePencilIcon } from "@phosphor-icons/react/dist/ssr"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { NoteEditIcon } from "@hugeicons-pro/core-stroke-rounded"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 
@@ -29,7 +30,7 @@ export function ButtonNewChat() {
           prefetch
           aria-label="New Chat"
         >
-          <NotePencilIcon size={24} />
+          <HugeiconsIcon icon={NoteEditIcon} size={24} />
         </Link>
       </TooltipTrigger>
       <TooltipContent>New Chat ⌘⇧U</TooltipContent>

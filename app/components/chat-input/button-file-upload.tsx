@@ -16,7 +16,11 @@ import {
 } from "@/components/ui/tooltip"
 import { getModelInfo } from "@/lib/models"
 import { cn } from "@/lib/utils"
-import { FileArrowUp, Paperclip } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  FileUploadIcon,
+  AttachmentIcon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import React from "react"
 import { PopoverContentAuth } from "./popover-content-auth"
 
@@ -46,11 +50,11 @@ export function ButtonFileUpload({
                 type="button"
                 aria-label="Add files"
               >
-                <Paperclip className="size-4" />
+                <HugeiconsIcon icon={AttachmentIcon} size={16} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Add files</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
         </Tooltip>
         <PopoverContent className="p-2">
           <div className="text-secondary-foreground text-sm">
@@ -76,11 +80,11 @@ export function ButtonFileUpload({
                 type="button"
                 aria-label="Add files"
               >
-                <Paperclip className="size-4" />
+                <HugeiconsIcon icon={AttachmentIcon} size={16} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Add files</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
         </Tooltip>
         <PopoverContentAuth />
       </Popover>
@@ -108,15 +112,15 @@ export function ButtonFileUpload({
               disabled={!isUserAuthenticated}
               aria-label="Add files"
             >
-              <Paperclip className="size-4" />
+              <HugeiconsIcon icon={AttachmentIcon} size={16} />
             </Button>
           </FileUploadTrigger>
         </TooltipTrigger>
-        <TooltipContent>Add files</TooltipContent>
+        <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
       </Tooltip>
       <FileUploadContent>
         <div className="border-input bg-background flex flex-col items-center rounded-lg border border-dashed p-8">
-          <FileArrowUp className="text-muted-foreground size-8" />
+          <HugeiconsIcon icon={FileUploadIcon} size={32} className="text-muted-foreground" />
           <span className="mt-4 mb-1 text-lg font-medium">Drop files here</span>
           <span className="text-muted-foreground text-sm">
             Drop any files here to add it to the conversation

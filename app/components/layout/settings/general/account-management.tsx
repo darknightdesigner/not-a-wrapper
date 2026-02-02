@@ -6,7 +6,8 @@ import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useClerk } from "@clerk/nextjs"
-import { SignOut } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
 export function AccountManagement() {
   const { signOut } = useClerk()
@@ -38,7 +39,7 @@ export function AccountManagement() {
         className="flex items-center gap-2"
         onClick={handleSignOut}
       >
-        <SignOut className="size-4" />
+        <HugeiconsIcon icon={Logout01Icon} size={16} />
         <span>Sign out</span>
       </Button>
     </div>

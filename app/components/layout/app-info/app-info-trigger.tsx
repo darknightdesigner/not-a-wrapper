@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/drawer"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { APP_NAME } from "@/lib/config"
-import { Info } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { InformationCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import { AppInfoContent } from "./app-info-content"
 
@@ -32,7 +33,7 @@ export function AppInfoTrigger({ trigger }: AppInfoTriggerProps) {
 
   const defaultTrigger = (
     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-      <Info className="size-4" />
+      <HugeiconsIcon icon={InformationCircleIcon} size={16} />
       About {APP_NAME}
     </DropdownMenuItem>
   )

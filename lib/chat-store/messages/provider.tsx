@@ -34,8 +34,8 @@ export function useMessages() {
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const { chatId } = useChatSession()
 
-  // Only query if chatId is a valid Convex ID (not optimistic)
-  const isValidConvexId = Boolean(chatId && !chatId.startsWith("optimistic-"))
+  // Only query if chatId is a valid Convex ID (not optimistic or local guest chat)
+  const isValidConvexId = Boolean(chatId && !chatId.startsWith("optimistic-") && !chatId.startsWith("local-"))
 
   // Convex real-time query for messages
   const convexMessages = useQuery(
@@ -113,12 +113,20 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Cache locally (works for both guest and authenticated users)
-    const updated = [...serverMessages, ...optimisticMessages, message]
+    // Deduplicate by ID to prevent duplicate key errors when optimistic messages
+    // overlap with server messages that have been assigned Convex IDs
+    const allMessages = [...serverMessages, ...optimisticMessages, message]
+    const seenIds = new Set<string>()
+    const updated = allMessages.filter((m) => {
+      if (seenIds.has(m.id)) return false
+      seenIds.add(m.id)
+      return true
+    })
     writeToIndexedDB("messages", { id: effectiveChatId, messages: updated })
 
     // Persist to Convex for authenticated users (valid Convex IDs only)
     // Guest users will silently skip this (auth required for mutations)
-    if (!effectiveChatId.startsWith("optimistic-")) {
+    if (!effectiveChatId.startsWith("optimistic-") && !effectiveChatId.startsWith("local-")) {
       try {
         await addMessageMutation({
           chatId: effectiveChatId as Id<"chats">,
@@ -140,7 +148,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   }, [chatId, serverMessages, optimisticMessages, updateOptimisticMessages, addMessageMutation])
 
   const saveAllMessages = useCallback(async (newMessages: MessageAISDK[]) => {
-    if (!chatId || chatId.startsWith("optimistic-")) return
+    if (!chatId || chatId.startsWith("optimistic-") || chatId.startsWith("local-")) return
 
     try {
       // Find new messages that need to be saved
@@ -174,7 +182,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   }, [chatId, serverMessages, addBatchMutation, updateOptimisticMessages])
 
   const deleteMessages = useCallback(async () => {
-    if (!chatId || chatId.startsWith("optimistic-")) return
+    if (!chatId || chatId.startsWith("optimistic-") || chatId.startsWith("local-")) return
 
     // Clear optimistic messages immediately
     updateOptimisticMessages(() => [])
@@ -193,7 +201,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   }, [updateOptimisticMessages])
 
   const deleteMessagesFromTimestamp = useCallback(async (timestamp: number) => {
-    if (!chatId || chatId.startsWith("optimistic-")) return
+    if (!chatId || chatId.startsWith("optimistic-") || chatId.startsWith("local-")) return
 
     await deleteFromTimestampMutation({
       chatId: chatId as Id<"chats">,

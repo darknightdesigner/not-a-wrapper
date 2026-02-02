@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { CaretDown, CaretLeft, CaretRight } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon, ArrowLeft01Icon, ArrowRight01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import {
   DayPicker,
   getDefaultClassNames,
@@ -138,24 +139,21 @@ function Calendar({
             />
           )
         },
-        Chevron: ({ className, orientation, ...props }) => {
+        Chevron: ({ className, orientation }) => {
           if (orientation === "left") {
             return (
-              <CaretLeft className={cn("size-4", className)} {...props} />
+              <HugeiconsIcon icon={ArrowLeft01Icon} size={16} className={cn(className)} />
             )
           }
 
           if (orientation === "right") {
             return (
-              <CaretRight
-                className={cn("size-4", className)}
-                {...props}
-              />
+              <HugeiconsIcon icon={ArrowRight01Icon} size={16} className={cn(className)} />
             )
           }
 
           return (
-            <CaretDown className={cn("size-4", className)} {...props} />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={cn(className)} />
           )
         },
         DayButton: CalendarDayButton,

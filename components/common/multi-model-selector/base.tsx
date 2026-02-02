@@ -31,12 +31,13 @@ import { ModelConfig } from "@/lib/models/types"
 import { PROVIDERS } from "@/lib/providers"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CaretDownIcon,
-  CheckIcon,
-  MagnifyingGlassIcon,
+  ArrowDown01Icon,
+  Tick02Icon,
+  Search01Icon,
   StarIcon,
-} from "@phosphor-icons/react"
+} from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "motion/react"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
@@ -133,7 +134,7 @@ export function MultiModelSelector({
         <div className="flex items-center gap-2">
           {isLocked && (
             <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-              <StarIcon className="size-2" />
+              <HugeiconsIcon icon={StarIcon} size={8} />
               <span>Locked</span>
             </div>
           )}
@@ -293,7 +294,7 @@ export function MultiModelSelector({
           )}
         </AnimatePresence>
       </div>
-      <CaretDownIcon className="ml-2 size-4 flex-shrink-0 opacity-50" />
+      <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="ml-2 flex-shrink-0 opacity-50" />
     </Button>
   )
 
@@ -320,11 +321,11 @@ export function MultiModelSelector({
                 type="button"
               >
                 <span>Select models</span>
-                <CaretDownIcon className="size-4" />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Select models</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Select models</TooltipContent>
         </Tooltip>
         <PopoverContentAuth />
       </Popover>
@@ -349,7 +350,7 @@ export function MultiModelSelector({
             </DrawerHeader>
             <div className="px-4 pb-2">
               <div className="relative">
-                <MagnifyingGlassIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground absolute top-2.5 left-2.5" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search models..."
@@ -415,7 +416,7 @@ export function MultiModelSelector({
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent side="bottom" hideArrow>
             Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
           </TooltipContent>
           <DropdownMenuContent
@@ -427,7 +428,7 @@ export function MultiModelSelector({
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
               <div className="relative">
-                <MagnifyingGlassIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground absolute top-2.5 left-2.5" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search models..."
@@ -484,7 +485,7 @@ export function MultiModelSelector({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isSelected && <CheckIcon className="size-4" />}
+                        {isSelected && <HugeiconsIcon icon={Tick02Icon} size={16} />}
                         {isLocked && (
                           <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
                             <span>Locked</span>

@@ -1,7 +1,8 @@
 "use client"
 
 import { api } from "@/convex/_generated/api"
-import { FolderPlusIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { FolderAddIcon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "convex/react"
 import { useState } from "react"
 import { DialogCreateProject } from "./dialog-create-project"
@@ -15,12 +16,12 @@ export function SidebarProject() {
   return (
     <div className="mb-5">
       <button
-        className="hover:bg-accent/80 hover:text-foreground text-primary group/new-chat relative inline-flex w-full items-center rounded-md bg-transparent px-2 py-2 text-sm transition-colors"
+        className="hover:bg-accent/80 hover:text-foreground text-primary group/new-chat relative inline-flex w-full items-center rounded-md bg-transparent px-2 py-2 text-sm"
         type="button"
         onClick={() => setIsDialogOpen(true)}
       >
         <div className="flex items-center gap-2">
-          <FolderPlusIcon size={20} />
+          <HugeiconsIcon icon={FolderAddIcon} size={20} />
           New project
         </div>
       </button>

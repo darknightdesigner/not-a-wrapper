@@ -2,7 +2,8 @@
 
 import * as React from "react"
 import * as MenubarPrimitive from "@radix-ui/react-menubar"
-import { Check, CaretRight, Circle } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, ArrowRight01Icon, CircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 
 import { cn } from "@/lib/utils"
 
@@ -129,7 +130,7 @@ function MenubarCheckboxItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenubarPrimitive.ItemIndicator>
-          <Check className="size-4" />
+          <HugeiconsIcon icon={Tick02Icon} size={16} />
         </MenubarPrimitive.ItemIndicator>
       </span>
       {children}
@@ -153,7 +154,7 @@ function MenubarRadioItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenubarPrimitive.ItemIndicator>
-          <Circle className="size-2 fill-current" weight="fill" />
+          <HugeiconsIcon icon={CircleIcon} size={8} className="fill-current" />
         </MenubarPrimitive.ItemIndicator>
       </span>
       {children}
@@ -235,7 +236,7 @@ function MenubarSubTrigger({
       {...props}
     >
       {children}
-      <CaretRight className="ml-auto h-4 w-4" />
+      <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="ml-auto" />
     </MenubarPrimitive.SubTrigger>
   )
 }

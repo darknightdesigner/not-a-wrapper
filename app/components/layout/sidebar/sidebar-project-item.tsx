@@ -6,7 +6,12 @@ import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import useClickOutside from "@/app/hooks/use-click-outside"
 import { toast } from "@/components/ui/toast"
 import { cn } from "@/lib/utils"
-import { Check, FolderIcon, X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Tick02Icon,
+  Folder01Icon,
+  Cancel01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useMutation } from "convex/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
@@ -149,7 +154,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/project relative w-full rounded-md transition-colors",
+        "hover:bg-accent/80 hover:text-foreground group/project relative w-full rounded-md",
         isActive && "bg-accent hover:bg-accent text-foreground"
       ),
     [isActive]
@@ -158,7 +163,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   const menuClassName = useMemo(
     () =>
       cn(
-        "absolute top-0 right-1 flex h-full items-center justify-center opacity-0 transition-opacity group-hover/project:opacity-100",
+        "absolute top-0 right-1 flex h-full items-center justify-center opacity-0 group-hover/project:opacity-100",
         isMobile && "opacity-100 group-hover/project:opacity-100"
       ),
     [isMobile]
@@ -172,7 +177,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
     >
       {isEditing ? (
         <div className="bg-accent flex items-center rounded-md py-1 pr-1 pl-2">
-          <FolderIcon size={20} className="text-primary mr-2 flex-shrink-0" />
+          <HugeiconsIcon icon={Folder01Icon} size={20} className="text-primary mr-2 flex-shrink-0" />
           <input
             ref={inputRef}
             value={editName}
@@ -184,17 +189,17 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
           <div className="flex gap-0.5">
             <button
               onClick={handleSaveClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <Check size={16} weight="bold" />
+              <HugeiconsIcon icon={Tick02Icon} size={16} />
             </button>
             <button
               onClick={handleCancelClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <X size={16} weight="bold" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} />
             </button>
           </div>
         </div>
@@ -210,7 +215,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
               className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
               title={displayName}
             >
-              <FolderIcon size={20} />
+              <HugeiconsIcon icon={Folder01Icon} size={20} />
               {displayName}
             </div>
           </Link>

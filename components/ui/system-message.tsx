@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { cva, type VariantProps } from "class-variance-authority"
-import { WarningCircle, Warning, Info } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { AlertCircleIcon, Alert01Icon, InformationCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import React from "react"
 
 const systemMessageVariants = cva(
@@ -85,11 +86,11 @@ export function SystemMessage({
 
     switch (variant) {
       case "error":
-        return <WarningCircle className="size-4" />
+        return <HugeiconsIcon icon={AlertCircleIcon} size={16} />
       case "warning":
-        return <Warning className="size-4" />
+        return <HugeiconsIcon icon={Alert01Icon} size={16} />
       default:
-        return <Info className="size-4" />
+        return <HugeiconsIcon icon={InformationCircleIcon} size={16} />
     }
   }
 

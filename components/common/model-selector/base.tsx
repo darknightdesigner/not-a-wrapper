@@ -30,11 +30,12 @@ import { ModelConfig } from "@/lib/models/types"
 import { PROVIDERS } from "@/lib/providers"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CaretDownIcon,
-  MagnifyingGlassIcon,
+  ArrowDown01Icon,
+  Search01Icon,
   StarIcon,
-} from "@phosphor-icons/react"
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "./pro-dialog"
 import { SubMenu } from "./sub-menu"
@@ -116,7 +117,7 @@ export function ModelSelector({
         </div>
         {isLocked && (
           <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-            <StarIcon className="size-2" />
+            <HugeiconsIcon icon={StarIcon} size={8} />
             <span>Locked</span>
           </div>
         )}
@@ -144,7 +145,7 @@ export function ModelSelector({
         {currentProvider?.icon && <currentProvider.icon className="size-5" />}
         <span>{currentModel?.name || "Select model"}</span>
       </div>
-      <CaretDownIcon className="size-4 opacity-50" />
+      <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-50" />
     </Button>
   )
 
@@ -174,11 +175,11 @@ export function ModelSelector({
                   <currentProvider.icon className="size-5" />
                 )}
                 {currentModel?.name}
-                <CaretDownIcon className="size-4" />
+                <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
               </Button>
             </PopoverTrigger>
           </TooltipTrigger>
-          <TooltipContent>Select a model</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Select a model</TooltipContent>
         </Tooltip>
         <PopoverContentAuth />
       </Popover>
@@ -201,7 +202,7 @@ export function ModelSelector({
             </DrawerHeader>
             <div className="px-4 pb-2">
               <div className="relative">
-                <MagnifyingGlassIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground absolute top-2.5 left-2.5" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search models..."
@@ -266,7 +267,7 @@ export function ModelSelector({
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
           </TooltipTrigger>
-          <TooltipContent>Switch model ⌘⇧P</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Switch model ⌘⇧P</TooltipContent>
           <DropdownMenuContent
             className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
@@ -276,7 +277,7 @@ export function ModelSelector({
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
               <div className="relative">
-                <MagnifyingGlassIcon className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
+                <HugeiconsIcon icon={Search01Icon} size={16} className="text-muted-foreground absolute top-2.5 left-2.5" />
                 <Input
                   ref={searchInputRef}
                   placeholder="Search models..."

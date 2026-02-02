@@ -3,7 +3,7 @@
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
-import { useMutation, useQuery } from "convex/react"
+import { useMutation, useQuery, useConvexAuth } from "convex/react"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "../../config"
 import type { Chats } from "../types"
@@ -54,6 +54,9 @@ export function ChatsProvider({
   userId?: string
   children: React.ReactNode
 }) {
+  // Check if Convex auth is ready (JWT token synced from Clerk)
+  const { isAuthenticated: isConvexAuthenticated, isLoading: isConvexAuthLoading } = useConvexAuth()
+
   // Convex real-time query for chats
   const convexChats = useQuery(api.chats.getForCurrentUser, {})
 
@@ -166,11 +169,43 @@ export function ChatsProvider({
     userId: string,
     title?: string,
     model?: string,
-    _isAuthenticated?: boolean,
+    isAuthenticated?: boolean,
     systemPrompt?: string,
     projectId?: string
   ): Promise<Chats | undefined> => {
     if (!userId) return
+
+    // For guest users, create a local-only chat (not persisted to Convex)
+    // This allows unauthenticated users to send messages without database errors
+    if (!isAuthenticated) {
+      const localChatId = `local-${Date.now().toString()}`
+      const localChat: Chats = {
+        id: localChatId,
+        title: title || "New Chat",
+        created_at: new Date().toISOString(),
+        model: model || MODEL_DEFAULT,
+        system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
+        user_id: userId,
+        public: false,
+        updated_at: new Date().toISOString(),
+        project_id: null,
+        pinned: false,
+        pinned_at: null,
+      }
+
+      // Add to optimistic state (stays local, not synced to server)
+      setOptimisticOps((prev) => [...prev, { type: "add", chat: localChat }])
+
+      return localChat
+    }
+
+    // For authenticated users, ensure Convex auth is ready before calling mutations
+    // This prevents "Not authenticated" errors due to Clerk→Convex auth sync delay
+    if (isAuthenticated && !isConvexAuthenticated && !isConvexAuthLoading) {
+      console.warn("createNewChat: Convex auth not ready yet, waiting...")
+      // Wait a bit for auth to sync
+      await new Promise((resolve) => setTimeout(resolve, 500))
+    }
 
     const optimisticId = `optimistic-${Date.now().toString()}`
     const optimisticChat: Chats = {
@@ -223,7 +258,7 @@ export function ChatsProvider({
       toast({ title: "Failed to create chat", status: "error" })
       return undefined
     }
-  }, [createChatMutation, removeOp])
+  }, [createChatMutation, removeOp, isConvexAuthenticated, isConvexAuthLoading])
 
   const resetChats = useCallback(async () => {
     setOptimisticOps([])

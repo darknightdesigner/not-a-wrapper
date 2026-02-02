@@ -7,7 +7,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-import { SidebarSimpleIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { SidebarLeftIcon } from "@hugeicons-pro/core-stroke-rounded"
 
 type HeaderSidebarTriggerProps = React.HTMLAttributes<HTMLButtonElement>
 
@@ -31,7 +32,7 @@ export function HeaderSidebarTrigger({
           )}
           {...props}
         >
-          <SidebarSimpleIcon size={20} />
+          <HugeiconsIcon icon={SidebarLeftIcon} size={20} />
           <span className="sr-only">Toggle sidebar</span>
         </button>
       </TooltipTrigger>

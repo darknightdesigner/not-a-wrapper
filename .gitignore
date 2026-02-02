@@ -66,5 +66,8 @@ bun-debug.log*
 # Claude Code local settings (personal preferences)
 .claude/settings.local.json
 
+# npm registry config (contains license keys)
+.npmrc
+
 # Optional: uncomment to ignore memories directory
 # memories/

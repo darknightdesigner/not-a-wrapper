@@ -24,9 +24,14 @@ import { toast } from "@/components/ui/toast"
 import { fetchClient } from "@/lib/fetch"
 import { useModel } from "@/lib/model-store/provider"
 import { cn } from "@/lib/utils"
-import { KeyIcon, PlusIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Key01Icon,
+  Add01Icon,
+  Loading01Icon,
+  Delete01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { SpinnerGap, Trash } from "@phosphor-icons/react"
 import { useState } from "react"
 
 type Provider = {
@@ -247,7 +252,7 @@ export function ByokSection() {
           >
             {userKeyStatus[provider.id] && (
               <span className="bg-secondary absolute top-1 right-1 rounded-sm border-[1px] p-1">
-                <KeyIcon className="text-secondary-foreground size-3.5" />
+                <HugeiconsIcon icon={Key01Icon} size={14} className="text-secondary-foreground" />
               </span>
             )}
             <provider.icon className="size-4" />
@@ -263,7 +268,7 @@ export function ByokSection() {
             "border-primary border-dashed"
           )}
         >
-          <PlusIcon className="size-4" />
+          <HugeiconsIcon icon={Add01Icon} size={16} />
         </button>
       </div>
 
@@ -308,7 +313,7 @@ export function ByokSection() {
                       deleteMutation.isPending || saveMutation.isPending
                     }
                   >
-                    <Trash className="mr-1 size-4" />
+                    <HugeiconsIcon icon={Delete01Icon} size={16} className="mr-1" />
                     Delete
                   </Button>
                 )}
@@ -320,7 +325,7 @@ export function ByokSection() {
                   disabled={saveMutation.isPending || deleteMutation.isPending}
                 >
                   {saveMutation.isPending ? (
-                    <SpinnerGap className="size-4 animate-spin" />
+                    <HugeiconsIcon icon={Loading01Icon} size={16} className="animate-spin" />
                   ) : (
                     "Save"
                   )}
@@ -349,7 +354,7 @@ export function ByokSection() {
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? (
-                <SpinnerGap className="mr-2 size-4 animate-spin" />
+                <HugeiconsIcon icon={Loading01Icon} size={16} className="mr-2 animate-spin" />
               ) : null}
               Delete
             </AlertDialogAction>

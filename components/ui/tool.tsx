@@ -7,13 +7,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CheckCircle,
-  CaretDown,
-  SpinnerGap,
-  Gear,
-  XCircle,
-} from "@phosphor-icons/react"
+  CheckmarkCircle01Icon,
+  ArrowDown01Icon,
+  Loading01Icon,
+  Settings01Icon,
+  CancelCircleIcon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 
 export type ToolPart = {
@@ -43,15 +44,15 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
   const getStateIcon = () => {
     switch (state) {
       case "input-streaming":
-        return <SpinnerGap className="h-4 w-4 animate-spin text-blue-500" />
+        return <HugeiconsIcon icon={Loading01Icon} size={16} className="animate-spin text-blue-500" />
       case "input-available":
-        return <Gear className="h-4 w-4 text-orange-500" />
+        return <HugeiconsIcon icon={Settings01Icon} size={16} className="text-orange-500" />
       case "output-available":
-        return <CheckCircle className="h-4 w-4 text-green-500" />
+        return <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} className="text-green-500" />
       case "output-error":
-        return <XCircle className="h-4 w-4 text-red-500" />
+        return <HugeiconsIcon icon={CancelCircleIcon} size={16} className="text-red-500" />
       default:
-        return <Gear className="text-muted-foreground h-4 w-4" />
+        return <HugeiconsIcon icon={Settings01Icon} size={16} className="text-muted-foreground" />
     }
   }
 
@@ -146,7 +147,7 @@ const Tool = ({ toolPart, defaultOpen = false, className }: ToolProps) => {
               </span>
               {getStateBadge()}
             </div>
-            <CaretDown className={cn("h-4 w-4", isOpen && "rotate-180")} />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} className={cn(isOpen && "rotate-180")} />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent

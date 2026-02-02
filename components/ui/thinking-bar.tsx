@@ -17,7 +17,8 @@
 
 import { TextShimmer } from "@/components/ui/text-shimmer"
 import { cn } from "@/lib/utils"
-import { CaretRight } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowRight01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
 type ThinkingBarProps = {
   className?: string
@@ -43,7 +44,7 @@ export function ThinkingBar({
           className="flex items-center gap-1 text-sm transition-opacity hover:opacity-80"
         >
           <TextShimmer className="font-medium">{text}</TextShimmer>
-          <CaretRight className="text-muted-foreground size-4" />
+          <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="text-muted-foreground" />
         </button>
       ) : (
         <TextShimmer className="cursor-default font-medium">{text}</TextShimmer>

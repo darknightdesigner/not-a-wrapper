@@ -4,9 +4,9 @@
 > 
 > **Created:** January 13, 2026
 > 
-> **Status:** ✅ **Research Complete - All Decisions Made**
+> **Status:** ✅ **Research Complete - Migration Complete**
 > 
-> **Next:** Draft AGENTS.md with finalized tech stack
+> **Note:** This document is a historical research reference. The Convex migration was completed in January 2026. All decisions have been implemented.
 
 ---
 
@@ -76,7 +76,7 @@ A platform that:
 | **Framework** | Next.js (App Router) | 16.0.9 | ✅ Latest |
 | **UI Library** | React | 19.2.2 | ✅ Latest |
 | **Language** | TypeScript | 5.x | ✅ Current |
-| **Database** | Supabase | 2.90.1 | ⚠️ Under evaluation |
+| **Database** | Convex | Latest | ✅ Migrated from Supabase |
 | **State Management** | Zustand | 5.0.9 | ✅ Current |
 | **Server State** | TanStack Query | 5.80.6 | ✅ Current |
 | **UI Components** | Shadcn/Radix | Latest | ✅ Current |
@@ -109,7 +109,7 @@ A platform that:
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Core Chat | ✅ 100% | Multi-provider support |
-| Authentication | ✅ 100% | Supabase Auth |
+| Authentication | ✅ 100% | Clerk Auth |
 | UI Components | 🟡 70% | 58 components remaining |
 | YouTube Integration | 🔴 0% | Research complete, evaluation needed |
 | Rate Limiting | 🔴 0% | Upstash planned |
@@ -364,10 +364,10 @@ Pricing is roughly comparable; Convex charges per function call while Supabase c
 [x] DECISION: Approve Convex migration ✅ APPROVED
 [x] DECISION: Use Clerk for auth ✅ APPROVED
 [x] Verify Clerk + Flowglad compatibility ✅ COMPATIBLE
-[ ] 🔲 Create Convex migration plan
-[ ] 🔲 Set up Convex project
-[ ] 🔲 Set up Clerk project
-[ ] 🔲 Plan data migration from Supabase
+[x] Create Convex migration plan ✅ COMPLETED (January 2026)
+[x] Set up Convex project ✅ COMPLETED
+[x] Set up Clerk project ✅ COMPLETED
+[x] Plan data migration from Supabase ✅ COMPLETED
 ```
 
 ---
@@ -1090,7 +1090,7 @@ Based on `.agents/context/ai-context-engineering-guide.md`:
 # Cursor/Claude Code can do freely:
 - Read any file in the project
 - Run: tsc --noEmit, eslint, prettier
-- Run: npm run dev, npm run build
+- Run: bun run dev, bun run build
 - Run: vitest (tests)
 - Search codebase
 - Create files in app/, lib/, components/
@@ -1147,14 +1147,13 @@ Environment & Secrets:
 └── any file containing API keys or secrets
 
 Authentication:
-├── lib/auth/           # Core auth logic
 ├── app/auth/           # Auth routes and callbacks
-├── middleware.ts       # Auth middleware
-└── utils/supabase/middleware.ts
+├── middleware.ts       # Clerk auth middleware
+└── convex/auth.config.js  # Convex auth configuration
 
 Database Schema:
-├── supabase/migrations/  # Database migrations
-└── Any SQL schema files
+├── convex/schema.ts    # Convex schema (TypeScript)
+└── convex/*.ts         # Database functions
 
 CI/CD & Deployment:
 ├── .github/workflows/
@@ -1179,7 +1178,7 @@ Configuration:
 | Read files | All source code | Understanding context |
 | Run `tsc --noEmit` | Any file | Type checking |
 | Run `eslint` | Any file | Linting |
-| Run `npm run dev` | Project | Development server |
+| Run `bun run dev` | Project | Development server |
 | Run tests | Test files | Vitest, Playwright |
 | Format code | Source files | Prettier |
 | Search codebase | All files | Grep, semantic search |
@@ -1823,36 +1822,35 @@ Based on research, the AGENTS.md file should include:
 
 ---
 
-### Immediate Next Steps
+### ✅ Completed Steps (January 2026)
 
-1. **📝 Draft AGENTS.md** with finalized tech stack
-2. **📝 Create CLAUDE.md** with Claude-specific context
-3. **🔧 Set up Convex project** and begin migration planning
-4. **🔧 Set up Clerk project** and configure auth
+1. **✅ AGENTS.md** — Created with finalized tech stack
+2. **✅ CLAUDE.md** — Created with Claude-specific context
+3. **✅ Convex project** — Set up and migration complete
+4. **✅ Clerk project** — Configured with Convex integration
 
-### Migration Planning
+### ✅ Migration Completed
 
-1. [ ] Create detailed Convex migration plan
-2. [ ] Inventory Supabase tables and data
-3. [ ] Map Supabase schema to Convex documents
-4. [ ] Plan auth migration (Supabase Auth → Clerk)
-5. [ ] Set up development environment
+1. [x] Created detailed Convex migration plan
+2. [x] Inventoried Supabase tables and data
+3. [x] Mapped Supabase schema to Convex documents
+4. [x] Completed auth migration (Supabase Auth → Clerk)
+5. [x] Set up development environment
 
-### Short-term (This Week)
+### ✅ Initial Setup Complete
 
-1. [ ] Finalize AGENTS.md
-2. [ ] Create CLAUDE.md
-3. [ ] Set up .cursor/rules/ directory
-4. [ ] Set up Convex + Clerk + Flowglad accounts
-5. [ ] Begin migration implementation
+1. [x] Finalized AGENTS.md
+2. [x] Created CLAUDE.md
+3. [x] Set up .cursor/rules/ directory
+4. [x] Set up Convex + Clerk accounts
+5. [x] Completed migration implementation
 
-### Medium-term (Next 2 Weeks)
+### Current Focus
 
-1. [ ] Complete Supabase → Convex migration
-2. [ ] Implement YouTube Data API integration
-3. [ ] Implement chat with YouTube context
-4. [ ] Add transcript analysis features
-5. [ ] Set up Flowglad for subscriptions
+1. [ ] Implement YouTube Data API integration
+2. [ ] Implement chat with YouTube context
+3. [ ] Add transcript analysis features
+4. [ ] Set up Flowglad for subscriptions
 
 ---
 

@@ -1,7 +1,7 @@
 # Testing Guidelines
 
 > **Last Updated:** January 2026  
-> **Status:** Testing infrastructure planned, not yet implemented
+> **Status:** Testing conventions defined, infrastructure pending implementation
 
 ## Testing Strategy
 
@@ -259,7 +259,7 @@ vi.stubEnv("NEXT_PUBLIC_CONVEX_URL", "https://test.convex.cloud")
 
 ```bash
 # Type checking (always run first)
-bun run type-check
+bun run typecheck
 
 # Linting
 bun run lint
@@ -281,10 +281,10 @@ bun run test:e2e --headed        # Run with browser visible
 jobs:
   validate:
     steps:
-      - run: npm run lint
-      - run: npm run type-check
+      - run: bun run lint
+      - run: bun run typecheck
       # TODO: Uncomment when tests are added
-      # - run: npm test
+      # - run: bun run test
 ```
 
 ## Coverage Requirements
