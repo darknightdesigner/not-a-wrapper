@@ -158,7 +158,7 @@ For long sessions, Claude should:
 ```markdown
 ✅ DO: "This error is because X. Here's how to fix the code properly..."
 ✅ DO: "This pattern violates React 19's ref rules. The correct pattern is..."
-✅ DO: "I'll consult docs/react-19-lint-fixes.md for the recommended fix."
+✅ DO: "I'll consult .agents/workflows/react-19-lint-fixes.md for the recommended fix."
 
 ❌ DON'T: "We can disable this rule in eslint.config.mjs..."
 ❌ DON'T: "Let me add // @ts-ignore to suppress this..."
@@ -167,7 +167,7 @@ For long sessions, Claude should:
 
 ### Reference for Fixes
 
-- `docs/react-19-lint-fixes.md` — React 19 / React Compiler patterns
+- `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
 - `.agents/context/conventions.md` — Quality gates and acceptable exceptions
 - Gold standard examples in `AGENTS.md`
 

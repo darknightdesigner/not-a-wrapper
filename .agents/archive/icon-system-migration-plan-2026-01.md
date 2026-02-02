@@ -417,7 +417,7 @@ rg "from ['\"]lucide-react['\"]" --type ts --type tsx
       paths: [
         {
           name: "lucide-react",
-          message: "Use @phosphor-icons/react or @/lib/icons instead. See docs/icon-system-migration-plan.md"
+          message: "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md"
         }
       ],
       patterns: [

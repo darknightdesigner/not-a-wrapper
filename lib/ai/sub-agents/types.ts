@@ -5,7 +5,7 @@
  * used to delegate specialized tasks to purpose-built agents.
  *
  * @see CLAUDE.md - Sub-Agent Architecture section
- * @see docs/agents-research.md - Detailed research on sub-agent patterns
+ * @see .agents/context/research/tech-stack-evaluation.md - Detailed research on sub-agent patterns
  */
 
 // ============================================================================

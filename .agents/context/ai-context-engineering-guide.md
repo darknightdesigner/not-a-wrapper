@@ -263,7 +263,7 @@ Use this decision matrix to determine where to put information:
 |------------------|------|--------|
 | Project overview, tech stack | `AGENTS.md` | Universal for all AI tools |
 | Build/test commands | `AGENTS.md` | All agents need this |
-| Code conventions & style | `AGENTS.md` or `context/conventions.md` | Universal, link for details |
+| Code conventions & style | `AGENTS.md` or `.agents/context/conventions.md` | Universal, link for details |
 | Claude-specific behaviors | `CLAUDE.md` | Only Claude reads this |
 | Module-specific patterns | `src/[module]/CLAUDE.md` | Loaded only when in that directory |
 | Permission boundaries | `AGENTS.md` + `.claude/settings.json` | Human-readable + enforced |
@@ -273,7 +273,7 @@ Use this decision matrix to determine where to put information:
 | Persistent notes & discoveries | `NOTES.md` or `memories/` | Agentic memory across sessions |
 | Feature requirements | `spec.md` | Planning before implementation |
 | Current task status | `plan.md` | Living document during work |
-| Architecture decisions | `context/architecture.md` | Long-term reference |
+| Architecture decisions | `.agents/context/architecture.md` | Long-term reference |
 
 ### File Overlap Strategy
 
@@ -697,7 +697,7 @@ Start with overview, provide details on demand:
 ```markdown
 ## Database
 We use Supabase PostgreSQL.
-- Schema: See `context/database.md`
+- Schema: See `.agents/context/database.md`
 - Queries: See `src/lib/queries.ts`
 - Migrations: See `supabase/migrations/`
 ```
@@ -819,7 +819,7 @@ For applications requiring robust AI memory beyond file-based storage:
 See @README for project overview and @package.json for available npm commands.
 
 # Additional Instructions
-- git workflow @docs/git-instructions.md
+- development workflow @.agents/workflows/development-cycle.md
 ```
 
 ### Four-Phase Coding Cycle (Anthropic's Recommended Workflow)
@@ -1018,13 +1018,13 @@ For scenarios where parallel tool use is less likely:
 - [x] Create `plan.md` as working document
 
 ### Project Setup — Context Directory
-- [x] Set up `context/` directory structure
-- [x] Write `context/architecture.md`
-- [x] Write `context/conventions.md`
-- [x] Write `context/testing.md`
-- [x] Write `context/api.md` (if applicable)
-- [x] Write `context/database.md` (if applicable)
-- [x] Write `context/deployment.md`
+- [x] Set up `.agents/context/` directory structure
+- [x] Write `.agents/context/architecture.md`
+- [x] Write `.agents/context/conventions.md`
+- [x] Write `.agents/context/testing.md`
+- [x] Write `.agents/context/api.md` (if applicable)
+- [x] Write `.agents/context/database.md` (if applicable)
+- [x] Write `.agents/context/deployment.md`
 
 ### Project Setup — Nested CLAUDE.md Files
 - [x] Identify key modules that need specific context
@@ -1116,11 +1116,11 @@ The following areas require additional investigation or clarification:
 
 | Question | Resolution | Reference |
 |----------|------------|-----------|
-| Convex vs Supabase for AI-first apps? | **Convex** — Built-in RAG, vector search, TypeScript-first | `docs/agents-research.md` |
-| Auth provider for Convex + payments? | **Clerk** — Native integration with both Convex and Flowglad | `docs/agents-research.md` |
-| Payments platform? | **Flowglad** — Open-source, Clerk-native, developer-friendly | `docs/agents-research.md` |
-| Testing strategy for AI apps? | **Critical paths only** — Auth, data transforms, rate limiting | `docs/agents-research.md` |
-| Sub-agent architecture? | **4-agent design** — Transcript, Title, Thumbnail, Analytics | `docs/agents-research.md` |
+| Convex vs Supabase for AI-first apps? | **Convex** — Built-in RAG, vector search, TypeScript-first | `.agents/context/research/tech-stack-evaluation.md` |
+| Auth provider for Convex + payments? | **Clerk** — Native integration with both Convex and Flowglad | `.agents/context/research/tech-stack-evaluation.md` |
+| Payments platform? | **Flowglad** — Open-source, Clerk-native, developer-friendly | `.agents/context/research/tech-stack-evaluation.md` |
+| Testing strategy for AI apps? | **Critical paths only** — Auth, data transforms, rate limiting | `.agents/context/research/tech-stack-evaluation.md` |
+| Sub-agent architecture? | **4-agent design** — Transcript, Title, Thumbnail, Analytics | `.agents/context/research/tech-stack-evaluation.md` |
 
 ### Remaining Questions
 
@@ -1215,8 +1215,8 @@ The following areas require additional investigation or clarification:
 - [Anthropic Model System Cards](https://www.anthropic.com/system-cards)
 
 ### Project-Specific Research (vid0)
-- `docs/agents-research.md` — Comprehensive tech stack evaluation (Convex vs Supabase, auth, payments)
-- `docs/youtube-transcript-evaluation.md` — YouTube transcript extraction research
+- `.agents/context/research/tech-stack-evaluation.md` — Comprehensive tech stack evaluation (Convex vs Supabase, auth, payments)
+- `.agents/context/research/youtube-transcript-evaluation.md` — YouTube transcript extraction research
 - `AGENTS.md` — Finalized project configuration for AI agents
 
 ## Case Study: vid0
@@ -1480,7 +1480,7 @@ The AI context infrastructure is now fully established:
 | Category | Files Created | Purpose |
 |----------|---------------|---------|
 | **Core Files** | `AGENTS.md`, `CLAUDE.md`, `NOTES.md`, `spec.md`, `plan.md` | Foundation for AI agents |
-| **Context Docs** | 6 files in `context/` | Domain-specific reference |
+| **Context Docs** | 6 files in `.agents/context/` | Domain-specific reference |
 | **Nested CLAUDE.md** | 8 module-specific files | Hierarchical context |
 | **Cursor Rules** | 6 numbered `.mdc` files | Auto-attached by glob |
 | **Claude Commands** | 5 slash commands | Reusable workflows |

@@ -100,9 +100,9 @@ A platform that:
 
 | Document | Status | Notes |
 |----------|--------|-------|
-| `youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
-| `installation-implementation-plan.md` | ✅ Complete | Phased implementation roadmap |
-| `AI_CONTEXT_SETUP_GUIDE.md` | ✅ Complete | AI orchestration best practices |
+| `.agents/context/research/youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
+| `.agents/archive/installation-implementation-plan-2026-01.md` | ✅ Complete | Phased implementation roadmap |
+| `.agents/context/ai-context-engineering-guide.md` | ✅ Complete | AI orchestration best practices |
 
 ### Current Implementation Status
 
@@ -912,7 +912,7 @@ const updateTitle = async (id: string, title: string) => {
 
 #### Context Management Strategy
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md` and Anthropic best practices:
+Based on `.agents/context/ai-context-engineering-guide.md` and Anthropic best practices:
 
 **1. Context Compaction (For Long Conversations)**
 
@@ -1041,7 +1041,7 @@ async function handleUserRequest(request: UserRequest) {
 
 #### Four-Phase Coding Cycle (Anthropic Recommended)
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md`:
+Based on `.agents/context/ai-context-engineering-guide.md`:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1427,7 +1427,7 @@ tests/
 
 ### 🔵 RESEARCH NEEDED: AI Development Workflow
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md`, the recommended workflow is:
+Based on `.agents/context/ai-context-engineering-guide.md`, the recommended workflow is:
 
 ```
 Phase 1: Research → Phase 2: Plan → Phase 3: Code → Phase 4: Commit
@@ -1715,8 +1715,8 @@ The core tech stack is now finalized:
 | Topic | Date | Summary | Decision Needed | Link |
 |-------|------|---------|-----------------|------|
 | YouTube Transcripts | Jan 2026 | Use youtube-transcript + Whisper fallback | ✅ Decided | [Link](./youtube-transcript-evaluation.md) |
-| Implementation Plan | Jan 2026 | Phased approach over 2 weeks | ✅ Approved | [Link](./installation-implementation-plan.md) |
-| AI Context Setup | Jan 2026 | AGENTS.md + CLAUDE.md standards | ✅ Following | [Link](../AI_CONTEXT_SETUP_GUIDE.md) |
+| Implementation Plan | Jan 2026 | Phased approach over 2 weeks | ✅ Approved | [Link](../../archive/installation-implementation-plan-2026-01.md) |
+| AI Context Setup | Jan 2026 | AGENTS.md + CLAUDE.md standards | ✅ Following | [Link](../ai-context-engineering-guide.md) |
 | **Convex vs Supabase** | Jan 13, 2026 | Convex recommended for AI-first chat | ✅ **DECIDED** | This doc |
 | **YouTube Data API** | Jan 13, 2026 | Two APIs needed (Data + Analytics) | ✅ **DECIDED** | This doc |
 | **Security Boundaries** | Jan 13, 2026 | AI permissions defined | ✅ Ready for AGENTS.md | This doc |

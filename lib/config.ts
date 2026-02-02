@@ -172,7 +172,7 @@ export const ANTHROPIC_BETA_HEADERS = {
  * Optimized for cost/performance balance.
  *
  * @see lib/ai/sub-agents/types.ts
- * @see docs/agents-research.md
+ * @see .agents/context/research/tech-stack-evaluation.md
  */
 export const SUB_AGENT_MODELS = {
   /** Main orchestrator - complex reasoning */

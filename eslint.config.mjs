@@ -7,9 +7,9 @@ const eslintConfig = [
   },
   {
     // Icon system enforcement: Use Phosphor or @/lib/icons instead of lucide-react
-    // See docs/icon-system-migration-plan.md for details
+    // See .agents/archive/icon-system-migration-plan-2026-01.md for details
     files: ["**/*.{ts,tsx}"],
-    ignores: ["lib/icons/extras.ts", "docs/**"],
+    ignores: ["lib/icons/extras.ts"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -18,14 +18,14 @@ const eslintConfig = [
             {
               name: "lucide-react",
               message:
-                "Use @phosphor-icons/react or @/lib/icons instead. See docs/icon-system-migration-plan.md",
+                "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md",
             },
           ],
           patterns: [
             {
               group: ["lucide-react/*"],
               message:
-                "Use @phosphor-icons/react or @/lib/icons instead. See docs/icon-system-migration-plan.md",
+                "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md",
             },
           ],
         },

@@ -17,20 +17,20 @@ export const MistralIcon = forwardRef<SVGSVGElement, MistralIconProps>(
     >
       <g clipPath="url(#mistral)">
         <path
-          fill="gold"
+          fill="currentColor"
           d="M9.141 9.067h9.144v9.141H9.141zm36.571 0h9.147v9.141h-9.147z"
         />
         <path
-          fill="#FFAF00"
+          fill="currentColor"
           d="M9.141 18.208h18.286v9.144H9.144zm27.43 0h18.285v9.144H36.571z"
         />
-        <path fill="#FF8205" d="M9.141 27.355H54.86v9.141H9.14z" />
+        <path fill="currentColor" d="M9.141 27.355H54.86v9.141H9.14z" />
         <path
-          fill="#FA500F"
+          fill="currentColor"
           d="M9.141 36.496h9.144v9.141H9.141zm18.288 0h9.144v9.141H27.43zm18.283 0h9.147v9.141h-9.147z"
         />
         <path
-          fill="#E10500"
+          fill="currentColor"
           d="M0 45.637h27.43v9.144H0zm36.57 0H64v9.144H36.57z"
         />
       </g>

@@ -7,7 +7,7 @@
  * - Token estimation
  *
  * @see https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
- * @see AI_CONTEXT_SETUP_GUIDE.md for implementation details
+ * @see .agents/context/ai-context-engineering-guide.md for implementation details
  */
 
 import type { Message as AIMessage } from "ai"

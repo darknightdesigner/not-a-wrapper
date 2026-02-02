@@ -16,7 +16,7 @@ Living document for tracking current work and next steps.
 
 ### ✅ Completed
 - [x] Research tech stack decisions (Convex, Clerk, Flowglad)
-- [x] Document decisions in `docs/agents-research.md`
+- [x] Document decisions in `.agents/context/research/tech-stack-evaluation.md`
 - [x] Create `AGENTS.md` with project overview
 - [x] Create `CLAUDE.md` with Claude-specific context
 - [x] Create `.copilot-instructions.md` for GitHub Copilot
@@ -24,12 +24,12 @@ Living document for tracking current work and next steps.
 - [x] Create `spec.md` for requirements
 - [x] Create `plan.md` (this file)
 - [x] Create context directory structure
-  - [x] `context/architecture.md`
-  - [x] `context/conventions.md`
-  - [x] `context/testing.md`
-  - [x] `context/api.md`
-  - [x] `context/database.md`
-  - [x] `context/deployment.md`
+  - [x] `.agents/context/architecture.md`
+  - [x] `.agents/context/conventions.md`
+  - [x] `.agents/context/testing.md`
+  - [x] `.agents/context/api.md`
+  - [x] `.agents/context/database.md`
+  - [x] `.agents/context/deployment.md`
 - [x] Set up `.cursor/rules/` directory
   - [x] `001_core.mdc` (core workspace rules)
   - [x] `002_security.mdc` (security guidelines)
@@ -54,11 +54,11 @@ Living document for tracking current work and next steps.
   - [x] `components/CLAUDE.md`
   - [x] `hooks/CLAUDE.md`
 - [x] Implement Development Workflow
-  - [x] Create `docs/workflows.md` with four-phase cycle, TDD, extended thinking
+  - [x] Create `.agents/workflows/development-cycle.md` with four-phase cycle, TDD, extended thinking
   - [x] Create workflow commands: `/research`, `/plan`, `/tdd`, `/verify`, `/commit`
   - [x] Update `CLAUDE.md` with workflow references
   - [x] Update `AGENTS.md` with workflow overview
-  - [x] Create `docs/workflow-examples.md` with practical examples
+  - [x] Create `.agents/workflows/examples.md` with practical examples
 
 ### ✅ Recently Completed (Sprint 3)
 - [x] Set up Convex project
@@ -72,7 +72,7 @@ Living document for tracking current work and next steps.
 - [x] Clean up legacy Supabase files
 
 ### 🔄 In Progress
-- [ ] Prompt-Kit component consolidation (see `docs/prompt-kit-update-plan.md`)
+- [ ] Prompt-Kit component consolidation
   - [ ] **Phase 1**: Pre-flight checks & install dependencies
   - [ ] **Phase 2**: Backup existing components
   - [ ] **Phase 3**: Migrate 9 components from `prompt-kit/` to `ui/`
@@ -132,8 +132,6 @@ Before YouTube integration, consolidating UI components:
 3. Update existing components to latest prompt-kit versions
 4. Verify all imports updated to `@/components/ui/`
 
-See `docs/prompt-kit-update-plan.md` for detailed execution steps.
-
 ### 2026-01-18
 
 **Convex Migration Complete!** Successfully migrated from Supabase to Convex:
@@ -154,8 +152,8 @@ See `docs/prompt-kit-update-plan.md` for detailed execution steps.
 - `plan.md` — This working document
 
 **Context Directory (6 files):**
-- `context/architecture.md`, `context/conventions.md`, `context/testing.md`
-- `context/api.md`, `context/database.md`, `context/deployment.md`
+- `.agents/context/architecture.md`, `.agents/context/conventions.md`, `.agents/context/testing.md`
+- `.agents/context/api.md`, `.agents/context/database.md`, `.agents/context/deployment.md`
 
 **Nested CLAUDE.md Files (8 files):**
 - `app/CLAUDE.md`, `app/api/CLAUDE.md`, `app/auth/CLAUDE.md`, `app/components/CLAUDE.md`
@@ -176,7 +174,7 @@ bun run build        # Production build
 ### Key Files
 - `AGENTS.md` — Project overview for AI
 - `spec.md` — Requirements
-- `docs/agents-research.md` — Tech decisions
+- `.agents/context/research/tech-stack-evaluation.md` — Tech decisions
 
 ### Gold Standard Patterns
 - API Route: `app/api/chat/route.ts`
@@ -232,7 +230,7 @@ bun run build        # Production build
   - Bundle size: Adds ~50KB for JSX parsing/rendering runtime
   - Performance: Needs debouncing for streaming responses to avoid excessive re-renders
 - **Status**: Evaluate when implementing generative UI features
-- **Reference**: https://prompt-kit.com/docs and `docs/prompt-kit-analysis.md`
+- **Reference**: https://prompt-kit.com/docs
 
 ### LLM Context Files
 

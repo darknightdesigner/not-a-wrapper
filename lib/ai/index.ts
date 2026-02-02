@@ -5,7 +5,7 @@
  * - Context management (compaction, token estimation)
  * - Sub-agent architecture (orchestration, specialized agents)
  *
- * @see AI_CONTEXT_SETUP_GUIDE.md for implementation details
+ * @see .agents/context/ai-context-engineering-guide.md for implementation details
  */
 
 // Context Management

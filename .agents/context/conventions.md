@@ -404,7 +404,7 @@ brokenCode()
 ### Reference Documentation
 
 When fixing lint errors, consult:
-- `docs/react-19-lint-fixes.md` — React 19 / React Compiler patterns
+- `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
 - Gold standard examples in `AGENTS.md`
 - Official documentation linked in error messages
 

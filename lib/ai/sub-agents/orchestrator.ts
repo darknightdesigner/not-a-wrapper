@@ -6,7 +6,7 @@
  * to prevent context pollution and optimize token usage.
  *
  * @see CLAUDE.md - Sub-Agent Architecture section
- * @see docs/agents-research.md - Implementation rationale
+ * @see .agents/context/research/tech-stack-evaluation.md - Implementation rationale
  *
  * TODO: Implement after core features are stable
  * TODO: Add streaming support for real-time responses
