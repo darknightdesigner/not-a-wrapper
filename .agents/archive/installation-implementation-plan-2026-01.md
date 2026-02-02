@@ -1392,7 +1392,7 @@ export async function transcribeWithWhisper(audioUrl: string) {
 
 **Priority:** 🟢 Low
 
-See `install-remaining-components.md` for full list of 58 missing components.
+> **Note**: The referenced `install-remaining-components.md` was never created. Use `npx shadcn@latest add <component>` to install missing shadcn/ui components as needed.
 
 ### 5.4 Rich Text Editor with Tiptap (Optional) ⏱️ 3-4 hours
 
