@@ -231,46 +231,65 @@ export const SidebarMenuItem = forwardRef<
 })
 ```
 
-### Step 4: Update Chat List Items for Icon Mode
+### Step 4 & 5: Hide Content When Collapsed (Simplified)
 
-**File**: `app/components/layout/sidebar/sidebar-item.tsx`
+> **Updated Approach**: Instead of modifying `sidebar-item.tsx` and `sidebar-list.tsx` individually, we wrap all collapsible content in a single div with `group-data-[collapsible=icon]:hidden`.
 
-Chat items should be hidden when collapsed (only show action buttons). Add:
+**File**: `app/components/layout/sidebar/app-sidebar.tsx`
+
+Wrap `SidebarProject`, chat lists, and empty state in a hidden-when-collapsed div:
 
 ```tsx
-// At the top of the component, get sidebar state:
+{/* Hide project and chat lists when collapsed */}
+<div className="group-data-[collapsible=icon]:hidden">
+  <SidebarProject />
+  {isLoading ? (
+    <div className="h-full" />
+  ) : hasChats ? (
+    <div className="space-y-4">
+      {pinnedChats.length > 0 && (
+        <SidebarList ... />
+      )}
+      {groupedChats?.map((group) => (
+        <SidebarList ... />
+      ))}
+    </div>
+  ) : (
+    <div className="flex py-20 flex-col items-center justify-center">
+      {/* Empty state */}
+    </div>
+  )}
+</div>
+```
+
+**Benefits of this approach**:
+- No changes needed to `sidebar-item.tsx`, `sidebar-list.tsx`, or `sidebar-project.tsx`
+- Single point of control
+- Easier to test and revert
+
+**Original approach** (kept for reference if per-component control is needed later):
+
+<details>
+<summary>Individual component modifications</summary>
+
+**sidebar-item.tsx**:
+```tsx
 import { useSidebar } from "@/components/ui/sidebar"
 
 // Inside the component:
 const { state } = useSidebar()
-const isCollapsed = state === "collapsed"
-
-// Hide entire chat list items when collapsed
-if (isCollapsed) {
-  return null
-}
-
-// ... rest of existing component
+if (state === "collapsed") return null
 ```
 
-### Step 5: Update SidebarList Section Headers
-
-**File**: `app/components/layout/sidebar/sidebar-list.tsx`
-
-Section headers should be hidden when collapsed:
-
+**sidebar-list.tsx**:
 ```tsx
 import { useSidebar } from "@/components/ui/sidebar"
 
 // Inside component:
 const { state } = useSidebar()
-const isCollapsed = state === "collapsed"
-
-// Hide section headers and chat lists when collapsed
-if (isCollapsed) {
-  return null
-}
+if (state === "collapsed") return null
 ```
+</details>
 
 ### Step 6: Update Sticky Actions Area
 
@@ -468,46 +487,68 @@ const SIDEBAR_WIDTH_ICON = "3rem"  // 48px collapsed
 ## Testing Checklist
 
 ### Functional Tests
-- [ ] Clicking toggle button collapses sidebar to icon rail
-- [ ] Clicking toggle button (or icons) expands sidebar
-- [ ] Tooltips appear on hover when collapsed
-- [ ] Keyboard shortcut (Cmd+B) toggles sidebar
-- [ ] State persists in cookie across page loads
-- [ ] New Chat button works in both states
-- [ ] Search button works in both states
-- [ ] User menu works in both states
-- [ ] Links navigate correctly in both states
+
+| Test | Priority | Notes |
+|------|----------|-------|
+| ⬜ Toggle button collapses sidebar to icon rail | P0 | Core functionality |
+| ⬜ Toggle button expands sidebar | P0 | Core functionality |
+| ⬜ Tooltips appear on hover when collapsed | P0 | Verify on: Home, New Chat, Search, User |
+| ✅ Keyboard shortcut (Cmd+B) toggles sidebar | P1 | Already implemented - just verify |
+| ✅ State persists in cookie across page loads | P1 | Already implemented - just verify |
+| ⬜ New Chat button navigates to `/` in both states | P0 | |
+| ⬜ Search button opens CommandHistory dialog | P0 | Test both expanded and collapsed |
+| ⬜ User menu dropdown opens in both states | P1 | |
+| ⬜ Login link works when collapsed | P2 | Only for logged-out users |
 
 ### Visual Tests
-- [ ] Smooth transition animation (200ms)
-- [ ] Icons centered in collapsed state
-- [ ] No layout shift in main content area
-- [ ] Proper spacing in both states
-- [ ] Hover states work correctly
-- [ ] Active states visible in both modes
+
+| Test | Priority | Notes |
+|------|----------|-------|
+| ⬜ Smooth transition animation (200ms) | P1 | No jarring jumps |
+| ⬜ Icons centered in collapsed state (48px rail) | P0 | Verify alignment |
+| ⬜ No layout shift in main content area | P0 | Content shouldn't jump |
+| ⬜ Proper spacing in both states | P1 | Check padding, gaps |
+| ⬜ Hover states work correctly | P1 | Background color change |
+| ⬜ Active chat state visible when expanded | P2 | |
+| ⬜ Gradient fade hidden when collapsed | P2 | |
 
 ### Responsive Tests
-- [ ] Mobile still uses Sheet (offcanvas) behavior
-- [ ] Desktop uses icon rail collapse
-- [ ] Breakpoint at 768px (md) works correctly
+
+| Test | Priority | Notes |
+|------|----------|-------|
+| ⬜ Mobile (< 768px) uses Sheet behavior | P0 | Swipe from left, full overlay |
+| ⬜ Desktop (≥ 768px) uses icon rail | P0 | 48px collapsed width |
+| ⬜ Resize from desktop to mobile | P1 | Should switch modes smoothly |
 
 ### Accessibility Tests
-- [ ] Screen reader announces sidebar state
-- [ ] Focus management works correctly
-- [ ] Keyboard navigation works in both states
-- [ ] Tooltips accessible via keyboard
+
+| Test | Priority | Notes |
+|------|----------|-------|
+| ⬜ Screen reader announces "Sidebar collapsed/expanded" | P1 | Via `aria-label` or live region |
+| ⬜ Focus visible on all interactive elements | P0 | Tab through collapsed state |
+| ⬜ Keyboard navigation works (Tab, Enter, Escape) | P0 | |
+| ⬜ Tooltips accessible via keyboard focus | P1 | Should appear on focus, not just hover |
+
+### Edge Cases
+
+| Test | Priority | Notes |
+|------|----------|-------|
+| ⬜ Empty state (no chats) - collapsed looks okay | P2 | Should just show action buttons |
+| ⬜ Many chats (50+) - scroll works when expanded | P2 | |
+| ⬜ Long chat titles - no overflow issues | P2 | |
+| ⬜ User with no profile image - avatar fallback | P2 | |
 
 ## Potential Issues & Solutions
 
 ### Issue 1: HistoryTrigger Component
-The `HistoryTrigger` component accepts `icon` and `label` props separately, so it can render icon-only. However, you'll need to:
-1. Create two instances: one for expanded (with label) and one for collapsed (icon-only)
-2. Use `group-data-[collapsible=icon]:hidden` and `hidden group-data-[collapsible=icon]:block` to toggle between them
-3. Add tooltip wrapper around the collapsed version
+
+**Problem**: `HistoryTrigger` can't easily switch between expanded/collapsed modes internally.
+
+**Solution**: Create two instances with CSS visibility toggling.
 
 ```tsx
 // Expanded version (has label)
-<div className="group-data-[collapsible=icon]:hidden">
+<div className="w-full group-data-[collapsible=icon]:hidden">
   <HistoryTrigger
     hasSidebar={false}
     classNameTrigger="..."
@@ -529,21 +570,94 @@ The `HistoryTrigger` component accepts `icon` and `label` props separately, so i
       />
     </div>
   </TooltipTrigger>
-  <TooltipContent side="right">Search</TooltipContent>
+  <TooltipContent side="right">Search (⌘K)</TooltipContent>
 </Tooltip>
 ```
 
+**Trade-off**: Verbose, but avoids refactoring `HistoryTrigger`. Consider refactoring in a future PR.
+
+---
+
 ### Issue 2: useSidebar Hook Context
-Ensure all components using `useSidebar()` are inside `SidebarProvider`. The provider is in the layout, so this should work, but verify.
 
-### Issue 3: Tooltip Provider
-The Shadcn sidebar wraps content in `TooltipProvider`. Nested tooltips might conflict. Test thoroughly.
+**Problem**: Components using `useSidebar()` will throw if rendered outside `SidebarProvider`.
 
-### Issue 4: Cookie Persistence
-The sidebar state is stored in a cookie. Ensure this doesn't cause hydration mismatches. The existing implementation handles this, but verify.
+**Impact**: Tests, Storybook, or standalone usage will fail.
+
+**Solution**: The layout wraps everything in `SidebarProvider`, so this works for production. For tests:
+
+```tsx
+// In test files, wrap with provider:
+import { SidebarProvider } from "@/components/ui/sidebar"
+
+render(
+  <SidebarProvider>
+    <SidebarMenuItem icon={HomeIcon} label="Home" />
+  </SidebarProvider>
+)
+```
+
+---
+
+### Issue 3: Tooltip Provider Nesting
+
+**Problem**: Shadcn sidebar wraps content in `TooltipProvider`. Our custom tooltips might conflict.
+
+**Solution**: The Shadcn `TooltipProvider` has `delayDuration={0}` set. Nested `<Tooltip>` components work fine - they share the same provider context. No action needed.
+
+---
+
+### Issue 4: Cookie Persistence & Hydration
+
+**Problem**: Cookie-based state could cause hydration mismatches.
+
+**Solution**: Already handled by Shadcn. The `getSidebarStateFromCookie()` function only runs client-side (`if (typeof document === "undefined") return undefined`). Initial render uses `defaultOpen`, then syncs from cookie on mount.
+
+---
 
 ### Issue 5: Mobile Behavior
-On mobile, we want to keep the Sheet (offcanvas) behavior, not icon mode. The Shadcn component handles this via `isMobile` check, but verify the breakpoint works.
+
+**Problem**: We want Sheet (offcanvas) on mobile, icon-rail on desktop.
+
+**Solution**: Already handled by Shadcn. The `Sidebar` component checks `isMobile` internally:
+
+```tsx
+// From components/ui/sidebar.tsx line 196:
+if (isMobile) {
+  return <Sheet>...</Sheet>  // Mobile uses Sheet
+}
+return <div data-collapsible={...}>...</div>  // Desktop uses icon mode
+```
+
+The `collapsible="icon"` prop only affects desktop behavior.
+
+---
+
+### Issue 6: ScrollArea Padding in Collapsed Mode
+
+**Problem**: `px-3` padding looks odd at 48px width.
+
+**Solution**: Reduce padding when collapsed:
+
+```tsx
+<ScrollArea className="flex h-full px-3 group-data-[collapsible=icon]:px-1 ...">
+```
+
+---
+
+### Issue 7: SidebarRail as Alternative Toggle
+
+**Problem**: Plan doesn't leverage `SidebarRail` component for edge-hover toggling.
+
+**Decision**: Out of scope for initial implementation. The `SidebarRail` provides a resize-cursor hover zone at the sidebar edge. Can be added later for power users:
+
+```tsx
+// Future enhancement:
+<Sidebar collapsible="icon">
+  {/* ... content ... */}
+  <SidebarRail />  {/* Adds hover-to-resize/toggle behavior */}
+</Sidebar>
+```
 
 ## File Change Summary
 
@@ -1003,13 +1117,59 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
 .group-data-[collapsible=icon]:p-1
 ```
 
+## Architecture Decisions
+
+### Why Wrap Content vs Modify Each Component
+
+**Decision**: Wrap collapsible content in a single `group-data-[collapsible=icon]:hidden` div rather than modifying `sidebar-item.tsx`, `sidebar-list.tsx`, and `sidebar-project.tsx` individually.
+
+**Pros**:
+- Fewer files changed (4 vs 6)
+- Single point of control
+- Easier to revert if needed
+- No risk of forgetting a component
+
+**Cons**:
+- Entire sections disappear rather than graceful degradation
+- No per-item collapsed representation (e.g., showing chat icons)
+
+**Future Alternative**: For a richer collapsed experience (like showing recent chat icons), you'd need to modify each component to have a collapsed variant.
+
+---
+
+### Why Keep Custom SidebarMenuItem
+
+**Decision**: Keep the custom `SidebarMenuItem` in `app/components/layout/sidebar/` rather than refactoring to use Shadcn's `SidebarMenuButton`.
+
+**Rationale**:
+- Custom component is tailored for action items (New Chat, Search)
+- Has specific styling (larger touch targets, keyboard shortcut trailing)
+- Shadcn's `SidebarMenuButton` is designed for menu items within `SidebarMenu`/`SidebarMenuItem` wrappers
+- Refactoring would require changing the HTML structure
+
+**Future**: Consider consolidating in a larger sidebar refactor.
+
+---
+
+## Future Enhancements
+
+| Enhancement | Effort | Value |
+|-------------|--------|-------|
+| Add `SidebarRail` for edge-hover toggle | Low | Medium |
+| Refactor `HistoryTrigger` to support collapsed prop | Medium | Medium |
+| Show recent chat icons when collapsed | High | High |
+| Rename custom `SidebarMenuItem` to `SidebarActionItem` | Low | Low |
+| Add animation polish (stagger, spring) | Low | Low |
+
+---
+
 ## References
 
-- Shadcn Sidebar Docs: https://ui.shadcn.com/docs/components/sidebar
+- [Shadcn Sidebar Docs](https://ui.shadcn.com/docs/components/sidebar)
 - ChatGPT Sidebar HTML analysis (provided by user)
 - Existing implementation in `components/ui/sidebar.tsx`
 
-## Notes
+## Implementation Notes
 
 - The Shadcn sidebar component already has excellent support for icon mode
 - Most of the work is updating app-specific components to respect the collapsed state
@@ -1017,3 +1177,12 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
 - The `useSidebar()` hook provides `state: "expanded" | "collapsed"`
 - The `HeaderSidebarTrigger` component already uses `toggleSidebar()` which works for both modes
 - Mobile continues to use Sheet (offcanvas) behavior - this is handled automatically by Shadcn
+
+---
+
+## Changelog
+
+| Date | Change |
+|------|--------|
+| 2026-02-01 | Added review summary, resolved open questions, renumbered steps, updated UserMenu guidance, added architecture decisions |
+| 2026-01-XX | Initial plan created |

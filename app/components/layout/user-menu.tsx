@@ -101,14 +101,19 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
             modal={false}
           >
             <DropdownMenuTrigger asChild>
-              <SidebarMenuButton size="lg" className="w-full">
+              <SidebarMenuButton
+                size="lg"
+                className="w-full"
+                tooltip={user?.display_name || "Account"}
+              >
                 <Avatar className="size-8 bg-emerald-600">
                   <AvatarImage src={user?.profile_image ?? undefined} />
                   <AvatarFallback className="bg-emerald-600 text-sm text-white">
                     {user?.display_name?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div className="grid flex-1 text-left text-sm leading-tight">
+                {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                   <span className="truncate font-semibold">
                     {user?.display_name}
                   </span>
@@ -116,7 +121,11 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                     {user?.premium ? "Plus" : "Free"}
                   </span>
                 </div>
-                <HugeiconsIcon icon={ArrowUpDownIcon} size={16} className="text-muted-foreground ml-auto" />
+                <HugeiconsIcon
+                  icon={ArrowUpDownIcon}
+                  size={16}
+                  className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent

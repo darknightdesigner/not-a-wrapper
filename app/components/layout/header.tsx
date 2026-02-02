@@ -6,6 +6,7 @@ import { UserMenu } from "@/app/components/layout/user-menu"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { NawIcon } from "@/components/icons/naw"
 import { Button } from "@/components/ui/button"
+import { useSidebar } from "@/components/ui/sidebar"
 import { APP_NAME } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
@@ -17,6 +18,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
   const { user } = useUser()
   const { preferences } = useUserPreferences()
+  const { state } = useSidebar()
+  const isCollapsed = state === "collapsed"
   const isMultiModelEnabled = preferences.multiModelEnabled
 
   const isLoggedIn = !!user
@@ -27,14 +30,18 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         <div className="flex flex-1 items-center justify-between">
           <div className="-ml-0.5 flex flex-1 items-center gap-2 lg:-ml-2.5">
             <div className="flex flex-1 items-center gap-2">
+              {/* Hide logo/text when sidebar is present on desktop (sidebar has its own home link) */}
+              {(!hasSidebar || isMobile) && (
                 <Link
                   href="/"
                   className="pointer-events-auto inline-flex items-center text-lg font-medium tracking-tight"
                 >
-                <NawIcon className="mr-1 size-4" />
-                {APP_NAME}
-              </Link>
-              {hasSidebar && isMobile && <HeaderSidebarTrigger />}
+                  <NawIcon className="mr-1 size-4" />
+                  {APP_NAME}
+                </Link>
+              )}
+              {/* Show toggle on mobile OR when collapsed on desktop */}
+              {hasSidebar && (isMobile || isCollapsed) && <HeaderSidebarTrigger />}
             </div>
           </div>
           <div />

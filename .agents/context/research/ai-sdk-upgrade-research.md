@@ -1,4 +1,4 @@
-# AI SDK Upgrade Research Plan
+# AI SDK Upgrade Research
 
 > **Goal:** Research and plan a smooth upgrade from Vercel AI SDK v4.x to v6.x
 > **Created:** 2026-02-01
