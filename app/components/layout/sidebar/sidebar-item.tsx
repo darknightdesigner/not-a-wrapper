@@ -183,13 +183,14 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
             href={`/c/${chat.id}`}
             className="block w-full"
             prefetch
+            draggable={false}
             onClick={handleLinkClick}
           >
             <div
-              className="text-primary relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
+              className="text-primary relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-2.5 py-2 pointer-coarse:py-3 text-sm text-ellipsis whitespace-nowrap"
               title={displayTitle}
             >
-              {displayTitle}
+              <span dir="auto">{displayTitle}</span>
             </div>
           </Link>
 

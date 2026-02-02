@@ -6,10 +6,38 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Touch device detection - hides elements on coarse pointer (touch) devices */
+@custom-variant pointer-coarse (@media (pointer: coarse));
+@custom-variant pointer-fine (@media (pointer: fine));
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
 @theme {
   --font-mono: var(--font-geist-mono);
   --spacing-app-header: 56px;
   --spacing-input-area: 134px;
+  --animate-collapsible-down: collapsible-down 200ms ease-out;
+  --animate-collapsible-up: collapsible-up 200ms ease-out;
 
   @keyframes loading-dots {
     0%,
