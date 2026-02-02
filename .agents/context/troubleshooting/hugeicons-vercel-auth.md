@@ -53,6 +53,24 @@ The fix is in `vercel.json` - use a custom install command that writes the full 
    - **Value:** Your HugeIcons Universal License Key (format: `XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX`)
    - **Environments:** Production, Preview, Development (all three)
 
+## GitHub Actions Setup
+
+The CI workflow (`.github/workflows/ci-cd.yml`) also needs the HugeIcons registry configured.
+
+1. Go to GitHub repo → Settings → Secrets and variables → Actions
+2. Add a new repository secret:
+   - **Name:** `HUGEICONS_LICENSE_KEY`
+   - **Value:** Your HugeIcons Universal License Key
+
+The workflow has a "Setup HugeIcons Pro registry" step that creates `.npmrc` before `bun install`:
+
+```yaml
+- name: Setup HugeIcons Pro registry
+  run: |
+    echo "@hugeicons-pro:registry=https://npm.hugeicons.com" >> .npmrc
+    echo "//npm.hugeicons.com/:_authToken=${{ secrets.HUGEICONS_LICENSE_KEY }}" >> .npmrc
+```
+
 ## Local Development
 
 For local development, the `.npmrc` file works normally because:
@@ -84,7 +102,8 @@ If builds still fail, check the Vercel build logs for the `cat .npmrc` output:
 
 ## Related Files
 
-- `vercel.json` - Contains the install command fix
+- `vercel.json` - Contains the install command fix for Vercel
+- `.github/workflows/ci-cd.yml` - GitHub Actions CI with registry setup
 - `.npmrc` - Local config (gitignored)
 - `.gitignore` - Line 70 excludes `.npmrc`
 - `.env.example` - Documents `HUGEICONS_LICENSE_KEY`
