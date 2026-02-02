@@ -1,10 +1,17 @@
 import {
-  Brain,
-  Notepad,
-  PaintBrush,
-  TrendUp,
-  MagnifyingGlass,
-} from "@phosphor-icons/react/dist/ssr"
+  Brain01Icon,
+  Note01Icon,
+  PaintBrush01Icon,
+  ChartUpIcon,
+  Search01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
+
+// IconSvgObject type definition for SUGGESTIONS array
+type IconSvgObject = ([string, {
+  [key: string]: string | number;
+}])[] | readonly (readonly [string, {
+  readonly [key: string]: string | number;
+}])[]
 
 // ============================================================================
 // Rate Limits & Usage
@@ -31,7 +38,13 @@ export const MODEL_DEFAULT = "gpt-4.1-nano"
 export const APP_NAME = "Not A Wrapper"
 export const APP_DOMAIN = "https://not-a-wrapper.com"
 
-export const SUGGESTIONS = [
+export const SUGGESTIONS: Array<{
+  label: string
+  highlight: string
+  prompt: string
+  items: string[]
+  icon: IconSvgObject
+}> = [
   {
     label: "Code",
     highlight: "Help me",
@@ -42,7 +55,7 @@ export const SUGGESTIONS = [
       "Help me optimize this database query for better performance",
       "Help me implement authentication in my Next.js app",
     ],
-    icon: Brain,
+    icon: Brain01Icon,
   },
   {
     label: "Writing",
@@ -54,7 +67,7 @@ export const SUGGESTIONS = [
       "Write a blog post explaining machine learning basics",
       "Write a compelling product description for my startup",
     ],
-    icon: Notepad,
+    icon: Note01Icon,
   },
   {
     label: "Research",
@@ -66,7 +79,7 @@ export const SUGGESTIONS = [
       "Research how to implement real-time features with WebSockets",
       "Research the latest trends in AI and machine learning",
     ],
-    icon: MagnifyingGlass,
+    icon: Search01Icon,
   },
   {
     label: "Analysis",
@@ -78,7 +91,7 @@ export const SUGGESTIONS = [
       "Analyze this dataset and summarize key insights",
       "Analyze the architecture of this system and suggest improvements",
     ],
-    icon: TrendUp,
+    icon: ChartUpIcon,
   },
   {
     label: "Creative",
@@ -90,7 +103,7 @@ export const SUGGESTIONS = [
       "Create a README template for my GitHub project",
       "Create a presentation outline for my tech talk",
     ],
-    icon: PaintBrush,
+    icon: PaintBrush01Icon,
   },
   {
     label: "Learning",
@@ -102,7 +115,7 @@ export const SUGGESTIONS = [
       "Explain WebAssembly and when to use it",
       "Explain OAuth 2.0 flow in simple terms",
     ],
-    icon: Brain,
+    icon: Brain01Icon,
   },
 ]
 

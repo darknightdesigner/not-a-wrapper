@@ -20,7 +20,7 @@ export type UserPreferencesApiFormat = {
 }
 
 export const defaultPreferences: UserPreferences = {
-  layout: "fullscreen",
+  layout: "sidebar",
   promptSuggestions: true,
   showToolInvocations: true,
   showConversationPreviews: true,
@@ -31,7 +31,7 @@ export const defaultPreferences: UserPreferences = {
 // Helper functions to convert between API format (snake_case) and frontend format (camelCase)
 export function convertFromApiFormat(apiData: UserPreferencesApiFormat): UserPreferences {
   return {
-    layout: apiData.layout || "fullscreen",
+    layout: apiData.layout || "sidebar",
     promptSuggestions: apiData.prompt_suggestions ?? true,
     showToolInvocations: apiData.show_tool_invocations ?? true,
     showConversationPreviews: apiData.show_conversation_previews ?? true,

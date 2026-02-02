@@ -3,7 +3,8 @@
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { type VariantProps } from "class-variance-authority"
-import { CaretDown } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useStickToBottomContext } from "use-stick-to-bottom"
 
 export type ScrollButtonProps = {
@@ -34,7 +35,7 @@ function ScrollButton({
       onClick={() => scrollToBottom()}
       {...props}
     >
-      <CaretDown className="h-5 w-5" />
+      <HugeiconsIcon icon={ArrowDown01Icon} size={20} />
     </Button>
   )
 }

@@ -9,7 +9,12 @@ import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { Chat } from "@/lib/chat-store/types"
-import { DotsThree, PencilSimple, Trash } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  MoreVerticalIcon,
+  PencilEdit01Icon,
+  Delete01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { Pin, PinOff } from "@/lib/icons"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
@@ -47,10 +52,10 @@ export function SidebarItemMenu({
       >
         <DropdownMenuTrigger asChild>
           <button
-            className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+            className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <DotsThree size={18} className="text-primary" weight="bold" />
+            <HugeiconsIcon icon={MoreVerticalIcon} size={18} className="text-primary" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
@@ -63,9 +68,9 @@ export function SidebarItemMenu({
             }}
           >
             {chat.pinned ? (
-              <PinOff size={16} className="mr-2" />
+              <HugeiconsIcon icon={PinOff} size={16} className="mr-2" />
             ) : (
-              <Pin size={16} className="mr-2" />
+              <HugeiconsIcon icon={Pin} size={16} className="mr-2" />
             )}
             {chat.pinned ? "Unpin" : "Pin"}
           </DropdownMenuItem>
@@ -77,7 +82,7 @@ export function SidebarItemMenu({
               onStartEditing()
             }}
           >
-            <PencilSimple size={16} className="mr-2" />
+            <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="mr-2" />
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -89,7 +94,7 @@ export function SidebarItemMenu({
               setIsDeleteDialogOpen(true)
             }}
           >
-            <Trash size={16} className="mr-2" />
+            <HugeiconsIcon icon={Delete01Icon} size={16} className="mr-2" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>

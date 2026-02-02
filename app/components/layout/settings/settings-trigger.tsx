@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/dialog"
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { User } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { User02Icon } from "@hugeicons-pro/core-stroke-rounded"
 import type React from "react"
 import { useState } from "react"
 import { SettingsContent } from "./settings-content"
@@ -30,7 +31,7 @@ export function SettingsTrigger({ onOpenChange }: SettingsTriggerProps) {
 
   const trigger = (
     <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-      <User className="size-4" />
+      <HugeiconsIcon icon={User02Icon} size={16} />
       <span>Settings</span>
     </DropdownMenuItem>
   )

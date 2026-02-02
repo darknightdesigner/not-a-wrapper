@@ -1,12 +1,13 @@
 "use client"
 
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CheckCircle,
-  Info,
-  SpinnerGap,
-  WarningOctagon,
-  Warning,
-} from "@phosphor-icons/react"
+  CheckmarkCircle01Icon,
+  InformationCircleIcon,
+  Alert01Icon,
+  AlertCircleIcon,
+  Loading01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useTheme } from "next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
@@ -18,11 +19,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
       icons={{
-        success: <CheckCircle className="size-4" />,
-        info: <Info className="size-4" />,
-        warning: <Warning className="size-4" />,
-        error: <WarningOctagon className="size-4" />,
-        loading: <SpinnerGap className="size-4 animate-spin" />,
+        success: <HugeiconsIcon icon={CheckmarkCircle01Icon} size={16} />,
+        info: <HugeiconsIcon icon={InformationCircleIcon} size={16} />,
+        warning: <HugeiconsIcon icon={Alert01Icon} size={16} />,
+        error: <HugeiconsIcon icon={AlertCircleIcon} size={16} />,
+        loading: <HugeiconsIcon icon={Loading01Icon} size={16} className="animate-spin" />,
       }}
       style={
         {

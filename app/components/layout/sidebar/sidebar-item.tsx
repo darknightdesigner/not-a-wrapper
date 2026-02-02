@@ -3,7 +3,8 @@ import useClickOutside from "@/app/hooks/use-click-outside"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { Chat } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
-import { Check, X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import Link from "next/link"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SidebarItemMenu } from "./sidebar-item-menu"
@@ -128,7 +129,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/chat relative w-full rounded-md transition-colors",
+        "hover:bg-accent/80 hover:text-foreground group/chat relative w-full rounded-md",
         isActive && "bg-accent hover:bg-accent text-foreground"
       ),
     [isActive]
@@ -137,7 +138,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const menuClassName = useMemo(
     () =>
       cn(
-        "absolute top-0 right-1 flex h-full items-center justify-center opacity-0 transition-opacity group-hover/chat:opacity-100",
+        "absolute top-0 right-1 flex h-full items-center justify-center opacity-0 group-hover/chat:opacity-100",
         isMobile && "opacity-100 group-hover/chat:opacity-100"
       ),
     [isMobile]
@@ -162,17 +163,17 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
           <div className="flex gap-0.5">
             <button
               onClick={handleSaveClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <Check size={16} weight="bold" />
+              <HugeiconsIcon icon={Tick02Icon} size={16} />
             </button>
             <button
               onClick={handleCancelClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <X size={16} weight="bold" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} />
             </button>
           </div>
         </div>

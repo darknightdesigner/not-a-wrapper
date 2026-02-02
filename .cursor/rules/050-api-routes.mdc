@@ -14,9 +14,9 @@ return new Response(
   { status: 200 }
 )
 
-// Error
+// Error (code is optional but recommended)
 return new Response(
-  JSON.stringify({ error: "Message", code: "ERROR_CODE" }),
+  JSON.stringify({ error: "Message", code?: "ERROR_CODE" }),
   { status: 400 }
 )
 ```

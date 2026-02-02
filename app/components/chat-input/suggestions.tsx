@@ -5,6 +5,7 @@ import { TRANSITION_SUGGESTIONS } from "@/lib/motion"
 import { AnimatePresence, motion } from "motion/react"
 import React, { memo, useCallback, useMemo, useState } from "react"
 import { SUGGESTIONS as SUGGESTIONS_CONFIG } from "../../../lib/config"
+import { HugeiconsIcon } from "@hugeicons/react"
 
 type SuggestionsProps = {
   onValueChange: (value: string) => void
@@ -81,7 +82,7 @@ export const Suggestions = memo(function Suggestions({
               animate: { opacity: 1, scale: 1 },
             }}
           >
-            <suggestion.icon className="size-4" />
+            <HugeiconsIcon icon={suggestion.icon} size={16} />
             {suggestion.label}
           </MotionPromptSuggestion>
         ))}

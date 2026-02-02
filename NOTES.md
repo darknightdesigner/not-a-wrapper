@@ -15,7 +15,7 @@ Agentic memory for persistent context across sessions. AI agents should update t
 
 ### 2026-01-14 — Project Context Setup
 
-- Created core AI context files: `CLAUDE.md`, `.copilot-instructions.md`, `NOTES.md`, `spec.md`, `plan.md`
+- Created core AI context files: `CLAUDE.md`, `NOTES.md`, `spec.md`, `plan.md`
 - Reviewed existing `AGENTS.md` — comprehensive, includes gold standard examples
 - Project was in active migration: Supabase → Convex (now complete)
 

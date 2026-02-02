@@ -9,7 +9,11 @@ import {
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
-import { ArrowUpIcon, StopIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  ArrowUp01Icon,
+  StopCircleIcon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useCallback, useEffect, useMemo, useRef } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonFileUpload } from "./button-file-upload"
@@ -219,9 +223,9 @@ export function ChatInput({
                 aria-label={status === "streaming" ? "Stop" : "Send message"}
               >
                 {status === "streaming" ? (
-                  <StopIcon className="size-4" />
+                  <HugeiconsIcon icon={StopCircleIcon} size={16} />
                 ) : (
-                  <ArrowUpIcon className="size-4" />
+                  <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
                 )}
               </Button>
             </PromptInputAction>

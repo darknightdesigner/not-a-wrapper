@@ -183,13 +183,15 @@ type PromptInputActionProps = {
   tooltip: React.ReactNode
   children: React.ReactNode
   side?: "top" | "bottom" | "left" | "right"
+  hideArrow?: boolean
 } & React.ComponentProps<typeof Tooltip>
 
 function PromptInputAction({
   tooltip,
   children,
   className,
-  side = "top",
+  side = "bottom",
+  hideArrow = true,
   ...props
 }: PromptInputActionProps) {
   const { disabled } = usePromptInput()
@@ -203,7 +205,7 @@ function PromptInputAction({
       >
         {children}
       </TooltipTrigger>
-      <TooltipContent side={side} className={className}>
+      <TooltipContent side={side} hideArrow={hideArrow} className={className}>
         {tooltip}
       </TooltipContent>
     </Tooltip>

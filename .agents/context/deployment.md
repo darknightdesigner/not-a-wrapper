@@ -53,7 +53,7 @@
 | `bun run build` | Production build |
 | `bun run dev` | Local development |
 | `bun run lint` | ESLint check |
-| `bun run type-check` | TypeScript check |
+| `bun run typecheck` | TypeScript check |
 
 ### Environment Variables
 
@@ -129,13 +129,13 @@ jobs:
           cache: "npm"
       
       - name: Install dependencies
-        run: npm ci
+        run: bun install
       
       - name: Run ESLint
-        run: npm run lint
+        run: bun run lint
       
       - name: Run TypeScript checks
-        run: npm run type-check
+        run: bun run typecheck
       
       # TODO: Enable when tests implemented
       # - name: Run Tests
@@ -155,10 +155,10 @@ jobs:
           cache: "npm"
       
       - name: Install dependencies
-        run: npm ci
+        run: bun install
       
       - name: Build application
-        run: npm run build
+        run: bun run build
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -203,14 +203,14 @@ FROM node:20-alpine AS base
 FROM base AS deps
 WORKDIR /app
 COPY package.json bun.lock ./
-RUN npm ci
+RUN bun install --frozen-lockfile
 
 # Build stage
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+RUN bun run build
 
 # Production stage
 FROM base AS runner

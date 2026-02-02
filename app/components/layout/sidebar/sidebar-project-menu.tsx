@@ -9,7 +9,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Id } from "@/convex/_generated/dataModel"
-import { DotsThree, PencilSimple, Trash } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  MoreVerticalIcon,
+  PencilEdit01Icon,
+  Delete01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 
 type Project = {
@@ -40,10 +45,10 @@ export function SidebarProjectMenu({
       >
         <DropdownMenuTrigger asChild>
           <button
-            className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1 transition-colors duration-150"
+            className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <DotsThree size={18} className="text-primary" weight="bold" />
+            <HugeiconsIcon icon={MoreVerticalIcon} size={18} className="text-primary" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
@@ -55,7 +60,7 @@ export function SidebarProjectMenu({
               onStartEditing()
             }}
           >
-            <PencilSimple size={16} className="mr-2" />
+            <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="mr-2" />
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem
@@ -67,7 +72,7 @@ export function SidebarProjectMenu({
               setIsDeleteDialogOpen(true)
             }}
           >
-            <Trash size={16} className="mr-2" />
+            <HugeiconsIcon icon={Delete01Icon} size={16} className="mr-2" />
             Delete
           </DropdownMenuItem>
         </DropdownMenuContent>

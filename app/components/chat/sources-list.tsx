@@ -2,7 +2,8 @@
 
 import { cn } from "@/lib/utils"
 import type { SourceUIPart } from "@ai-sdk/ui-utils"
-import { CaretDown, Link } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon, Link01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "motion/react"
 import Image from "next/image"
 import { useState } from "react"
@@ -67,7 +68,9 @@ export function SourcesList({ sources, className }: SourcesListProps) {
               )}
             </div>
           </div>
-          <CaretDown
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            size={16}
             className={cn(
               "h-4 w-4 transition-transform",
               isExpanded ? "rotate-180 transform" : ""
@@ -112,7 +115,7 @@ export function SourcesList({ sources, className }: SourcesListProps) {
                             />
                           )}
                           <span className="truncate">{source.title}</span>
-                          <Link className="inline h-3 w-3 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+                          <HugeiconsIcon icon={Link01Icon} size={12} className="inline h-3 w-3 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
                         </a>
                         <div className="text-muted-foreground line-clamp-1 text-xs">
                           {formatUrl(source.url)}

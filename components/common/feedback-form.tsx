@@ -3,7 +3,12 @@
 import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
-import { CaretLeft, SealCheck, Spinner } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  ArrowLeft01Icon,
+  CheckmarkBadge01Icon,
+  Loading01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { useMutation } from "convex/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useState } from "react"
@@ -76,7 +81,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
             transition={TRANSITION_CONTENT}
           >
             <div className="rounded-full bg-green-500/10 p-1">
-              <SealCheck className="size-6 text-green-500" />
+              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={24} className="text-green-500" />
             </div>
             <p className="text-foreground mt-3 mb-1 text-center text-sm font-medium">
               Thank you for your time!
@@ -129,7 +134,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
                 disabled={status === "submitting"}
                 className="rounded-lg"
               >
-                <CaretLeft size={16} className="text-foreground" />
+                <HugeiconsIcon icon={ArrowLeft01Icon} size={16} className="text-foreground" />
               </Button>
               <Button
                 type="submit"
@@ -149,7 +154,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
                       transition={TRANSITION_CONTENT}
                       className="inline-flex items-center gap-2"
                     >
-                      <Spinner className="size-4 animate-spin" />
+                      <HugeiconsIcon icon={Loading01Icon} size={16} className="animate-spin" />
                       Sending...
                     </motion.span>
                   ) : (

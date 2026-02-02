@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils"
-import { ThumbsDown, ThumbsUp, X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ThumbsDownIcon, ThumbsUpIcon, Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
 type FeedbackBarProps = {
   className?: string
@@ -37,7 +38,7 @@ export function FeedbackBar({
             aria-label="Helpful"
             onClick={onHelpful}
           >
-            <ThumbsUp className="size-4" />
+            <HugeiconsIcon icon={ThumbsUpIcon} size={16} />
           </button>
           <button
             type="button"
@@ -45,7 +46,7 @@ export function FeedbackBar({
             aria-label="Not helpful"
             onClick={onNotHelpful}
           >
-            <ThumbsDown className="size-4" />
+            <HugeiconsIcon icon={ThumbsDownIcon} size={16} />
           </button>
         </div>
         <div className="border-border flex items-center justify-center border-l">
@@ -55,7 +56,7 @@ export function FeedbackBar({
             className="text-muted-foreground hover:text-foreground flex items-center justify-center rounded-md p-3"
             aria-label="Close"
           >
-            <X className="size-5" />
+            <HugeiconsIcon icon={Cancel01Icon} size={20} />
           </button>
         </div>
       </div>

@@ -29,7 +29,13 @@ import { APP_DOMAIN } from "@/lib/config"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { useMutation } from "convex/react"
-import { Check, Copy, Globe, Spinner } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Tick02Icon,
+  Copy01Icon,
+  GlobeIcon,
+  Loading01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import type React from "react"
 import { useState } from "react"
 
@@ -92,9 +98,9 @@ export function DialogPublish() {
             disabled={isLoading}
           >
             {isLoading ? (
-              <Spinner className="size-5 animate-spin" />
+              <HugeiconsIcon icon={Loading01Icon} size={20} className="animate-spin" />
             ) : (
-              <Globe className="size-5" />
+              <HugeiconsIcon icon={GlobeIcon} size={20} />
             )}
             <span className="sr-only">Make public</span>
           </Button>
@@ -119,9 +125,9 @@ export function DialogPublish() {
                 className="bg-background hover:bg-background absolute top-0 right-0 rounded-l-none transition-colors"
               >
                 {copied ? (
-                  <Check className="size-4" />
+                  <HugeiconsIcon icon={Tick02Icon} size={16} />
                 ) : (
-                  <Copy className="size-4" />
+                  <HugeiconsIcon icon={Copy01Icon} size={16} />
                 )}
               </Button>
             </div>

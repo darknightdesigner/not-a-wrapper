@@ -3,7 +3,10 @@ import type { NextConfig } from "next"
 const nextConfig: NextConfig = {
   output: "standalone",
   experimental: {
-    optimizePackageImports: ["@phosphor-icons/react"],
+    optimizePackageImports: [
+      "@hugeicons/react",
+      "@hugeicons-pro/core-stroke-rounded",
+    ],
   },
   serverExternalPackages: ["shiki", "vscode-oniguruma"],
   images: {

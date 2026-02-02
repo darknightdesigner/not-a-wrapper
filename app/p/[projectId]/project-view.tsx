@@ -15,7 +15,8 @@ import { API_ROUTE_CHAT } from "@/lib/routes"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import { useChat } from "@ai-sdk/react"
-import { ChatCircleIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Chat01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { usePathname } from "next/navigation"
@@ -404,7 +405,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
             }}
           >
             <div className="mb-6 flex items-center justify-center gap-2">
-              <ChatCircleIcon className="text-muted-foreground" size={24} />
+              <HugeiconsIcon icon={Chat01Icon} size={24} className="text-muted-foreground" />
               <h1 className="text-center text-3xl font-medium tracking-tight">
                 {project?.name || ""}
               </h1>

@@ -6,7 +6,7 @@ Based on [Zola](https://github.com/ibelick/zola), the open-source AI chat interf
 
 ## Prerequisites
 
-- [Bun](https://bun.sh) 1.0 or later (recommended) or Node.js 18.x or later
+- [Bun](https://bun.sh) 1.3.1 or later (recommended) or Node.js 20.x or later
 - Git
 - Clerk account (for authentication)
 - Convex account (for database)
@@ -588,7 +588,7 @@ For a self-hosted production environment, you'll need to build the application a
 bun run build
 
 # Start the production server
-bun start
+bun run start
 ```
 
 ## Configuration Options

@@ -2,7 +2,8 @@
 import React, { useRef, useState } from 'react';
 import { motion, MotionConfig } from 'motion/react';
 import useClickOutside from '@/hooks/useClickOutside';
-import { ArrowLeft, MagnifyingGlass, User } from '@phosphor-icons/react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { ArrowLeft01Icon, Search01Icon, User02Icon } from '@hugeicons-pro/core-stroke-rounded';
 
 const transition = {
   type: 'spring' as const,
@@ -57,19 +58,19 @@ export default function ToolbarDynamic() {
               {!isOpen ? (
                 <div className='flex space-x-2'>
                   <Button disabled ariaLabel='User profile'>
-                    <User className='h-5 w-5' />
+                    <HugeiconsIcon icon={User02Icon} size={20} />
                   </Button>
                   <Button
                     onClick={() => setIsOpen(true)}
                     ariaLabel='Search notes'
                   >
-                    <MagnifyingGlass className='h-5 w-5' />
+                    <HugeiconsIcon icon={Search01Icon} size={20} />
                   </Button>
                 </div>
               ) : (
                 <div className='flex space-x-2'>
                   <Button onClick={() => setIsOpen(false)} ariaLabel='Back'>
-                    <ArrowLeft className='h-5 w-5' />
+                    <HugeiconsIcon icon={ArrowLeft01Icon} size={20} />
                   </Button>
                   <div className='relative w-full'>
                     <input

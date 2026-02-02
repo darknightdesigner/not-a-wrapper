@@ -7,7 +7,8 @@ import {
   MorphingPopoverContent,
   MorphingPopoverTrigger,
 } from "@/components/motion-primitives/morphing-popover"
-import { QuestionMark } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { HelpCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import { motion } from "motion/react"
 import { useState } from "react"
 
@@ -61,7 +62,7 @@ export function FeedbackWidget({ authUserId }: FeedbackWidgetProps) {
               delay: isOpen ? 0 : TRANSITION_POPOVER.duration / 2,
             }}
           >
-            <QuestionMark className="text-foreground size-4" />
+            <HugeiconsIcon icon={HelpCircleIcon} size={16} className="text-foreground" />
           </motion.span>
         </MorphingPopoverTrigger>
         <MorphingPopoverContent

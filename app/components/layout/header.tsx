@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button"
 import { APP_NAME } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
-import { Info } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { InformationCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import Link from "next/link"
 import { DialogPublish } from "./dialog-publish"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
@@ -50,7 +51,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                     className="bg-background hover:bg-muted text-muted-foreground h-8 w-8 rounded-full"
                     aria-label={`About ${APP_NAME}`}
                   >
-                    <Info className="size-4" />
+                    <HugeiconsIcon icon={InformationCircleIcon} size={16} />
                   </Button>
                 }
               />

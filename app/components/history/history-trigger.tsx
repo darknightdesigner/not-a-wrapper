@@ -5,7 +5,8 @@ import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { cn } from "@/lib/utils"
-import { ListMagnifyingGlass } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { SearchList01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { CommandHistory } from "./command-history"
@@ -57,7 +58,7 @@ export function HistoryTrigger({
       aria-label="Search"
       tabIndex={isMobile ? -1 : 0}
     >
-      {icon || <ListMagnifyingGlass size={24} />}
+      {icon || <HugeiconsIcon icon={SearchList01Icon} size={24} />}
       {label}
     </button>
   )

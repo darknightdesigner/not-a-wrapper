@@ -23,7 +23,8 @@ import { useMessages } from "@/lib/chat-store/messages/provider"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useUser } from "@/lib/user-store/provider"
 import { useClerk } from "@clerk/nextjs"
-import { CaretUpDown, SignOut } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowUpDownIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
 import { AppInfoTrigger } from "./app-info/app-info-trigger"
@@ -83,7 +84,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
         onClick={handleSignOut}
         className="flex items-center gap-2"
       >
-        <SignOut className="size-4" />
+        <HugeiconsIcon icon={Logout01Icon} size={16} />
         <span>Sign out</span>
       </DropdownMenuItem>
     </>
@@ -115,7 +116,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                     {user?.premium ? "Plus" : "Free"}
                   </span>
                 </div>
-                <CaretUpDown className="text-muted-foreground ml-auto size-4" />
+                <HugeiconsIcon icon={ArrowUpDownIcon} size={16} className="text-muted-foreground ml-auto" />
               </SidebarMenuButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent

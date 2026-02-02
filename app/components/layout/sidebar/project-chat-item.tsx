@@ -5,7 +5,12 @@ import useClickOutside from "@/app/hooks/use-click-outside"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { Chat } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
-import { ChatCircleIcon, Check, X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Chat01Icon,
+  Tick02Icon,
+  Cancel01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import Link from "next/link"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SidebarItemMenu } from "./sidebar-item-menu"
@@ -125,7 +130,7 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "border-border hover:bg-accent/50 group/chat relative rounded-lg border transition-colors",
+        "border-border hover:bg-accent/50 group/chat relative rounded-lg border",
         isEditing || isMenuOpen ? "bg-accent/50" : ""
       ),
     [isEditing, isMenuOpen]
@@ -134,7 +139,7 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
   const menuClassName = useMemo(
     () =>
       cn(
-        "absolute top-3 right-3 opacity-0 transition-opacity group-hover/chat:opacity-100",
+        "absolute top-3 right-3 opacity-0 group-hover/chat:opacity-100",
         isMobile && "opacity-100 group-hover/chat:opacity-100"
       ),
     [isMobile]
@@ -148,7 +153,8 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
         ref={containerRef}
       >
         <div className="flex items-center p-3">
-          <ChatCircleIcon
+          <HugeiconsIcon
+            icon={Chat01Icon}
             size={16}
             className="text-muted-foreground mr-3 flex-shrink-0"
           />
@@ -163,17 +169,17 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
           <div className="ml-2 flex gap-1">
             <button
               onClick={handleSaveClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <Check size={12} weight="bold" />
+              <HugeiconsIcon icon={Tick02Icon} size={12} />
             </button>
             <button
               onClick={handleCancelClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1 transition-colors duration-150"
+              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <X size={12} weight="bold" />
+              <HugeiconsIcon icon={Cancel01Icon} size={12} />
             </button>
           </div>
         </div>

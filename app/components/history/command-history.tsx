@@ -30,8 +30,15 @@ import type { Chats } from "@/lib/chat-store/types"
 import { useChatPreview } from "@/lib/hooks/use-chat-preview"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
-import { Check, PencilSimple, TrashSimple, X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import {
+  Tick02Icon,
+  PencilEdit01Icon,
+  Delete01Icon,
+  Cancel01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { Pin, PinOff } from "@/lib/icons"
+// Note: Pin and PinOff are HugeIcons data objects used with HugeiconsIcon wrapper
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { ChatPreviewPanel } from "./chat-preview-panel"
@@ -105,11 +112,11 @@ function CommandItemEdit({
             <Button
               size="icon"
               variant="ghost"
-              className="group/edit-confirm text-muted-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+              className="group/edit-confirm text-muted-foreground hover:bg-primary/10 size-8"
               type="submit"
               aria-label="Confirm"
             >
-              <Check className="group-hover/edit-confirm:text-primary size-4 transition-colors duration-150" />
+              <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/edit-confirm:text-primary" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Confirm</TooltipContent>
@@ -119,12 +126,12 @@ function CommandItemEdit({
             <Button
               size="icon"
               variant="ghost"
-              className="group/edit-cancel text-muted-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+              className="group/edit-cancel text-muted-foreground hover:bg-primary/10 size-8"
               type="button"
               onClick={onCancel}
               aria-label="Cancel"
             >
-              <X className="group-hover/edit-cancel:text-primary size-4 transition-colors duration-150" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/edit-cancel:text-primary" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Cancel</TooltipContent>
@@ -171,11 +178,11 @@ function CommandItemDelete({
             <Button
               size="icon"
               variant="ghost"
-              className="group/delete-confirm text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+              className="group/delete-confirm text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
               type="submit"
               aria-label="Confirm"
             >
-              <Check className="group-hover/delete-confirm:text-primary size-4 transition-colors duration-150" />
+              <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/delete-confirm:text-primary" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Confirm</TooltipContent>
@@ -185,12 +192,12 @@ function CommandItemDelete({
             <Button
               size="icon"
               variant="ghost"
-              className="group/delete-cancel text-muted-foreground hover:text-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+              className="group/delete-cancel text-muted-foreground hover:text-foreground hover:bg-primary/10 size-8"
               onClick={onCancel}
               type="button"
               aria-label="Cancel"
             >
-              <X className="group-hover/delete-cancel:text-primary size-4 transition-colors duration-150" />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/delete-cancel:text-primary" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Cancel</TooltipContent>
@@ -222,17 +229,17 @@ function CommandItemRow({
       </div>
 
       <div className="relative flex min-w-[140px] flex-shrink-0 items-center justify-end">
-        <div className="text-muted-foreground mr-2 text-xs transition-opacity duration-200 group-hover:opacity-0">
+        <div className="text-muted-foreground mr-2 text-xs group-hover:opacity-0">
           {formatDate(chat.updated_at || chat.created_at)}
         </div>
 
-        <div className="absolute right-0 flex translate-x-1 gap-1 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100">
+        <div className="absolute right-0 flex gap-1 opacity-0 group-hover:opacity-100">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 size="icon"
                 variant="ghost"
-                className="group/edit text-muted-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+                className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
                 onClick={(e) => {
                   e.stopPropagation()
                   togglePinned(chat.id, !chat.pinned)
@@ -241,9 +248,9 @@ function CommandItemRow({
                 aria-label={chat.pinned ? "Unpin" : "Pin"}
               >
                 {chat.pinned ? (
-                  <PinOff className="group-hover/edit:text-primary size-3 stroke-[1.5px] transition-colors duration-150" />
+                  <HugeiconsIcon icon={PinOff} size={12} className="group-hover/edit:text-primary" />
                 ) : (
-                  <Pin className="group-hover/edit:text-primary size-3 stroke-[1.5px] transition-colors duration-150" />
+                  <HugeiconsIcon icon={Pin} size={12} className="group-hover/edit:text-primary" />
                 )}
               </Button>
             </TooltipTrigger>
@@ -255,7 +262,7 @@ function CommandItemRow({
               <Button
                 size="icon"
                 variant="ghost"
-                className="group/edit text-muted-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+                className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
                 onClick={(e) => {
                   e.stopPropagation()
                   onEdit(chat)
@@ -263,7 +270,7 @@ function CommandItemRow({
                 disabled={!!editingId || !!deletingId}
                 aria-label="Edit"
               >
-                <PencilSimple className="group-hover/edit:text-primary size-4 transition-colors duration-150" />
+                <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="group-hover/edit:text-primary" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
@@ -274,7 +281,7 @@ function CommandItemRow({
               <Button
                 size="icon"
                 variant="ghost"
-                className="group/delete text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8 transition-colors duration-150"
+                className="group/delete text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
                 onClick={(e) => {
                   e.stopPropagation()
                   onDelete(chat.id)
@@ -282,7 +289,7 @@ function CommandItemRow({
                 disabled={!!editingId || !!deletingId}
                 aria-label="Delete"
               >
-                <TrashSimple className="group-hover/delete:text-primary size-4 transition-colors duration-150" />
+                <HugeiconsIcon icon={Delete01Icon} size={16} className="group-hover/delete:text-primary" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Delete</TooltipContent>
@@ -605,7 +612,7 @@ export function CommandHistory({
                 <CommandGroup
                   heading={
                     <div className="flex items-center gap-1 font-semibold break-all">
-                      <Pin className="size-3" />
+                      <HugeiconsIcon icon={Pin} size={12} />
                       Pinned
                     </div>
                   }

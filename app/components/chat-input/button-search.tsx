@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
-import { GlobeIcon } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { GlobeIcon } from "@hugeicons-pro/core-stroke-rounded"
 import React from "react"
 import { PopoverContentAuth } from "./popover-content-auth"
 
@@ -29,7 +30,7 @@ export function ButtonSearch({
             variant="secondary"
             className="border-border dark:bg-secondary rounded-full border bg-transparent"
           >
-            <GlobeIcon className="size-5" />
+            <HugeiconsIcon icon={GlobeIcon} size={20} />
             Search
           </Button>
         </PopoverTrigger>
@@ -48,7 +49,7 @@ export function ButtonSearch({
       )}
       onClick={handleClick}
     >
-      <GlobeIcon className="size-5" />
+      <HugeiconsIcon icon={GlobeIcon} size={20} />
       <span className="hidden md:block">Search</span>
     </Button>
   )

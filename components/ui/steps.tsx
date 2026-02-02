@@ -6,7 +6,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
 import { cn } from "@/lib/utils"
-import { CaretDown } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
 export type StepsItemProps = React.ComponentProps<"div">
 
@@ -53,14 +54,14 @@ export const StepsTrigger = ({
             {leftIcon}
           </span>
           {swapIconOnHover && (
-            <CaretDown className="absolute size-4 opacity-0 transition-opacity group-hover:opacity-100 group-data-[state=open]:rotate-180" />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="absolute opacity-0 transition-opacity group-hover:opacity-100 group-data-[state=open]:rotate-180" />
           )}
         </span>
       ) : null}
       <span>{children}</span>
     </div>
     {!leftIcon && (
-      <CaretDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+      <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="transition-transform group-data-[state=open]:rotate-180" />
     )}
   </CollapsibleTrigger>
 )

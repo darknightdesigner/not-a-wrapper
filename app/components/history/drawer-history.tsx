@@ -9,13 +9,14 @@ import {
 } from "@/components/ui/tooltip"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { Chats } from "@/lib/chat-store/types"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Check,
-  MagnifyingGlass,
-  PencilSimple,
-  TrashSimple,
-  X,
-} from "@phosphor-icons/react"
+  Tick02Icon,
+  Search01Icon,
+  PencilEdit01Icon,
+  Delete01Icon,
+  Cancel01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { Pin, PinOff } from "@/lib/icons"
 import Link from "next/link"
 import { useParams } from "next/navigation"
@@ -142,7 +143,7 @@ export function DrawerHistory({
                     className="h-8 w-8"
                     type="submit"
                   >
-                    <Check className="size-4" />
+                    <HugeiconsIcon icon={Tick02Icon} size={16} />
                   </Button>
                   <Button
                     size="icon"
@@ -151,7 +152,7 @@ export function DrawerHistory({
                     type="button"
                     onClick={handleCancelEdit}
                   >
-                    <X className="size-4" />
+                    <HugeiconsIcon icon={Cancel01Icon} size={16} />
                   </Button>
                 </div>
               </form>
@@ -189,7 +190,7 @@ export function DrawerHistory({
                     className="text-muted-foreground hover:text-destructive size-8"
                     type="submit"
                   >
-                    <Check className="size-4" />
+                    <HugeiconsIcon icon={Tick02Icon} size={16} />
                   </Button>
                   <Button
                     size="icon"
@@ -198,7 +199,7 @@ export function DrawerHistory({
                     onClick={handleCancelDelete}
                     type="button"
                   >
-                    <X className="size-4" />
+                    <HugeiconsIcon icon={Cancel01Icon} size={16} />
                   </Button>
                 </div>
               </form>
@@ -239,9 +240,9 @@ export function DrawerHistory({
                     aria-label={chat.pinned ? "Unpin" : "Pin"}
                   >
                     {chat.pinned ? (
-                      <PinOff className="size-4 stroke-[1.5px]" />
+                      <HugeiconsIcon icon={PinOff} size={16} />
                     ) : (
-                      <Pin className="size-4 stroke-[1.5px]" />
+                      <HugeiconsIcon icon={Pin} size={16} />
                     )}
                   </Button>
                   <Button
@@ -254,7 +255,7 @@ export function DrawerHistory({
                     }}
                     type="button"
                   >
-                    <PencilSimple className="size-4" />
+                    <HugeiconsIcon icon={PencilEdit01Icon} size={16} />
                   </Button>
                   <Button
                     size="icon"
@@ -266,7 +267,7 @@ export function DrawerHistory({
                     }}
                     type="button"
                   >
-                    <TrashSimple className="size-4" />
+                    <HugeiconsIcon icon={Delete01Icon} size={16} />
                   </Button>
                 </div>
               </div>
@@ -309,7 +310,7 @@ export function DrawerHistory({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <MagnifyingGlass className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 transform text-gray-400" />
+              <HugeiconsIcon icon={Search01Icon} size={14} className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 transform text-gray-400" />
             </div>
           </div>
 
@@ -329,7 +330,7 @@ export function DrawerHistory({
                   {pinnedChats.length > 0 && (
                     <div className="space-y-0.5">
                       <h3 className="text-muted-foreground flex items-center gap-1 pl-2 text-sm font-medium">
-                        <Pin className="size-3" />
+                        <HugeiconsIcon icon={Pin} size={12} />
                         Pinned
                       </h3>
                       <div className="space-y-2">

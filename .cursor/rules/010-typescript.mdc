@@ -5,6 +5,23 @@ globs: ["**/*.ts", "**/*.tsx"]
 
 # TypeScript Conventions
 
+## File Naming
+
+```typescript
+// Files: kebab-case
+chat-input.tsx
+use-chat-core.ts
+button-copy.tsx
+
+// Components: PascalCase
+export function ChatInput() {}
+export function ButtonCopy() {}
+
+// Hooks: use-[name].ts
+use-chat-core.ts
+use-file-upload.ts
+```
+
 ## Type Safety
 
 ```typescript

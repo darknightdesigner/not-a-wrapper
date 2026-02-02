@@ -19,7 +19,6 @@ Living document for tracking current work and next steps.
 - [x] Document decisions in `.agents/context/research/tech-stack-evaluation.md`
 - [x] Create `AGENTS.md` with project overview
 - [x] Create `CLAUDE.md` with Claude-specific context
-- [x] Create `.copilot-instructions.md` for GitHub Copilot
 - [x] Create `NOTES.md` for agentic memory
 - [x] Create `spec.md` for requirements
 - [x] Create `plan.md` (this file)

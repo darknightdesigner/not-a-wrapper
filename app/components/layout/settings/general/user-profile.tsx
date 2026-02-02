@@ -2,7 +2,8 @@
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUser } from "@/lib/user-store/provider"
-import { User } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { User02Icon } from "@hugeicons-pro/core-stroke-rounded"
 
 export function UserProfile() {
   const { user } = useUser()
@@ -20,7 +21,7 @@ export function UserProfile() {
               <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
             </Avatar>
           ) : (
-            <User className="text-muted-foreground size-12" />
+            <HugeiconsIcon icon={User02Icon} size={48} className="text-muted-foreground" />
           )}
         </div>
         <div>

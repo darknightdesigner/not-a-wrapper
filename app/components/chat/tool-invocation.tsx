@@ -2,15 +2,16 @@
 
 import { cn } from "@/lib/utils"
 import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils"
+import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  CaretDown,
-  CheckCircle,
-  Code,
-  Link,
-  Nut,
-  Spinner,
-  Wrench,
-} from "@phosphor-icons/react"
+  ArrowDown01Icon,
+  CheckmarkCircle01Icon,
+  SourceCodeIcon,
+  Link01Icon,
+  NutIcon,
+  Loading01Icon,
+  Wrench01Icon,
+} from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
 
@@ -74,13 +75,15 @@ export function ToolInvocation({
           className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
         >
           <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-            <Nut className="text-muted-foreground size-4" />
+            <HugeiconsIcon icon={NutIcon} size={16} className="text-muted-foreground" />
             <span className="text-sm">Tools executed</span>
             <div className="bg-secondary text-secondary-foreground rounded-full px-1.5 py-0.5 font-mono text-xs">
               {uniqueToolIds.length}
             </div>
           </div>
-          <CaretDown
+          <HugeiconsIcon
+            icon={ArrowDown01Icon}
+            size={16}
             className={cn(
               "h-4 w-4 transition-transform",
               isExpanded ? "rotate-180 transform" : ""
@@ -298,7 +301,7 @@ function SingleToolCard({
                     className="text-primary group flex items-center gap-1 font-medium hover:underline"
                   >
                     {item.title}
-                    <Link className="h-3 w-3 opacity-70 transition-opacity group-hover:opacity-100" />
+                    <HugeiconsIcon icon={Link01Icon} size={12} className="h-3 w-3 opacity-70 transition-opacity group-hover:opacity-100" />
                   </a>
                   <div className="text-muted-foreground mt-1 font-mono text-xs">
                     {item.url}
@@ -344,7 +347,7 @@ function SingleToolCard({
                 className="text-primary flex items-center gap-1 hover:underline"
               >
                 <span className="font-mono">{htmlUrl}</span>
-                <Link className="h-3 w-3 opacity-70" />
+                <HugeiconsIcon icon={Link01Icon} size={12} className="h-3 w-3 opacity-70" />
               </a>
             </div>
           )}
@@ -382,7 +385,7 @@ function SingleToolCard({
         className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-          <Wrench className="text-muted-foreground size-4" />
+          <HugeiconsIcon icon={Wrench01Icon} size={16} className="text-muted-foreground" />
           <span className="font-mono text-sm">{toolName}</span>
           <AnimatePresence mode="popLayout" initial={false}>
             {isLoading ? (
@@ -394,7 +397,7 @@ function SingleToolCard({
                 key="loading"
               >
                 <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
-                  <Spinner className="mr-1 h-3 w-3 animate-spin" />
+                  <HugeiconsIcon icon={Loading01Icon} size={12} className="mr-1 h-3 w-3 animate-spin" />
                   Running
                 </div>
               </motion.div>
@@ -407,14 +410,16 @@ function SingleToolCard({
                 key="completed"
               >
                 <div className="inline-flex items-center rounded-full border border-green-200 bg-green-50 px-1.5 py-0.5 text-xs text-green-700 dark:border-green-800 dark:bg-green-950/30 dark:text-green-400">
-                  <CheckCircle className="mr-1 h-3 w-3" />
+                  <HugeiconsIcon icon={CheckmarkCircle01Icon} size={12} className="mr-1 h-3 w-3" />
                   Completed
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-        <CaretDown
+        <HugeiconsIcon
+          icon={ArrowDown01Icon}
+          size={16}
           className={cn(
             "h-4 w-4 transition-transform",
             isExpanded ? "rotate-180 transform" : ""
@@ -463,7 +468,7 @@ function SingleToolCard({
               {/* Tool call ID */}
               <div className="text-muted-foreground flex items-center justify-between text-xs">
                 <div className="flex items-center">
-                  <Code className="mr-1 inline size-3" />
+                  <HugeiconsIcon icon={SourceCodeIcon} size={12} className="mr-1 inline" />
                   Tool Call ID:{" "}
                   <span className="ml-1 font-mono">{toolCallId}</span>
                 </div>

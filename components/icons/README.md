@@ -1,16 +1,18 @@
 # Icon System
 
-This project uses a consolidated icon system with **Phosphor Icons** as the primary library.
+This project uses a consolidated icon system with **HugeIcons Pro** as the primary library.
 
 ## Quick Start
 
-### Default: Phosphor Icons
+### Default: HugeIcons
 
 ```typescript
-import { Check, X, CaretDown } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Cancel01Icon, ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
-// For Server Components, use SSR import
-import { Check } from "@phosphor-icons/react/dist/ssr"
+// Usage
+<HugeiconsIcon icon={Tick02Icon} size={16} />
+<HugeiconsIcon icon={Cancel01Icon} size={16} className="text-red-500" />
 ```
 
 ### Custom Brand Icons
@@ -28,15 +30,13 @@ All brand icons support the `size` prop:
 <OpenAIIcon size={32} className="text-primary" />
 ```
 
-### Exception Icons (Non-Phosphor)
+### Re-exported Icons (via lib/icons)
 
-Some icons don't have Phosphor equivalents and are imported from Lucide via `@/lib/icons`:
+Some commonly used icons are re-exported from `@/lib/icons` for convenience:
 
 ```typescript
-import { Pin, PinOff, PanelLeft, GripVertical } from "@/lib/icons"
+import { HugeiconsIcon, PinIcon, PinOffIcon, PanelLeftIcon, GripVerticalIcon } from "@/lib/icons"
 ```
-
-**Do NOT import directly from `lucide-react`** — ESLint will error.
 
 ## Creating New Custom Icons
 
@@ -78,28 +78,37 @@ MyIcon.displayName = "MyIcon"
 export default MyIcon
 ```
 
-## Icon Mapping (Lucide → Phosphor)
+## Icon Mapping Reference
 
-| Lucide | Phosphor |
-|--------|----------|
-| `Check` | `Check` |
-| `X` | `X` |
-| `ChevronDown` | `CaretDown` |
-| `ChevronUp` | `CaretUp` |
-| `ChevronRight` | `CaretRight` |
-| `ChevronLeft` | `CaretLeft` |
-| `ArrowLeft` | `ArrowLeft` |
-| `ArrowRight` | `ArrowRight` |
-| `Search` | `MagnifyingGlass` |
-| `Loader2` | `SpinnerGap` |
-| `RefreshCw` | `ArrowClockwise` |
-| `AlertCircle` | `WarningCircle` |
-| `AlertTriangle` | `Warning` |
-| `Trash2` | `Trash` |
-| `MoreHorizontal` | `DotsThreeOutline` |
-| `Quote` | `Quotes` |
-| `MessageCircle` | `ChatCircle` |
-| `Settings` | `Gear` |
+See `.agents/archive/icon-mapping-phosphor-hugeicons.md` for the complete Phosphor → HugeIcons mapping.
+
+### Common Icons Quick Reference
+
+| Purpose | HugeIcon |
+|---------|----------|
+| Checkmark | `Tick02Icon` |
+| Close/X | `Cancel01Icon` |
+| Arrow down | `ArrowDown01Icon` |
+| Arrow up | `ArrowUp01Icon` |
+| Arrow left | `ArrowLeft01Icon` |
+| Arrow right | `ArrowRight01Icon` |
+| Search | `Search01Icon` |
+| Loading | `Loading01Icon` |
+| Refresh | `RefreshIcon` |
+| Warning | `Alert01Icon` |
+| Error | `AlertCircleIcon` |
+| Info | `InformationCircleIcon` |
+| Delete | `Delete01Icon` |
+| More (horizontal) | `MoreHorizontalIcon` |
+| More (vertical) | `MoreVerticalIcon` |
+| Quote | `QuoteUpIcon` |
+| Chat | `Chat01Icon` |
+| Settings | `Settings01Icon` |
+| User | `User02Icon` |
+| Copy | `Copy01Icon` |
+| Edit | `PencilEdit01Icon` |
+| Add | `Add01Icon` |
+| Minus | `MinusSignIcon` |
 
 ## Available Brand Icons
 
@@ -121,4 +130,4 @@ export default MyIcon
 
 ## Migration Guide
 
-See `../../.agents/archive/icon-system-migration-plan-2026-01.md` for the complete migration plan and rationale.
+See `.agents/archive/icon-mapping-phosphor-hugeicons.md` for the Phosphor → HugeIcons migration details.

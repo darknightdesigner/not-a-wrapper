@@ -17,7 +17,8 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import { CaretDown } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import React, {
   createContext,
   useContext,
@@ -125,7 +126,7 @@ function ReasoningTrigger({
           isOpen ? "rotate-180" : ""
         )}
       >
-        <CaretDown className="size-4" />
+        <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
       </div>
     </button>
   )

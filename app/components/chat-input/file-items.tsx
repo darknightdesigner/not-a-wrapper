@@ -10,7 +10,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { X } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import { useState } from "react"
 
@@ -78,10 +79,10 @@ export function FileItem({ file, onRemove }: FileItemProps) {
               className="border-background absolute top-1 right-1 z-10 inline-flex size-6 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[3px] bg-black text-white shadow-none transition-colors"
               aria-label="Remove file"
             >
-              <X className="size-3" />
+              <HugeiconsIcon icon={Cancel01Icon} size={12} />
             </button>
           </TooltipTrigger>
-          <TooltipContent>Remove file</TooltipContent>
+          <TooltipContent side="bottom" hideArrow>Remove file</TooltipContent>
         </Tooltip>
       ) : null}
     </div>

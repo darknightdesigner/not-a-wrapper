@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { HugeiconsIcon } from "@hugeicons/react"
 import { PanelLeft } from "@/lib/icons"
 
 import { useIsMobile } from "@/hooks/use-mobile"
@@ -31,6 +32,14 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+// Helper to read sidebar state from cookie
+function getSidebarStateFromCookie(): boolean | undefined {
+  if (typeof document === "undefined") return undefined
+  const match = document.cookie.match(new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`))
+  if (match) return match[1] === "true"
+  return undefined
+}
 
 type SidebarContextProps = {
   state: "expanded" | "collapsed"
@@ -71,7 +80,11 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  const [_open, _setOpen] = React.useState(defaultOpen)
+  // Initialize from cookie if available, otherwise use defaultOpen
+  const [_open, _setOpen] = React.useState(() => {
+    const cookieValue = getSidebarStateFromCookie()
+    return cookieValue ?? defaultOpen
+  })
   const open = openProp ?? _open
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
@@ -273,7 +286,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <PanelLeft />
+      <HugeiconsIcon icon={PanelLeft} size={16} />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )

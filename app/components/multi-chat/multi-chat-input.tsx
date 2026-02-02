@@ -8,7 +8,8 @@ import {
   PromptInputTextarea,
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
-import { ArrowUp, Stop } from "@phosphor-icons/react"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowUp01Icon, StopCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import React, { useCallback } from "react"
 
 type MultiChatInputProps = {
@@ -116,9 +117,9 @@ export function MultiChatInput({
                 aria-label={status === "streaming" ? "Stop" : "Send message"}
               >
                 {status === "streaming" || anyLoading ? (
-                  <Stop className="size-4" />
+                  <HugeiconsIcon icon={StopCircleIcon} size={16} />
                 ) : (
-                  <ArrowUp className="size-4" />
+                  <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
                 )}
               </Button>
             </PromptInputAction>

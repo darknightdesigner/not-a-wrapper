@@ -6,8 +6,8 @@ const eslintConfig = [
     ignores: ["convex/_generated/**"],
   },
   {
-    // Icon system enforcement: Use Phosphor or @/lib/icons instead of lucide-react
-    // See .agents/archive/icon-system-migration-plan-2026-01.md for details
+    // Icon system enforcement: Use HugeIcons (@hugeicons/react + @hugeicons-pro/core-stroke-rounded)
+    // See .agents/archive/icon-mapping-phosphor-hugeicons.md for migration details
     files: ["**/*.{ts,tsx}"],
     ignores: ["lib/icons/extras.ts"],
     rules: {
@@ -18,14 +18,24 @@ const eslintConfig = [
             {
               name: "lucide-react",
               message:
-                "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md",
+                "Use @hugeicons/react with @hugeicons-pro/core-stroke-rounded instead. See .agents/archive/icon-mapping-phosphor-hugeicons.md",
+            },
+            {
+              name: "@phosphor-icons/react",
+              message:
+                "Use @hugeicons/react with @hugeicons-pro/core-stroke-rounded instead. See .agents/archive/icon-mapping-phosphor-hugeicons.md",
             },
           ],
           patterns: [
             {
               group: ["lucide-react/*"],
               message:
-                "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md",
+                "Use @hugeicons/react with @hugeicons-pro/core-stroke-rounded instead. See .agents/archive/icon-mapping-phosphor-hugeicons.md",
+            },
+            {
+              group: ["@phosphor-icons/react/*"],
+              message:
+                "Use @hugeicons/react with @hugeicons-pro/core-stroke-rounded instead. See .agents/archive/icon-mapping-phosphor-hugeicons.md",
             },
           ],
         },
