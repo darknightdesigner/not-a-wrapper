@@ -30,20 +30,29 @@ type SidebarMenuItemProps = {
   isActive?: boolean
 }
 
-const baseClassName =
-  "group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex w-full items-center gap-2 rounded-md bg-transparent px-2 py-2 pointer-coarse:py-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+const baseClassName = cn(
+  "group/menu-item relative inline-flex w-full items-center rounded-md bg-transparent text-sm",
+  // Spacing using CSS variables
+  "gap-(--sidebar-item-gap) px-2 py-2 pointer-coarse:py-3",
+  // Colors and transitions
+  "text-primary hover:bg-accent/80 hover:text-foreground",
+  "motion-safe:transition-colors",
+  // Focus states
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+)
 
 // Icon-only styles when sidebar is collapsed
 const collapsedClassName =
   "group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
 
 /**
- * Unified sidebar menu item component with icon mode support.
- *
- * - Uses <Link> for navigation items (SEO, prefetch, right-click menu)
- * - Uses <button> for interactive items (modals, actions)
- * - Shows tooltip with label when sidebar is collapsed
- * - Consistent icon sizing (20x20)
+ * Unified sidebar menu item component.
+ * 
+ * Features:
+ * - Icon wrapper pattern (ChatGPT style) for consistent alignment
+ * - motion-safe: transitions for reduced motion support
+ * - CSS variables for spacing
+ * - Tooltip support when sidebar is collapsed
  */
 export const SidebarMenuItem = forwardRef<
   HTMLAnchorElement | HTMLButtonElement,
@@ -57,18 +66,21 @@ export const SidebarMenuItem = forwardRef<
 
   const content = (
     <>
-      <HugeiconsIcon
-        icon={icon}
-        size={20}
-        className="shrink-0 group-disabled/menu-item:opacity-50"
-      />
-      {/* Hide label when collapsed */}
-      <div className="flex min-w-0 grow items-center gap-1.5 group-data-[collapsible=icon]:hidden">
+      {/* Icon wrapper (ChatGPT pattern) for consistent alignment */}
+      <div className="flex items-center justify-center shrink-0">
+        <HugeiconsIcon
+          icon={icon}
+          size={20}
+          className="group-disabled/menu-item:opacity-50"
+        />
+      </div>
+      {/* Label - hidden when collapsed */}
+      <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap) group-data-[collapsible=icon]:hidden">
         <span className="truncate">{label}</span>
       </div>
-      {/* Hide trailing when collapsed */}
+      {/* Trailing content - hidden when collapsed */}
       {trailing && (
-        <div className="text-muted-foreground ml-auto opacity-0 transition-opacity group-hover/menu-item:opacity-100 group-data-[collapsible=icon]:hidden">
+        <div className="text-muted-foreground ml-auto opacity-0 motion-safe:transition-opacity group-hover/menu-item:opacity-100 group-data-[collapsible=icon]:hidden">
           {trailing}
         </div>
       )}

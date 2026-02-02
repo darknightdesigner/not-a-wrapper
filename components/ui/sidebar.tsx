@@ -271,7 +271,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, state } = useSidebar()
 
   return (
     <Button
@@ -279,7 +279,14 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-9 rounded-lg", className)}
+      className={cn(
+        "size-9 rounded-lg",
+        // Resize cursor indicates expandability
+        state === "collapsed" 
+          ? "cursor-e-resize rtl:cursor-w-resize" 
+          : "cursor-w-resize rtl:cursor-e-resize",
+        className
+      )}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()

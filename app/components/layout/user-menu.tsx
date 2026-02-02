@@ -106,14 +106,14 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                 className="w-full"
                 tooltip={user?.display_name || "Account"}
               >
-                <Avatar className="size-8 bg-emerald-600">
+                <Avatar className="size-8 group-data-[collapsible=icon]:size-6 bg-emerald-600 motion-safe:transition-[width,height]">
                   <AvatarImage src={user?.profile_image ?? undefined} />
-                  <AvatarFallback className="bg-emerald-600 text-sm text-white">
+                  <AvatarFallback className="bg-emerald-600 text-sm group-data-[collapsible=icon]:text-xs text-white">
                     {user?.display_name?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
                 {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
-                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
                   <span className="truncate font-semibold">
                     {user?.display_name}
                   </span>

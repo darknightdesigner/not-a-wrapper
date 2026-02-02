@@ -33,6 +33,32 @@ git status         # ✅ Clean working tree (or stash changes)
 
 ---
 
+## Quick Reference Links
+
+### Official Migration Guides
+- [v4 → v5 Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0) — Primary reference for v5 changes
+- [v5 → v6 Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-6-0) — Primary reference for v6 changes
+- [Data Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0-data) — Message format conversion patterns
+
+### API Documentation (v5/v6 Patterns)
+- [useChat Hook](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot) — `sendMessage`, `regenerate`, `status` patterns
+- [Transport Architecture](https://ai-sdk.dev/docs/ai-sdk-ui/transport) — `DefaultChatTransport` configuration
+- [Message Persistence](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence) — `UIMessage` format, parts structure
+- [streamText API](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text) — Server-side streaming options
+
+### Codemods & Changelogs
+- [AI SDK Codemods](https://github.com/vercel/ai/tree/main/packages/codemod) — Automated transformations
+- [AI SDK Changelog](https://github.com/vercel/ai/blob/main/CHANGELOG.md) — Detailed change history
+- [AI SDK Releases](https://github.com/vercel/ai/releases) — Release notes
+
+### Provider Documentation
+- [OpenRouter v2.x Provider](https://github.com/openrouter/ai-sdk-provider) — v6-compatible provider
+
+### Project Research
+- `.agents/context/research/ai-sdk-upgrade-research.md` — Detailed research with code examples and Q&A
+
+---
+
 ## Phase 0: Setup (10 min)
 
 ### 0.1 Create Feature Branch
@@ -182,6 +208,8 @@ git commit -m "chore: upgrade AI SDK packages to v5 and run codemods"
 
 ## Phase 2: Server-Side Migration (45 min)
 
+> 📚 **Reference:** [streamText API](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text) | [toUIMessageStreamResponse](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence#server-side)
+
 ### 2.1 Update API Route Streaming
 **File:** `app/api/chat/route.ts`
 **DEPENDS:** Phase 1 complete
@@ -253,6 +281,8 @@ git commit -m "feat: migrate server-side to AI SDK v5 streaming protocol"
 ---
 
 ## Phase 3: Client-Side Hook Migration (90 min)
+
+> 📚 **Reference:** [useChat Hook](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot) | [Transport Architecture](https://ai-sdk.dev/docs/ai-sdk-ui/transport) | [Migration Guide §useChat](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#usechat-hook)
 
 This is the most complex phase. Follow steps precisely.
 
@@ -415,6 +445,8 @@ git commit -m "feat: migrate useChat hook to v5 transport architecture"
 
 ## Phase 4: Message Rendering Migration (45 min)
 
+> 📚 **Reference:** [UIMessage Format](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence) | [Data Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0-data)
+
 ### 4.1 Update Message Parts Rendering
 **Files (PARALLEL):**
 - `app/components/chat/message-assistant.tsx`
@@ -484,6 +516,8 @@ git commit -m "feat: migrate message rendering to v5 parts format"
 ---
 
 ## Phase 5: v5 → v6 Upgrade (30 min)
+
+> 📚 **Reference:** [v6 Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-6-0) | [AI SDK v6 Codemods](https://github.com/vercel/ai/tree/main/packages/codemod)
 
 ### 5.1 Upgrade Packages to v6
 **DEPENDS:** Phase 4 complete and verified
@@ -692,4 +726,27 @@ When executing this plan as an AI agent:
 
 ---
 
-*Plan created from research document: `.agents/archive/ai-sdk-upgrade-research.md`*
+## Troubleshooting Resources
+
+If you encounter issues during migration:
+
+1. **Check the research document first** — `.agents/context/research/ai-sdk-upgrade-research.md` contains detailed Q&A for common scenarios
+2. **Review GitHub Issues** — [AI SDK Issues](https://github.com/vercel/ai/issues) for similar problems
+3. **Consult the Changelog** — [CHANGELOG.md](https://github.com/vercel/ai/blob/main/CHANGELOG.md) for breaking change details
+4. **Type errors after codemod** — Run `bun run typecheck 2>&1 | head -50` to see first errors; often import path issues
+5. **Streaming not working** — Verify `toUIMessageStreamResponse()` is used (not `toDataStreamResponse()`)
+6. **Messages not displaying** — Check that `message.parts` is being used, not `message.content`
+
+### Common Error Resolutions
+
+| Error | Likely Cause | Fix |
+|-------|--------------|-----|
+| `Property 'content' does not exist on UIMessage` | v4 message format | Use `message.parts` with text parts |
+| `toDataStreamResponse is not a function` | v5 API change | Replace with `toUIMessageStreamResponse()` |
+| `handleSubmit is not a function` | v5 API change | Replace with `sendMessage()` |
+| `maxSteps is not a valid option` | v5 API change | Replace with `stopWhen: stepCountIs(N)` |
+| `LanguageModelV1 not exported` | v5/v6 type change | Use `LanguageModelV2` (v5) or `LanguageModelV3` (v6) |
+
+---
+
+*Plan created from research document: `.agents/context/research/ai-sdk-upgrade-research.md`*

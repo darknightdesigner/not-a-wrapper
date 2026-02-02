@@ -40,8 +40,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
                   {APP_NAME}
                 </Link>
               )}
-              {/* Show toggle on mobile OR when collapsed on desktop */}
-              {hasSidebar && (isMobile || isCollapsed) && <HeaderSidebarTrigger />}
+              {/* Show toggle only on mobile (collapsed rail has its own toggle on desktop) */}
+              {hasSidebar && isMobile && <HeaderSidebarTrigger />}
             </div>
           </div>
           <div />
