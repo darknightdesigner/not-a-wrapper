@@ -82,4 +82,4 @@ const identity = await ctx.auth.getUserIdentity()
 
 - Convex docs: https://docs.convex.dev
 - Migration PR: [link if available]
-- `context/database.md` for patterns
+- `.agents/context/database.md` for patterns

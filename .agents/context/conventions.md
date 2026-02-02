@@ -432,4 +432,4 @@ refactor/chat-components
 
 ---
 
-*See `@AGENTS.md` for gold standard code examples and `@context/architecture.md` for system design patterns.*
+*See `@AGENTS.md` for gold standard code examples and `@.agents/context/architecture.md` for system design patterns.*

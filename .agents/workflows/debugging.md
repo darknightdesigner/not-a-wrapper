@@ -178,4 +178,4 @@ npx convex dev
 
 - `CLAUDE.md` — Debugging workflow section
 - `.cursor/rules/040-security.mdc` — Security patterns
-- `context/architecture.md` — System overview
+- `.agents/context/architecture.md` — System overview

@@ -58,4 +58,4 @@ Once all checks pass:
 
 ## Reference
 
-See `@docs/workflows.md` for complete verification workflow.
+See `@.agents/workflows/development-cycle.md` for complete verification workflow.

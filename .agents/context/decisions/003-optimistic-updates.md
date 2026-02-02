@@ -121,5 +121,5 @@ setTimeout(() => {
 ## References
 
 - `lib/chat-store/chats/provider.tsx` — Gold standard
-- `context/architecture.md` — State management layers
+- `.agents/context/architecture.md` — State management layers
 - `.cursor/rules/020-react-components.mdc` — React patterns

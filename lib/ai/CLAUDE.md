@@ -3,7 +3,7 @@
 This directory contains AI-related utilities implementing Anthropic's best practices for context management and sub-agent architecture.
 
 > See `@AGENTS.md` for universal guidelines.
-> See `@AI_CONTEXT_SETUP_GUIDE.md` for implementation rationale.
+> See `@.agents/context/ai-context-engineering-guide.md` for implementation rationale.
 
 ## Structure
 
@@ -139,6 +139,6 @@ After Convex migration:
 
 ## References
 
-- `AI_CONTEXT_SETUP_GUIDE.md` — Context management best practices
-- `docs/agents-research.md` — Sub-agent architecture research
+- `.agents/context/ai-context-engineering-guide.md` — Context management best practices
+- `.agents/context/research/tech-stack-evaluation.md` — Sub-agent architecture research
 - `AGENTS.md` — Universal agent guidelines

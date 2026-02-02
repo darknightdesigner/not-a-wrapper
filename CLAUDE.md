@@ -54,13 +54,13 @@ CLAUDE.md (this file) → Project-level Claude context
 When you need additional context, use the `@` import syntax:
 
 ```markdown
-@AGENTS.md                          # Project overview, commands, permissions
-@.agents/context/glossary.md        # Domain terminology definitions
-@.agents/skills/add-ai-provider/    # Adding new AI providers
-@.agents/skills/add-model/          # Adding new models
-@.agents/skills/convex-function/    # Creating database functions
-@docs/workflows.md                  # Development workflows (four-phase cycle, TDD)
-@lib/config.ts                      # Centralized configuration constants
+@AGENTS.md                              # Project overview, commands, permissions
+@.agents/context/glossary.md            # Domain terminology definitions
+@.agents/skills/add-ai-provider/        # Adding new AI providers
+@.agents/skills/add-model/              # Adding new models
+@.agents/skills/convex-function/        # Creating database functions
+@.agents/workflows/development-cycle.md # Development workflows (four-phase cycle, TDD)
+@lib/config.ts                          # Centralized configuration constants
 ```
 
 ## Context System
@@ -68,13 +68,14 @@ When you need additional context, use the `@` import syntax:
 | Location | Purpose |
 |----------|---------|
 | `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
+| `.agents/context/` | Architecture, API, database, and deployment docs |
 | `.agents/skills/` | Multi-step task guides |
+| `.agents/workflows/` | Development workflows and procedures |
 | `.cursor/rules/` | Cursor-specific patterns (auto-loaded) |
-| `context/` | Architecture and API documentation |
 
 ## Development Workflow
 
-This project follows Anthropic's four-phase coding cycle. See `@docs/workflows.md` for complete details.
+This project follows Anthropic's four-phase coding cycle. See `@.agents/workflows/development-cycle.md` for complete details.
 
 ### Quick Reference
 
@@ -110,7 +111,7 @@ When sessions get long:
 - Reference `@` files instead of pasting content
 - Use context compaction strategies
 
-See `@docs/workflows.md` for detailed workflows and examples.
+See `@.agents/workflows/development-cycle.md` and `@.agents/workflows/examples.md` for detailed workflows.
 
 ## Sub-Agent Architecture
 
@@ -167,7 +168,7 @@ For long sessions, Claude should:
 ### Reference for Fixes
 
 - `docs/react-19-lint-fixes.md` — React 19 / React Compiler patterns
-- `context/conventions.md` — Quality gates and acceptable exceptions
+- `.agents/context/conventions.md` — Quality gates and acceptable exceptions
 - Gold standard examples in `AGENTS.md`
 
 ## Debugging Workflow

@@ -458,4 +458,4 @@ const apiKey = await getEffectiveApiKey(userId, provider)
 
 ---
 
-*See `@app/api/chat/route.ts` for the gold standard implementation and `@context/architecture.md` for data flow patterns.*
+*See `@app/api/chat/route.ts` for the gold standard implementation and `@.agents/context/architecture.md` for data flow patterns.*

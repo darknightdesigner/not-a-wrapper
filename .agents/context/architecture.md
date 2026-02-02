@@ -290,4 +290,4 @@ components/           # Shadcn UI components (shared)
 
 ---
 
-*See `@docs/agents-research.md` for detailed tech stack evaluation and decision rationale.*
+*See `@.agents/context/research/tech-stack-evaluation.md` for detailed tech stack evaluation and decision rationale.*

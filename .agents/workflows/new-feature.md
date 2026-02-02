@@ -178,6 +178,6 @@ Step-by-step procedure for implementing new features in Not A Wrapper.
 
 ## Reference
 
-- `docs/workflows.md` — Four-phase cycle details
+- `.agents/workflows/development-cycle.md` — Four-phase cycle details
 - `.agents/skills/` — Task-specific guides
 - `.cursor/rules/` — Pattern enforcement

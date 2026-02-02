@@ -200,7 +200,7 @@ Four-phase cycle: **Research → Plan → Code & Verify → Commit**
 
 Use `ultrathink` for complex architectural decisions.
 
-See `docs/workflows.md` for details.
+See `.agents/workflows/development-cycle.md` for details.
 
 ---
 

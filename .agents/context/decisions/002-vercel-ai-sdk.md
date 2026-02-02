@@ -105,4 +105,4 @@ return result.toDataStreamResponse({
 
 - Vercel AI SDK: https://sdk.vercel.ai
 - Provider docs: https://sdk.vercel.ai/providers
-- `context/api.md` for API patterns
+- `.agents/context/api.md` for API patterns

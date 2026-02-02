@@ -74,4 +74,4 @@ This enables maximum depth analysis for:
 
 ## Reference
 
-See `@docs/workflows.md` for complete planning guidelines.
+See `@.agents/workflows/development-cycle.md` for complete planning guidelines.

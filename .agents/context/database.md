@@ -352,4 +352,4 @@ const relevantDocs = await ctx.db
 
 ---
 
-*See `convex/schema.ts` for the complete schema and `context/architecture.md` for data flow patterns.*
+*See `convex/schema.ts` for the complete schema and `.agents/context/architecture.md` for data flow patterns.*
