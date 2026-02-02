@@ -1,0 +1,71 @@
+---
+description: "Security patterns and critical boundaries"
+globs: ["**/*.ts", "**/*.tsx"]
+---
+
+# Security Patterns
+
+## API Key Encryption
+
+```typescript
+// lib/encryption.ts
+// ENCRYPTION_KEY must be exactly 32 bytes (base64)
+// IV must be random per encryption (NEVER reuse)
+// Format: encrypted:authTag (colon separator)
+```
+
+**Never:**
+- Log decrypted API keys
+- Return encrypted keys to client
+- Reuse initialization vectors
+
+## Streaming Responses (CRITICAL)
+
+```typescript
+// app/api/chat/route.ts
+// MUST return toDataStreamResponse, never regular Response
+
+const result = streamText({ ... })
+
+return result.toDataStreamResponse({
+  sendReasoning: true,
+  sendSources: true,
+  getErrorMessage: (error) => extractErrorMessage(error),  // Sanitize errors
+})
+```
+
+## Rate Limiting Order
+
+```typescript
+// CORRECT ORDER:
+// 1. Validate request
+// 2. Check rate limit
+// 3. Increment usage
+// 4. THEN call streamText()
+
+await checkServerSideUsage()      // Check first
+await incrementServerSideUsage()  // Increment before expensive operation
+const result = streamText({ ... }) // Then stream
+```
+
+## CSRF Protection
+
+- All POST/PUT/DELETE require `x-csrf-token` header
+- Token validated in middleware.ts
+- Cookie must be `httpOnly: false` (client reads it)
+
+## Never Log
+
+- OAuth tokens
+- API keys (even encrypted)
+- Session tokens
+- User credentials
+
+## Data Access Rules
+
+| Resource | Rule |
+|----------|------|
+| User data | Verify ownership before access |
+| Private chats | Check `chat.public === false` |
+| User keys | Never return in queries |
+| Anonymous usage | Require `anonymousId` |

@@ -1,7 +1,7 @@
 /**
  * Sub-Agent Architecture
  *
- * Multi-agent system for YouTube content analysis.
+ * Multi-agent system for specialized task handling.
  * Implements Anthropic's sub-agent pattern to:
  * - Prevent context pollution
  * - Optimize token usage
@@ -17,27 +17,27 @@
  *         ┌─────────────┼─────────────┬─────────────┐
  *         ▼             ▼             ▼             ▼
  * ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
- * │  TRANSCRIPT   │ │   TITLE/SEO   │ │  THUMBNAIL    │ │  ANALYTICS    │
- * │   ANALYZER    │ │   OPTIMIZER   │ │   ADVISOR     │ │  INTERPRETER  │
- * │  (Haiku 4.5)  │ │ (Sonnet 4.5)  │ │(Sonnet+Vision)│ │ (Sonnet 4.5)  │
+ * │     CODE      │ │   WRITING     │ │   RESEARCH    │ │     DATA      │
+ * │   ASSISTANT   │ │    EDITOR     │ │   ANALYST     │ │   ANALYST     │
+ * │  (Haiku 4.5)  │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │
  * └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
  * ```
  *
- * @see AI_CONTEXT_SETUP_GUIDE.md - Sub-Agent Architecture section
- * @see docs/agents-research.md - Research and rationale
+ * @see CLAUDE.md - Sub-Agent Architecture section
+ * @see .agents/context/research/tech-stack-evaluation.md - Research and rationale
  *
  * @example
  * ```typescript
  * import { createOrchestrator, classifyTask } from '@/lib/ai/sub-agents'
  *
  * // Classify a task
- * const classification = classifyTask("Generate titles for my gaming video")
- * // { type: 'title-optimizer', confidence: 0.8, parameters: {} }
+ * const classification = classifyTask("Help me debug this React component")
+ * // { type: 'code-assistant', confidence: 0.8, parameters: {} }
  *
  * // Create orchestrator and process
  * const orchestrator = createOrchestrator()
  * const result = await orchestrator.process({
- *   userRequest: "Generate titles for my gaming video about Elden Ring"
+ *   userRequest: "Help me debug this React component"
  * })
  * ```
  */
@@ -53,17 +53,16 @@ export type {
   SubAgentTaskInput,
   SubAgentAttachment,
   // Specific inputs
-  TranscriptAnalysisInput,
-  TitleOptimizationInput,
-  ThumbnailAnalysisInput,
-  AnalyticsInterpretationInput,
-  AnalyticsMetrics,
+  CodeAssistanceInput,
+  WritingEditInput,
+  ResearchInput,
+  DataAnalysisInput,
   // Response types
   SubAgentResponse,
-  TranscriptAnalysisResponse,
-  TitleOptimizationResponse,
-  ThumbnailAnalysisResponse,
-  AnalyticsInterpretationResponse,
+  CodeAssistanceResponse,
+  WritingEditResponse,
+  ResearchResponse,
+  DataAnalysisResponse,
   // Orchestrator
   OrchestratorConfig,
   OrchestratorResult,
@@ -82,93 +81,93 @@ export {
 // ============================================================================
 
 /**
- * Transcript Analyzer Agent
+ * Code Assistant Agent
  *
  * Model: Claude Haiku 4.5 (fast, cost-effective)
  *
  * Capabilities:
- * - Summarize video content
- * - Extract key points and hooks
- * - Identify retention patterns
- * - Find quotable clips
+ * - Write and debug code
+ * - Explain programming concepts
+ * - Code review and optimization
+ * - Documentation help
  *
- * TODO: Implement after Convex migration
- * @see lib/ai/sub-agents/transcript-analyzer.ts (create when implementing)
+ * TODO: Implement when sub-agent architecture is ready
+ * @see lib/ai/sub-agents/code-assistant.ts (create when implementing)
  */
-export const TranscriptAnalyzer = {
+export const CodeAssistant = {
   // Placeholder - implement when needed
-  analyze: async () => {
+  assist: async () => {
     throw new Error(
-      "TranscriptAnalyzer not yet implemented. See lib/ai/sub-agents/types.ts for interface."
+      "CodeAssistant not yet implemented. See lib/ai/sub-agents/types.ts for interface."
     )
   },
 }
 
 /**
- * Title/SEO Optimizer Agent
+ * Writing Editor Agent
  *
  * Model: Claude Sonnet 4.5 (balanced reasoning)
  *
  * Capabilities:
- * - Generate click-worthy titles
- * - Create SEO-optimized tags
- * - Suggest A/B test variants
- * - Analyze keywords
+ * - Write and edit content
+ * - Adapt tone and style
+ * - Grammar and structure
+ * - Content strategy
  *
- * TODO: Implement after Convex migration
- * @see lib/ai/sub-agents/title-optimizer.ts (create when implementing)
+ * TODO: Implement when sub-agent architecture is ready
+ * @see lib/ai/sub-agents/writing-editor.ts (create when implementing)
  */
-export const TitleOptimizer = {
+export const WritingEditor = {
   // Placeholder - implement when needed
-  generate: async () => {
+  edit: async () => {
     throw new Error(
-      "TitleOptimizer not yet implemented. See lib/ai/sub-agents/types.ts for interface."
+      "WritingEditor not yet implemented. See lib/ai/sub-agents/types.ts for interface."
     )
   },
 }
 
 /**
- * Thumbnail Advisor Agent
+ * Research Analyst Agent
  *
- * Model: Claude Sonnet 4.5 + Vision
+ * Model: Claude Sonnet 4.5
  *
  * Capabilities:
- * - Analyze thumbnail composition
- * - Evaluate text readability
- * - Assess color and contrast
- * - Suggest improvements
+ * - Comprehensive research
+ * - Multi-perspective analysis
+ * - Source synthesis
+ * - Insight extraction
  *
- * TODO: Implement after Convex migration
- * @see lib/ai/sub-agents/thumbnail-advisor.ts (create when implementing)
+ * TODO: Implement when sub-agent architecture is ready
+ * @see lib/ai/sub-agents/research-analyst.ts (create when implementing)
  */
-export const ThumbnailAdvisor = {
+export const ResearchAnalyst = {
   // Placeholder - implement when needed
-  analyze: async () => {
+  research: async () => {
     throw new Error(
-      "ThumbnailAdvisor not yet implemented. See lib/ai/sub-agents/types.ts for interface."
+      "ResearchAnalyst not yet implemented. See lib/ai/sub-agents/types.ts for interface."
     )
   },
 }
 
 /**
- * Analytics Interpreter Agent
+ * Data Analyst Agent
  *
  * Model: Claude Sonnet 4.5 (data analysis)
  *
  * Capabilities:
- * - Interpret YouTube metrics
- * - Identify trends and patterns
- * - Benchmark against niche
- * - Provide recommendations
+ * - Analyze datasets
+ * - Identify patterns and trends
+ * - Statistical analysis
+ * - Visualization suggestions
  *
- * TODO: Implement after Convex migration
- * @see lib/ai/sub-agents/analytics-interpreter.ts (create when implementing)
+ * TODO: Implement when sub-agent architecture is ready
+ * @see lib/ai/sub-agents/data-analyst.ts (create when implementing)
  */
-export const AnalyticsInterpreter = {
+export const DataAnalyst = {
   // Placeholder - implement when needed
-  interpret: async () => {
+  analyze: async () => {
     throw new Error(
-      "AnalyticsInterpreter not yet implemented. See lib/ai/sub-agents/types.ts for interface."
+      "DataAnalyst not yet implemented. See lib/ai/sub-agents/types.ts for interface."
     )
   },
 }

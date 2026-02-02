@@ -14,4 +14,4 @@ Files in this directory are:
 - 🔒 May contain session-specific information
 - 📝 Updated by AI agents during development
 
-See AI_CONTEXT_SETUP_GUIDE.md for memory patterns.
+See .agents/context/ai-context-engineering-guide.md for memory patterns.

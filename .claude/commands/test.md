@@ -38,4 +38,4 @@ describe('FeatureName', () => {
 })
 ```
 
-Reference: `context/testing.md` for full guidelines.
+Reference: `.agents/context/testing.md` for full guidelines.

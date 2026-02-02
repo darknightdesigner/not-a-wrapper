@@ -6,7 +6,7 @@
  * @customizations
  *   - Uses `next/dynamic` for Markdown import (code-splitting)
  *   - Removes redundant `TooltipProvider` wrapper in `MessageAction`
- *   - vid0 uses app-level TooltipProvider, reducing bundle size
+ *   - Not A Wrapper uses app-level TooltipProvider, reducing bundle size
  *   - Upstream wraps each MessageAction with TooltipProvider (30+ instances in a chat)
  * @upgradeNotes
  *   - Preserve dynamic import for Markdown component

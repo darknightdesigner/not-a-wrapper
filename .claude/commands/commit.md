@@ -88,4 +88,4 @@ Ensure:
 
 ## Reference
 
-See `@docs/workflows.md` for complete commit workflow and best practices.
+See `@.agents/workflows/development-cycle.md` for complete commit workflow and best practices.

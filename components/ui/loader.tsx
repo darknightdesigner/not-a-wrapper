@@ -10,11 +10,11 @@
  *   - 1 Framer Motion variant: `chat` (the original prompt-kit loader)
  *   - Adds size prop (sm/md/lg) for all variants
  *   - Adds text prop for text-based variants
- *   - vid0 consolidated multiple loader components into single unified API
+ *   - Not A Wrapper consolidated multiple loader components into single unified API
  * @upgradeNotes
  *   - Upstream only provides ChatLoader (3-dot bounce with Framer Motion)
- *   - Do NOT replace with upstream; vid0 version is significantly more feature-rich
- *   - If upstream adds new variants, consider adding them to vid0's variant union
+ *   - Do NOT replace with upstream; Not A Wrapper version is significantly more feature-rich
+ *   - If upstream adds new variants, consider adding them to Not A Wrapper's variant union
  *   - Preserve all 13 variants and the unified Loader API
  */
 "use client"

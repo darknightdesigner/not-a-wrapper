@@ -1,6 +1,6 @@
 # API Routes — Claude Context
 
-This directory contains Next.js API routes for the vid0 backend.
+This directory contains Next.js API routes for the Not A Wrapper backend.
 
 > See `@AGENTS.md` for universal guidelines. Gold standard: `app/api/chat/route.ts`
 

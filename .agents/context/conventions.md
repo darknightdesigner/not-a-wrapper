@@ -404,7 +404,7 @@ brokenCode()
 ### Reference Documentation
 
 When fixing lint errors, consult:
-- `docs/react-19-lint-fixes.md` — React 19 / React Compiler patterns
+- `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
 - Gold standard examples in `AGENTS.md`
 - Official documentation linked in error messages
 
@@ -432,4 +432,4 @@ refactor/chat-components
 
 ---
 
-*See `@AGENTS.md` for gold standard code examples and `@context/architecture.md` for system design patterns.*
+*See `@AGENTS.md` for gold standard code examples and `@.agents/context/architecture.md` for system design patterns.*

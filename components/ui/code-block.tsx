@@ -5,7 +5,7 @@
  * @customized true
  * @customizations
  *   - Uses `useTheme()` hook for automatic dark/light mode switching
- *   - Upstream requires manual `theme` prop; vid0 auto-detects from app theme
+ *   - Upstream requires manual `theme` prop; Not A Wrapper auto-detects from app theme
  *   - Adds `[&>pre]:!bg-background` for consistent backgrounds across themes
  *   - SSR fallback renders plain code block before hydration
  * @upgradeNotes

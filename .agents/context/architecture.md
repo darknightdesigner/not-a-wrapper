@@ -5,11 +5,11 @@
 
 ## Overview
 
-vid0 is an AI-powered platform for YouTube content creators, providing data-driven recommendations for scripts, titles, and thumbnails through a chat-based interface.
+Not A Wrapper is an open-source multi-AI chat application that provides a unified interface for multiple models. It supports BYOK, multi-model comparison, and local models via Ollama.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                          vid0                                │
+│                      Not A Wrapper                           │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────────────────────────────────────────────┐│
@@ -37,8 +37,8 @@ vid0 is an AI-powered platform for YouTube content creators, providing data-driv
 │  │  └──────────┘  └──────────────┘  └──────────────────┘ │  │
 │  │                                                        │  │
 │  │  ┌──────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
-│  │  │ Vercel   │  │   YouTube    │  │   AI Providers   │ │  │
-│  │  │   AI SDK │  │     APIs     │  │ Claude/OpenAI/.. │ │  │
+│  │  │ Vercel   │  │   Ollama     │  │   AI Providers   │ │  │
+│  │  │   AI SDK │  │   (Local)    │  │ Claude/OpenAI/.. │ │  │
 │  │  └──────────┘  └──────────────┘  └──────────────────┘ │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                              │
@@ -171,18 +171,18 @@ For complex tasks, we use specialized sub-agents:
         ┌─────────────┼─────────────┬─────────────┐
         ▼             ▼             ▼             ▼
 ┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│  TRANSCRIPT   │ │   TITLE/SEO   │ │  THUMBNAIL    │ │  ANALYTICS    │
-│   ANALYZER    │ │   OPTIMIZER   │ │   ADVISOR     │ │  INTERPRETER  │
-│ (Haiku 4.5)   │ │ (Sonnet 4.5)  │ │ (Sonnet+Vision)│ │ (Sonnet 4.5)  │
+│     CODE      │ │   WRITING     │ │   RESEARCH    │ │     DATA      │
+│   ASSISTANT   │ │    EDITOR     │ │   ANALYST     │ │   ANALYST     │
+│ (Haiku 4.5)   │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │ │ (Sonnet 4.5)  │
 └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
 | Agent | Model | Purpose |
 |-------|-------|---------|
-| **Transcript Analyzer** | Claude Haiku 4.5 | Summarize, extract key points, identify hooks |
-| **Title/SEO Optimizer** | Claude Sonnet 4.5 | Generate titles, tags, A/B test variants |
-| **Thumbnail Advisor** | Claude Sonnet 4.5 + Vision | Analyze images, suggest improvements |
-| **Analytics Interpreter** | Claude Sonnet 4.5 | Interpret metrics, identify trends |
+| **Code Assistant** | Claude Haiku 4.5 | Programming help, debugging, code review |
+| **Writing Editor** | Claude Sonnet 4.5 | Content creation, editing, proofreading |
+| **Research Analyst** | Claude Sonnet 4.5 | Web research, fact-checking, analysis |
+| **Data Analyst** | Claude Sonnet 4.5 | Data interpretation, insights, visualization |
 
 ## Directory Structure
 
@@ -283,11 +283,11 @@ components/           # Shadcn UI components (shared)
 - TypeScript-first schema definitions
 - Automatic optimistic updates
 
-### YouTube Integration
+### Future Enhancements
 
-- **Phase 1**: YouTube Data API v3 (public data, competitor analysis)
-- **Phase 2**: YouTube Analytics API (creator metrics, OAuth)
+- **Phase 1**: Model comparison analytics and smart routing
+- **Phase 2**: Model chains and workflow automation
 
 ---
 
-*See `@docs/agents-research.md` for detailed tech stack evaluation and decision rationale.*
+*See `@.agents/context/research/tech-stack-evaluation.md` for detailed tech stack evaluation and decision rationale.*

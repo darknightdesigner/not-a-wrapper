@@ -1,0 +1,96 @@
+---
+description: "API route patterns for Next.js App Router"
+globs: ["app/api/**/*.ts"]
+---
+
+# API Route Patterns
+
+## Response Format
+
+```typescript
+// Success
+return new Response(
+  JSON.stringify({ data: result }),
+  { status: 200 }
+)
+
+// Error
+return new Response(
+  JSON.stringify({ error: "Message", code: "ERROR_CODE" }),
+  { status: 400 }
+)
+```
+
+## Streaming Response
+
+```typescript
+// For AI chat - use Vercel AI SDK
+import { streamText } from "ai"
+
+const result = streamText({
+  model: modelConfig.apiSdk(apiKey),
+  system: systemPrompt,
+  messages,
+})
+
+return result.toDataStreamResponse({
+  sendReasoning: true,
+  sendSources: true,
+  getErrorMessage: (error) => extractErrorMessage(error),
+})
+```
+
+## Authentication
+
+```typescript
+import { auth } from "@clerk/nextjs/server"
+
+export async function POST(req: Request) {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    return new Response(
+      JSON.stringify({ error: "Unauthorized" }),
+      { status: 401 }
+    )
+  }
+  
+  // Continue with authenticated request
+}
+```
+
+## Validation
+
+```typescript
+import { z } from "zod"
+
+const schema = z.object({
+  messages: z.array(z.object({
+    role: z.enum(["user", "assistant", "system"]),
+    content: z.string(),
+  })),
+  chatId: z.string(),
+})
+
+export async function POST(req: Request) {
+  const body = await req.json()
+  const result = schema.safeParse(body)
+  
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ error: "Invalid request", code: "VALIDATION_ERROR" }),
+      { status: 400 }
+    )
+  }
+  
+  const { messages, chatId } = result.data
+  // ...
+}
+```
+
+## Long-Running Routes
+
+```typescript
+// Export maxDuration for routes that may take longer
+export const maxDuration = 60  // seconds
+```

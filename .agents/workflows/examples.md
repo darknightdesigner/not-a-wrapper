@@ -391,7 +391,7 @@ Closes #456"
 
 ## Reference
 
-- `@docs/workflows.md` - Complete workflow documentation
+- `@.agents/workflows/development-cycle.md` - Complete workflow documentation
 - `@AGENTS.md` - Project conventions
 - `@CLAUDE.md` - Claude-specific behaviors
 

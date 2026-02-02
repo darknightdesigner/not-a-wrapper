@@ -29,9 +29,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_DOMAIN),
-  title: "vid0",
+  title: "Not A Wrapper",
   description:
-    "vid0 is an AI-powered assistant for YouTube creators. Get help with video ideas, titles, scripts, SEO, thumbnails, and growth strategies. Multi-model, BYOK-ready, and self-hostable.",
+    "Not A Wrapper is an open-source, Next.js-based AI chat application that provides a unified interface for multiple models, including OpenAI, Mistral, Claude, and Gemini. BYOK-ready and self-hostable.",
 }
 
 export default async function RootLayout({
@@ -40,7 +40,7 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   const isDev = process.env.NODE_ENV === "development"
-  const isOfficialDeployment = process.env.ZOLA_OFFICIAL === "true"
+  const isOfficialDeployment = process.env.NAW_OFFICIAL === "true"
   const userProfile = await getUserProfile()
 
   return (
@@ -49,7 +49,7 @@ export default async function RootLayout({
         <Script
           defer
           src="https://assets.onedollarstats.com/stonks.js"
-          {...(isDev ? { "data-debug": "vid0.chat" } : {})}
+          {...(isDev ? { "data-debug": "not-a-wrapper.com" } : {})}
         />
       ) : null}
       <body

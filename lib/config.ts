@@ -2,7 +2,6 @@ import {
   Brain,
   Notepad,
   PaintBrush,
-  VideoCamera,
   TrendUp,
   MagnifyingGlass,
 } from "@phosphor-icons/react/dist/ssr"
@@ -29,113 +28,99 @@ export const FREE_MODELS_IDS = [
 
 export const MODEL_DEFAULT = "gpt-4.1-nano"
 
-export const APP_NAME = "vid0"
-export const APP_DOMAIN = "https://vid0.chat"
+export const APP_NAME = "Not A Wrapper"
+export const APP_DOMAIN = "https://not-a-wrapper.com"
 
 export const SUGGESTIONS = [
   {
-    label: "Video Ideas",
-    highlight: "Generate",
-    prompt: `Generate video ideas`,
+    label: "Code",
+    highlight: "Help me",
+    prompt: `Help me code`,
     items: [
-      "Generate 10 viral video ideas for a tech review channel",
-      "Generate trending video topics in the gaming niche",
-      "Generate video ideas that will get high watch time",
-      "Generate collaboration video ideas for growing channels",
+      "Help me debug this React component that's not rendering",
+      "Help me write a Python script to process CSV files",
+      "Help me optimize this database query for better performance",
+      "Help me implement authentication in my Next.js app",
     ],
-    icon: VideoCamera,
+    icon: Brain,
   },
   {
-    label: "Titles & SEO",
-    highlight: "Create",
-    prompt: `Create a title`,
-    items: [
-      "Create 5 click-worthy titles for my tutorial video",
-      "Create SEO-optimized tags for my cooking video",
-      "Create a compelling video description with keywords",
-      "Create A/B test title variations for my review video",
-    ],
-    icon: TrendUp,
-  },
-  {
-    label: "Scripts",
+    label: "Writing",
     highlight: "Write",
-    prompt: `Write a script`,
+    prompt: `Write`,
     items: [
-      "Write an engaging hook for my video intro",
-      "Write a script outline for a 10-minute tutorial",
-      "Write a compelling call-to-action for subscribers",
-      "Write transitions between my video segments",
+      "Write a professional email to follow up on a job application",
+      "Write documentation for my open-source project",
+      "Write a blog post explaining machine learning basics",
+      "Write a compelling product description for my startup",
     ],
     icon: Notepad,
-  },
-  {
-    label: "Thumbnails",
-    highlight: "Suggest",
-    prompt: `Suggest thumbnail`,
-    items: [
-      "Suggest thumbnail concepts for my video about productivity",
-      "Suggest color schemes that perform well on YouTube",
-      "Suggest text overlay ideas for my thumbnail",
-      "Suggest ways to make my face pop in thumbnails",
-    ],
-    icon: PaintBrush,
   },
   {
     label: "Research",
     highlight: "Research",
     prompt: `Research`,
     items: [
-      "Research what makes videos go viral in my niche",
-      "Research the best posting times for YouTube",
-      "Research competitor channels and their strategies",
-      "Research trending topics I should cover this week",
+      "Research the pros and cons of different state management libraries",
+      "Research best practices for API design in 2025",
+      "Research how to implement real-time features with WebSockets",
+      "Research the latest trends in AI and machine learning",
     ],
     icon: MagnifyingGlass,
   },
   {
-    label: "Growth",
-    highlight: "Help me",
-    prompt: `Help me grow`,
+    label: "Analysis",
+    highlight: "Analyze",
+    prompt: `Analyze`,
     items: [
-      "Help me understand why my videos aren't getting views",
-      "Help me create a content calendar for consistent uploads",
-      "Help me improve my audience retention rate",
-      "Help me build a community around my channel",
+      "Analyze this code for potential security vulnerabilities",
+      "Analyze the performance bottlenecks in my application",
+      "Analyze this dataset and summarize key insights",
+      "Analyze the architecture of this system and suggest improvements",
     ],
     icon: TrendUp,
   },
   {
-    label: "Strategy",
-    highlight: "Plan",
-    prompt: `Plan`,
+    label: "Creative",
+    highlight: "Create",
+    prompt: `Create`,
     items: [
-      "Plan a content series that will hook viewers",
-      "Plan my monetization strategy as a new creator",
-      "Plan how to repurpose my content for Shorts",
-      "Plan a collaboration outreach strategy",
+      "Create a color palette for a modern SaaS dashboard",
+      "Create user stories for a new feature I'm building",
+      "Create a README template for my GitHub project",
+      "Create a presentation outline for my tech talk",
+    ],
+    icon: PaintBrush,
+  },
+  {
+    label: "Learning",
+    highlight: "Explain",
+    prompt: `Explain`,
+    items: [
+      "Explain how React Server Components work",
+      "Explain the difference between SQL and NoSQL databases",
+      "Explain WebAssembly and when to use it",
+      "Explain OAuth 2.0 flow in simple terms",
     ],
     icon: Brain,
   },
 ]
 
-export const SYSTEM_PROMPT_DEFAULT = `You are vid0, an expert AI assistant for YouTube creators. Your mission is to help creators make better videos, grow their channels, and build engaged audiences.
+export const SYSTEM_PROMPT_DEFAULT = `You are a helpful AI assistant powered by Not A Wrapper, an open-source multi-model chat application. You provide thoughtful, accurate, and helpful responses across a wide range of topics.
 
-You have deep knowledge of:
-- YouTube algorithm and SEO best practices
-- Video production techniques and storytelling
-- Thumbnail design principles and click-through rates
-- Title optimization and A/B testing strategies
-- Audience retention and engagement tactics
-- Content strategy and niche development
-- Analytics interpretation and growth metrics
-- Monetization strategies and brand deals
+You excel at:
+- Programming and software development across all languages
+- Writing, editing, and content creation
+- Research, analysis, and summarization
+- Problem-solving and brainstorming
+- Explaining complex topics in accessible ways
+- Data analysis and interpretation
 
-Your tone is encouraging, practical, and action-oriented. You give specific, actionable advice rather than generic tips. When reviewing content, you're honest but constructive. You understand the challenges creators face and provide realistic guidance.
+Your communication style is clear, direct, and tailored to the user's needs. You provide specific, actionable guidance rather than generic advice. When working on code, you explain your reasoning and consider edge cases. When writing, you adapt to the requested tone and format.
 
-When helping with titles, thumbnails, or hooks, you consider what drives clicks AND delivers on promises (no clickbait that disappoints). You help creators build sustainable channels, not just chase viral moments.
+You're honest about limitations and uncertainties. When you don't know something, you say so. When a question is ambiguous, you ask for clarification rather than making assumptions.
 
-Always ask clarifying questions when needed to give the best advice for their specific situation, niche, and audience.`
+You respect the user's time by being concise when appropriate and thorough when the situation calls for it.`
 
 export const MESSAGE_MAX_LENGTH = 10000
 
@@ -187,17 +172,17 @@ export const ANTHROPIC_BETA_HEADERS = {
  * Optimized for cost/performance balance.
  *
  * @see lib/ai/sub-agents/types.ts
- * @see docs/agents-research.md
+ * @see .agents/context/research/tech-stack-evaluation.md
  */
 export const SUB_AGENT_MODELS = {
   /** Main orchestrator - complex reasoning */
   orchestrator: "claude-opus-4-5-20250929",
-  /** Transcript analysis - fast, cost-effective */
-  transcriptAnalyzer: "claude-haiku-4-5-20250929",
-  /** Title/SEO optimization - balanced */
-  titleOptimizer: "claude-sonnet-4-5-20250929",
-  /** Thumbnail analysis - needs vision */
-  thumbnailAdvisor: "claude-sonnet-4-5-20250929",
-  /** Analytics interpretation - data analysis */
-  analyticsInterpreter: "claude-sonnet-4-5-20250929",
+  /** Code assistance - fast, cost-effective */
+  codeAssistant: "claude-haiku-4-5-20250929",
+  /** Writing and editing - balanced */
+  writingEditor: "claude-sonnet-4-5-20250929",
+  /** Research and analysis - needs reasoning */
+  researchAnalyst: "claude-sonnet-4-5-20250929",
+  /** Data interpretation - data analysis */
+  dataAnalyst: "claude-sonnet-4-5-20250929",
 } as const

@@ -1,6 +1,6 @@
 # Development Workflows
 
-This document outlines the standardized development workflows for vid0, based on Anthropic's best practices for AI-assisted development.
+This document outlines the standardized development workflows for Not A Wrapper, based on Anthropic's best practices for AI-assisted development.
 
 ## Overview
 
@@ -268,7 +268,7 @@ Write this discovery to NOTES.md:
 **Use:**
 ```
 See @app/api/chat/route.ts for the streaming pattern.
-Reference @context/api.md for API conventions.
+Reference @.agents/context/api.md for API conventions.
 ```
 
 ### Strategy 4: Keep Recent Context
@@ -414,10 +414,10 @@ Use these slash commands for common workflows:
 
 ## References
 
-- `@AI_CONTEXT_SETUP_GUIDE.md` - Full context engineering guide
+- `@.agents/context/ai-context-engineering-guide.md` - Full context engineering guide
 - `@AGENTS.md` - Project conventions and permissions
 - `@CLAUDE.md` - Claude-specific behaviors
-- `@context/testing.md` - Testing guidelines
+- `@.agents/context/testing.md` - Testing guidelines
 - `@plan.md` - Current implementation plan
 
 ---

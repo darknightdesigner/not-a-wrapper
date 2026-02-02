@@ -6,7 +6,7 @@
  * @customizations
  *   - Adds `onClick` prop for navigation/expansion functionality
  *   - Shows ChevronRight icon on hover when onClick is provided
- *   - Upstream only has `onStop` prop; vid0 adds clickable thinking text
+ *   - Upstream only has `onStop` prop; Not A Wrapper adds clickable thinking text
  *   - Uses local TextShimmer component (also customized)
  * @upgradeNotes
  *   - Preserve onClick prop and ChevronRight icon rendering

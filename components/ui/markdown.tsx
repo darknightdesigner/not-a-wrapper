@@ -9,7 +9,7 @@
  *   - Adds `CodeBlockGroup` header with language label display
  *   - Uses `marked.lexer()` for block-level parsing optimization
  *   - Per-block memoization via `MemoizedMarkdownBlock` for better performance
- *   - Upstream has basic code/link handling; vid0 has enhanced UX features
+ *   - Upstream has basic code/link handling; Not A Wrapper has enhanced UX features
  * @upgradeNotes
  *   - Preserve LinkMarkdown, ButtonCopy, and CodeBlockGroup integrations
  *   - Maintain per-block memoization pattern for performance

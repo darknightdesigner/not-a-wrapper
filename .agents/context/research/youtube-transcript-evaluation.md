@@ -1,6 +1,6 @@
 # YouTube Transcript Extraction - Technical Evaluation
 
-> **Document Purpose:** Evaluate all available options for converting YouTube video links into transcripts for AI training and chat integration in vid0.
+> **Document Purpose:** Evaluate all available options for converting YouTube video links into transcripts for AI training and chat integration in Not A Wrapper.
 >
 > **Last Updated:** January 2026
 
@@ -40,7 +40,7 @@
 
 ## Requirements Analysis
 
-### vid0 Use Cases
+### Not A Wrapper Use Cases
 
 | Use Case | Transcript Need | Priority |
 |----------|-----------------|----------|
@@ -513,11 +513,11 @@ console.log(transcription.text);
 
 ## Technical Implementation
 
-### Recommended Architecture for vid0
+### Recommended Architecture for Not A Wrapper
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                         vid0                              │
+│                         Not A Wrapper                              │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
@@ -722,7 +722,7 @@ export function useYouTubeTranscript() {
 
 ## Recommendations
 
-### For vid0
+### For Not A Wrapper
 
 #### Primary Recommendation: Hybrid Free Approach
 

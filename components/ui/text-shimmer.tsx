@@ -6,7 +6,7 @@
  * @customizations
  *   - Adds configurable `duration` prop (default: 4 seconds)
  *   - Adds configurable `spread` prop (default: 20, range: 5-45)
- *   - Upstream has fixed animation timing; vid0 allows customization
+ *   - Upstream has fixed animation timing; this project allows customization
  *   - Enables fine-tuning of shimmer effect speed and gradient width
  * @upgradeNotes
  *   - Preserve duration and spread props with their default values

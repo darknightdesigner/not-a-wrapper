@@ -32,7 +32,7 @@
 
 ### Core Purpose
 
-**vid0** (placeholder name) is a chat-based platform that helps content creators make better YouTube videos through data-driven AI recommendations.
+**Not A Wrapper** (placeholder name) is a chat-based platform that helps content creators make better YouTube videos through data-driven AI recommendations.
 
 ### Problem Statement
 
@@ -100,9 +100,9 @@ A platform that:
 
 | Document | Status | Notes |
 |----------|--------|-------|
-| `youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
-| `installation-implementation-plan.md` | ✅ Complete | Phased implementation roadmap |
-| `AI_CONTEXT_SETUP_GUIDE.md` | ✅ Complete | AI orchestration best practices |
+| `.agents/context/research/youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
+| `.agents/archive/installation-implementation-plan-2026-01.md` | ✅ Complete | Phased implementation roadmap |
+| `.agents/context/ai-context-engineering-guide.md` | ✅ Complete | AI orchestration best practices |
 
 ### Current Implementation Status
 
@@ -425,7 +425,7 @@ Flowglad's Core Platform **uses Clerk as its primary authentication provider**:
 
 ```
 ┌─────────────────────────────────────────┐
-│                  vid0                    │
+│                  Not A Wrapper                    │
 ├─────────────────────────────────────────┤
 │                                          │
 │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
@@ -671,7 +671,7 @@ Both VidIQ and TubeBuddy are YouTube partners but do not expose APIs for third-p
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                          vid0                                │
+│                          Not A Wrapper                                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────┐    ┌─────────────────┐                │
@@ -912,7 +912,7 @@ const updateTitle = async (id: string, title: string) => {
 
 #### Context Management Strategy
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md` and Anthropic best practices:
+Based on `.agents/context/ai-context-engineering-guide.md` and Anthropic best practices:
 
 **1. Context Compaction (For Long Conversations)**
 
@@ -955,7 +955,7 @@ From Anthropic's context engineering research:
 - **Better results** - Focused prompts outperform generic ones
 - **Token efficiency** - Only relevant context per agent
 
-#### Proposed Sub-Agent Architecture for vid0
+#### Proposed Sub-Agent Architecture for Not A Wrapper
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1041,7 +1041,7 @@ async function handleUserRequest(request: UserRequest) {
 
 #### Four-Phase Coding Cycle (Anthropic Recommended)
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md`:
+Based on `.agents/context/ai-context-engineering-guide.md`:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1427,7 +1427,7 @@ tests/
 
 ### 🔵 RESEARCH NEEDED: AI Development Workflow
 
-Based on `AI_CONTEXT_SETUP_GUIDE.md`, the recommended workflow is:
+Based on `.agents/context/ai-context-engineering-guide.md`, the recommended workflow is:
 
 ```
 Phase 1: Research → Phase 2: Plan → Phase 3: Code → Phase 4: Commit
@@ -1715,8 +1715,8 @@ The core tech stack is now finalized:
 | Topic | Date | Summary | Decision Needed | Link |
 |-------|------|---------|-----------------|------|
 | YouTube Transcripts | Jan 2026 | Use youtube-transcript + Whisper fallback | ✅ Decided | [Link](./youtube-transcript-evaluation.md) |
-| Implementation Plan | Jan 2026 | Phased approach over 2 weeks | ✅ Approved | [Link](./installation-implementation-plan.md) |
-| AI Context Setup | Jan 2026 | AGENTS.md + CLAUDE.md standards | ✅ Following | [Link](../AI_CONTEXT_SETUP_GUIDE.md) |
+| Implementation Plan | Jan 2026 | Phased approach over 2 weeks | ✅ Approved | [Link](../../archive/installation-implementation-plan-2026-01.md) |
+| AI Context Setup | Jan 2026 | AGENTS.md + CLAUDE.md standards | ✅ Following | [Link](../ai-context-engineering-guide.md) |
 | **Convex vs Supabase** | Jan 13, 2026 | Convex recommended for AI-first chat | ✅ **DECIDED** | This doc |
 | **YouTube Data API** | Jan 13, 2026 | Two APIs needed (Data + Analytics) | ✅ **DECIDED** | This doc |
 | **Security Boundaries** | Jan 13, 2026 | AI permissions defined | ✅ Ready for AGENTS.md | This doc |
@@ -1753,7 +1753,7 @@ Based on research, the AGENTS.md file should include:
 ### Proposed Structure
 
 ```markdown
-# vid0
+# Not A Wrapper
 
 ## Project Overview
 - Purpose and vision
@@ -1898,7 +1898,7 @@ Based on research, the AGENTS.md file should include:
 
 ```
 ┌────────────────────────────────────────────────────┐
-│                  vid0 STACK                          │
+│                  Not A Wrapper STACK                          │
 ├────────────────────────────────────────────────────┤
 │                                                     │
 │  Next.js 16 + React 19 + TypeScript                │

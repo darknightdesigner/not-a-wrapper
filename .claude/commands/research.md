@@ -47,4 +47,4 @@ description: Phase 1 - Research and explore before implementation
 
 ## Reference
 
-See `@docs/workflows.md` for the complete four-phase coding cycle.
+See `@.agents/workflows/development-cycle.md` for the complete four-phase coding cycle.

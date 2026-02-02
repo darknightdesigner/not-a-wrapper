@@ -1,6 +1,6 @@
 # App Components — Claude Context
 
-This directory contains app-specific React components for vid0.
+This directory contains app-specific React components for Not A Wrapper.
 
 > See `@components/CLAUDE.md` for Shadcn UI primitives.
 > Gold standard: `app/components/chat/chat.tsx`
@@ -147,4 +147,4 @@ layout/
 ## Notes
 
 <!-- TODO: Document multi-chat comparison patterns -->
-<!-- TODO: Add thumbnail advisor component (sub-agent integration) -->
+<!-- TODO: Add sub-agent integration components -->

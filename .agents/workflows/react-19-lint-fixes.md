@@ -1,6 +1,6 @@
 # React 19 Lint Fixes Guide
 
-This document guides AI agents through fixing React 19 / React Compiler lint issues in the vid0 codebase, organized into context-optimized phases.
+This document guides AI agents through fixing React 19 / React Compiler lint issues in the Not A Wrapper codebase, organized into context-optimized phases.
 
 ## Background
 

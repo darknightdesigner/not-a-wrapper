@@ -1,6 +1,6 @@
 # Claude-Specific Context
 
-This file contains Claude-specific behaviors, preferences, and context for the vid0 project.
+This file contains Claude-specific behaviors, preferences, and context for the Not A Wrapper project.
 
 > See `@AGENTS.md` for universal guidelines that apply to all AI agents.
 
@@ -43,10 +43,10 @@ This file contains Claude-specific behaviors, preferences, and context for the v
 This project uses the following memory structure:
 
 ```
-CLAUDE.md (this file)     → Project-level Claude context
-├── app/CLAUDE.md         → App-specific patterns (TODO: create when needed)
-├── lib/CLAUDE.md         → Library patterns (TODO: create when needed)
-└── ~/.claude/CLAUDE.md   → Personal user preferences
+CLAUDE.md (this file) → Project-level Claude context
+├── app/CLAUDE.md → App-specific patterns
+├── lib/CLAUDE.md → Library patterns
+└── ~/.claude/CLAUDE.md → Personal user preferences
 ```
 
 ## Import Syntax for Context
@@ -54,16 +54,28 @@ CLAUDE.md (this file)     → Project-level Claude context
 When you need additional context, use the `@` import syntax:
 
 ```markdown
-@AGENTS.md                           # Project overview, commands, permissions
-@docs/agents-research.md             # Tech stack decisions, sub-agent architecture
-@docs/youtube-transcript-evaluation.md # YouTube API research
-@docs/workflows.md                   # Development workflows (four-phase cycle, TDD)
-@lib/config.ts                       # Centralized configuration constants
+@AGENTS.md                              # Project overview, commands, permissions
+@.agents/context/glossary.md            # Domain terminology definitions
+@.agents/skills/add-ai-provider/        # Adding new AI providers
+@.agents/skills/add-model/              # Adding new models
+@.agents/skills/convex-function/        # Creating database functions
+@.agents/workflows/development-cycle.md # Development workflows (four-phase cycle, TDD)
+@lib/config.ts                          # Centralized configuration constants
 ```
+
+## Context System
+
+| Location | Purpose |
+|----------|---------|
+| `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
+| `.agents/context/` | Architecture, API, database, and deployment docs |
+| `.agents/skills/` | Multi-step task guides |
+| `.agents/workflows/` | Development workflows and procedures |
+| `.cursor/rules/` | Cursor-specific patterns (auto-loaded) |
 
 ## Development Workflow
 
-This project follows Anthropic's four-phase coding cycle. See `@docs/workflows.md` for complete details.
+This project follows Anthropic's four-phase coding cycle. See `@.agents/workflows/development-cycle.md` for complete details.
 
 ### Quick Reference
 
@@ -99,20 +111,18 @@ When sessions get long:
 - Reference `@` files instead of pasting content
 - Use context compaction strategies
 
-See `@docs/workflows.md` for detailed workflows and examples.
+See `@.agents/workflows/development-cycle.md` and `@.agents/workflows/examples.md` for detailed workflows.
 
-## Sub-Agent Architecture (Future)
-
-<!-- TODO: Implement after Convex migration -->
+## Sub-Agent Architecture
 
 When the sub-agent architecture is implemented, Claude should route tasks:
 
 | Task Type | Agent | Model |
 |-----------|-------|-------|
-| Transcript analysis | Transcript Analyzer | Haiku 4.5 |
-| Title generation | Title/SEO Optimizer | Sonnet 4.5 |
-| Thumbnail feedback | Thumbnail Advisor | Sonnet 4.5 + Vision |
-| Analytics interpretation | Analytics Interpreter | Sonnet 4.5 |
+| Code assistance | Code Assistant | Haiku 4.5 |
+| Writing/editing | Writing Editor | Sonnet 4.5 |
+| Research tasks | Research Analyst | Sonnet 4.5 |
+| Data analysis | Data Analyst | Sonnet 4.5 |
 | General conversation | Main Orchestrator | Opus 4.5 |
 
 ## Context Compaction
@@ -148,7 +158,7 @@ For long sessions, Claude should:
 ```markdown
 ✅ DO: "This error is because X. Here's how to fix the code properly..."
 ✅ DO: "This pattern violates React 19's ref rules. The correct pattern is..."
-✅ DO: "I'll consult docs/react-19-lint-fixes.md for the recommended fix."
+✅ DO: "I'll consult .agents/workflows/react-19-lint-fixes.md for the recommended fix."
 
 ❌ DON'T: "We can disable this rule in eslint.config.mjs..."
 ❌ DON'T: "Let me add // @ts-ignore to suppress this..."
@@ -157,8 +167,8 @@ For long sessions, Claude should:
 
 ### Reference for Fixes
 
-- `docs/react-19-lint-fixes.md` — React 19 / React Compiler patterns
-- `context/conventions.md` — Quality gates and acceptable exceptions
+- `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
+- `.agents/context/conventions.md` — Quality gates and acceptable exceptions
 - Gold standard examples in `AGENTS.md`
 
 ## Debugging Workflow
@@ -173,13 +183,12 @@ When debugging issues:
 
 ## Common Gotchas
 
-<!-- Add project-specific issues as discovered -->
-
-- **Streaming responses**: Must use `StreamingTextResponse` from AI SDK
-- **Server Components**: Cannot use hooks; use Client Components wrapper
+- **Streaming responses**: Must use `result.toDataStreamResponse()` from Vercel AI SDK
+- **Server Components**: Cannot use hooks; use Client Components wrapper with `"use client"`
 - **Database**: Uses Convex for all data operations (real-time queries + mutations)
 - **Auth**: Uses Clerk for authentication; avoid touching `middleware.ts` without review
 - **File Storage**: Uses Convex storage for file uploads
+- **Model terminology**: See `.agents/context/glossary.md` for precise definitions
 
 ---
 

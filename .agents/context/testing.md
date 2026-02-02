@@ -330,7 +330,7 @@ export const mockPremiumUser = {
 // tests/fixtures/messages.ts
 export const mockUserMessage = {
   role: "user" as const,
-  content: "Hello, vid0!",
+  content: "Hello!",
   chat_id: "chat-123",
 }
 ```
@@ -344,4 +344,4 @@ export const mockUserMessage = {
 
 ---
 
-*See `@docs/agents-research.md` for testing strategy rationale and `@AGENTS.md` for gold standard examples.*
+*See `@.agents/context/research/tech-stack-evaluation.md` for testing strategy rationale and `@AGENTS.md` for gold standard examples.*

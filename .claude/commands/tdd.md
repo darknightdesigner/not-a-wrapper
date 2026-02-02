@@ -71,7 +71,7 @@ Skip:
 
 ## Test Structure
 
-Follow patterns in `context/testing.md`:
+Follow patterns in `.agents/context/testing.md`:
 
 ```typescript
 import { describe, it, expect, beforeEach, vi } from 'vitest'
@@ -113,6 +113,6 @@ bun run test       # Run tests
 
 ## Reference
 
-- `@docs/workflows.md` - Complete TDD workflow
-- `@context/testing.md` - Testing guidelines
+- `@.agents/workflows/development-cycle.md` - Complete TDD workflow
+- `@.agents/context/testing.md` - Testing guidelines
 - `@AGENTS.md` - Testing strategy

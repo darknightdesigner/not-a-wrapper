@@ -219,7 +219,7 @@ bun run lint       # Should pass
 | `components/icons/meta.tsx` | `export default Icon` | `export const MetaIcon` + `export default` |
 | `components/icons/ollama.tsx` | `export default Icon` | `export const OllamaIcon` + `export default` |
 | `components/icons/zola.tsx` | `export default Icon` | `export const ZolaIcon` + `export default` |
-| `components/icons/vid0.tsx` | `export function Vid0Icon` | Already correct, add size prop |
+| `components/icons/naw.tsx` | `export function NawIcon` | Already correct, add size prop |
 
 #### Migration Pattern
 
@@ -417,7 +417,7 @@ rg "from ['\"]lucide-react['\"]" --type ts --type tsx
       paths: [
         {
           name: "lucide-react",
-          message: "Use @phosphor-icons/react or @/lib/icons instead. See docs/icon-system-migration-plan.md"
+          message: "Use @phosphor-icons/react or @/lib/icons instead. See .agents/archive/icon-system-migration-plan-2026-01.md"
         }
       ],
       patterns: [

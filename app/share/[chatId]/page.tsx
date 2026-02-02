@@ -48,7 +48,7 @@ export async function generateMetadata({
   const convexId = toConvexId(chatId)
 
   let title = "Shared Chat"
-  let description = "A conversation in vid0"
+  let description = "A conversation in Not A Wrapper"
 
   if (convexId) {
     try {
@@ -119,7 +119,7 @@ export default async function ShareChat({
       messages={messages}
       date={new Date(chat._creationTime).toISOString()}
       title={chat.title ?? "Shared Chat"}
-      subtitle="A conversation in vid0"
+      subtitle="A conversation in Not A Wrapper"
     />
   )
 }

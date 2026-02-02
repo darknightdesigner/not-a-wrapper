@@ -55,7 +55,7 @@ export function DialogPublish() {
 
   const shareOnX = () => {
     setOpenDialog(false)
-    const X_TEXT = `Check out this public page I created with vid0! ${publicLink}`
+    const X_TEXT = `Check out this conversation I shared with Not A Wrapper! ${publicLink}`
     window.open(`https://x.com/intent/tweet?text=${X_TEXT}`, "_blank")
   }
 

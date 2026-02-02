@@ -1,6 +1,6 @@
-# vid0 Installation Guide
+# Not A Wrapper Installation Guide
 
-vid0 is an AI-powered assistant for YouTube creators, helping with video ideas, titles, scripts, SEO, and growth strategies. This guide covers how to install and run vid0 on different platforms, including Docker deployment options.
+Not A Wrapper is an open-source, Next.js-based AI chat application that provides a unified interface for multiple models, including OpenAI, Mistral, Claude, and Gemini. This guide covers how to install and run Not A Wrapper on different platforms, including Docker deployment options.
 
 Based on [Zola](https://github.com/ibelick/zola), the open-source AI chat interface.
 
@@ -76,7 +76,7 @@ Copy the generated value and add it to your `.env.local` file as the `CSRF_SECRE
 
 ### BYOK (Bring Your Own Key) Setup
 
-vid0 supports BYOK functionality, allowing users to securely store and use their own API keys for AI providers. To enable this feature, you need to configure an encryption key for secure storage of user API keys.
+Not A Wrapper supports BYOK functionality, allowing users to securely store and use their own API keys for AI providers. To enable this feature, you need to configure an encryption key for secure storage of user API keys.
 
 #### Generating an Encryption Key
 
@@ -110,7 +110,7 @@ With BYOK enabled, users can securely add their own API keys through the setting
 
 #### Clerk Authentication Setup
 
-vid0 uses Clerk for authentication. Follow these steps:
+Not A Wrapper uses Clerk for authentication. Follow these steps:
 
 1. Create a Clerk account at [clerk.com](https://clerk.com)
 2. Create a new application
@@ -135,7 +135,7 @@ Anonymous/guest access is handled through the application's anonymous usage trac
 
 ### Database Setup (Convex)
 
-vid0 uses Convex for the database. The schema is defined in TypeScript and automatically synced.
+Not A Wrapper uses Convex for the database. The schema is defined in TypeScript and automatically synced.
 
 1. Create a Convex account at [convex.dev](https://convex.dev)
 2. Create a new project
@@ -170,7 +170,7 @@ To connect Clerk authentication with Convex:
 
 ## Ollama Setup (Local AI Models)
 
-Ollama allows you to run AI models locally on your machine. vid0 has built-in support for Ollama with automatic model detection.
+Ollama allows you to run AI models locally on your machine. Not A Wrapper has built-in support for Ollama with automatic model detection.
 
 ### Installing Ollama
 
@@ -213,13 +213,13 @@ ollama list
 ollama serve
 ```
 
-### vid0 + Ollama Integration
+### Not A Wrapper + Ollama Integration
 
-vid0 automatically detects all models available in your Ollama installation. No additional configuration is needed!
+Not A Wrapper automatically detects all models available in your Ollama installation. No additional configuration is needed!
 
 **Features:**
 
-- **Automatic Model Detection**: vid0 scans your Ollama instance and makes all models available
+- **Automatic Model Detection**: Not A Wrapper scans your Ollama instance and makes all models available
 - **Intelligent Categorization**: Models are automatically categorized by family (Llama, Gemma, Qwen, etc.)
 - **Smart Tagging**: Models get appropriate tags (local, open-source, coding, size-based)
 - **No Pro Restrictions**: All Ollama models are free to use
@@ -229,7 +229,7 @@ vid0 automatically detects all models available in your Ollama installation. No 
 
 #### Default Configuration
 
-By default, vid0 connects to Ollama at `http://localhost:11434`. This works for local installations.
+By default, Not A Wrapper connects to Ollama at `http://localhost:11434`. This works for local installations.
 
 #### Custom Ollama URL
 
@@ -250,7 +250,7 @@ OLLAMA_BASE_URL=http://your-ollama-server:11434 bun dev
 
 #### Settings UI
 
-vid0 includes a settings interface where you can:
+Not A Wrapper includes a settings interface where you can:
 
 - Enable/disable Ollama integration
 - Configure custom Ollama base URLs
@@ -261,7 +261,7 @@ Access settings through the gear icon in the interface.
 
 ### Docker with Ollama
 
-For a complete Docker setup with both vid0 and Ollama:
+For a complete Docker setup with both Not A Wrapper and Ollama:
 
 ```bash
 # Use the provided Docker Compose file
@@ -269,7 +269,7 @@ docker-compose -f docker-compose.ollama.yml up
 
 # Or manually with separate containers
 docker run -d -v ollama:/root/.ollama -p 11434:11434 --name ollama ollama/ollama
-docker run -p 3000:3000 -e OLLAMA_BASE_URL=http://ollama:11434 vid0
+docker run -p 3000:3000 -e OLLAMA_BASE_URL=http://ollama:11434 not-a-wrapper
 ```
 
 The `docker-compose.ollama.yml` file includes:
@@ -289,9 +289,9 @@ The `docker-compose.ollama.yml` file includes:
 
 #### Models not appearing
 
-1. Refresh the models list in vid0 settings
+1. Refresh the models list in Not A Wrapper settings
 2. Check Ollama has models: `ollama list`
-3. Restart vid0 if models were added after startup
+3. Restart Not A Wrapper if models were added after startup
 
 #### Performance optimization
 
@@ -348,8 +348,8 @@ DISABLE_OLLAMA=true
 
 ```bash
 # Clone the repository
-git clone https://github.com/batmn-dev/vid0.git
-cd vid0
+git clone https://github.com/your-username/not-a-wrapper.git
+cd not-a-wrapper
 
 # Install dependencies
 bun install
@@ -362,8 +362,8 @@ bun dev
 
 ```bash
 # Clone the repository
-git clone https://github.com/batmn-dev/vid0.git
-cd vid0
+git clone https://github.com/your-username/not-a-wrapper.git
+cd not-a-wrapper
 
 # Install dependencies
 bun install
@@ -374,9 +374,21 @@ bun dev
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
 
+### AI Tool Skills Setup (For Developers)
+
+If you're contributing to the project using AI coding tools (Cursor, Claude Code, Codex), run the skill sync script to set up shared development skills:
+
+```bash
+./.agents/skills/sync-agent-skills/scripts/sync-skills.sh
+```
+
+This creates symlinks in `.cursor/skills/`, `.claude/skills/`, and `.codex/skills/` pointing to the canonical skills in `.agents/skills/`. The skills provide specialized guidance for common tasks like adding AI providers or creating Convex functions.
+
+**Note**: The symlinks are gitignored, so you need to run this script after every fresh clone.
+
 ## Convex Setup
 
-vid0 uses Convex for its database. Follow these steps:
+Not A Wrapper uses Convex for its database. Follow these steps:
 
 1. Create a new project at [convex.dev](https://convex.dev)
 2. Run `npx convex dev` to sync your schema
@@ -461,7 +473,7 @@ Build and run the Docker container:
 
 ```bash
 # Build the Docker image
-docker build -t vid0 .
+docker build -t not-a-wrapper .
 
 # Run the container
 docker run -p 3000:3000 \
@@ -474,7 +486,7 @@ docker run -p 3000:3000 \
   -e ENCRYPTION_KEY=your_encryption_key \
   -e ANTHROPIC_API_KEY=your_anthropic_api_key \
   -e OPENAI_API_KEY=your_openai_api_key \
-  vid0
+  not-a-wrapper
 ```
 
 ### Option 2: Docker Compose
@@ -485,7 +497,7 @@ Create a `docker-compose.yml` file in the root of your project:
 version: "3"
 
 services:
-  vid0:
+  not-a-wrapper:
     build:
       context: .
       dockerfile: Dockerfile
@@ -518,10 +530,10 @@ docker-compose down
 
 ### Option 3: Docker Compose with Ollama (Recommended for Local AI)
 
-For a complete setup with both vid0 and Ollama running locally, use the provided `docker-compose.ollama.yml`:
+For a complete setup with both Not A Wrapper and Ollama running locally, use the provided `docker-compose.ollama.yml`:
 
 ```bash
-# Start both vid0 and Ollama services
+# Start both Not A Wrapper and Ollama services
 docker-compose -f docker-compose.ollama.yml up -d
 
 # View logs
@@ -536,10 +548,10 @@ This setup includes:
 - **Ollama service** with GPU support (if available)
 - **Automatic model pulling** (llama3.2:3b by default)
 - **Health checks** for both services
-- **Proper networking** between vid0 and Ollama
+- **Proper networking** between Not A Wrapper and Ollama
 - **Volume persistence** for Ollama models
 
-The Ollama service will be available at `http://localhost:11434` and vid0 will automatically detect all available models.
+The Ollama service will be available at `http://localhost:11434` and Not A Wrapper will automatically detect all available models.
 
 To customize which models are pulled, edit the `docker-compose.ollama.yml` file and modify the `OLLAMA_MODELS` environment variable:
 
@@ -552,7 +564,7 @@ environment:
 
 ### Deploy to Vercel
 
-The easiest way to deploy vid0 is using Vercel:
+The easiest way to deploy Not A Wrapper is using Vercel:
 
 1. Push your code to a Git repository (GitHub, GitLab, etc.)
 2. Import the project into Vercel
@@ -581,7 +593,7 @@ bun start
 
 ## Configuration Options
 
-You can customize various aspects of vid0 by modifying the configuration files:
+You can customize various aspects of Not A Wrapper by modifying the configuration files:
 
 - `app/lib/config.ts`: Configure AI models, daily message limits, etc.
 - `.env.local`: Set environment variables and API keys

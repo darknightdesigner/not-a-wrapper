@@ -115,11 +115,10 @@ export default MyIcon
 - `OpenAIIcon`
 - `OpenRouterIcon`
 - `PerplexityIcon`
-- `Vid0Icon`
 - `XaiIcon`
 - `XIcon` (X/Twitter logo)
 - `ZolaIcon`
 
 ## Migration Guide
 
-See `docs/icon-system-migration-plan.md` for the complete migration plan and rationale.
+See `../../.agents/archive/icon-system-migration-plan-2026-01.md` for the complete migration plan and rationale.

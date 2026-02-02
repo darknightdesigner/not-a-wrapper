@@ -1,5 +1,5 @@
 services:
-  vid0:
+  not-a-wrapper:
     build:
       context: .
       dockerfile: Dockerfile

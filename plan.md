@@ -16,7 +16,7 @@ Living document for tracking current work and next steps.
 
 ### ✅ Completed
 - [x] Research tech stack decisions (Convex, Clerk, Flowglad)
-- [x] Document decisions in `docs/agents-research.md`
+- [x] Document decisions in `.agents/context/research/tech-stack-evaluation.md`
 - [x] Create `AGENTS.md` with project overview
 - [x] Create `CLAUDE.md` with Claude-specific context
 - [x] Create `.copilot-instructions.md` for GitHub Copilot
@@ -24,12 +24,12 @@ Living document for tracking current work and next steps.
 - [x] Create `spec.md` for requirements
 - [x] Create `plan.md` (this file)
 - [x] Create context directory structure
-  - [x] `context/architecture.md`
-  - [x] `context/conventions.md`
-  - [x] `context/testing.md`
-  - [x] `context/api.md`
-  - [x] `context/database.md`
-  - [x] `context/deployment.md`
+  - [x] `.agents/context/architecture.md`
+  - [x] `.agents/context/conventions.md`
+  - [x] `.agents/context/testing.md`
+  - [x] `.agents/context/api.md`
+  - [x] `.agents/context/database.md`
+  - [x] `.agents/context/deployment.md`
 - [x] Set up `.cursor/rules/` directory
   - [x] `001_core.mdc` (core workspace rules)
   - [x] `002_security.mdc` (security guidelines)
@@ -54,11 +54,11 @@ Living document for tracking current work and next steps.
   - [x] `components/CLAUDE.md`
   - [x] `hooks/CLAUDE.md`
 - [x] Implement Development Workflow
-  - [x] Create `docs/workflows.md` with four-phase cycle, TDD, extended thinking
+  - [x] Create `.agents/workflows/development-cycle.md` with four-phase cycle, TDD, extended thinking
   - [x] Create workflow commands: `/research`, `/plan`, `/tdd`, `/verify`, `/commit`
   - [x] Update `CLAUDE.md` with workflow references
   - [x] Update `AGENTS.md` with workflow overview
-  - [x] Create `docs/workflow-examples.md` with practical examples
+  - [x] Create `.agents/workflows/examples.md` with practical examples
 
 ### ✅ Recently Completed (Sprint 3)
 - [x] Set up Convex project
@@ -72,7 +72,7 @@ Living document for tracking current work and next steps.
 - [x] Clean up legacy Supabase files
 
 ### 🔄 In Progress
-- [ ] Prompt-Kit component consolidation (see `docs/prompt-kit-update-plan.md`)
+- [ ] Prompt-Kit component consolidation
   - [ ] **Phase 1**: Pre-flight checks & install dependencies
   - [ ] **Phase 2**: Backup existing components
   - [ ] **Phase 3**: Migrate 9 components from `prompt-kit/` to `ui/`
@@ -81,20 +81,20 @@ Living document for tracking current work and next steps.
   - [ ] **Phase 6**: Final verification (typecheck, lint, build)
 
 ### 📋 Next Up
-- [ ] YouTube Data API v3 integration
-  - [ ] Set up Google Cloud project
-  - [ ] Enable YouTube Data API v3
-  - [ ] Create YouTube service layer in `lib/youtube/`
-  - [ ] Implement video metadata retrieval
-- [ ] Transcript extraction (`youtube-transcript` package)
-- [ ] Competitor video analysis tools
+- [ ] Model comparison analytics
+  - [ ] Response time tracking
+  - [ ] Token usage comparison
+  - [ ] Cost analysis per response
+- [ ] Smart model routing
+  - [ ] Task-based auto-selection
+  - [ ] Cost/quality optimization
 
 ### 🔮 Backlog
 - [ ] Sub-agent architecture implementation
-- [ ] YouTube Analytics API (OAuth 2.0)
-- [ ] Title generation & A/B suggestions
-- [ ] Thumbnail analysis (vision model)
+- [ ] Model chains and workflow automation
+- [ ] Advanced multi-model UI (diff view, voting)
 - [ ] Flowglad payment setup
+- [ ] API access for developers
 
 ---
 
@@ -113,8 +113,8 @@ Living document for tracking current work and next steps.
 <!-- Decisions that need to be made -->
 
 1. **Loader naming**: Keep both `loader.tsx` (12+ variants) and `loader-dots.tsx` (simple)?
-2. **YouTube quota management**: How to handle 10K units/day limit?
-3. **Transcript caching**: Cache duration for video transcripts?
+2. **Model routing**: How to automatically select best model for task?
+3. **Response caching**: Cache identical prompts for cost savings?
 
 ---
 
@@ -131,8 +131,6 @@ Before YouTube integration, consolidating UI components:
 2. Install 7 missing components (tool, source, chain-of-thought, feedback-bar, steps, system-message, image)
 3. Update existing components to latest prompt-kit versions
 4. Verify all imports updated to `@/components/ui/`
-
-See `docs/prompt-kit-update-plan.md` for detailed execution steps.
 
 ### 2026-01-18
 
@@ -154,8 +152,8 @@ See `docs/prompt-kit-update-plan.md` for detailed execution steps.
 - `plan.md` — This working document
 
 **Context Directory (6 files):**
-- `context/architecture.md`, `context/conventions.md`, `context/testing.md`
-- `context/api.md`, `context/database.md`, `context/deployment.md`
+- `.agents/context/architecture.md`, `.agents/context/conventions.md`, `.agents/context/testing.md`
+- `.agents/context/api.md`, `.agents/context/database.md`, `.agents/context/deployment.md`
 
 **Nested CLAUDE.md Files (8 files):**
 - `app/CLAUDE.md`, `app/api/CLAUDE.md`, `app/auth/CLAUDE.md`, `app/components/CLAUDE.md`
@@ -176,7 +174,7 @@ bun run build        # Production build
 ### Key Files
 - `AGENTS.md` — Project overview for AI
 - `spec.md` — Requirements
-- `docs/agents-research.md` — Tech decisions
+- `.agents/context/research/tech-stack-evaluation.md` — Tech decisions
 
 ### Gold Standard Patterns
 - API Route: `app/api/chat/route.ts`
@@ -212,9 +210,9 @@ bun run build        # Production build
 - 📋 Update existing components to latest
 
 ### Sprint 5 (Next)
-- 📋 YouTube Data API v3 integration
-- 📋 Transcript extraction
-- 📋 Competitor analysis tools
+- 📋 Model comparison analytics
+- 📋 Smart model routing
+- 📋 Multi-model UI enhancements
 
 ---
 
@@ -223,25 +221,25 @@ bun run build        # Production build
 ### JSX Preview Component
 
 - **Description**: prompt-kit has a `jsx-preview.tsx` component that renders JSX strings as React components dynamically
-- **Potential use cases for vid0**:
-  - AI-generated YouTube thumbnail previews (render mock thumbnails from LLM output)
-  - Interactive script visualization (render formatted scripts with highlights)
+- **Potential use cases for Not A Wrapper**:
+  - Dynamic code previews from AI responses
+  - Interactive component visualization
   - Generative UI features (dynamic component rendering from AI responses)
 - **Considerations**:
   - Security: Requires careful sanitization of JSX strings before rendering
   - Bundle size: Adds ~50KB for JSX parsing/rendering runtime
   - Performance: Needs debouncing for streaming responses to avoid excessive re-renders
-- **Status**: Evaluate when implementing thumbnail generation or generative UI features
-- **Reference**: https://prompt-kit.com/docs and `docs/prompt-kit-analysis.md`
+- **Status**: Evaluate when implementing generative UI features
+- **Reference**: https://prompt-kit.com/docs
 
 ### LLM Context Files
 
 - **Description**: prompt-kit provides `llms.txt` and `llms-full.txt` for AI-assisted development
 - **Purpose**: Gives AI assistants (Claude, Copilot, etc.) context about component APIs and usage patterns
-- **Potential for vid0**:
-  - Create `/public/llms.txt` documenting vid0's customized prompt-kit components
+- **Potential for Not A Wrapper**:
+  - Create `/public/llms.txt` documenting customized prompt-kit components
   - Include component customizations, upgrade notes, and usage examples
-  - Help AI assistants understand vid0-specific patterns vs upstream prompt-kit
+  - Help AI assistants understand project-specific patterns vs upstream prompt-kit
 - **Status**: Consider when AI-assisted development becomes a priority
 - **Reference**: https://prompt-kit.com/llms.txt
 
