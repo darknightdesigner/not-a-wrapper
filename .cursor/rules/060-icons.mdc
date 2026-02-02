@@ -1,49 +1,69 @@
 ---
-description: "Icon system using Phosphor Icons as primary library"
+description: "Icon system using HugeIcons Pro as primary library"
 globs: ["**/*.tsx", "**/*.ts"]
 ---
 
 # Icon System
 
-## Primary Library: Phosphor Icons
+## Primary Library: HugeIcons Pro
 
 ```typescript
-// ✅ Standard import for Client Components
-import { Gear, User, Chat } from "@phosphor-icons/react"
+// ✅ Standard usage with HugeiconsIcon wrapper
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Tick02Icon, Cancel01Icon, ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 
-// ✅ SSR-safe import for Server Components
-import { Gear, User, Chat } from "@phosphor-icons/react/dist/ssr"
+<HugeiconsIcon icon={Tick02Icon} size={16} />
+<HugeiconsIcon icon={Cancel01Icon} size={16} className="text-red-500" />
+```
+
+## Re-exported Icons (Convenience)
+
+```typescript
+// Common icons re-exported from lib/icons
+import { HugeiconsIcon, PinIcon, PinOffIcon, PanelLeftIcon, GripVerticalIcon } from "@/lib/icons"
 ```
 
 ## Brand Icons
 
 ```typescript
 // Provider brand icons (custom)
-import { OpenAIIcon } from "@/components/icons/openai"
-import { ClaudeIcon } from "@/components/icons/claude"
+import { ClaudeIcon, OpenAIIcon } from "@/components/icons/claude"
 import { GeminiIcon } from "@/components/icons/gemini"
+import { AnthropicIcon } from "@/components/icons/anthropic"
+
+// All brand icons support size prop
+<ClaudeIcon size={24} />
+<OpenAIIcon size={32} className="text-primary" />
 ```
 
-## Exception Icons (Lucide)
+## Creating Custom Icons
 
 ```typescript
-// Fallback for icons not in Phosphor
-import { SpecialIcon } from "@/lib/icons"
+// Use createIcon factory for simple path-based icons
+import { createIcon } from "@/lib/icons"
+
+export const MyIcon = createIcon(
+  <path d="..." fill="currentColor" />,
+  { viewBox: "0 0 24 24", displayName: "MyIcon" }
+)
 ```
 
-## Icon Props
+## Common Icons Quick Reference
 
-```typescript
-// ✅ Use size and weight props
-<Gear size={24} weight="regular" />
-<User size={20} weight="bold" />
+| Purpose | HugeIcon |
+|---------|----------|
+| Checkmark | `Tick02Icon` |
+| Close/X | `Cancel01Icon` |
+| Search | `Search01Icon` |
+| Settings | `Settings01Icon` |
+| User | `User02Icon` |
+| Copy | `Copy01Icon` |
+| Edit | `PencilEdit01Icon` |
+| Delete | `Delete01Icon` |
+| Add | `Add01Icon` |
+| Chat | `Chat01Icon` |
 
-// Available weights: thin, light, regular, bold, fill, duotone
-```
+## Documentation
 
-## Migration Notes
-
-- Primary: `@phosphor-icons/react`
-- Brand icons: `@/components/icons/[provider]`
-- Exceptions: `@/lib/icons` (Lucide fallback)
-- See `components/icons/README.md` for full details
+- Full reference: `components/icons/README.md`
+- Migration mapping: `.agents/archive/icon-mapping-phosphor-hugeicons.md`

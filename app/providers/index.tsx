@@ -10,7 +10,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider
       appearance={{
-        theme: shadcn,
+        baseTheme: shadcn,
       }}
     >
       <PostHogProvider>

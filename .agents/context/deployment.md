@@ -108,63 +108,86 @@ CLERK_WEBHOOK_SECRET=whsec_...
 ```yaml
 # .github/workflows/ci-cd.yml
 
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
     branches: [main, develop]
-    tags: ["v*"]
+  pull_request:
+    branches: [main]
 
 jobs:
   validate:
-    name: Lint and Test
+    name: Lint & Typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "20"
-          cache: "npm"
-      
+          bun-version: latest
+
       - name: Install dependencies
-        run: bun install
-      
+        run: bun install --frozen-lockfile
+
       - name: Run ESLint
         run: bun run lint
-      
+
       - name: Run TypeScript checks
         run: bun run typecheck
-      
-      # TODO: Enable when tests implemented
+
+      # TODO: Uncomment when tests are added
       # - name: Run Tests
-      #   run: npm test
+      #   run: bun test
 
   build:
-    name: Build Application
+    name: Build
     needs: validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          node-version: "20"
-          cache: "npm"
-      
+          bun-version: latest
+
       - name: Install dependencies
-        run: bun install
-      
+        run: bun install --frozen-lockfile
+
       - name: Build application
-        run: bun run build
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        run: bun run build:next
+        env:
+          NEXT_PUBLIC_CONVEX_URL: ${{ vars.NEXT_PUBLIC_CONVEX_URL || 'https://placeholder.convex.cloud' }}
+
+  # Deploy to Convex on main branch merges
+  deploy:
+    name: Deploy to Convex
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    concurrency:
+      group: convex-deploy
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          name: build-output
-          path: .next/
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Deploy to Convex
+        run: bun run build
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
 ```
 
 ### Pipeline Flow
@@ -197,7 +220,8 @@ jobs:
 
 ```dockerfile
 # Multi-stage build
-FROM node:20-alpine AS base
+# Use Bun for dependency installation and building
+FROM oven/bun:1 AS base
 
 # Dependencies stage
 FROM base AS deps
@@ -210,17 +234,26 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN bun run build
 
 # Production stage
-FROM base AS runner
+# Use Node.js for runtime (Next.js standalone output is optimized for Node)
+FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
 # Copy built application
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
