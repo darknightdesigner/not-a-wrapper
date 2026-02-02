@@ -20,7 +20,7 @@ export function Kbd({ children, label, className }: KbdProps) {
     <kbd
       aria-label={label}
       className={cn(
-        "inline-flex min-w-[1em] items-center justify-center font-sans text-[11px]",
+        "inline-flex min-w-[1em] items-center justify-center font-sans text-sm",
         className
       )}
     >

@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { getModelInfo } from "@/lib/models"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  ArrowUp01Icon,
+  ArrowUp02Icon,
   StopCircleIcon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useCallback, useEffect, useMemo, useRef } from "react"
@@ -225,7 +225,7 @@ export function ChatInput({
                 {status === "streaming" ? (
                   <HugeiconsIcon icon={StopCircleIcon} size={16} />
                 ) : (
-                  <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
+                  <HugeiconsIcon icon={ArrowUp02Icon} size={16} />
                 )}
               </Button>
             </PromptInputAction>

@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowUp01Icon, StopCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
+import { ArrowUp02Icon, StopCircleIcon } from "@hugeicons-pro/core-stroke-rounded"
 import React, { useCallback } from "react"
 
 type MultiChatInputProps = {
@@ -119,7 +119,7 @@ export function MultiChatInput({
                 {status === "streaming" || anyLoading ? (
                   <HugeiconsIcon icon={StopCircleIcon} size={16} />
                 ) : (
-                  <HugeiconsIcon icon={ArrowUp01Icon} size={16} />
+                  <HugeiconsIcon icon={ArrowUp02Icon} size={16} />
                 )}
               </Button>
             </PromptInputAction>

@@ -24,7 +24,7 @@ import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useUser } from "@/lib/user-store/provider"
 import { useClerk } from "@clerk/nextjs"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowUpDownIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
+import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
 import { AppInfoTrigger } from "./app-info/app-info-trigger"
@@ -122,7 +122,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                   </span>
                 </div>
                 <HugeiconsIcon
-                  icon={ArrowUpDownIcon}
+                  icon={UnfoldLessIcon}
                   size={16}
                   className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
                 />

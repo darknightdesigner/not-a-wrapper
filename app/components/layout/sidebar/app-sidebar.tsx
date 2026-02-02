@@ -28,10 +28,9 @@ import {
   Cancel01Icon,
   Search01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { AddCircleIcon } from "@hugeicons-pro/core-bulk-rounded"
-import { Pin, PanelLeft } from "@/lib/icons"
+import { Pin, PanelLeft, NewChatIcon } from "@/lib/icons"
 import { useParams } from "next/navigation"
-import { useMemo, useRef } from "react"
+import React, { useMemo, useRef } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { UserMenu } from "../user-menu"
 import { ScrollShadowWrapper } from "./scroll-shadow-wrapper"
@@ -101,7 +100,7 @@ export function AppSidebar() {
         {/* Action buttons */}
         <div className="mt-(--sidebar-section-first-margin-top) flex flex-col items-center gap-0">
           <CollapsedMenuItem
-            icon={AddCircleIcon}
+            icon={<NewChatIcon size={20} />}
             label="New Chat"
             href="/"
             shortcut="⇧⌘O"
@@ -179,7 +178,7 @@ export function AppSidebar() {
               <div className="sticky top-0 z-20 bg-sidebar pb-2 pt-(--sidebar-section-first-margin-top)">
                 <div className="flex w-full flex-col items-start gap-0">
                   <SidebarMenuItem
-                    icon={AddCircleIcon}
+                    icon={<NewChatIcon size={20} />}
                     label="New Chat"
                     href="/"
                     testId="new-chat-button"
@@ -267,7 +266,7 @@ export function AppSidebar() {
               <TooltipTrigger asChild>
                 <Link
                   href="/auth/login"
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md px-4 text-sm font-medium motion-safe:transition-colors"
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium motion-safe:transition-colors"
                 >
                   Log in
                 </Link>
@@ -327,15 +326,18 @@ function CollapsedMenuItem({
   onClick,
   shortcut,
 }: {
-  icon: IconSvgElement
+  icon: IconSvgElement | React.ReactNode
   label: string
   href?: string
   onClick?: () => void
   shortcut?: string
 }) {
+  // Check if icon is a React element (custom icon) vs Hugeicons IconSvgElement
+  const isCustomIcon = React.isValidElement(icon)
+
   const content = (
     <div className="flex items-center justify-center">
-      <HugeiconsIcon icon={icon} size={20} />
+      {isCustomIcon ? icon : <HugeiconsIcon icon={icon as IconSvgElement} size={20} />}
     </div>
   )
 
@@ -383,7 +385,7 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
         <TooltipTrigger asChild>
           <Link
             href="/auth/login"
-            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent motion-safe:transition-colors mx-auto"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent motion-safe:transition-colors mx-auto"
           >
             <NawIcon className="size-5" />
           </Link>

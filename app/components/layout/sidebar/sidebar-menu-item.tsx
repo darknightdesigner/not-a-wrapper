@@ -9,11 +9,11 @@ import { useSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
-import { forwardRef } from "react"
+import { forwardRef, isValidElement, type ReactNode } from "react"
 
 type SidebarMenuItemProps = {
-  /** Icon component from Hugeicons */
-  icon: IconSvgElement
+  /** Icon component from Hugeicons, or a custom React node */
+  icon: IconSvgElement | ReactNode
   /** Label text */
   label: string
   /** Navigation href - renders as Link if provided */
@@ -64,15 +64,22 @@ export const SidebarMenuItem = forwardRef<
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
 
+  // Check if icon is a React element (custom icon) vs Hugeicons IconSvgElement
+  const isCustomIcon = isValidElement(icon)
+
   const content = (
     <>
       {/* Icon wrapper (ChatGPT pattern) for consistent alignment */}
       <div className="flex items-center justify-center shrink-0">
-        <HugeiconsIcon
-          icon={icon}
-          size={20}
-          className="group-disabled/menu-item:opacity-50"
-        />
+        {isCustomIcon ? (
+          icon
+        ) : (
+          <HugeiconsIcon
+            icon={icon as IconSvgElement}
+            size={20}
+            className="group-disabled/menu-item:opacity-50"
+          />
+        )}
       </div>
       {/* Label - hidden when collapsed */}
       <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap) group-data-[collapsible=icon]:hidden">

@@ -113,7 +113,15 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Cache locally (works for both guest and authenticated users)
-    const updated = [...serverMessages, ...optimisticMessages, message]
+    // Deduplicate by ID to prevent duplicate key errors when optimistic messages
+    // overlap with server messages that have been assigned Convex IDs
+    const allMessages = [...serverMessages, ...optimisticMessages, message]
+    const seenIds = new Set<string>()
+    const updated = allMessages.filter((m) => {
+      if (seenIds.has(m.id)) return false
+      seenIds.add(m.id)
+      return true
+    })
     writeToIndexedDB("messages", { id: effectiveChatId, messages: updated })
 
     // Persist to Convex for authenticated users (valid Convex IDs only)

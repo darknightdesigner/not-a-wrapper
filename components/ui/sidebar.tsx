@@ -33,7 +33,7 @@ const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
-// Helper to read sidebar state from cookie
+// Helper to read sidebar state from cookie (only call after mount)
 function getSidebarStateFromCookie(): boolean | undefined {
   if (typeof document === "undefined") return undefined
   const match = document.cookie.match(new RegExp(`${SIDEBAR_COOKIE_NAME}=([^;]+)`))
@@ -80,12 +80,19 @@ function SidebarProvider({
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
-  // Initialize from cookie if available, otherwise use defaultOpen
-  const [_open, _setOpen] = React.useState(() => {
-    const cookieValue = getSidebarStateFromCookie()
-    return cookieValue ?? defaultOpen
-  })
+  // Initialize with defaultOpen to ensure server/client match during hydration
+  const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
+
+  // Sync with cookie value after mount to avoid hydration mismatch
+  React.useEffect(() => {
+    const cookieValue = getSidebarStateFromCookie()
+    if (cookieValue !== undefined && cookieValue !== _open) {
+      _setOpen(cookieValue)
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value
@@ -293,7 +300,7 @@ function SidebarTrigger({
       }}
       {...props}
     >
-      <HugeiconsIcon icon={PanelLeft} size={20} />
+      <HugeiconsIcon icon={PanelLeft} size={20} className="size-5" />
       <span className="sr-only">Toggle Sidebar</span>
     </Button>
   )
