@@ -10,7 +10,7 @@
 - **Expanded project structure** with nested CLAUDE.md, .claude/settings.json, numerical Cursor rules naming
 - Added "When to Use Which File" decision matrix
 - Added custom slash command documentation with frontmatter
-- Added vid0 case study with finalized tech stack decisions (Convex + Clerk + Flowglad)
+- Added Not A Wrapper case study with finalized tech stack decisions (Convex + Clerk + Flowglad)
 - Added practical sub-agent architecture example for YouTube content analysis
 - Added gold standard code pattern examples from real codebase
 - Added Convex + AI/RAG as context management backend option
@@ -1112,7 +1112,7 @@ Treat AI-generated code with the same scrutiny as code from any developer. Test,
 
 The following areas require additional investigation or clarification:
 
-### Recently Resolved (vid0 Project)
+### Recently Resolved (Not A Wrapper Project)
 
 | Question | Resolution | Reference |
 |----------|------------|-----------|
@@ -1214,14 +1214,14 @@ The following areas require additional investigation or clarification:
 - [GitHub - PatrickJS/awesome-cursorrules](https://github.com/PatrickJS/awesome-cursorrules)
 - [Anthropic Model System Cards](https://www.anthropic.com/system-cards)
 
-### Project-Specific Research (vid0)
+### Project-Specific Research (Not A Wrapper)
 - `.agents/context/research/tech-stack-evaluation.md` — Comprehensive tech stack evaluation (Convex vs Supabase, auth, payments)
 - `.agents/context/research/youtube-transcript-evaluation.md` — YouTube transcript extraction research
 - `AGENTS.md` — Finalized project configuration for AI agents
 
-## Case Study: vid0
+## Case Study: Not A Wrapper
 
-This section documents real-world decisions and patterns from the vid0 project—an AI-powered chat platform for YouTube content creators—as a practical example of applying the principles in this guide.
+This section documents real-world decisions and patterns from the Not A Wrapper project—an AI-powered chat platform for YouTube content creators—as a practical example of applying the principles in this guide.
 
 ### Finalized Tech Stack (January 2026)
 
@@ -1256,7 +1256,7 @@ For AI-first chat applications, Convex offers critical advantages:
 
 ```
 ┌────────────────────────────────────────────────────┐
-│                  vid0 STACK                          │
+│                  Not A Wrapper STACK                          │
 ├────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────┐   │
 │  │                  CONVEX                      │   │

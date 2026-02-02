@@ -101,14 +101,18 @@ if (!identity) throw new Error("Not authenticated")
 ### BYOK Not Working
 
 ```typescript
-// Check provider in env.ts
-export function createEnvWithUserKeys(userKeys: UserKeys) {
+// Check env.ts — user keys override defaults per provider
+export function createEnvWithUserKeys(userKeys: Record<string, string> = {}) {
   return {
-    [PROVIDER]_API_KEY: userKeys["providerId"] || process.env.[PROVIDER]_API_KEY,
+    OPENAI_API_KEY: userKeys.openai || env.OPENAI_API_KEY,
+    ANTHROPIC_API_KEY: userKeys.anthropic || env.ANTHROPIC_API_KEY,
+    // ... each provider has explicit mapping
   }
 }
 
-// Check providerId matches key name
+// Common issues:
+// - userKeys key doesn't match provider ID (e.g., "claude" vs "anthropic")
+// - API key not passed through from user-keys API
 ```
 
 ## Step 4: Apply Fix

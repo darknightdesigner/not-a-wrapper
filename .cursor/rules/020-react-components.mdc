@@ -33,7 +33,7 @@ const handleSubmit = useCallback((data: FormData) => {
 
 // ✅ useMemo for expensive computations
 const sorted = useMemo(
-  () => items.sort((a, b) => a.date - b.date),
+  () => [...items].sort((a, b) => a.date - b.date),
   [items]
 )
 

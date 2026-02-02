@@ -1,6 +1,6 @@
 # Vercel Deployment Debugging Workflow
 
-A comprehensive guide for systematically debugging and resolving Vercel deployment issues for the vid0 project.
+A comprehensive guide for systematically debugging and resolving Vercel deployment issues for the Not A Wrapper project.
 
 ## Table of Contents
 

@@ -32,7 +32,7 @@
 
 ### Core Purpose
 
-**vid0** (placeholder name) is a chat-based platform that helps content creators make better YouTube videos through data-driven AI recommendations.
+**Not A Wrapper** (placeholder name) is a chat-based platform that helps content creators make better YouTube videos through data-driven AI recommendations.
 
 ### Problem Statement
 
@@ -425,7 +425,7 @@ Flowglad's Core Platform **uses Clerk as its primary authentication provider**:
 
 ```
 ┌─────────────────────────────────────────┐
-│                  vid0                    │
+│                  Not A Wrapper                    │
 ├─────────────────────────────────────────┤
 │                                          │
 │  ┌──────────┐  ┌──────────┐  ┌────────┐ │
@@ -671,7 +671,7 @@ Both VidIQ and TubeBuddy are YouTube partners but do not expose APIs for third-p
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                          vid0                                │
+│                          Not A Wrapper                                │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  ┌─────────────────┐    ┌─────────────────┐                │
@@ -955,7 +955,7 @@ From Anthropic's context engineering research:
 - **Better results** - Focused prompts outperform generic ones
 - **Token efficiency** - Only relevant context per agent
 
-#### Proposed Sub-Agent Architecture for vid0
+#### Proposed Sub-Agent Architecture for Not A Wrapper
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -1753,7 +1753,7 @@ Based on research, the AGENTS.md file should include:
 ### Proposed Structure
 
 ```markdown
-# vid0
+# Not A Wrapper
 
 ## Project Overview
 - Purpose and vision
@@ -1898,7 +1898,7 @@ Based on research, the AGENTS.md file should include:
 
 ```
 ┌────────────────────────────────────────────────────┐
-│                  vid0 STACK                          │
+│                  Not A Wrapper STACK                          │
 ├────────────────────────────────────────────────────┤
 │                                                     │
 │  Next.js 16 + React 19 + TypeScript                │

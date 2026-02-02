@@ -1,6 +1,6 @@
 # Development Workflows
 
-This document outlines the standardized development workflows for vid0, based on Anthropic's best practices for AI-assisted development.
+This document outlines the standardized development workflows for Not A Wrapper, based on Anthropic's best practices for AI-assisted development.
 
 ## Overview
 

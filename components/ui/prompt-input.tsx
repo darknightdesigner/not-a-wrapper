@@ -6,8 +6,8 @@
  * @customizations
  *   - `autoFocus` is enabled by default on PromptInputTextarea
  *   - Removes redundant `TooltipProvider` wrapper in `PromptInputAction`
- *   - vid0 uses app-level TooltipProvider for consistency and smaller bundle
- *   - Upstream uses useLayoutEffect; vid0 uses standard useEffect for SSR safety
+ *   - Not A Wrapper uses app-level TooltipProvider for consistency and smaller bundle
+ *   - Upstream uses useLayoutEffect; Not A Wrapper uses standard useEffect for SSR safety
  * @upgradeNotes
  *   - Preserve autoFocus default on PromptInputTextarea
  *   - Do NOT re-add TooltipProvider wrapper in PromptInputAction

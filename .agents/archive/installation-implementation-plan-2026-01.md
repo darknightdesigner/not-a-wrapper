@@ -1,4 +1,4 @@
-# vid0 - Installation & Implementation Plan
+# Not A Wrapper - Installation & Implementation Plan
 
 > **Purpose:** Prioritized roadmap to complete all remaining installation and implementation tasks
 >
@@ -204,7 +204,7 @@ mv lib/user-store/api.ts lib/user/api.ts
 
 ### 2.1 YouTube Transcript Service ⏱️ 2-3 hours
 
-**Priority:** 🔴 Critical (Core feature for vid0)
+**Priority:** 🔴 Critical (Core feature for Not A Wrapper)
 
 #### Step 1: Install dependency
 
@@ -1095,7 +1095,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <>
       <HighlightInit
         projectId={process.env.NEXT_PUBLIC_HIGHLIGHT_PROJECT_ID!}
-        serviceName="vid0"
+        serviceName="Not A Wrapper"
         tracingOrigins
         networkRecording={{
           enabled: true,
@@ -1173,7 +1173,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Chat functionality', () => {
   test('should load homepage', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/vid0/);
+    await expect(page).toHaveTitle(/Not A Wrapper/);
   });
 
   test('should show login page for unauthenticated users', async ({ page }) => {
@@ -1726,8 +1726,8 @@ npx supabase gen types typescript --project-id YOUR_PROJECT_ID > app/types/datab
 docker-compose -f docker-compose.ollama.yml up
 
 # Production build
-docker build -t vid0 .
-docker run -p 3000:3000 vid0
+docker build -t Not A Wrapper .
+docker run -p 3000:3000 Not A Wrapper
 ```
 
 ---

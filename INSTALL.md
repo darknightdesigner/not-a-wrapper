@@ -533,7 +533,7 @@ docker-compose down
 For a complete setup with both Not A Wrapper and Ollama running locally, use the provided `docker-compose.ollama.yml`:
 
 ```bash
-# Start both vid0 and Ollama services
+# Start both Not A Wrapper and Ollama services
 docker-compose -f docker-compose.ollama.yml up -d
 
 # View logs
