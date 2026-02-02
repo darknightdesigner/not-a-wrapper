@@ -1,0 +1,96 @@
+---
+description: "React component patterns for Next.js App Router and React 19"
+globs: ["**/*.tsx"]
+---
+
+# React Component Patterns
+
+## Server vs Client Components
+
+```typescript
+// Server Component (default) - pages, layouts
+// No "use client", can be async, no hooks
+export default async function Page() {
+  const data = await fetchData()
+  return <ClientComponent data={data} />
+}
+
+// Client Component - interactivity required
+"use client"  // First line, REQUIRED for hooks
+export function ClientComponent({ data }: Props) {
+  const [state, setState] = useState(data)
+  return <div>{state}</div>
+}
+```
+
+## Hook Patterns
+
+```typescript
+// ✅ useCallback for stable function refs
+const handleSubmit = useCallback((data: FormData) => {
+  // implementation
+}, [dependency])
+
+// ✅ useMemo for expensive computations
+const sorted = useMemo(
+  () => items.sort((a, b) => a.date - b.date),
+  [items]
+)
+
+// ✅ Return typed objects from hooks
+export function useChatCore() {
+  return useMemo(() => ({
+    messages,
+    sendMessage,
+    isLoading,
+  }), [messages, sendMessage, isLoading])
+}
+```
+
+## Component Props
+
+```typescript
+// ✅ Export types alongside component
+export type ChatMessageProps = {
+  message: Message
+  onEdit: (id: string, content: string) => void
+}
+
+export function ChatMessage({ message, onEdit }: ChatMessageProps) {
+  // ...
+}
+```
+
+## Optimistic Updates Pattern
+
+```typescript
+// Store previous → Update optimistically → Rollback on error
+const update = async (id: string, title: string) => {
+  let previous: State | null = null
+  
+  setState((prev) => {
+    previous = prev
+    return applyUpdate(prev, id, title)
+  })
+  
+  try {
+    await serverMutation(id, title)
+  } catch {
+    if (previous) setState(previous)
+    toast.error("Failed to update")
+  }
+}
+```
+
+## Convex Query Patterns
+
+```typescript
+// ✅ Use "skip" for conditional queries
+const messages = useQuery(
+  api.messages.get,
+  isValidId ? { chatId } : "skip"
+)
+
+// ❌ Don't pass undefined/null IDs
+const messages = useQuery(api.messages.get, { chatId })  // May error
+```

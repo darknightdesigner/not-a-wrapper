@@ -54,11 +54,23 @@ CLAUDE.md (this file) → Project-level Claude context
 When you need additional context, use the `@` import syntax:
 
 ```markdown
-@AGENTS.md # Project overview, commands, permissions
-@docs/agents-research.md # Tech stack decisions, sub-agent architecture
-@docs/workflows.md # Development workflows (four-phase cycle, TDD)
-@lib/config.ts # Centralized configuration constants
+@AGENTS.md                          # Project overview, commands, permissions
+@.agents/context/glossary.md        # Domain terminology definitions
+@.agents/skills/add-ai-provider/    # Adding new AI providers
+@.agents/skills/add-model/          # Adding new models
+@.agents/skills/convex-function/    # Creating database functions
+@docs/workflows.md                  # Development workflows (four-phase cycle, TDD)
+@lib/config.ts                      # Centralized configuration constants
 ```
+
+## Context System
+
+| Location | Purpose |
+|----------|---------|
+| `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
+| `.agents/skills/` | Multi-step task guides |
+| `.cursor/rules/` | Cursor-specific patterns (auto-loaded) |
+| `context/` | Architecture and API documentation |
 
 ## Development Workflow
 
@@ -170,11 +182,12 @@ When debugging issues:
 
 ## Common Gotchas
 
-- **Streaming responses**: Must use `StreamingTextResponse` from AI SDK
-- **Server Components**: Cannot use hooks; use Client Components wrapper
+- **Streaming responses**: Must use `result.toDataStreamResponse()` from Vercel AI SDK
+- **Server Components**: Cannot use hooks; use Client Components wrapper with `"use client"`
 - **Database**: Uses Convex for all data operations (real-time queries + mutations)
 - **Auth**: Uses Clerk for authentication; avoid touching `middleware.ts` without review
 - **File Storage**: Uses Convex storage for file uploads
+- **Model terminology**: See `.agents/context/glossary.md` for precise definitions
 
 ---
 

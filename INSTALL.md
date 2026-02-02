@@ -374,6 +374,18 @@ bun dev
 
 The application will be available at [http://localhost:3000](http://localhost:3000).
 
+### AI Tool Skills Setup (For Developers)
+
+If you're contributing to the project using AI coding tools (Cursor, Claude Code, Codex), run the skill sync script to set up shared development skills:
+
+```bash
+./.agents/skills/sync-agent-skills/scripts/sync-skills.sh
+```
+
+This creates symlinks in `.cursor/skills/`, `.claude/skills/`, and `.codex/skills/` pointing to the canonical skills in `.agents/skills/`. The skills provide specialized guidance for common tasks like adding AI providers or creating Convex functions.
+
+**Note**: The symlinks are gitignored, so you need to run this script after every fresh clone.
+
 ## Convex Setup
 
 Not A Wrapper uses Convex for its database. Follow these steps:

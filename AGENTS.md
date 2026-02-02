@@ -17,66 +17,118 @@ Open-source multi-AI chat application with unified model interface. Supports 100
 ## Commands
 
 ```bash
-bun install # Install deps
-bun run dev # Dev server (:3000)
-bun run lint # ESLint
+bun install      # Install deps
+bun run dev      # Dev server (:3000)
+bun run lint     # ESLint
 bun run typecheck # tsc --noEmit
-bun run build # Production build
-bun run test # Vitest (critical paths)
+bun run build    # Production build
+bun run test     # Vitest (critical paths)
 ```
 
-## Development Workflow
+## Context System
 
-This project follows a **four-phase coding cycle**:
+This project uses a structured context system for AI assistants:
 
-1. **Research** → Gather context, read files, understand patterns
-2. **Plan** → Create detailed plan, use `ultrathink` for complex problems
-3. **Code & Verify** → Implement step-by-step, verify after each step
-4. **Commit** → Commit incrementally with conventional messages
+| Location | Purpose | When Loaded |
+|----------|---------|-------------|
+| `AGENTS.md` | Quick reference (this file) | Always |
+| `.cursor/rules/` | Cursor-specific patterns | Auto by Cursor |
+| `.agents/context/glossary.md` | Domain terminology | On-demand |
+| `.agents/skills/` | Multi-step task guides | On-demand |
+| `.agents/workflows/` | Step-by-step procedures | On-demand |
+| `.agents/context/decisions/` | Architecture Decision Records | On-demand |
 
-**Workflow Commands:**
-- `/research` - Start research phase
-- `/plan` - Create implementation plan
-- `/tdd` - Test-Driven Development workflow
-- `/verify` - Run all verification checks
-- `/commit` - Commit with conventional message
+### Key Skills
 
-See `docs/workflows.md` for complete workflow documentation.
+**Load skills BEFORE starting work** when a task matches the trigger.
+
+| Skill | Use When |
+|-------|----------|
+| `add-ai-provider` | Integrating new AI service |
+| `add-model` | Adding model to existing provider |
+| `convex-function` | Creating database functions |
+
+> Skills contain checklists and patterns that prevent common mistakes. Load via `@.agents/skills/[name]/SKILL.md`
+
+### Workflows
+
+| Workflow | Use When |
+|----------|----------|
+| `new-feature.md` | Implementing new features |
+| `debugging.md` | Troubleshooting issues |
+| `release.md` | Releasing new versions |
+
+### Architecture Decisions
+
+| ADR | Topic |
+|-----|-------|
+| `001-convex-database.md` | Why Convex over Supabase |
+| `002-vercel-ai-sdk.md` | Multi-provider abstraction |
+| `003-optimistic-updates.md` | State update pattern |
 
 ## Directory Structure
 
 ```
-app/ # Next.js App Router
-├── api/ # API routes (streaming)
-├── auth/ # Auth pages/actions
-├── components/chat/ # Chat UI
-└── (app)/ # Main routes
+app/                    # Next.js App Router
+├── api/               # API routes (streaming)
+├── auth/              # Auth pages/actions
+├── c/[chatId]/        # Chat pages
+├── p/[projectId]/     # Project pages
+├── share/             # Public share pages
+└── components/chat/   # Chat UI
 
-lib/ # Shared utilities
-├── chat-store/ # Chat state
-├── config.ts # Constants
-├── models/ # AI model definitions
-└── openproviders/ # AI provider abstraction
+lib/                    # Shared utilities
+├── chat-store/        # Chat state
+├── config.ts          # Constants
+├── models/            # AI model definitions
+└── openproviders/     # AI provider abstraction
 
-components/ # Shadcn UI components
-convex/ # Convex DB schema & functions
+components/            # Shadcn UI components
+convex/               # Convex DB schema & functions
+.agents/              # AI context (skills, glossary)
+.cursor/rules/        # Cursor-specific rules
 ```
 
 ## Gold Standard Examples
 
-Follow these patterns when creating new code:
+| Pattern | File |
+|---------|------|
+| API Route | `app/api/chat/route.ts` |
+| Custom Hook | `app/components/chat/use-chat-core.ts` |
+| Context Provider | `lib/chat-store/chats/provider.tsx` |
+| Component | `app/components/chat/chat.tsx` |
 
-- **API Route:** `app/api/chat/route.ts` — streaming, validation, auth
-- **Custom Hook:** `app/components/chat/use-chat-core.ts` — useCallback, typed returns
-- **Context Provider:** `lib/chat-store/chats/provider.tsx` — optimistic updates
-- **Component:** `app/components/chat/chat.tsx` — dynamic imports, memoization
+## Critical Patterns
 
-## Code Conventions
+### Streaming Responses (MUST)
 
-- **TypeScript:** Explicit types, avoid `any`, use `unknown` + guards
-- **Components:** Server Components for pages, Client for interactivity
-- **Hooks:** `useMemo` for computations, `useCallback` for stable refs
-- **Imports:** React → External → `@/` aliases → Relative
+```typescript
+// ALWAYS use toDataStreamResponse for AI chat
+return result.toDataStreamResponse({
+  sendReasoning: true,
+  sendSources: true,
+  getErrorMessage: (error) => extractErrorMessage(error),
+})
+```
+
+### Convex Auth Pattern (MUST)
+
+```typescript
+// All mutations modifying user data:
+const identity = await ctx.auth.getUserIdentity()
+if (!identity) throw new Error("Not authenticated")
+// ... lookup user, verify ownership, then operate
+```
+
+### Optimistic Updates
+
+```typescript
+// Store previous → Update optimistic → Rollback on error
+let previous = null
+setState((prev) => { previous = prev; return updated })
+try { await mutation() } 
+catch { if (previous) setState(previous) }
+```
 
 ## AI Agent Permissions
 
@@ -91,7 +143,7 @@ Follow these patterns when creating new code:
 - `bun add <package>`
 - Modify: `package.json`, `tsconfig.json`, `next.config.*`
 - Git operations
-- Auth logic (`lib/auth/`, `app/auth/`, `middleware.ts`)
+- Auth logic (`app/auth/`, `middleware.ts`)
 - Delete files
 - DB schema (`convex/schema.ts`)
 - CI/CD (`.github/workflows/`)
@@ -99,50 +151,57 @@ Follow these patterns when creating new code:
 ### 🚫 Forbidden
 
 - Read/write `.env*` files
-- Force push
-- Commit secrets
-- Modify prod configs without review
-- **Disable lint rules or type checks** — Fix the underlying issue instead
-- **Set ESLint rules to "off" or "warn"** to bypass errors — Always fix at source
-- **Add `// @ts-ignore` or `// @ts-expect-error`** without a linked issue
-- **Add `eslint-disable` comments** without explicit approval and documented reason
-- **Downgrade dependencies** to avoid lint/type errors
+- Force push or commit secrets
+- `// @ts-ignore` (never acceptable)
+- `eslint-disable` without documented reason
+- Disabling lint rules to bypass errors
 
 ## Security
 
 **Never log:** OAuth tokens, API keys, credentials, session tokens
 
-**Encrypt at rest:** User-provided API keys (BYOK)
+**Encrypt at rest:** User-provided API keys (BYOK) via AES-256-GCM
 
-## Testing Strategy
+**Rate limiting:** Check BEFORE calling `streamText()`
 
-Critical paths only: auth flows, OAuth handling, message persistence, rate limiting.
+## Key Terminology
 
-Skip: UI rendering tests, animations, AI response quality.
+> Full glossary: `.agents/context/glossary.md`
+
+| Term | Meaning |
+|------|---------|
+| Model | Config object, ID string, or SDK instance (context-dependent) |
+| providerId | Internal ID for API key lookups (`"anthropic"`) |
+| baseProviderId | AI SDK identifier (`"claude"`) |
+| parts | AI SDK message content array (text, tools, reasoning) |
+| BYOK | Bring Your Own Key |
 
 ## Environment Variables
 
 ```bash
-# Authentication (Clerk)
+# Required
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
-CLERK_JWT_ISSUER_DOMAIN=
-
-# Database (Convex)
 CONVEX_DEPLOYMENT=
 NEXT_PUBLIC_CONVEX_URL=
-
-# Security
 CSRF_SECRET=
-ENCRYPTION_KEY=
+ENCRYPTION_KEY=  # Must be 32 bytes base64
 
-# AI Providers (at least one required)
+# AI Providers (at least one)
 ANTHROPIC_API_KEY=
 OPENAI_API_KEY=
 ```
 
 See `.env.example` for complete documentation.
 
+## Development Workflow
+
+Four-phase cycle: **Research → Plan → Code & Verify → Commit**
+
+Use `ultrathink` for complex architectural decisions.
+
+See `docs/workflows.md` for details.
+
 ---
 
-*~100 lines. Link to `/docs` for detailed research and architecture.*
+*~200 lines. For detailed patterns, see `.cursor/rules/` and `.agents/skills/`.*

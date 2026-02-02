@@ -52,13 +52,19 @@ next-env.d.ts
 # bun debug logs
 bun-debug.log*
 
-/.cursor
+# AI tool skill directories (symlinked from .agents/skills/)
+# The source of truth is .agents/skills/ which IS tracked in git
+# Each developer runs the sync script after cloning
+.cursor/skills/
+.claude/skills/
+.codex/skills/
+
+# Cursor rules are tracked, but other Cursor config is ignored
+.cursor/*
+!.cursor/rules/
 
 # Claude Code local settings (personal preferences)
 .claude/settings.local.json
 
 # Optional: uncomment to ignore memories directory
 # memories/
-
-# Claude Code personal settings
-.claude/settings.local.json

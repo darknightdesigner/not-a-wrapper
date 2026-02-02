@@ -45,6 +45,16 @@ bun dev
 
 Not A Wrapper will automatically detect your local Ollama models!
 
+### Setup AI Tool Skills (Optional)
+
+If you're developing with AI coding tools (Cursor, Claude Code, Codex), run the skill sync script:
+
+```bash
+./.agents/skills/sync-agent-skills/scripts/sync-skills.sh
+```
+
+This creates symlinks so all AI tools can access the shared skills in `.agents/skills/`.
+
 ### Option 3: Docker with Ollama
 
 ```bash

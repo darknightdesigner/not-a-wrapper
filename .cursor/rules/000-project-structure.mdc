@@ -1,0 +1,48 @@
+---
+description: "Core project structure and file organization for Not A Wrapper"
+---
+
+# Project Structure
+
+## Directory Layout
+
+```
+app/                    # Next.js App Router
+├── api/               # API routes (streaming, REST)
+├── auth/              # Auth pages (Clerk)
+├── components/        # App-specific components
+│   ├── chat/         # Chat UI (gold standard: chat.tsx)
+│   ├── chat-input/   # Input components
+│   └── layout/       # App layout
+├── hooks/            # App-specific hooks
+└── types/            # App-specific types
+
+lib/                   # Shared utilities
+├── chat-store/       # Chat state (gold standard: chats/provider.tsx)
+├── models/           # AI model definitions
+├── openproviders/    # AI provider abstraction
+└── config.ts         # Centralized constants
+
+components/           # Shadcn UI components (shared)
+convex/              # Database schema & functions
+```
+
+## Where to Add Code
+
+| Type | Location |
+|------|----------|
+| New page | `app/[route]/page.tsx` |
+| API route | `app/api/[route]/route.ts` |
+| Chat component | `app/components/chat/` |
+| Shared UI | `components/ui/` |
+| State provider | `lib/[feature]-store/provider.tsx` |
+| Utility function | `lib/utils.ts` or `lib/[feature].ts` |
+| Database function | `convex/[table].ts` |
+| Type definition | Colocate with feature or `app/types/` |
+
+## Gold Standard Examples
+
+- **API Route**: `app/api/chat/route.ts`
+- **Custom Hook**: `app/components/chat/use-chat-core.ts`
+- **Context Provider**: `lib/chat-store/chats/provider.tsx`
+- **Component**: `app/components/chat/chat.tsx`
