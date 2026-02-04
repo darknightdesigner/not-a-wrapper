@@ -9,7 +9,7 @@ import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
 
-// v5 helper: Extract text content from UIMessage parts array
+// v6 helper: Extract text content from UIMessage parts array
 function getMessageText(message: MessageType): string {
   const textPart = message.parts?.find((p) => p.type === "text")
   return (textPart as { text?: string })?.text || ""

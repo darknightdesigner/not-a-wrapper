@@ -149,15 +149,15 @@ export function useChatCore({
 
     const isNewChat = hydratedChatIdRef.current !== chatId
     if (isNewChat) {
-      setMessages(initialMessages)
       hydratedChatIdRef.current = chatId
+      setMessages(initialMessages)
       return
     }
 
-    if (messages.length === 0 && initialMessages.length > 0) {
-      setMessages(initialMessages)
+    if (initialMessages.length > 0) {
+      setMessages((prev) => (prev.length === 0 ? initialMessages : prev))
     }
-  }, [chatId, initialMessages, messages.length, setMessages])
+  }, [chatId, initialMessages, setMessages])
 
   // Handle search params on mount
   useEffect(() => {
@@ -195,7 +195,7 @@ export function useChatCore({
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
 
-    // Create optimistic message with parts format (includes createdAt for app compatibility)
+    // Create optimistic message with v6 parts format (includes createdAt for app compatibility)
     const optimisticMessage: OptimisticUIMessage = {
       id: optimisticId,
       role: "user",
@@ -370,7 +370,7 @@ export function useChatCore({
       const targetFileParts =
         target.parts?.filter((p) => p.type === "file") || []
 
-      // Create optimistic message with v5 parts format (includes createdAt for app compatibility)
+      // Create optimistic message with v6 parts format (includes createdAt for app compatibility)
       const optimisticEditedMessage: OptimisticUIMessage = {
         id: optimisticId,
         role: "user",
@@ -560,7 +560,7 @@ export function useChatCore({
     ]
   )
 
-  // Handle reload (v5: renamed to regenerate)
+  // Handle reload (v6: renamed to regenerate)
   const handleReload = useCallback(async () => {
     const uid = await getOrCreateGuestUserId(user)
     if (!uid) {
