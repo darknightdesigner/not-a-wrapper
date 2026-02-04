@@ -103,7 +103,7 @@ git commit -m "test: verify AI SDK v6 upgrade functionality
 ## Reference
 
 - Full plan: `.agents/plans/ai-sdk-v6-upgrade-execution.md`
-- Research: `.agents/context/research/ai-sdk-upgrade-research.md`
+- Research: `.agents/archive/ai-sdk-upgrade-research.md`
 
 ## Success Criteria
 

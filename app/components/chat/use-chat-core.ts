@@ -65,6 +65,7 @@ export function useChatCore({
   // State for tracking first message sent (prevents redirect after sending)
   const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false)
   const prevChatIdRef = useRef<string | null>(chatId)
+  const hydratedChatIdRef = useRef<string | null>(null)
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
   const systemPrompt = useMemo(
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
@@ -142,6 +143,21 @@ export function useChatCore({
 
     onError: handleError,
   })
+
+  useEffect(() => {
+    if (!chatId) return
+
+    const isNewChat = hydratedChatIdRef.current !== chatId
+    if (isNewChat) {
+      setMessages(initialMessages)
+      hydratedChatIdRef.current = chatId
+      return
+    }
+
+    if (messages.length === 0 && initialMessages.length > 0) {
+      setMessages(initialMessages)
+    }
+  }, [chatId, initialMessages, messages.length, setMessages])
 
   // Handle search params on mount
   useEffect(() => {

@@ -809,7 +809,7 @@ append(
     content: newContent,
   },
   options
-)
+:)
 
 // AFTER (v5/v6) - Two approaches:
 
@@ -901,7 +901,7 @@ const handleInputChange = useCallback(
     setDraftValue(value)
   },
   [setInput, setDraftValue]
-)
+:)
 
 // AFTER (v5/v6)
 const [input, setInput] = useState(draftValue);  // Manual state, initialize with draft
@@ -918,7 +918,7 @@ const handleInputChange = useCallback(
     setDraftValue(value) // Draft persistence unchanged
   },
   [setInput, setDraftValue]
-)
+:)
 ```
 
 **Key Points:**

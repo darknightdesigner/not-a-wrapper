@@ -79,7 +79,7 @@ This plan is optimized for AI agent execution with:
 | `@ai-sdk/google` | v1.x | v2.x | v3.x |
 
 ### Project Research
-- `.agents/context/research/ai-sdk-upgrade-research.md` — Detailed research with code examples and Q&A
+- `.agents/archive/ai-sdk-upgrade-research.md` — Detailed research with code examples and Q&A
 
 ---
 
@@ -884,9 +884,7 @@ grep -r "FIXME(@ai-sdk-upgrade-v5)" --include="*.ts" --include="*.tsx" app/ lib/
 Update the "Gold Standard Examples" section if API route pattern changed.
 
 ### 7.4 Archive Research Document
-```bash
-mv .agents/context/research/ai-sdk-upgrade-research.md .agents/archive/
-```
+- Archived at `.agents/archive/ai-sdk-upgrade-research.md`
 
 ### [COMMIT] Final
 ```bash
@@ -1010,7 +1008,7 @@ When executing this plan as an AI agent:
 
 If you encounter issues during migration:
 
-1. **Check the research document first** — `.agents/context/research/ai-sdk-upgrade-research.md` contains detailed Q&A
+1. **Check the research document first** — `.agents/archive/ai-sdk-upgrade-research.md` contains detailed Q&A
 2. **Review FIXME comments** — The codemod added markers at locations needing manual work
 3. **Type errors after codemod** — Usually import path issues; check imports first
 4. **Streaming not working** — Verify `toUIMessageStreamResponse()` is used
@@ -1057,5 +1055,5 @@ If you encounter issues during migration:
 
 ---
 
-*Plan created from research document: `.agents/context/research/ai-sdk-upgrade-research.md`*
+*Plan created from research document: `.agents/archive/ai-sdk-upgrade-research.md`*
 *Last updated: 2026-02-04 with codemod findings and Phase 1.5 additions*

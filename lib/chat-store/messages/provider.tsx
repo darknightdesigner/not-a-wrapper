@@ -63,16 +63,22 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   // Convert Convex messages to AI SDK format
   const serverMessages: ExtendedUIMessage[] = useMemo(() => {
     if (!convexMessages) return []
-    return convexMessages.map((msg): ExtendedUIMessage => ({
-      id: msg._id,
-      // v5 UIMessage supports user, assistant, system roles
-      role: (msg.role === "data" ? "system" : msg.role) as "user" | "assistant" | "system",
-      content: msg.content ?? "",
-      createdAt: new Date(msg._creationTime),
-      parts: msg.parts as ExtendedUIMessage["parts"],
-      experimental_attachments:
-        msg.attachments as ExtendedUIMessage["experimental_attachments"],
-    }))
+    return convexMessages.map((msg): ExtendedUIMessage => {
+      const parts =
+        (msg.parts as ExtendedUIMessage["parts"]) ??
+        (msg.content ? [{ type: "text", text: msg.content }] : [])
+
+      return {
+        id: msg._id,
+        // v5 UIMessage supports user, assistant, system roles
+        role: (msg.role === "data" ? "system" : msg.role) as "user" | "assistant" | "system",
+        content: msg.content ?? "",
+        createdAt: new Date(msg._creationTime),
+        parts,
+        experimental_attachments:
+          msg.attachments as ExtendedUIMessage["experimental_attachments"],
+      }
+    })
   }, [convexMessages])
 
   const isLoading = convexMessages === undefined && isValidConvexId

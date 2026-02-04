@@ -6,7 +6,7 @@ A code review of the AI SDK v5 upgrade (Phase 1.5) identified one remaining issu
 
 **Key Documents:**
 - Execution plan: `.agents/plans/ai-sdk-v6-upgrade-execution.md`
-- Research document: `.agents/context/research/ai-sdk-upgrade-research.md`
+- Research document: `.agents/archive/ai-sdk-upgrade-research.md`
 
 ## Issue to Fix
 
