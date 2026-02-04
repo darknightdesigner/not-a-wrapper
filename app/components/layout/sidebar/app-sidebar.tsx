@@ -26,9 +26,10 @@ import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import {
   Chat01Icon,
   Cancel01Icon,
+  PencilEdit02Icon,
   Search01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { Pin, PanelLeft, NewChatIcon } from "@/lib/icons"
+import { Pin, PanelLeft } from "@/lib/icons"
 import { useParams } from "next/navigation"
 import React, { useMemo, useRef } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
@@ -74,13 +75,18 @@ export function AppSidebar() {
         className={cn(
           "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
+          // Stepped easing: appear instantly at END of collapse animation
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,end)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-auto opacity-100" 
             : "pointer-events-none opacity-0"
         )}
         aria-hidden={!isCollapsed}
+        inert={!isCollapsed ? true : undefined}
       >
         {/* Header */}
         <div className="flex h-(--sidebar-header-height) w-full items-center justify-center">
@@ -100,7 +106,7 @@ export function AppSidebar() {
         {/* Action buttons */}
         <div className="mt-(--sidebar-section-first-margin-top) flex flex-col items-center gap-0">
           <CollapsedMenuItem
-            icon={<NewChatIcon size={20} />}
+            icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New Chat"
             href="/"
             shortcut="⇧⌘O"
@@ -128,8 +134,14 @@ export function AppSidebar() {
       {/* === EXPANDED CONTENT === */}
       <div
         className={cn(
-          "flex h-full w-full flex-col",
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
+          "flex h-full flex-col",
+          // Fixed width + clipping prevents text reflow during animation (ChatGPT pattern)
+          "w-(--sidebar-width) overflow-x-clip whitespace-nowrap",
+          // Stepped easing: disappear instantly at START of collapse animation
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,start)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-none opacity-0" 
@@ -178,7 +190,7 @@ export function AppSidebar() {
               <div className="sticky top-0 z-20 bg-sidebar pb-2 pt-(--sidebar-section-first-margin-top)">
                 <div className="flex w-full flex-col items-start gap-0">
                   <SidebarMenuItem
-                    icon={<NewChatIcon size={20} />}
+                    icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
                     label="New Chat"
                     href="/"
                     testId="new-chat-button"
