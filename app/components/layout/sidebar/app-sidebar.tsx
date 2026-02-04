@@ -61,7 +61,10 @@ export function AppSidebar() {
     <Sidebar
       collapsible="icon"
       variant="sidebar"
-      className="border-border/40 border-r bg-transparent"
+      className={cn(
+        "border-border/40 border-r",
+        isCollapsed ? "bg-background" : "bg-sidebar"
+      )}
     >
       {/* 
         Dual-layer structure (ChatGPT pattern):
@@ -75,10 +78,10 @@ export function AppSidebar() {
         className={cn(
           "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          // Stepped easing: appear instantly at END of collapse animation
+          // Stepped easing: appear instantly at START of collapse animation (same time expanded content hides)
           "motion-safe:transition-opacity motion-safe:duration-150",
           isCollapsed 
-            ? "motion-safe:ease-[steps(1,end)]" 
+            ? "motion-safe:ease-[steps(1,start)]" 
             : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
@@ -103,8 +106,8 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="mt-(--sidebar-section-first-margin-top) flex flex-col items-center gap-0">
+        {/* Action buttons - +1px accounts for border-t on SidebarContent in expanded state */}
+        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-center gap-0">
           <CollapsedMenuItem
             icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New Chat"
@@ -136,7 +139,7 @@ export function AppSidebar() {
         className={cn(
           "flex h-full flex-col",
           // Fixed width + clipping prevents text reflow during animation (ChatGPT pattern)
-          "w-(--sidebar-width) overflow-x-clip whitespace-nowrap",
+          "w-(--sidebar-width) overflow-x-clip text-clip whitespace-nowrap",
           // Stepped easing: disappear instantly at START of collapse animation
           "motion-safe:transition-opacity motion-safe:duration-150",
           isCollapsed 
@@ -204,7 +207,7 @@ export function AppSidebar() {
                   />
                   <HistoryTrigger
                     hasSidebar={false}
-                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm motion-safe:transition-colors"
+                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex h-9 w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm motion-safe:transition-colors"
                     icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
                     label={
                       <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">
