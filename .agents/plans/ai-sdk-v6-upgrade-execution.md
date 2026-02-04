@@ -3,8 +3,8 @@
 > **Goal:** Upgrade from AI SDK v4.x to v6.x with near-perfect execution
 > **Created:** 2026-02-02
 > **Last Updated:** 2026-02-04
-> **Estimated Remaining Effort:** 1.25 hours
-> **Status:** ✅ Phase 5 Complete — Ready for Phase 6 (Testing)
+> **Estimated Remaining Effort:** 1.0 hours
+> **Status:** ✅ Phase 7 Cleanup Complete — Phase 6 Testing Pending
 
 ---
 
@@ -874,9 +874,9 @@ grep -r "FIXME(@ai-sdk-upgrade-v5)" --include="*.ts" --include="*.tsx" app/ lib/
 ```
 
 ### 7.2 Remove Deprecated Code
-- [ ] Remove any `// TODO: v5` comments
-- [ ] Remove any backward-compat shims that are no longer needed
-- [ ] Clean up unused imports
+- [x] Remove any `// TODO: v5` comments
+- [x] Remove any backward-compat shims that are no longer needed
+- [x] Clean up unused imports
 
 ### 7.3 Update Documentation
 **File:** `AGENTS.md` (if patterns changed significantly)
@@ -885,6 +885,17 @@ Update the "Gold Standard Examples" section if API route pattern changed.
 
 ### 7.4 Archive Research Document
 - Archived at `.agents/archive/ai-sdk-upgrade-research.md`
+
+### Phase 7 Completion Notes (2026-02-04)
+
+Phase 7 completed with the following changes:
+
+| Area | Changes Made |
+|------|--------------|
+| Message types | Removed `experimental_attachments` compatibility fields from UI message types |
+| Message mapping | Attachments derived directly from file parts for storage and display |
+| Rendering helpers | File attachments now read only from `parts` |
+| Conversion utils | Removed legacy attachment conversion paths and updated v6 wording |
 
 ### [COMMIT] Final
 ```bash
@@ -996,8 +1007,8 @@ When executing this plan as an AI agent:
 | Phase 4: Rendering | 45 min | ✅ Complete |
 | Phase 5: v6 | 30 min | ✅ Complete |
 | Phase 6: Testing | 60 min | Pending |
-| Phase 7: Cleanup | 15 min | Pending |
-| **Total Remaining** | **~1.25 hours** | |
+| Phase 7: Cleanup | 15 min | ✅ Complete |
+| **Total Remaining** | **~1.0 hours** | |
 
 **Buffer for issues:** +30 min
 **Total estimate:** 2-2.5 hours remaining

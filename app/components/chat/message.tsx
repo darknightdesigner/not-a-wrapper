@@ -3,7 +3,7 @@ import React, { useState } from "react"
 import { MessageAssistant } from "./message-assistant"
 import { MessageUser } from "./message-user"
 
-// Attachment type for backward compatibility with v4 format
+// Attachment type for file parts
 type MessageAttachment = {
   name: string
   contentType: string

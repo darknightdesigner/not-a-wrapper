@@ -1,27 +1,21 @@
 /**
  * AI SDK Message Format Conversion Utilities
  *
- * Provides runtime conversion between v4 (content string) and v5+ (parts array)
+ * Provides runtime conversion between v4 (content string) and v6+ (parts array)
  * message formats to enable migration without database changes.
  *
- * Note: These utilities prepare for the v5 migration. The types will be updated
- * during the package upgrade when UIMessage changes to require parts instead of content.
+ * Note: These utilities keep content-only messages compatible with parts-based
+ * rendering and storage.
  */
 
 import type { UIMessage } from "ai"
 
-// v4 message shape (what we currently have in storage)
-// Note: experimental_attachments is a v4 legacy property; v5 uses parts array with file parts
+// v4 message shape (content-only messages)
 interface V4Message {
   id: string
   role: "user" | "assistant" | "system"
   content: string
   createdAt?: Date
-  experimental_attachments?: Array<{
-    name: string
-    contentType: string
-    url: string
-  }>
 }
 
 /**
@@ -40,10 +34,10 @@ export function hasPartsArray(
 }
 
 /**
- * Convert v4 message format to v5 UIMessage format
+ * Convert v4 message format to UIMessage parts format
  *
  * In v4: UIMessage extends Message which requires `content: string`
- * In v5: UIMessage will have `parts` as the primary format, with `content` derived
+ * In v6: UIMessage uses `parts` as the primary format, with `content` derived
  *
  * This function creates the parts array structure that v5 expects.
  */
@@ -55,22 +49,9 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     parts.push({ type: "text", text: v4Message.content })
   }
 
-  // Convert v4 experimental_attachments to v5 parts format
-  // Note: In v5, files are represented as file parts in the parts array
-  if (v4Message.experimental_attachments?.length) {
-    for (const att of v4Message.experimental_attachments) {
-      // Store file metadata as a text marker for now
-      // The actual attachment handling is done via experimental_attachments
-      parts.push({
-        type: "text",
-        text: `[Attachment: ${att.name}]`,
-      })
-    }
-  }
-
-  // In v5, UIMessage has parts instead of content. The extended types in
-  // lib/chat-store/messages/api.ts add optional content/experimental_attachments
-  // for backward compatibility, but the core UIMessage only needs parts.
+  // In v6, UIMessage has parts instead of content. The extended types in
+  // lib/chat-store/messages/api.ts add optional content for compatibility,
+  // but the core UIMessage only needs parts.
   return {
     id: v4Message.id,
     role: v4Message.role,
@@ -100,10 +81,10 @@ export function ensureV5Format(messages: unknown[]): UIMessage[] {
 }
 
 /**
- * Convert v4 attachments to the format expected by sendMessage in v5
+ * Convert attachments to the format expected by sendMessage
  *
- * In v5, files are passed directly to sendMessage instead of experimental_attachments.
- * This prepares attachments for the v5 API.
+ * In v6, files are passed directly to sendMessage as file parts.
+ * This prepares attachments for the sendMessage API.
  */
 export function convertAttachmentsToFiles(
   attachments?: Array<{ name: string; contentType: string; url: string }>

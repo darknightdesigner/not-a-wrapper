@@ -13,11 +13,49 @@ import { useChatSession } from "../session/provider"
 export type ExtendedUIMessage = UIMessage & {
   createdAt?: Date
   content?: string
-  experimental_attachments?: Array<{
-    name: string
-    contentType: string
-    url: string
-  }>
+}
+
+type StoredAttachment = {
+  name: string
+  contentType: string
+  url: string
+}
+
+function normalizeStoredAttachments(
+  attachments?: unknown[] | null
+): StoredAttachment[] | undefined {
+  if (!attachments || !Array.isArray(attachments)) return undefined
+  const normalized = attachments
+    .map((attachment) => {
+      if (!attachment || typeof attachment !== "object") return null
+      const record = attachment as {
+        name?: string
+        contentType?: string
+        url?: string
+      }
+      if (!record.url) return null
+      return {
+        name: record.name || "file",
+        contentType: record.contentType || "application/octet-stream",
+        url: record.url,
+      }
+    })
+    .filter((attachment): attachment is StoredAttachment => Boolean(attachment))
+  return normalized.length > 0 ? normalized : undefined
+}
+
+function getAttachmentsFromParts(
+  parts?: UIMessage["parts"]
+): StoredAttachment[] | undefined {
+  if (!parts?.length) return undefined
+  const fileParts = parts.filter((part) => part.type === "file")
+  if (fileParts.length === 0) return undefined
+  return fileParts.map((part) => ({
+    name: (part as { filename?: string }).filename || "file",
+    contentType:
+      (part as { mediaType?: string }).mediaType || "application/octet-stream",
+    url: (part as { url?: string }).url || "",
+  }))
 }
 
 interface MessagesContextType {
@@ -64,9 +102,25 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const serverMessages: ExtendedUIMessage[] = useMemo(() => {
     if (!convexMessages) return []
     return convexMessages.map((msg): ExtendedUIMessage => {
-      const parts =
+      const baseParts =
         (msg.parts as ExtendedUIMessage["parts"]) ??
         (msg.content ? [{ type: "text", text: msg.content }] : [])
+      const hasFileParts = baseParts.some((part) => part.type === "file")
+      const storedAttachments = normalizeStoredAttachments(
+        msg.attachments as unknown[] | null
+      )
+      const parts =
+        !hasFileParts && storedAttachments && storedAttachments.length > 0
+          ? [
+              ...baseParts,
+              ...storedAttachments.map((att) => ({
+                type: "file" as const,
+                filename: att.name,
+                mediaType: att.contentType,
+                url: att.url,
+              })),
+            ]
+          : baseParts
 
       return {
         id: msg._id,
@@ -75,8 +129,6 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         content: msg.content ?? "",
         createdAt: new Date(msg._creationTime),
         parts,
-        experimental_attachments:
-          msg.attachments as ExtendedUIMessage["experimental_attachments"],
       }
     })
   }, [convexMessages])
@@ -157,7 +209,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
           role: message.role as "user" | "assistant" | "system",
           content: textContent,
           parts: message.parts,
-          attachments: message.experimental_attachments,
+          attachments: getAttachmentsFromParts(message.parts),
           model: (message as unknown as { model?: string }).model,
           messageGroupId: (message as unknown as { message_group_id?: string })
             .message_group_id,
@@ -193,7 +245,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
               role: msg.role as "user" | "assistant" | "system",
               content: textContent,
               parts: msg.parts,
-              attachments: msg.experimental_attachments,
+              attachments: getAttachmentsFromParts(msg.parts),
               model: (msg as unknown as { model?: string }).model,
               messageGroupId: (msg as unknown as { message_group_id?: string })
                 .message_group_id,

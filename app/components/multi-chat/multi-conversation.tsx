@@ -20,16 +20,10 @@ function getMessageText(message: MessageType): string {
   return (textPart as { text?: string })?.text || ""
 }
 
-// v5 helper: Extract file attachments from parts array for backward compatibility
+// Extract file attachments from parts array
 function getMessageAttachments(
   message: MessageType
 ): Array<{ name: string; contentType: string; url: string }> | undefined {
-  const extMessage = message as ExtendedMessageAISDK
-  // First check if legacy experimental_attachments exists on extended type
-  if (extMessage.experimental_attachments) {
-    return extMessage.experimental_attachments
-  }
-  // Otherwise extract from file parts
   const fileParts = message.parts?.filter((p) => p.type === "file")
   if (!fileParts || fileParts.length === 0) return undefined
   return fileParts.map((p) => ({

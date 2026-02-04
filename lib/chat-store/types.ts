@@ -40,8 +40,6 @@ export interface Message {
   role: "user" | "assistant" | "system" | "data"
   content: string | null
   parts?: unknown
-  // Legacy v4 property - v5 uses file parts in the parts array
-  experimental_attachments?: unknown[]
   message_group_id?: string | null
   model?: string | null
   created_at?: string | null
@@ -79,7 +77,6 @@ export function convexChatToChat(convexChat: ConvexChat): Chat {
 
 /**
  * Convert Convex message to unified Message type
- * Note: experimental_attachments is mapped from Convex attachments for backward compatibility
  */
 export function convexMessageToMessage(convexMessage: ConvexMessage): Message {
   return {
@@ -89,7 +86,6 @@ export function convexMessageToMessage(convexMessage: ConvexMessage): Message {
     role: convexMessage.role,
     content: convexMessage.content ?? null,
     parts: convexMessage.parts,
-    experimental_attachments: convexMessage.attachments,
     message_group_id: convexMessage.messageGroupId ?? null,
     model: convexMessage.model ?? null,
     created_at: new Date(convexMessage._creationTime).toISOString(),

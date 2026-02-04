@@ -5,11 +5,6 @@ import { readFromIndexedDB, writeToIndexedDB } from "../persist"
 export type ExtendedUIMessage = UIMessage & {
   createdAt?: Date
   content?: string
-  experimental_attachments?: Array<{
-    name: string
-    contentType: string
-    url: string
-  }>
 }
 
 export interface ExtendedMessageAISDK extends ExtendedUIMessage {
