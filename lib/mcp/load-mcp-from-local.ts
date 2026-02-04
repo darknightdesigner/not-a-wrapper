@@ -1,5 +1,5 @@
-import { experimental_createMCPClient as createMCPClient } from "ai"
-import { Experimental_StdioMCPTransport as StdioMCPTransport } from "ai/mcp-stdio"
+import { createMCPClient } from "@ai-sdk/mcp"
+import { Experimental_StdioMCPTransport as StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio"
 
 export async function loadMCPToolsFromLocal(
   command: string,

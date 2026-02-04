@@ -1,4 +1,4 @@
-import { experimental_createMCPClient as createMCPClient } from "ai"
+import { createMCPClient } from "@ai-sdk/mcp"
 
 export async function loadMCPToolsFromURL(url: string) {
   const mcpClient = await createMCPClient({

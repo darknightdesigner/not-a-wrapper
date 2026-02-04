@@ -141,7 +141,7 @@ export function ByokSection() {
       if (!res.ok) throw new Error("Failed to save key")
       return res.json()
     },
-    onSuccess: async (response, { provider }) => {
+    onSuccess: async (response: { isNewKey?: boolean }, { provider }: { provider: string; apiKey: string }) => {
       const providerConfig = PROVIDERS.find((p) => p.id === provider)
 
       toast({
@@ -164,7 +164,7 @@ export function ByokSection() {
         [provider]: providerConfig?.defaultKey || "",
       }))
     },
-    onError: (_, { provider }) => {
+    onError: (_error: Error, { provider }: { provider: string; apiKey: string }) => {
       const providerConfig = PROVIDERS.find((p) => p.id === provider)
       toast({
         title: "Failed to save API key",
@@ -184,7 +184,7 @@ export function ByokSection() {
       if (!res.ok) throw new Error("Failed to delete key")
       return res
     },
-    onSuccess: async (_, provider) => {
+    onSuccess: async (_response: Response, provider: string) => {
       const providerConfig = PROVIDERS.find((p) => p.id === provider)
       toast({
         title: "API key deleted",
@@ -195,7 +195,7 @@ export function ByokSection() {
       setDeleteDialogOpen(false)
       setProviderToDelete("")
     },
-    onError: (_, provider) => {
+    onError: (_error: Error, provider: string) => {
       const providerConfig = PROVIDERS.find((p) => p.id === provider)
       toast({
         title: "Failed to delete API key",
