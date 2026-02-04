@@ -14,10 +14,16 @@ import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "../chat/message"
 
+type MessagePart = NonNullable<MessageType["parts"]>[number]
+type TextPart = Extract<MessagePart, { type: "text" }>
+
 // Helper: Extract text content from UIMessage parts array
 function getMessageText(message: MessageType): string {
-  const textPart = message.parts?.find((p) => p.type === "text")
-  return (textPart as { text?: string })?.text || ""
+  const textParts = message.parts?.filter(
+    (part): part is TextPart => part.type === "text"
+  )
+  if (!textParts || textParts.length === 0) return ""
+  return textParts.map((part) => part.text || "").join("")
 }
 
 // Extract file attachments from parts array

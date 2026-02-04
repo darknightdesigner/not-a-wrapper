@@ -19,9 +19,13 @@ function getMessageText(message: ExtendedUIMessage): string {
   if (message.content) {
     return message.content
   }
-  // Otherwise extract from parts
-  const textPart = message.parts?.find((p) => p.type === "text")
-  return (textPart as { text?: string })?.text || ""
+  // Otherwise extract from parts (combine all text parts)
+  const textParts =
+    message.parts
+      ?.filter((part) => part.type === "text")
+      .map((part) => (part as { text?: string }).text)
+      .filter((text): text is string => Boolean(text)) || []
+  return textParts.join("")
 }
 
 interface UseChatPreviewReturn {

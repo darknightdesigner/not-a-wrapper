@@ -215,7 +215,7 @@ function SingleToolCard({
   // v6: Get tool name using official helper
   const toolName = getStaticToolName(toolData)
   const args = toolData.input as Record<string, unknown> | undefined
-  const isLoading = state === "input-available"
+  const isLoading = state === "input-available" || state === "input-streaming"
   const isCompleted = state === "output-available"
   const result = isCompleted ? toolData.output : undefined
 

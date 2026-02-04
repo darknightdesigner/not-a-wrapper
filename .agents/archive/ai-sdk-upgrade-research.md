@@ -800,7 +800,7 @@ append(
     content: newContent,
   },
   options
-:)
+);
 
 // AFTER (v5/v6) - Two approaches:
 

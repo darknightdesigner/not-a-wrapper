@@ -820,7 +820,7 @@ A web-only AI chat cannot:
 | **Architecture** | Electron app + local MCP servers |
 | **Security** | User approves tool access per session |
 
-### Codex Desktop App (Anthropic)
+### Codex Desktop App (OpenAI)
 
 | Feature | How It Works |
 |---------|--------------|
