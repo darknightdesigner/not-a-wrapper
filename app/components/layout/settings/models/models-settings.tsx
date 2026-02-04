@@ -174,13 +174,8 @@ export function ModelsSettings() {
                       <button
                         onClick={() => removeFavorite(model.id)}
                         type="button"
-                        disabled={favoriteModels.length <= 1}
-                        className="text-muted-foreground rounded-md border p-1 opacity-0 transition-all group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50"
-                        title={
-                          favoriteModels.length <= 1
-                            ? "At least one favorite model is required"
-                            : "Remove from favorites"
-                        }
+                        className="text-muted-foreground rounded-md border p-1 opacity-0 transition-all group-hover:opacity-100"
+                        title="Remove from favorites"
                       >
                         <HugeiconsIcon icon={MinusSignIcon} size={16} />
                       </button>
