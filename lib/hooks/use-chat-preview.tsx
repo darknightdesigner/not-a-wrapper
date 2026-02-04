@@ -2,6 +2,7 @@ import {
   cacheMessages,
   getCachedMessages,
   getMessagesFromDb,
+  type ExtendedUIMessage,
 } from "@/lib/chat-store/messages/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 
@@ -10,6 +11,21 @@ interface ChatMessage {
   content: string
   role: "user" | "assistant"
   created_at: string
+}
+
+// v5 helper: Extract text content from UIMessage parts array
+function getMessageText(message: ExtendedUIMessage): string {
+  // First check legacy content property
+  if (message.content) {
+    return message.content
+  }
+  // Otherwise extract from parts (combine all text parts)
+  const textParts =
+    message.parts
+      ?.filter((part) => part.type === "text")
+      .map((part) => (part as { text?: string }).text)
+      .filter((text): text is string => Boolean(text)) || []
+  return textParts.join("")
 }
 
 interface UseChatPreviewReturn {
@@ -68,7 +84,7 @@ export function useChatPreview(): UseChatPreviewReturn {
               .slice(-5) // Get last 5 messages
               .map((msg) => ({
                 id: msg.id,
-                content: msg.content,
+                content: getMessageText(msg),
                 role: msg.role as "user" | "assistant",
                 created_at:
                   msg.createdAt?.toISOString() || new Date().toISOString(),
@@ -92,7 +108,7 @@ export function useChatPreview(): UseChatPreviewReturn {
               .slice(-5) // Get last 5 messages
               .map((msg) => ({
                 id: msg.id,
-                content: msg.content,
+                content: getMessageText(msg),
                 role: msg.role as "user" | "assistant",
                 created_at:
                   msg.createdAt?.toISOString() || new Date().toISOString(),

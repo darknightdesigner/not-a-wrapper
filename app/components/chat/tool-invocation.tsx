@@ -1,7 +1,8 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { ToolInvocationUIPart } from "@ai-sdk/ui-utils"
+import type { ToolUIPart } from 'ai'
+import { getStaticToolName } from 'ai'
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowDown01Icon,
@@ -16,7 +17,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
 
 interface ToolInvocationProps {
-  toolInvocations: ToolInvocationUIPart[]
+  toolInvocations: ToolUIPart[]
   className?: string
   defaultOpen?: boolean
 }
@@ -40,14 +41,14 @@ export function ToolInvocation({
   // Group tool invocations by toolCallId
   const groupedTools = toolInvocationsData.reduce(
     (acc, item) => {
-      const { toolCallId } = item.toolInvocation
+      const { toolCallId } = item
       if (!acc[toolCallId]) {
         acc[toolCallId] = []
       }
       acc[toolCallId].push(item)
       return acc
     },
-    {} as Record<string, ToolInvocationUIPart[]>
+    {} as Record<string, ToolUIPart[]>
   )
 
   const uniqueToolIds = Object.keys(groupedTools)
@@ -129,7 +130,7 @@ export function ToolInvocation({
 }
 
 type SingleToolViewProps = {
-  toolInvocations: ToolInvocationUIPart[]
+  toolInvocations: ToolUIPart[]
   defaultOpen?: boolean
   className?: string
 }
@@ -142,33 +143,33 @@ function SingleToolView({
   // Group by toolCallId and pick the most informative state
   const groupedTools = toolInvocations.reduce(
     (acc, item) => {
-      const { toolCallId } = item.toolInvocation
+      const { toolCallId } = item
       if (!acc[toolCallId]) {
         acc[toolCallId] = []
       }
       acc[toolCallId].push(item)
       return acc
     },
-    {} as Record<string, ToolInvocationUIPart[]>
+    {} as Record<string, ToolUIPart[]>
   )
 
-  // For each toolCallId, get the most informative state (result > call > requested)
+  // For each toolCallId, get the most informative state (output-available > input-available > input-streaming)
   const toolsToDisplay = Object.values(groupedTools)
     .map((group) => {
       const resultTool = group.find(
-        (item) => item.toolInvocation.state === "result"
+        (item) => item.state === "output-available"
       )
       const callTool = group.find(
-        (item) => item.toolInvocation.state === "call"
+        (item) => item.state === "input-available"
       )
       const partialCallTool = group.find(
-        (item) => item.toolInvocation.state === "partial-call"
+        (item) => item.state === "input-streaming"
       )
 
       // Return the most informative one
       return resultTool || callTool || partialCallTool
     })
-    .filter(Boolean) as ToolInvocationUIPart[]
+    .filter(Boolean) as ToolUIPart[]
 
   if (toolsToDisplay.length === 0) return null
 
@@ -189,7 +190,7 @@ function SingleToolView({
       <div className="space-y-4">
         {toolsToDisplay.map((tool) => (
           <SingleToolCard
-            key={tool.toolInvocation.toolCallId}
+            key={tool.toolCallId}
             toolData={tool}
             defaultOpen={defaultOpen}
           />
@@ -205,16 +206,18 @@ function SingleToolCard({
   defaultOpen = false,
   className,
 }: {
-  toolData: ToolInvocationUIPart
+  toolData: ToolUIPart
   defaultOpen?: boolean
   className?: string
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
-  const { toolInvocation } = toolData
-  const { state, toolName, toolCallId, args } = toolInvocation
-  const isLoading = state === "call"
-  const isCompleted = state === "result"
-  const result = isCompleted ? toolInvocation.result : undefined
+  const { state, toolCallId } = toolData
+  // v6: Get tool name using official helper
+  const toolName = getStaticToolName(toolData)
+  const args = toolData.input as Record<string, unknown> | undefined
+  const isLoading = state === "input-available" || state === "input-streaming"
+  const isCompleted = state === "output-available"
+  const result = isCompleted ? toolData.output : undefined
 
   // Parse the result JSON if available
   const { parsedResult, parseError } = useMemo(() => {
@@ -229,8 +232,9 @@ function SingleToolCard({
         result !== null &&
         "content" in result
       ) {
-        const textContent = result.content?.find(
-          (item: { type: string }) => item.type === "text"
+        const resultObj = result as { content?: Array<{ type: string; text?: string }> }
+        const textContent = resultObj.content?.find(
+          (item) => item.type === "text"
         )
         if (!textContent?.text) return { parsedResult: null, parseError: null }
 

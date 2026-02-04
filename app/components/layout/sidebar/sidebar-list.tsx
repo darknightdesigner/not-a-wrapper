@@ -34,9 +34,9 @@ export function SidebarList({
   if (!shouldCollapse) {
     return (
       <div>
-        <h3 className="flex items-center gap-1 overflow-hidden px-3 py-1.5 text-xs font-medium text-muted-foreground break-all text-ellipsis">
-          {icon && <span>{icon}</span>}
-          {title}
+        <h3 className="flex items-center gap-1 overflow-hidden px-3 py-1.5 text-xs font-medium text-muted-foreground whitespace-nowrap text-ellipsis">
+          {icon && <span className="shrink-0">{icon}</span>}
+          <span className="truncate">{title}</span>
         </h3>
         <div className="space-y-0.5">{renderItems()}</div>
       </div>

@@ -68,7 +68,7 @@ export function DeveloperTools() {
 
       {/* Tools List */}
       <div className="space-y-6">
-        {tools.map((tool) => (
+        {tools.map((tool: DeveloperTool) => (
           <div key={tool.id} className="border-border rounded-lg border p-3">
             <div className="space-y-4">
               {/* Tool Header */}

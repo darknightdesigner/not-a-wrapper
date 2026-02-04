@@ -59,7 +59,7 @@ export default defineSchema({
     ),
     content: v.optional(v.string()),
     parts: v.optional(v.any()), // AI SDK parts format
-    attachments: v.optional(v.array(v.any())), // experimental_attachments
+    attachments: v.optional(v.array(v.any())), // Legacy field; v6 uses file parts in `parts`
     messageGroupId: v.optional(v.string()), // For grouping related messages
     model: v.optional(v.string()), // Model used for this message
   })

@@ -20,9 +20,9 @@ export function SidebarProject() {
         type="button"
         onClick={() => setIsDialogOpen(true)}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 whitespace-nowrap">
           <HugeiconsIcon icon={FolderAddIcon} size={20} />
-          New project
+          <span>New project</span>
         </div>
       </button>
 

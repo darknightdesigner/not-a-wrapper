@@ -106,9 +106,9 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                 className="w-full"
                 tooltip={user?.display_name || "Account"}
               >
-                <Avatar className="size-8 group-data-[collapsible=icon]:size-6 bg-emerald-600 motion-safe:transition-[width,height]">
+                <Avatar className="size-6 bg-emerald-600">
                   <AvatarImage src={user?.profile_image ?? undefined} />
-                  <AvatarFallback className="bg-emerald-600 text-sm group-data-[collapsible=icon]:text-xs text-white">
+                  <AvatarFallback className="bg-emerald-600 text-xs text-white">
                     {user?.display_name?.slice(0, 2).toUpperCase()}
                   </AvatarFallback>
                 </Avatar>

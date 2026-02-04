@@ -1,7 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import type { SourceUIPart } from "@ai-sdk/ui-utils"
+import type { SourceUrlUIPart } from 'ai'
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowDown01Icon, Link01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "motion/react"
@@ -10,7 +10,7 @@ import { useState } from "react"
 import { addUTM, formatUrl, getFavicon } from "./utils"
 
 type SourcesListProps = {
-  sources: SourceUIPart["source"][]
+  sources: SourceUrlUIPart[]
   className?: string
 }
 
@@ -94,7 +94,7 @@ export function SourcesList({ sources, className }: SourcesListProps) {
                     !faviconUrl || failedFavicons.has(source.url)
 
                   return (
-                    <li key={source.id} className="flex items-center text-sm">
+                    <li key={source.sourceId} className="flex items-center text-sm">
                       <div className="min-w-0 flex-1 overflow-hidden">
                         <a
                           href={addUTM(source.url)}

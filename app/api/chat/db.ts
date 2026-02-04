@@ -41,7 +41,7 @@ export function processFinalAssistantMessage(
         } else if (part.type === "reasoning") {
           parts.push({
             type: "reasoning",
-            reasoning: part.text || "",
+            reasoningText: part.text || "",
             details: [
               {
                 type: "text",

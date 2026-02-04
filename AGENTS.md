@@ -103,11 +103,11 @@ convex/               # Convex DB schema & functions
 ### Streaming Responses (MUST)
 
 ```typescript
-// ALWAYS use toDataStreamResponse for AI chat
-return result.toDataStreamResponse({
+// ALWAYS use toUIMessageStreamResponse for AI chat (AI SDK v6)
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
-  getErrorMessage: (error) => extractErrorMessage(error),
+  onError: (error) => extractErrorMessage(error),
 })
 ```
 

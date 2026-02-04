@@ -5,9 +5,28 @@ import {
 import { Loader } from "@/components/ui/loader"
 import { ScrollButton } from "@/components/ui/scroll-button"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
+
+// v6 helper: Extract text content from UIMessage parts array
+function getMessageText(message: MessageType): string {
+  const textPart = message.parts?.find((p) => p.type === "text")
+  return (textPart as { text?: string })?.text || ""
+}
+
+// Extract file attachments from parts array
+function getMessageAttachments(
+  message: MessageType
+): Array<{ name: string; contentType: string; url: string }> | undefined {
+  const fileParts = message.parts?.filter((p) => p.type === "file")
+  if (!fileParts || fileParts.length === 0) return undefined
+  return fileParts.map((p) => ({
+    name: (p as { filename?: string }).filename || "file",
+    contentType: (p as { mediaType?: string }).mediaType || "application/octet-stream",
+    url: (p as { url?: string }).url || "",
+  }))
+}
 
 type ConversationProps = {
   messages: MessageType[]
@@ -58,7 +77,7 @@ export function Conversation({
                 key={message.id}
                 id={message.id}
                 variant={message.role}
-                attachments={message.experimental_attachments}
+                attachments={getMessageAttachments(message)}
                 isLast={isLast}
                 onDelete={onDelete}
                 onEdit={onEdit}
@@ -72,9 +91,9 @@ export function Conversation({
                 }
                 isUserAuthenticated={isUserAuthenticated}
               >
-                {message.content}
+                {getMessageText(message)}
               </Message>
-            )
+            );
           })}
           {status === "submitted" &&
             messages.length > 0 &&
@@ -89,5 +108,5 @@ export function Conversation({
         </ChatContainerContent>
       </ChatContainerRoot>
     </div>
-  )
+  );
 }

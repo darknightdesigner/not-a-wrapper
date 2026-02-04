@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { isConvexId } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Tick02Icon,
@@ -34,9 +34,16 @@ const getTextFromDataUrl = (dataUrl: string) => {
   return base64
 }
 
+// Attachment type for backward compatibility with v4 format
+type MessageAttachment = {
+  name: string
+  contentType: string
+  url: string
+}
+
 export type MessageUserProps = {
   hasScrollAnchor?: boolean
-  attachments?: MessageType["experimental_attachments"]
+  attachments?: MessageAttachment[]
   children: string
   copied: boolean
   copyToClipboard: () => void

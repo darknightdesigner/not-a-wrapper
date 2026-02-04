@@ -40,7 +40,6 @@ export interface Message {
   role: "user" | "assistant" | "system" | "data"
   content: string | null
   parts?: unknown
-  experimental_attachments?: unknown[]
   message_group_id?: string | null
   model?: string | null
   created_at?: string | null
@@ -87,11 +86,10 @@ export function convexMessageToMessage(convexMessage: ConvexMessage): Message {
     role: convexMessage.role,
     content: convexMessage.content ?? null,
     parts: convexMessage.parts,
-    experimental_attachments: convexMessage.attachments,
     message_group_id: convexMessage.messageGroupId ?? null,
     model: convexMessage.model ?? null,
     created_at: new Date(convexMessage._creationTime).toISOString(),
-  }
+  };
 }
 
 /**

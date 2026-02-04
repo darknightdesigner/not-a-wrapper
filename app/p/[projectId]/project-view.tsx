@@ -7,6 +7,7 @@ import { useFileUpload } from "@/app/components/chat/use-file-upload"
 import { useModel } from "@/app/components/chat/use-model"
 import { ProjectChatItem } from "@/app/components/layout/sidebar/project-chat-item"
 import { toast } from "@/components/ui/toast"
+import { convertAttachmentsToFiles } from "@/lib/ai/message-conversion"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { MESSAGE_MAX_LENGTH, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
@@ -14,7 +15,12 @@ import { Attachment } from "@/lib/file-handling"
 import { API_ROUTE_CHAT } from "@/lib/routes"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
+import type { UIMessage } from "@ai-sdk/react"
 import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
+
+// Extended UIMessage type for optimistic updates that includes createdAt
+type OptimisticUIMessage = UIMessage & { createdAt?: Date }
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Chat01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "@tanstack/react-query"
@@ -51,6 +57,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     handleFileRemove,
   } = useFileUpload()
 
+  // Manual input state management (v6 no longer returns input/setInput from useChat)
+  const [input, setInput] = useState("")
+
   // Fetch project details
   const { data: project } = useQuery<Project>({
     queryKey: ["project", projectId],
@@ -86,25 +95,34 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     })
   }, [])
 
+  // Memoized transport for v6
+  const transport = useMemo(
+    () => new DefaultChatTransport({ api: API_ROUTE_CHAT }),
+    []
+  )
+
+  // Initialize useChat with v6 API
   const {
     messages,
-    input,
-    handleSubmit,
+    sendMessage,
+    regenerate,
     status,
-    reload,
     stop,
     setMessages,
-    setInput,
   } = useChat({
     id: `project-${projectId}-${currentChatId}`,
-    api: API_ROUTE_CHAT,
-    initialMessages: [],
-    onFinish: (m) => {
+    transport,
+    messages: [],
+
+    onFinish: ({ message, isAbort, isError }) => {
+      // Skip processing for aborted or errored responses
+      if (isAbort || isError) return
       // Pass currentChatId explicitly to handle stale closures during chat creation
       if (currentChatId) {
-        cacheAndAddMessage(m, currentChatId)
+        cacheAndAddMessage(message, currentChatId)
       }
     },
+
     onError: handleError,
   })
 
@@ -182,7 +200,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     createNewChat,
     setHasDialogAuth: () => {}, // Not used in project context
     setMessages,
-    setInput,
+    setInput, // Now using our local setInput from useState
   })
 
   // Simple input change handler for project context (no draft saving needed)
@@ -201,17 +219,27 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       return
     }
 
+    // Capture current input value before clearing
+    const currentInput = input
+
     const optimisticId = `optimistic-${Date.now().toString()}`
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
 
-    const optimisticMessage = {
+    // Create optimistic message with v5 parts format (includes createdAt for app compatibility)
+    const optimisticMessage: OptimisticUIMessage = {
       id: optimisticId,
-      content: input,
-      role: "user" as const,
+      role: "user",
       createdAt: new Date(),
-      experimental_attachments:
-        optimisticAttachments.length > 0 ? optimisticAttachments : undefined,
+      parts: [
+        { type: "text", text: currentInput },
+        ...(optimisticAttachments.map((att) => ({
+          type: "file" as const,
+          filename: att.name,
+          mediaType: att.contentType,
+          url: att.url,
+        }))),
+      ],
     }
 
     setMessages((prev) => [...prev, optimisticMessage])
@@ -220,61 +248,72 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     const submittedFiles = [...files]
     setFiles([])
 
+    // Helper to extract file URLs from parts for cleanup
+    const getFileUrlsFromParts = () =>
+      optimisticMessage.parts
+        ?.filter((p) => p.type === "file")
+        .map((p) => ({ url: (p as { url?: string }).url })) || []
+
     try {
-      const currentChatId = await ensureChatExists(user.id)
-      if (!currentChatId) {
+      const chatId = await ensureChatExists(user.id)
+      if (!chatId) {
         setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
-        cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
+        cleanupOptimisticAttachments(getFileUrlsFromParts())
         return
       }
 
-      if (input.length > MESSAGE_MAX_LENGTH) {
+      if (currentInput.length > MESSAGE_MAX_LENGTH) {
         toast({
           title: `The message you submitted was too long, please submit something shorter. (Max ${MESSAGE_MAX_LENGTH} characters)`,
           status: "error",
         })
         setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
-        cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
+        cleanupOptimisticAttachments(getFileUrlsFromParts())
         return
       }
 
       let attachments: Attachment[] | null = []
       if (submittedFiles.length > 0) {
-        attachments = await handleFileUploads(currentChatId)
+        attachments = await handleFileUploads(chatId)
         if (attachments === null) {
           setMessages((prev) => prev.filter((m) => m.id !== optimisticId))
-          cleanupOptimisticAttachments(
-            optimisticMessage.experimental_attachments
-          )
+          cleanupOptimisticAttachments(getFileUrlsFromParts())
           return
         }
       }
 
-      const options = {
-        body: {
-          chatId: currentChatId,
-          userId: user.id,
-          model: selectedModel,
-          isAuthenticated: true,
-          systemPrompt: SYSTEM_PROMPT_DEFAULT,
-          enableSearch,
+      // Use sendMessage with text + file parts, options in second param
+      sendMessage(
+        {
+          text: currentInput,
+          files: attachments?.length
+            ? convertAttachmentsToFiles(attachments)
+            : undefined,
         },
-        experimental_attachments: attachments || undefined,
-      }
+        {
+          body: {
+            chatId,
+            userId: user.id,
+            model: selectedModel,
+            isAuthenticated: true,
+            systemPrompt: SYSTEM_PROMPT_DEFAULT,
+            enableSearch,
+          },
+        }
+      )
 
-      handleSubmit(undefined, options)
       setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
-      cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
-      // Pass currentChatId explicitly to handle stale closures during chat creation
-      cacheAndAddMessage(optimisticMessage, currentChatId)
+      cleanupOptimisticAttachments(getFileUrlsFromParts())
+      // Pass chatId explicitly to handle stale closures during chat creation
+      cacheAndAddMessage(optimisticMessage, chatId)
 
       // Bump existing chats to top (non-blocking, after submit)
       if (messages.length > 0) {
-        bumpChat(currentChatId)
+        bumpChat(chatId)
       }
     } catch {
       setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
-      cleanupOptimisticAttachments(optimisticMessage.experimental_attachments)
+      cleanupOptimisticAttachments(getFileUrlsFromParts())
       toast({ title: "Failed to send message", status: "error" })
     } finally {
       setIsSubmitting(false)
@@ -285,19 +324,19 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     createOptimisticAttachments,
     input,
     setMessages,
-    setInput,
     setFiles,
     cleanupOptimisticAttachments,
     ensureChatExists,
     handleFileUploads,
     selectedModel,
-    handleSubmit,
+    sendMessage,
     cacheAndAddMessage,
     messages.length,
     bumpChat,
     enableSearch,
   ])
 
+  // Handle reload (regenerate)
   const handleReload = useCallback(async () => {
     if (!user?.id) {
       return
@@ -313,8 +352,8 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       },
     }
 
-    reload(options)
-  }, [user, selectedModel, reload])
+    regenerate(options)
+  }, [user, selectedModel, regenerate])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {

@@ -26,9 +26,10 @@ import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import {
   Chat01Icon,
   Cancel01Icon,
+  PencilEdit02Icon,
   Search01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { Pin, PanelLeft, NewChatIcon } from "@/lib/icons"
+import { Pin, PanelLeft } from "@/lib/icons"
 import { useParams } from "next/navigation"
 import React, { useMemo, useRef } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
@@ -60,7 +61,10 @@ export function AppSidebar() {
     <Sidebar
       collapsible="icon"
       variant="sidebar"
-      className="border-border/40 border-r bg-transparent"
+      className={cn(
+        "border-border/40 border-r",
+        isCollapsed ? "bg-background" : "bg-sidebar"
+      )}
     >
       {/* 
         Dual-layer structure (ChatGPT pattern):
@@ -74,13 +78,18 @@ export function AppSidebar() {
         className={cn(
           "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
+          // Stepped easing: appear instantly at START of collapse animation (same time expanded content hides)
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,start)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-auto opacity-100" 
             : "pointer-events-none opacity-0"
         )}
         aria-hidden={!isCollapsed}
+        inert={!isCollapsed ? true : undefined}
       >
         {/* Header */}
         <div className="flex h-(--sidebar-header-height) w-full items-center justify-center">
@@ -97,10 +106,10 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Action buttons */}
-        <div className="mt-(--sidebar-section-first-margin-top) flex flex-col items-center gap-0">
+        {/* Action buttons - +1px accounts for border-t on SidebarContent in expanded state */}
+        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-center gap-0">
           <CollapsedMenuItem
-            icon={<NewChatIcon size={20} />}
+            icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New Chat"
             href="/"
             shortcut="⇧⌘O"
@@ -128,8 +137,14 @@ export function AppSidebar() {
       {/* === EXPANDED CONTENT === */}
       <div
         className={cn(
-          "flex h-full w-full flex-col",
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
+          "flex h-full flex-col",
+          // Fixed width + clipping prevents text reflow during animation (ChatGPT pattern)
+          "w-(--sidebar-width) overflow-x-clip text-clip whitespace-nowrap",
+          // Stepped easing: disappear instantly at START of collapse animation
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,start)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-none opacity-0" 
@@ -178,7 +193,7 @@ export function AppSidebar() {
               <div className="sticky top-0 z-20 bg-sidebar pb-2 pt-(--sidebar-section-first-margin-top)">
                 <div className="flex w-full flex-col items-start gap-0">
                   <SidebarMenuItem
-                    icon={<NewChatIcon size={20} />}
+                    icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
                     label="New Chat"
                     href="/"
                     testId="new-chat-button"
@@ -192,7 +207,7 @@ export function AppSidebar() {
                   />
                   <HistoryTrigger
                     hasSidebar={false}
-                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm motion-safe:transition-colors"
+                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex h-9 w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm motion-safe:transition-colors"
                     icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
                     label={
                       <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">

@@ -1,13 +1,20 @@
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import React, { useState } from "react"
 import { MessageAssistant } from "./message-assistant"
 import { MessageUser } from "./message-user"
+
+// Attachment type for file parts
+type MessageAttachment = {
+  name: string
+  contentType: string
+  url: string
+}
 
 type MessageProps = {
   variant: MessageType["role"]
   children: string
   id: string
-  attachments?: MessageType["experimental_attachments"]
+  attachments?: MessageAttachment[]
   isLast?: boolean
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => Promise<void> | void

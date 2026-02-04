@@ -7,6 +7,8 @@
 > **Status:** ✅ **Research Complete - Migration Complete**
 > 
 > **Note:** This document is a historical research reference. The Convex migration was completed in January 2026. All decisions have been implemented.
+> 
+> **AI SDK Note (Feb 2026):** Code examples showing `toDataStreamResponse` or legacy attachment fields reflect the v4 API. Current code uses AI SDK v6 with `toUIMessageStreamResponse` and file parts.
 
 ---
 

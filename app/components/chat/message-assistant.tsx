@@ -6,7 +6,9 @@ import {
 } from "@/components/ui/message"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
-import type { Message as MessageAISDK } from "@ai-sdk/react"
+import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
+import type { ToolUIPart } from "ai"
+import { isStaticToolUIPart, getStaticToolName } from "ai"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   RefreshIcon,
@@ -50,30 +52,31 @@ export function MessageAssistant({
   onQuote,
 }: MessageAssistantProps) {
   const { preferences } = useUserPreferences()
-  const sources = getSources(parts)
-  const toolInvocationParts = parts?.filter(
-    (part) => part.type === "tool-invocation"
-  )
+  const sources = getSources(parts || [])
+  
+  // v6: Filter tool parts using official helper
+  const toolInvocationParts = parts?.filter(isStaticToolUIPart) as ToolUIPart[] | undefined
+  
   const reasoningParts = parts?.find((part) => part.type === "reasoning")
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
-  const searchImageResults =
+  
+  // Type for image search results
+  type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
+  
+  // v6: Use flat properties and official helper for tool name
+  const searchImageResults: ImageResult[] =
     parts
-      ?.filter(
-        (part) =>
-          part.type === "tool-invocation" &&
-          part.toolInvocation?.state === "result" &&
-          part.toolInvocation?.toolName === "imageSearch" &&
-          part.toolInvocation?.result?.content?.[0]?.type === "images"
+      ?.filter((part): part is ToolUIPart =>
+        isStaticToolUIPart(part) &&
+        part.state === "output-available" &&
+        getStaticToolName(part) === "imageSearch" &&
+        (part.output as { content?: Array<{ type: string }> })?.content?.[0]?.type === "images"
       )
-      .flatMap((part) =>
-        part.type === "tool-invocation" &&
-        part.toolInvocation?.state === "result" &&
-        part.toolInvocation?.toolName === "imageSearch" &&
-        part.toolInvocation?.result?.content?.[0]?.type === "images"
-          ? (part.toolInvocation?.result?.content?.[0]?.results ?? [])
-          : []
-      ) ?? []
+      .flatMap((part) => {
+        const output = part.output as { content?: Array<{ type: string; results?: ImageResult[] }> }
+        return output?.content?.[0]?.results ?? []
+      }) ?? []
 
   const isQuoteEnabled = !preferences.multiModelEnabled
   const messageRef = useRef<HTMLDivElement>(null)
@@ -104,9 +107,9 @@ export function MessageAssistant({
         )}
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
-        {reasoningParts && reasoningParts.reasoning && (
+        {reasoningParts && reasoningParts.text && (
           <Reasoning
-            reasoning={reasoningParts.reasoning}
+            reasoning={reasoningParts.text}
             isStreaming={status === "streaming"}
           />
         )}
@@ -187,5 +190,5 @@ export function MessageAssistant({
         )}
       </div>
     </Message>
-  )
+  );
 }

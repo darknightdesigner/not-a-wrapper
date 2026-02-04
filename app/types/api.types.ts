@@ -22,14 +22,14 @@ export interface ContentPart {
     args?: Json
     result?: Json
   }
-  reasoning?: string
+  reasoningText?: string
   details?: Json[]
 }
 
 export interface Message {
   role: "user" | "assistant" | "system" | "data" | "tool" | "tool-call"
   content: string | null | ContentPart[]
-  reasoning?: string
+  reasoningText?: string
 }
 
 export interface ChatApiParams {

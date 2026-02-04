@@ -10,7 +10,7 @@ import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
 import { useCallback, useMemo, useState } from "react"
 import { MultiChatInput } from "./multi-chat-input"
@@ -32,6 +32,12 @@ type GroupedMessage = {
   onDelete: (model: string, id: string) => void
   onEdit: (model: string, id: string, newText: string) => void
   onReload: (model: string) => void
+}
+
+// v5 helper: Extract text content from UIMessage parts array
+function getMessageText(message: MessageType): string {
+  const textPart = message.parts?.find((p) => p.type === "text")
+  return (textPart as { text?: string })?.text || ""
 }
 
 export function MultiChat() {
@@ -112,7 +118,7 @@ export function MultiChat() {
       const message = persistedMessages[i]
 
       if (message.role === "user") {
-        const groupKey = message.content
+        const groupKey = getMessageText(message)
         if (!groups[groupKey]) {
           groups[groupKey] = {
             userMessage: message,
@@ -129,7 +135,7 @@ export function MultiChat() {
         }
 
         if (associatedUserMessage) {
-          const groupKey = associatedUserMessage.content
+          const groupKey = getMessageText(associatedUserMessage)
           if (!groups[groupKey]) {
             groups[groupKey] = {
               userMessage: associatedUserMessage,
@@ -178,7 +184,7 @@ export function MultiChat() {
         const assistantMsg = chat.messages[i + 1]
 
         if (userMsg?.role === "user") {
-          const groupKey = userMsg.content
+          const groupKey = getMessageText(userMsg)
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -205,13 +211,13 @@ export function MultiChat() {
             }
           } else if (
             chat.isLoading &&
-            userMsg.content === prompt &&
+            getMessageText(userMsg) === prompt &&
             selectedModelIds.includes(chat.model.id)
           ) {
             const placeholderMessage: MessageType = {
               id: `loading-${chat.model.id}`,
               role: "assistant",
-              content: "",
+              parts: [{ type: "text", text: "" }],
             }
             liveGroups[groupKey].responses.push({
               model: chat.model.id,
@@ -281,7 +287,8 @@ export function MultiChat() {
             },
           }
 
-          chat.append({ role: "user", content: prompt }, options)
+          // v5: Use sendMessage instead of append
+          chat.sendMessage({ text: prompt }, options)
         })
       )
 

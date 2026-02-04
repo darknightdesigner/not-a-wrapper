@@ -10,7 +10,7 @@
  * @see .agents/context/ai-context-engineering-guide.md for implementation details
  */
 
-import type { Message as AIMessage } from "ai"
+import type { UIMessage as AIMessage } from "ai"
 
 // ============================================================================
 // Constants
@@ -111,10 +111,17 @@ export function estimateMessageTokens(messages: AIMessage[]): TokenEstimate {
   }
 
   for (const message of messages) {
-    const content =
-      typeof message.content === "string"
-        ? message.content
-        : JSON.stringify(message.content)
+    if (!message) continue
+
+    // In v5, messages use parts array instead of content string
+    // Extract text from parts for token estimation
+    let content = ""
+    if (message.parts && Array.isArray(message.parts)) {
+      content = message.parts
+        .filter((part) => part.type === "text")
+        .map((part) => (part as { type: "text"; text: string }).text)
+        .join("")
+    }
 
     const tokens = estimateTokens(content)
     result.total += tokens
@@ -214,9 +221,8 @@ export async function compactContext(
   const summaryMessage: AIMessage = {
     id: `summary-${Date.now()}`,
     role: "system",
-    content: `[Context Summary]\n${summary}`,
-     
-  } as any
+    parts: [{ type: "text", text: `[Context Summary]\n${summary}` }],
+  }
 
   const compactedMessages = [summaryMessage, ...recentMessages]
   const newEstimate = estimateMessageTokens(compactedMessages)
@@ -238,8 +244,8 @@ export async function compactContext(
  * In production, this would use Claude Haiku for summarization.
  */
 function generatePlaceholderSummary(messages: AIMessage[]): string {
-  const userMessages = messages.filter((m) => m.role === "user")
-  const assistantMessages = messages.filter((m) => m.role === "assistant")
+  const userMessages = messages.filter((m) => m?.role === "user")
+  const assistantMessages = messages.filter((m) => m?.role === "assistant")
 
   return `Previous conversation context (${messages.length} messages):
 - User messages: ${userMessages.length}
@@ -294,7 +300,6 @@ export function formatNote(note: StructuredNote): string {
  * @returns Array of structured notes
  */
 export async function extractNotesFromConversation(
-   
   _messages: AIMessage[]
 ): Promise<StructuredNote[]> {
   // TODO: Implement with Claude Haiku

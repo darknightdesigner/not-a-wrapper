@@ -46,7 +46,7 @@ export interface SubAgentConfig {
   systemPrompt: string
 
   /** Maximum tokens for agent output */
-  maxTokens: number
+  maxOutputTokens: number
 
   /** Temperature setting (0-1) */
   temperature: number
