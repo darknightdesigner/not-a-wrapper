@@ -3,6 +3,7 @@
 ## Status
 
 **Accepted** — January 2025
+**Updated** — February 2026 (AI SDK v6)
 
 ## Context
 
@@ -86,7 +87,7 @@ const result = streamText({ model, messages })
 
 See `.agents/skills/add-ai-provider/SKILL.md`
 
-### Streaming Pattern
+### Streaming Pattern (AI SDK v6)
 
 ```typescript
 const result = streamText({
@@ -95,9 +96,10 @@ const result = streamText({
   messages,
 })
 
-return result.toDataStreamResponse({
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
+  onError: (error) => extractErrorMessage(error),
 })
 ```
 

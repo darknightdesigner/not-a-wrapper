@@ -23,14 +23,14 @@ globs: ["**/*.ts", "**/*.tsx"]
 
 ```typescript
 // app/api/chat/route.ts
-// MUST return toDataStreamResponse, never regular Response
+// MUST return toUIMessageStreamResponse (AI SDK v6), never regular Response
 
 const result = streamText({ ... })
 
-return result.toDataStreamResponse({
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
-  getErrorMessage: (error) => extractErrorMessage(error),  // Sanitize errors
+  onError: (error) => extractErrorMessage(error),  // Sanitize errors
 })
 ```
 

@@ -282,7 +282,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
         }
       }
 
-      // v5: Use sendMessage with text and files, options in second param
+      // Use sendMessage with text + file parts, options in second param
       sendMessage(
         {
           text: currentInput,
@@ -336,7 +336,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     enableSearch,
   ])
 
-  // Handle reload (v5: renamed to regenerate)
+  // Handle reload (regenerate)
   const handleReload = useCallback(async () => {
     if (!user?.id) {
       return

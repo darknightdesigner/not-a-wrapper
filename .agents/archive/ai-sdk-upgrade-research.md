@@ -5,7 +5,7 @@
 > **Status:** ✅ All Research Complete — Ready for Implementation
 > **Last Updated:** 2026-02-02
 
-> **Historical Note (2026-02-04):** This archive reflects v4→v6 migration research. References to `experimental_attachments`, legacy `files` properties, or v5-era patterns are historical only; current code uses file parts in the `parts` array.
+> **Historical Note (2026-02-04):** This archive reflects v4→v6 migration research. References to legacy attachment fields, legacy `files` properties, or v5-era patterns are historical only; current code uses file parts in the `parts` array.
 
 ---
 
@@ -101,7 +101,7 @@ All 8 additional questions have been thoroughly researched and answered:
   - [x] `useChat` API changes (transport architecture, removed managed input)
   - [x] Tool invocation rendering (part.toolInvocation → typed tool parts)
   - [x] Reasoning display (part.reasoning → part.text on reasoning parts)
-  - [x] `experimental_attachments` → file parts in v5
+  - [x] Legacy attachment field → file parts in v5
   - [x] `append` → `sendMessage`, `reload` → `regenerate`
 
 - [x] **Check third-party compatibility**
@@ -126,7 +126,7 @@ All 8 additional questions have been thoroughly researched and answered:
 |--------|--------|----------------|
 | `getErrorMessage` → `onError` | Error handling pattern | `app/api/chat/route.ts` |
 | Tool calling API (`parameters` → `inputSchema`) | Schema definition change | Any tool definitions |
-| `experimental_attachments` → file parts | Attachment handling | `use-chat-core.ts`, message components |
+| Legacy attachment field → file parts | Attachment handling | `use-chat-core.ts`, message components |
 | `reload` → `regenerate` | Method rename | `use-chat-core.ts` |
 | Tool UI parts typing | Render logic change | `message-assistant.tsx`, `tool-invocation.tsx` |
 
@@ -353,19 +353,15 @@ const transport = new DefaultChatTransport({
 **Migration Path for `use-chat-core.ts`:**
 
 ```typescript
-// BEFORE (v4)
-handleSubmit(undefined, {
-  body: { chatId, userId, model, systemPrompt, enableSearch },
-  experimental_attachments: attachments,
-})
-
-// AFTER (v5)
-const [input, setInput] = useState('');  // Manual input state
+// Current (v6)
+const [input, setInput] = useState("");  // Manual input state
 
 sendMessage(
-  { 
+  {
     text: input,
-    files: attachments,  // v5: files replaces experimental_attachments
+    files: attachments?.length
+      ? convertAttachmentsToFiles(attachments)
+      : undefined,
   },
   {
     body: { chatId, userId, model, systemPrompt, enableSearch },
@@ -375,7 +371,7 @@ sendMessage(
 
 **Key Changes:**
 - `handleSubmit` → `sendMessage`
-- `experimental_attachments` → `files` property in first argument
+- Legacy attachment field → `files` property in first argument
 - Input state must be managed manually (not by useChat)
 - Body can be passed per-request ✅
 
@@ -571,38 +567,31 @@ const toolParts = parts?.filter((part) => isToolUIPart(part))
 
 ### 7. File Upload Flow 🟢 LOW PRIORITY ✅ ANSWERED
 
-**Question:** How does `experimental_attachments` → file parts affect the upload workflow?
+**Question:** How does the legacy attachment field → file parts affect the upload workflow?
 
 **Strategic Answer:**
 
-**v5 File Handling:**
+**v6 File Handling:**
 
 ```typescript
-// BEFORE (v4)
-handleSubmit(undefined, {
-  experimental_attachments: [
-    { name: 'image.png', contentType: 'image/png', url: 'https://...' }
-  ],
-})
-
-// AFTER (v5) - Method 1: FileList from input
+// Method 1: FileList from input
 sendMessage({
   text: input,
   files: fileInputRef.current?.files,  // FileList auto-converted
 });
 
-// AFTER (v5) - Method 2: File objects array
+// Method 2: File parts array
 sendMessage({
   text: input,
   files: [
-    { type: 'file', filename: 'image.png', mediaType: 'image/png', url: 'https://...' }
+    { type: "file", filename: "image.png", mediaType: "image/png", url: "https://..." }
   ],
 });
 ```
 
 **Rendering File Parts:**
 ```typescript
-// v5 rendering
+// File parts rendering
 {message.parts.map((part, index) => {
   if (part.type === 'file' && part.mediaType?.startsWith('image/')) {
     return <img key={index} src={part.url} alt={part.filename} />;
@@ -616,7 +605,7 @@ sendMessage({
 **Current Upload Flow Compatibility:**
 1. User selects files → ✅ Same
 2. Files uploaded to Convex storage → ✅ Same  
-3. Attachment URLs passed via `files` property → Changed from `experimental_attachments`
+3. Attachment URLs passed via `files` property → Changed from legacy attachment field
 4. Rendered via `message.parts` with `type: 'file'` → Changed property names
 
 **Property Changes:**
@@ -673,7 +662,7 @@ All questions have been researched and answered. Priority order was:
 4. ✅ **Multi-Model View** — Compatible with transport updates
 5. ✅ **Parts Compatibility** — Codebase aligned, minor property renames needed
 6. ✅ **Framework Compatibility** — No known issues with Next.js 16 + React 19
-7. ✅ **File Upload Flow** — `experimental_attachments` → `files` property
+7. ✅ **File Upload Flow** — Legacy attachment field → `files` property
 8. ✅ **Status States** — Identical in v5
 
 ---
@@ -818,12 +807,11 @@ append(
 // Approach 1: Use messageId for replacement (RECOMMENDED)
 // First, trim messages locally, then send with new content
 setMessages((prev) => prev.slice(0, editIndex));
+const fileParts = target.parts?.filter((part) => part.type === "file");
 sendMessage(
   { 
     text: newContent,
-    files: target.experimental_attachments 
-      ? convertAttachmentsToFiles(target.experimental_attachments) 
-      : undefined,
+    files: fileParts?.length ? fileParts : undefined,
   },
   {
     body: {
@@ -850,20 +838,16 @@ sendMessage(undefined, { body: { ... } }); // Empty message triggers resubmit
 
 **Attachment Migration:**
 ```typescript
-// BEFORE (v4)
-experimental_attachments: target.experimental_attachments
+// Legacy attachments should be represented as file parts
+// Legacy attachment shape: { name, contentType, url }
+// File parts shape: { type: "file", filename, mediaType, url }
 
-// AFTER (v5/v6)
-// v4 attachments: { name, contentType, url }
-// v5 file parts: { type: 'file', filename, mediaType, url }
-
-// Conversion helper:
-function convertV4AttachmentsToV5Files(
+function convertLegacyAttachmentsToFileParts(
   attachments?: Array<{ name: string; contentType: string; url: string }>
 ): FileUIPart[] | undefined {
   if (!attachments?.length) return undefined;
-  return attachments.map(att => ({
-    type: 'file' as const,
+  return attachments.map((att) => ({
+    type: "file" as const,
     filename: att.name,
     mediaType: att.contentType,
     url: att.url,
@@ -1148,9 +1132,13 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     parts.push({ type: 'text', text: v4Message.content });
   }
 
-  // Convert experimental_attachments to file parts
-  if (v4Message.experimental_attachments?.length) {
-    for (const att of v4Message.experimental_attachments) {
+  // Convert legacy attachments to file parts
+  const legacyAttachments =
+    (v4Message as {
+      legacyAttachments?: Array<{ name: string; contentType: string; url: string }>
+    }).legacyAttachments;
+  if (legacyAttachments?.length) {
+    for (const att of legacyAttachments) {
       parts.push({
         type: 'file',
         filename: att.name,
@@ -1181,7 +1169,7 @@ export function convertV5ToV4Message(v5Message: UIMessage): V4Message {
   const content = textParts.map(p => (p as { text: string }).text).join('');
 
   const fileParts = v5Message.parts.filter(p => p.type === 'file');
-  const experimental_attachments = fileParts.map(p => {
+  const legacyAttachments = fileParts.map(p => {
     const fp = p as { filename?: string; mediaType: string; url: string };
     return {
       name: fp.filename || 'file',
@@ -1195,7 +1183,7 @@ export function convertV5ToV4Message(v5Message: UIMessage): V4Message {
     role: v5Message.role,
     content,
     createdAt: v5Message.createdAt,
-    experimental_attachments: experimental_attachments.length ? experimental_attachments : undefined,
+    legacyAttachments: legacyAttachments.length ? legacyAttachments : undefined,
   };
 }
 

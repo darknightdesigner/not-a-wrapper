@@ -24,7 +24,7 @@ return new Response(
 ## Streaming Response
 
 ```typescript
-// For AI chat - use Vercel AI SDK
+// For AI chat - use Vercel AI SDK v6
 import { streamText } from "ai"
 
 const result = streamText({
@@ -33,10 +33,10 @@ const result = streamText({
   messages,
 })
 
-return result.toDataStreamResponse({
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
-  getErrorMessage: (error) => extractErrorMessage(error),
+  onError: (error) => extractErrorMessage(error),
 })
 ```
 

@@ -195,7 +195,7 @@ export function useChatCore({
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
 
-    // Create optimistic message with v5 parts format (includes createdAt for app compatibility)
+    // Create optimistic message with parts format (includes createdAt for app compatibility)
     const optimisticMessage: OptimisticUIMessage = {
       id: optimisticId,
       role: "user",
@@ -260,7 +260,7 @@ export function useChatCore({
         }
       }
 
-      // v6: Use sendMessage with text and files, options in second param
+      // Use sendMessage with text + file parts, options in second param
       sendMessage(
         {
           text: currentInput,

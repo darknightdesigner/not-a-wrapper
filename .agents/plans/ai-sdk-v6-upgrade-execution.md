@@ -5,6 +5,8 @@
 > **Last Updated:** 2026-02-04
 > **Estimated Remaining Effort:** 1.0 hours (manual testing)
 > **Status:** ✅ Phase 7 Documentation Cleanup Complete — Phase 6 Testing Pending
+>
+> **Historical Note:** Code snippets showing legacy attachment fields, v4/v5-era `files` property, or legacy message formats are preserved for migration reference only. Current code uses file parts in the `parts` array with `sendMessage({ text, files })`.
 
 ---
 

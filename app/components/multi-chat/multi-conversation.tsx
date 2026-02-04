@@ -14,7 +14,7 @@ import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "../chat/message"
 
-// v5 helper: Extract text content from UIMessage parts array
+// Helper: Extract text content from UIMessage parts array
 function getMessageText(message: MessageType): string {
   const textPart = message.parts?.find((p) => p.type === "text")
   return (textPart as { text?: string })?.text || ""
@@ -59,7 +59,7 @@ function ResponseCard({ response, group }: ResponseCardProps) {
   const model = getModelInfo(response.model)
   const providerIcon = PROVIDERS.find((p) => p.id === model?.baseProviderId)
   
-  // v5: Extract text and attachments using helper functions
+  // Extract text and attachments using helper functions
   const messageText = response.message ? getMessageText(response.message) : ""
   const messageAttachments = response.message ? getMessageAttachments(response.message) : undefined
 
@@ -148,7 +148,7 @@ export function MultiModelConversation({
           {messageGroups.length === 0
             ? null
             : messageGroups.map((group, groupIndex) => {
-                // v5: Extract text and attachments using helper functions
+                // Extract text and attachments using helper functions
                 const userMessageText = getMessageText(group.userMessage)
                 const userMessageAttachments = getMessageAttachments(group.userMessage)
                 
