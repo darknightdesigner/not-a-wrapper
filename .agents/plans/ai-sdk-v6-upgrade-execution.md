@@ -3,8 +3,8 @@
 > **Goal:** Upgrade from AI SDK v4.x to v6.x with near-perfect execution
 > **Created:** 2026-02-02
 > **Last Updated:** 2026-02-04
-> **Estimated Remaining Effort:** 1.0 hours
-> **Status:** ✅ Phase 7 Cleanup Complete — Phase 6 Testing Pending
+> **Estimated Remaining Effort:** 1.0 hours (manual testing)
+> **Status:** ✅ Phase 7 Documentation Cleanup Complete — Phase 6 Testing Pending
 
 ---
 
@@ -410,15 +410,7 @@ const {
 
 **Step 3.1.4:** Update submit function
 ```typescript
-// Find all handleSubmit calls and replace with sendMessage pattern
-// BEFORE
-handleSubmit(undefined, {
-  body: { chatId, userId, model, systemPrompt, enableSearch },
-  experimental_attachments: attachments,
-})
-
-// AFTER  
-import { convertAttachmentsToFiles } from '@/lib/ai/message-conversion';
+import { convertAttachmentsToFiles } from "@/lib/ai/message-conversion"
 
 sendMessage(
   {
@@ -428,8 +420,8 @@ sendMessage(
   {
     body: { chatId, userId, model, systemPrompt, enableSearch },
   }
-);
-setInput(''); // Clear input manually after sending
+)
+setInput("") // Clear input manually after sending
 ```
 
 **Step 3.1.5:** Update reload/regenerate calls
@@ -450,17 +442,22 @@ append({ role: "user", content: newContent }, options)
 
 // AFTER
 setMessages((prev) => prev.slice(0, editIndex));
+const targetFileParts = target.parts?.filter((p) => p.type === "file") || []
+const targetFiles = targetFileParts.map((p) => ({
+  type: "file" as const,
+  filename: (p as { filename?: string }).filename || "file",
+  mediaType: (p as { mediaType?: string }).mediaType || "application/octet-stream",
+  url: (p as { url?: string }).url || "",
+}))
 sendMessage(
   {
     text: newContent,
-    files: target.experimental_attachments
-      ? convertAttachmentsToFiles(target.experimental_attachments)
-      : undefined,
+    files: targetFiles.length > 0 ? targetFiles : undefined,
   },
   {
     body: { chatId, userId, model, systemPrompt },
   }
-);
+)
 ```
 
 ### 3.2 Update project-view.tsx
@@ -505,10 +502,9 @@ const optimisticMessage = {
   content: input,
   role: "user",
   createdAt: new Date(),
-  experimental_attachments: attachments,
 }
 
-// AFTER (v5 format with parts)
+// AFTER (parts format)
 const optimisticMessage: UIMessage = {
   id: `optimistic-${Date.now()}`,
   role: "user",
@@ -534,7 +530,7 @@ bun run typecheck 2>&1 | grep -E "(use-chat|multi-chat|project-view)" | head -20
 ### [COMMIT] Checkpoint 3
 ```bash
 git add -A
-git commit -m "feat: migrate useChat hooks to v5 transport architecture"
+git commit -m "feat: migrate useChat hooks to v6 transport architecture"
 ```
 
 ### Phase 3 Completion Notes (2026-02-04)
@@ -543,8 +539,8 @@ Phase 3 completed with the following changes:
 
 | File | Changes Made |
 |------|--------------|
-| `app/components/chat/use-chat-core.ts` | Manual input state, `sendMessage`/`regenerate` instead of `handleSubmit`/`reload`/`append`, v5 `onFinish` callback, optimistic messages with parts format |
-| `app/p/[projectId]/project-view.tsx` | Same v5 patterns as use-chat-core.ts |
+| `app/components/chat/use-chat-core.ts` | Manual input state, `sendMessage`/`regenerate` instead of `handleSubmit`/`reload`/`append`, v6 `onFinish` callback, optimistic messages with parts format |
+| `app/p/[projectId]/project-view.tsx` | Same v6 patterns as use-chat-core.ts |
 | `app/components/multi-chat/use-multi-chat.ts` | Updated to use `sendMessage`, `status !== 'ready'` for loading, memoized transports |
 | `app/components/multi-chat/multi-chat.tsx` | Updated to call `sendMessage` instead of `append`; added `getMessageText()` helper to extract text from parts; placeholder messages now use `parts` format |
 | `lib/chat-store/messages/provider.tsx` | Fixed `undefined` types from codemod, created `ExtendedUIMessage` type for app compatibility |
@@ -552,10 +548,10 @@ Phase 3 completed with the following changes:
 | `app/components/chat/syncRecentMessages.ts` | Fixed type issues with `ExtendedUIMessage` |
 
 **Key Patterns Established:**
-- Created `OptimisticUIMessage` / `ExtendedUIMessage` types for app compatibility (includes `createdAt`, `content`, `experimental_attachments`)
-- v5 `useChat` returns `sendMessage` (replaces `handleSubmit` and `append`) and `regenerate` (replaces `reload`)
+- Created `OptimisticUIMessage` / `ExtendedUIMessage` types for app compatibility (includes `createdAt` and optional `content`)
+- v6 `useChat` returns `sendMessage` (replaces `handleSubmit` and `append`) and `regenerate` (replaces `reload`)
 - `input` and `setInput` must be managed locally with `useState` - no longer returned from `useChat`
-- Optimistic messages use v5 `parts` array format: `{ type: "text", text: "..." }`, `{ type: "file", filename, mediaType, url }`
+- Optimistic messages use v6 `parts` array format: `{ type: "text", text: "..." }`, `{ type: "file", filename, mediaType, url }`
 - `onFinish` callback receives `{ message, isAbort, isError }` instead of just the message
 - Use `getMessageText(message)` helper to extract text from `parts` array (replaces direct `content` access)
 
@@ -657,7 +653,7 @@ if (isToolUIPart(part) &&
 }
 ```
 
-### 4.6 Resolve FIXME Markers for experimental_attachments
+### 4.6 Resolve FIXME Markers for file attachments
 **Files with FIXME markers:**
 - `use-chat-core.ts` (10 locations)
 - `project-view.tsx` (7 locations)
@@ -667,9 +663,7 @@ if (isToolUIPart(part) &&
 - `messages/provider.tsx` (3 locations)
 - `conversation.tsx` (1 location)
 
-**Pattern:** Replace `experimental_attachments` with file parts in `parts` array where v5 message format is expected.
-
-For backward compatibility in storage types, keep the property but note it's deprecated.
+**Pattern:** Ensure file attachments are represented as `file` parts in the `parts` array where the parts-based message format is expected.
 
 ### 4.7 Apply Message Conversion at API Boundary
 **File:** `lib/chat-store/messages/api.ts`
@@ -713,7 +707,7 @@ Phase 4 completed with the following changes:
 | `app/components/chat/get-sources.ts` | Updated to v5 flat tool properties (`part.state`, `part.output`); added helper functions `isToolPart()`, `getToolNameFromPart()`; proper typing with `SourceUrlUIPart[]` return type |
 | `app/components/chat/message-assistant.tsx` | Fixed tool parts filtering with `isToolPart()` helper; updated `searchImageResults` to use v5 flat properties; proper `ImageResult[]` typing |
 | `app/components/chat/tool-invocation.tsx` | Fixed `toolCallId` and `toolName` access (v5 uses flat properties, tool name extracted from type); added `getToolNameFromPart()` helper |
-| `app/components/multi-chat/multi-conversation.tsx` | Added `getMessageText()` and `getMessageAttachments()` helpers; replaced direct `content` and `experimental_attachments` access with helper functions |
+| `app/components/multi-chat/multi-conversation.tsx` | Added `getMessageText()` and `getMessageAttachments()` helpers; replaced direct `content` and file-part access with helper functions |
 | `lib/hooks/use-chat-preview.tsx` | Added `getMessageText()` helper; fixed content extraction for preview messages |
 | `lib/ai/message-conversion.ts` | Removed FIXME markers; updated comments to be informational |
 | `lib/chat-store/types.ts` | Removed FIXME markers; added informational comments about legacy properties |
@@ -892,10 +886,12 @@ Phase 7 completed with the following changes:
 
 | Area | Changes Made |
 |------|--------------|
-| Message types | Removed `experimental_attachments` compatibility fields from UI message types |
+| Message types | Removed legacy attachment fields from UI message types |
 | Message mapping | Attachments derived directly from file parts for storage and display |
 | Rendering helpers | File attachments now read only from `parts` |
 | Conversion utils | Removed legacy attachment conversion paths and updated v6 wording |
+| Documentation | Updated `AGENTS.md`, `app/api/CLAUDE.md`, glossary, and skills to use v6 patterns (`toUIMessageStreamResponse`, `LanguageModelV3`) |
+| Code comments | Updated deprecated JSDoc in `utils.ts` to reference v6 API |
 
 ### [COMMIT] Final
 ```bash
@@ -1030,7 +1026,7 @@ If you encounter issues during migration:
 | Error | Likely Cause | Fix |
 |-------|--------------|-----|
 | `Property 'content' does not exist on UIMessage` | v4 message format | Use `message.parts` with text parts |
-| `toDataStreamResponse is not a function` | v5 API change | Replace with `toUIMessageStreamResponse()` |
+| `toDataStreamResponse is not a function` | v5 API change | Replace with `toUIMessageStreamResponse()` ✅ Done |
 | `handleSubmit is not a function` | v5 API change | Replace with `sendMessage()` |
 | `maxSteps is not a valid option` | v5 API change | Replace with `stopWhen: stepCountIs(N)` |
 | `LanguageModelV1 not exported` | v5/v6 type change | Use `LanguageModelV2` (v5) or `LanguageModelV3` (v6) |
@@ -1060,7 +1056,7 @@ If you encounter issues during migration:
 
 | Category | Count | Primary Files |
 |----------|-------|---------------|
-| `experimental_attachments` → parts | 23 | use-chat-core.ts, project-view.tsx |
+| Legacy attachment fields → file parts | 23 | use-chat-core.ts, project-view.tsx |
 | Tool invocation patterns | 2 | get-sources.ts |
 | Reasoning property | 1 | reasoning.tsx |
 

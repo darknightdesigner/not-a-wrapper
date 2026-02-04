@@ -76,7 +76,7 @@ export function useChatCore({
   const searchParams = useSearchParams()
   const prompt = searchParams.get("prompt")
 
-  // Manual input state management (v5 no longer returns input/setInput from useChat)
+  // Manual input state management (v6 no longer returns input/setInput from useChat)
   const [input, setInput] = useState(draftValue || "")
 
   // Chats operations
@@ -98,13 +98,13 @@ export function useChatCore({
     })
   }, [])
 
-  // Memoized transport for v5
+  // Memoized transport for v6
   const transport = useMemo(
     () => new DefaultChatTransport({ api: API_ROUTE_CHAT }),
     []
   )
 
-  // Initialize useChat with v5 API
+  // Initialize useChat with v6 API
   const {
     messages,
     sendMessage,
@@ -260,7 +260,7 @@ export function useChatCore({
         }
       }
 
-      // v5: Use sendMessage with text and files, options in second param
+      // v6: Use sendMessage with text and files, options in second param
       sendMessage(
         {
           text: currentInput,

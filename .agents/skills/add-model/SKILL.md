@@ -96,7 +96,7 @@ export type OpenAIModel =
 | `provider` | string | Provider display name |
 | `providerId` | string | Internal provider ID |
 | `baseProviderId` | string | AI SDK provider prefix |
-| `apiSdk` | function | Factory returning LanguageModelV1 |
+| `apiSdk` | function | Factory returning LanguageModelV3 |
 
 ### Capability Flags
 

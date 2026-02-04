@@ -57,7 +57,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     handleFileRemove,
   } = useFileUpload()
 
-  // Manual input state management (v5 no longer returns input/setInput from useChat)
+  // Manual input state management (v6 no longer returns input/setInput from useChat)
   const [input, setInput] = useState("")
 
   // Fetch project details
@@ -95,13 +95,13 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     })
   }, [])
 
-  // Memoized transport for v5
+  // Memoized transport for v6
   const transport = useMemo(
     () => new DefaultChatTransport({ api: API_ROUTE_CHAT }),
     []
   )
 
-  // Initialize useChat with v5 API
+  // Initialize useChat with v6 API
   const {
     messages,
     sendMessage,

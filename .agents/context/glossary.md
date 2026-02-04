@@ -10,7 +10,7 @@ Domain-specific terminology for the Not A Wrapper codebase. AI assistants should
 |---------|---------|---------|
 | **ModelConfig** | Full configuration object with metadata | `{ id: "gpt-4.1-nano", name: "GPT-4.1 Nano", provider: "OpenAI", ... }` |
 | **Model ID** | String identifier matching AI SDK | `"gpt-4.1-nano"`, `"claude-3-5-sonnet-latest"` |
-| **Model Instance** | `LanguageModelV1` from AI SDK | Return value of `modelConfig.apiSdk()` |
+| **Model Instance** | `LanguageModelV3` from AI SDK | Return value of `modelConfig.apiSdk()` |
 
 When code says "model", determine which meaning from context:
 - Database/API requests → Model ID string
@@ -50,7 +50,7 @@ Factory function on `ModelConfig` that returns an AI SDK model instance.
 
 ```typescript
 // Signature
-apiSdk?: (apiKey?: string, opts?: { enableSearch?: boolean }) => LanguageModelV1
+apiSdk?: (apiKey?: string, opts?: { enableSearch?: boolean }) => LanguageModelV3
 
 // Usage
 const modelInstance = modelConfig.apiSdk(userApiKey, { enableSearch: true })
@@ -62,7 +62,7 @@ const result = streamText({ model: modelInstance, ... })
 Unified abstraction layer over multiple AI SDK providers. Located at `lib/openproviders/index.ts`.
 
 ```typescript
-// Returns LanguageModelV1 for any supported model
+// Returns LanguageModelV3 for any supported model
 openproviders("gpt-4.1-nano", settings, apiKey)
 openproviders("claude-3-5-sonnet-latest", settings, apiKey)
 ```
@@ -109,9 +109,10 @@ type MessageAISDK = {
   role: "user" | "assistant" | "system" | "tool"
   content: string | ContentPart[]
   parts?: Part[]
-  experimental_attachments?: Attachment[]
 }
 ```
+
+Attachments are represented as `file` parts in the `parts` array (e.g., `{ type: "file", filename, mediaType, url }`).
 
 ## Access Control
 

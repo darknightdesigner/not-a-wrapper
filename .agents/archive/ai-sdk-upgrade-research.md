@@ -5,6 +5,8 @@
 > **Status:** ✅ All Research Complete — Ready for Implementation
 > **Last Updated:** 2026-02-02
 
+> **Historical Note (2026-02-04):** This archive reflects v4→v6 migration research. References to `experimental_attachments`, legacy `files` properties, or v5-era patterns are historical only; current code uses file parts in the `parts` array.
+
 ---
 
 ## 🎯 Executive Summary

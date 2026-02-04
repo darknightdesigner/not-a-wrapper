@@ -141,7 +141,7 @@ const result = streamText({
   },
 })
 
-return result.toDataStreamResponse({
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
 })

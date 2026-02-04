@@ -183,7 +183,7 @@ When debugging issues:
 
 ## Common Gotchas
 
-- **Streaming responses**: Must use `result.toDataStreamResponse()` from Vercel AI SDK
+- **Streaming responses**: Must use `result.toUIMessageStreamResponse()` from Vercel AI SDK (v6)
 - **Server Components**: Cannot use hooks; use Client Components wrapper with `"use client"`
 - **Database**: Uses Convex for all data operations (real-time queries + mutations)
 - **Auth**: Uses Clerk for authentication; avoid touching `middleware.ts` without review

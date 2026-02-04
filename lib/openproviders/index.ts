@@ -46,7 +46,7 @@ const createOllamaProvider = () => {
  * @param modelId - The model identifier (e.g., "gpt-4.1", "claude-3-5-sonnet-latest")
  * @param _settings - Deprecated: settings parameter (kept for backward compatibility, not used)
  * @param apiKey - Optional API key (uses environment variable if not provided)
- * @returns LanguageModelV2 instance
+ * @returns LanguageModelV3 instance
  */
 export function openproviders<T extends SupportedModel>(
   modelId: T,

@@ -84,10 +84,10 @@ const result = streamText({
   messages: messages,
 })
 
-return result.toDataStreamResponse({
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
-  getErrorMessage: (error) => extractErrorMessage(error),
+  onError: (error) => extractErrorMessage(error),
 })
 ```
 

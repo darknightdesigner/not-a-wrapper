@@ -18,7 +18,7 @@ Determine where the issue originates:
 | 500 error | API/Server | API route logs |
 | Data not saving | Database/Convex | Convex dashboard |
 | Auth issues | Middleware/Clerk | middleware.ts |
-| Streaming broken | AI SDK | toDataStreamResponse |
+| Streaming broken | AI SDK | toUIMessageStreamResponse |
 
 ## Step 2: Gather Information
 
@@ -56,11 +56,11 @@ bun run typecheck 2>&1 | head -50
 ### Streaming Response Issues
 
 ```typescript
-// Check API route returns correct format
-return result.toDataStreamResponse({
+// Check API route returns correct format (AI SDK v6)
+return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
-  getErrorMessage: (error) => extractErrorMessage(error),  // Must sanitize
+  onError: (error) => extractErrorMessage(error),  // Must sanitize
 })
 
 // Never return regular Response for streaming

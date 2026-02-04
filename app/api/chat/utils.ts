@@ -77,7 +77,7 @@ export type ApiError = Error & {
 
 /**
  * Parse and handle stream errors from AI SDK
- * @deprecated Use extractErrorMessage instead for streaming errors with toDataStreamResponse
+ * @deprecated Use extractErrorMessage instead for streaming errors with toUIMessageStreamResponse
  * This is kept for legacy/fallback purposes or non-streaming error scenarios
  * @param err - The error from streamText onError callback
  * @returns Structured error with status code and error code
