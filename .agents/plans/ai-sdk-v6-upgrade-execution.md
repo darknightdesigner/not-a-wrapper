@@ -2,8 +2,44 @@
 
 > **Goal:** Upgrade from AI SDK v4.x to v6.x with near-perfect execution
 > **Created:** 2026-02-02
-> **Estimated Effort:** 8-12 hours
-> **Status:** 🚀 Ready to Execute
+> **Last Updated:** 2026-02-04
+> **Estimated Remaining Effort:** 4 hours
+> **Status:** ✅ Phase 3 Complete — Ready for Phase 4
+
+---
+
+## Current State Summary (as of 2026-02-04)
+
+### ✅ Phase 0 & 1 Completed
+
+| Task | Status | Notes |
+|------|--------|-------|
+| Feature branch created | ✅ | `give-these-pipes-an-upgrade` |
+| Message conversion module | ✅ | `lib/ai/message-conversion.ts` exists |
+| AI SDK v5 packages installed | ✅ | `ai@5`, `@ai-sdk/*@2`, `@ai-sdk/provider-utils@3` |
+| v5 Codemod executed | ✅ | 36 files modified, 26 FIXME markers added |
+| OpenRouter provider upgraded | ✅ | v0.7.1 → v1.5.4 (AI SDK v5 compatible) |
+
+### ⚠️ Current Issues
+
+| Issue | Count | Files Affected |
+|-------|-------|----------------|
+| Type errors | ~70+ | 20+ files |
+| FIXME markers | 26 | 8 files |
+| Manual migrations needed | Multiple | `use-chat-core.ts`, `project-view.tsx`, etc. |
+
+### 📊 Files Modified by Codemod
+
+```
+app/api/chat/route.ts, app/api/chat/utils.ts, app/api/chat/db.ts
+app/components/chat/*.ts(x) (10 files)
+app/components/multi-chat/*.ts (2 files)
+app/p/[projectId]/project-view.tsx
+lib/ai/*.ts (3 files)
+lib/chat-store/*.ts(x) (3 files)
+lib/models/**/*.ts (10 files)
+lib/openproviders/index.ts
+```
 
 ---
 
@@ -20,19 +56,6 @@ This plan is optimized for AI agent execution with:
 
 ---
 
-## Pre-Flight Checklist
-
-Before starting, verify:
-
-```bash
-# Must pass before starting
-bun run typecheck  # ✅ No errors
-bun run lint       # ✅ No errors
-git status         # ✅ Clean working tree (or stash changes)
-```
-
----
-
 ## Quick Reference Links
 
 ### Official Migration Guides
@@ -46,163 +69,138 @@ git status         # ✅ Clean working tree (or stash changes)
 - [Message Persistence](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence) — `UIMessage` format, parts structure
 - [streamText API](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text) — Server-side streaming options
 
-### Codemods & Changelogs
-- [AI SDK Codemods](https://github.com/vercel/ai/tree/main/packages/codemod) — Automated transformations
-- [AI SDK Changelog](https://github.com/vercel/ai/blob/main/CHANGELOG.md) — Detailed change history
-- [AI SDK Releases](https://github.com/vercel/ai/releases) — Release notes
+### Provider Compatibility Matrix
 
-### Provider Documentation
-- [OpenRouter v2.x Provider](https://github.com/openrouter/ai-sdk-provider) — v6-compatible provider
+| Provider Package | AI SDK v4 | AI SDK v5 | AI SDK v6 |
+|-----------------|-----------|-----------|-----------|
+| `@openrouter/ai-sdk-provider` | v0.7.x | **v1.5.4** | v2.x |
+| `@ai-sdk/anthropic` | v1.x | v2.x | v3.x |
+| `@ai-sdk/openai` | v1.x | v2.x | v3.x |
+| `@ai-sdk/google` | v1.x | v2.x | v3.x |
 
 ### Project Research
 - `.agents/context/research/ai-sdk-upgrade-research.md` — Detailed research with code examples and Q&A
 
 ---
 
-## Phase 0: Setup (10 min)
+## Phase 0: Setup ✅ COMPLETE
 
-### 0.1 Create Feature Branch
-```bash
-git checkout -b feat/ai-sdk-v6-upgrade
-```
+*Completed 2026-02-01*
 
-### 0.2 Create Message Conversion Module
-**File:** `lib/ai/message-conversion.ts` (NEW)
-
-```typescript
-/**
- * AI SDK Message Format Conversion Utilities
- * 
- * Provides runtime conversion between v4 (content string) and v5+ (parts array)
- * message formats to enable migration without database changes.
- */
-
-import type { UIMessage } from 'ai';
-
-// v4 message shape (for reference)
-interface V4Message {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  createdAt?: Date;
-  experimental_attachments?: Array<{
-    name: string;
-    contentType: string;
-    url: string;
-  }>;
-}
-
-/**
- * Type guard: Check if message is already in v5+ format
- */
-export function isV5Format(message: unknown): message is UIMessage {
-  return (
-    typeof message === 'object' &&
-    message !== null &&
-    'parts' in message &&
-    Array.isArray((message as UIMessage).parts)
-  );
-}
-
-/**
- * Convert v4 message format to v5 UIMessage format
- */
-export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
-  const parts: UIMessage['parts'] = [];
-
-  // Convert content string to text part
-  if (v4Message.content) {
-    parts.push({ type: 'text', text: v4Message.content });
-  }
-
-  // Convert experimental_attachments to file parts
-  if (v4Message.experimental_attachments?.length) {
-    for (const att of v4Message.experimental_attachments) {
-      parts.push({
-        type: 'file',
-        filename: att.name,
-        mediaType: att.contentType,
-        url: att.url,
-      } as UIMessage['parts'][number]);
-    }
-  }
-
-  return {
-    id: v4Message.id,
-    role: v4Message.role,
-    parts,
-    createdAt: v4Message.createdAt,
-  };
-}
-
-/**
- * Batch convert messages, handling mixed formats gracefully
- */
-export function ensureV5Format(messages: unknown[]): UIMessage[] {
-  return messages.map((msg) =>
-    isV5Format(msg) ? msg : convertV4ToV5Message(msg as V4Message)
-  );
-}
-
-/**
- * Convert v4 attachments to v5 file format for sendMessage
- */
-export function convertAttachmentsToFiles(
-  attachments?: Array<{ name: string; contentType: string; url: string }>
-): Array<{ type: 'file'; filename: string; mediaType: string; url: string }> | undefined {
-  if (!attachments?.length) return undefined;
-  return attachments.map((att) => ({
-    type: 'file' as const,
-    filename: att.name,
-    mediaType: att.contentType,
-    url: att.url,
-  }));
-}
-```
-
-### [COMMIT] Checkpoint 0
-```bash
-git add -A
-git commit -m "chore: add message format conversion utilities for AI SDK v5 migration"
-```
-
-**Verification:**
-```bash
-bun run typecheck  # Should pass
-```
+- [x] Feature branch created
+- [x] Message conversion module created
 
 ---
 
-## Phase 1: Package Upgrades (15 min)
+## Phase 1: Package Upgrades ✅ COMPLETE
 
-### 1.1 Upgrade to AI SDK v5
-**DEPENDS:** Phase 0 complete
+*Completed 2026-02-04*
+
+### What Was Done
 
 ```bash
-# Install v5 packages (exact versions for reproducibility)
-bun add ai@5 @ai-sdk/react@2 \
-  @ai-sdk/anthropic@2 @ai-sdk/google@2 @ai-sdk/mistral@2 \
-  @ai-sdk/openai@2 @ai-sdk/perplexity@2 @ai-sdk/xai@2 \
+# Packages installed
+bun add ai@5 @ai-sdk/react@2 @ai-sdk/anthropic@2 @ai-sdk/google@2 \
+  @ai-sdk/mistral@2 @ai-sdk/openai@2 @ai-sdk/perplexity@2 @ai-sdk/xai@2 \
   @ai-sdk/provider@2 @ai-sdk/provider-utils@3
+
+# Codemod executed (44 seconds, successful)
+npx @ai-sdk/codemod v5 --verbose ./
+
+# OpenRouter provider upgraded for v5 compatibility
+bun add @openrouter/ai-sdk-provider@1.5.4
 ```
 
-### 1.2 Run v5 Codemods
+### Codemod Results
+
+**Transformations Applied:**
+- `Message` → `UIMessage` imports (partially applied)
+- `CoreMessage` → `ModelMessage` 
+- `convertToCoreMessages` → `convertToModelMessages`
+- Added FIXME markers for manual migrations
+
+**Blocking Files Fixed During Investigation:**
+| File | Issue | Fix |
+|------|-------|-----|
+| `lib/ai/message-conversion.ts` | Duplicate `UIMessage` import | Removed duplicate |
+| `app/components/chat/use-chat-core.ts` | Duplicate `setInput` declaration | Removed manual `useState` |
+| `app/p/[projectId]/project-view.tsx` | Duplicate `setInput` declaration | Removed manual `useState` |
+
+---
+
+## Phase 1.5: Pre-Implementation Cleanup (30 min) 🆕
+
+> **Purpose:** Resolve import errors and prepare codebase for Phase 2 implementation
+
+### 1.5.1 Fix Type Import Statements
+**Files (PARALLEL):**
+
+Each file needs `Message` → `UIMessage` import fix:
+
 ```bash
-# Automated transformations
-npx @ai-sdk/codemod v5
+# Search for remaining Message imports
+grep -r "import.*Message.*from.*@ai-sdk/react" app/ lib/
 ```
 
-### 1.3 Verify Codemod Results
+| File | Change |
+|------|--------|
+| `app/components/chat/conversation.tsx` | `Message` → `UIMessage` |
+| `app/components/chat/get-sources.ts` | `Message` → `UIMessage` |
+| `app/components/chat/message-assistant.tsx` | `Message` → `UIMessage` |
+| `app/components/chat/message-user.tsx` | `Message` → `UIMessage` |
+| `app/components/chat/message.tsx` | `Message` → `UIMessage` |
+| `app/components/chat/use-chat-core.ts` | `Message` → `UIMessage`, fix `DefaultChatTransport` |
+| `app/components/chat/use-chat-operations.ts` | `Message` → `UIMessage` |
+| `app/components/multi-chat/multi-chat.tsx` | `Message` → `UIMessage` |
+| `app/components/multi-chat/multi-conversation.tsx` | `Message` → `UIMessage` |
+| `app/share/[chatId]/article.tsx` | `Message` → `UIMessage` |
+
+### 1.5.2 Fix DefaultChatTransport Import
+**File:** `app/components/chat/use-chat-core.ts`
+
+```typescript
+// WRONG (type-only import used as value)
+import type { Message, DefaultChatTransport } from "@ai-sdk/react";
+
+// CORRECT (DefaultChatTransport is from 'ai' package, imported as value)
+import type { UIMessage } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+```
+
+### 1.5.3 Fix Other Type Renames
+**Files (PARALLEL):**
+
+| File | Old Type | New Type |
+|------|----------|----------|
+| `app/components/chat/sources-list.tsx` | `SourceUIPart` | `SourceUrlUIPart` |
+| `app/components/chat/tool-invocation.tsx` | `ToolInvocationUIPart` | `ToolUIPart` |
+
+### 1.5.4 Verify Phase 1.5 Completion
+
 ```bash
-git diff --stat  # Review what changed
-bun run typecheck 2>&1 | head -50  # Expect errors - we'll fix them
+# Should see significantly fewer type errors (import-related errors should be gone)
+bun run typecheck 2>&1 | wc -l
 ```
 
-### [COMMIT] Checkpoint 1
+### [COMMIT] Checkpoint 1.5
 ```bash
 git add -A
-git commit -m "chore: upgrade AI SDK packages to v5 and run codemods"
+git commit -m "fix: resolve v5 type import errors and FIXME preparations"
 ```
+
+### Phase 1.5 Review Findings (2026-02-04)
+
+A code review identified the following issues that were fixed:
+
+| Issue | File | Fix Applied |
+|-------|------|-------------|
+| `reasoningText` → `text` | `message-assistant.tsx` | Property access updated |
+| `"source"` → `"source-url"` | `get-sources.ts` | Type filter updated |
+| `SourceUrlUIPart["source"]` invalid | `sources-list.tsx` | Type corrected |
+| Tool type documentation | execution plan | Corrected to `ToolUIPart` |
+| `source.id` → `source.sourceId` | `sources-list.tsx` | Property access updated |
+
+**Note:** The codemod added `transport: new DefaultChatTransport({...})` while leaving v4 API patterns (`initialMessages`, `handleSubmit`, `reload`, `append`). This creates a mixed state that will be resolved in Phase 3.
 
 ---
 
@@ -210,19 +208,20 @@ git commit -m "chore: upgrade AI SDK packages to v5 and run codemods"
 
 > 📚 **Reference:** [streamText API](https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text) | [toUIMessageStreamResponse](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence#server-side)
 
+**DEPENDS:** Phase 1.5 complete
+
 ### 2.1 Update API Route Streaming
 **File:** `app/api/chat/route.ts`
-**DEPENDS:** Phase 1 complete
 
 **Changes Required:**
 
-| Line | Change |
-|------|--------|
-| ~145 | `maxSteps: 10` → `stopWhen: stepCountIs(10)` |
-| ~155 | `toDataStreamResponse()` → `toUIMessageStreamResponse()` |
-| ~158 | `getErrorMessage: (error)` → `onError: (error)` |
+| Location | v4 Pattern | v5 Pattern |
+|----------|------------|------------|
+| streamText options | `maxSteps: 10` | `stopWhen: stepCountIs(10)` |
+| Response helper | `toDataStreamResponse()` | `toUIMessageStreamResponse()` |
+| Error handler | `getErrorMessage: (error) => ...` | `onError: (error) => ({ errorCode, message })` |
 
-**New imports:**
+**New imports needed:**
 ```typescript
 import { stepCountIs } from 'ai';
 ```
@@ -260,16 +259,28 @@ return result.toUIMessageStreamResponse({
 })
 ```
 
-### 2.2 Update Type Imports
-**Files (PARALLEL):**
-- `lib/ai/context-management.ts` — `Message` → `UIMessage`
-- `lib/chat-store/messages/api.ts` — `Message` → `UIMessage`
-- `lib/openproviders/index.ts` — `LanguageModelV1` → `LanguageModelV2`
-- `lib/models/types.ts` — `LanguageModelV1` → `LanguageModelV2`
+### 2.2 Fix API Utils Type Issues
+**File:** `app/api/chat/utils.ts`
 
-### 2.3 Verify Server Changes
+The codemod may have left array filter operations with potential `undefined` values. Add type guards:
+
+```typescript
+// Pattern for filtering arrays
+const validMessages = messages.filter((msg): msg is NonNullable<typeof msg> => msg !== undefined);
+```
+
+### 2.3 Update Provider Type Imports
+**Files (PARALLEL):**
+
+| File | Old Import | New Import |
+|------|------------|------------|
+| `lib/openproviders/index.ts` | `LanguageModelV1` | `LanguageModelV2` |
+| `lib/models/types.ts` | `LanguageModelV1` | `LanguageModelV2` |
+
+### 2.4 Verify Server Changes
 ```bash
-bun run typecheck 2>&1 | grep -E "(error|Error)" | head -20
+bun run typecheck 2>&1 | grep -E "app/api" | head -20
+# Should show zero or minimal errors in API routes
 ```
 
 ### [COMMIT] Checkpoint 2
@@ -278,98 +289,166 @@ git add -A
 git commit -m "feat: migrate server-side to AI SDK v5 streaming protocol"
 ```
 
+### Phase 2 Completion Notes (2026-02-04)
+
+Phase 2 completed successfully with the following changes:
+
+| File | Changes Made |
+|------|--------------|
+| `app/api/chat/route.ts` | Added `convertToModelMessages()` for UIMessage→ModelMessage conversion; fixed `ChatRequest` type |
+| `app/api/chat/utils.ts` | Rewrote `cleanMessagesForTools()` and `messageHasToolContent()` to use v5 `parts` structure instead of `content`/`toolInvocations` |
+| `lib/openproviders/index.ts` | Updated to `LanguageModelV2`; removed unused settings parameter from provider calls (v5 uses `providerOptions` in streamText instead) |
+| `lib/models/types.ts` | Updated `apiSdk` return type to `LanguageModelV2` |
+
+**Key Findings:**
+- The `onError` callback in `toUIMessageStreamResponse()` expects a `string` return, not an object (plan had incorrect info)
+- In v5, provider functions (`openai()`, `anthropic()`, etc.) only take the model ID; settings are passed via `providerOptions` in `streamText`/`generateText`
+- The `convertToModelMessages()` function is required to convert `UIMessage[]` to `ModelMessage[]` for `streamText`
+
+**Server-side errors: 0** (all remaining errors are in client-side files for Phase 3/4)
+
 ---
 
 ## Phase 3: Client-Side Hook Migration (90 min)
 
-> 📚 **Reference:** [useChat Hook](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot) | [Transport Architecture](https://ai-sdk.dev/docs/ai-sdk-ui/transport) | [Migration Guide §useChat](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#usechat-hook)
+> 📚 **Reference:** [useChat Hook](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot) | [Transport Architecture](https://ai-sdk.dev/docs/ai-sdk-ui/transport)
 
-This is the most complex phase. Follow steps precisely.
-
-### 3.1 Update use-chat-core.ts — Input State
-**File:** `app/components/chat/use-chat-core.ts`
 **DEPENDS:** Phase 2 complete
 
-**Step 3.1.1:** Add manual input state management
+### Critical API Changes Summary
 
-```typescript
-// At top of hook, AFTER existing state declarations
-const [input, setInput] = useState(draftValue || '');
+| v4 (Current) | v5 (Target) | Notes |
+|--------------|-------------|-------|
+| `handleSubmit(e, options)` | `sendMessage({ text }, options)` | No event, explicit text |
+| `append(message, options)` | `sendMessage(message, options)` | Same structure |
+| `reload(options)` | `regenerate(options)` | Simple rename |
+| `input` (from useChat) | Manual `useState('')` | Must manage locally |
+| `setInput` (from useChat) | Manual `setInput` | From local useState |
+| `api: '/api/chat'` | `transport: new DefaultChatTransport({ api })` | Transport object |
+| `initialMessages` | `messages` | Prop rename |
+| `initialInput` | ❌ Removed | Initialize local state |
+| `onFinish: (m) => {}` | `onFinish: ({ message, isAbort, isError }) => {}` | Destructured object |
 
-// Remove reliance on useChat's input/setInput
-```
+### 3.1 Update use-chat-core.ts — Complete Rewrite
+**File:** `app/components/chat/use-chat-core.ts`
 
-**Step 3.1.2:** Update useChat configuration
-
+**Step 3.1.1:** Fix imports
 ```typescript
 // BEFORE
-const { messages, input, setInput, handleSubmit, append, reload, status, setMessages, stop } = useChat({
-  api: "/api/chat",
+import type { Message, DefaultChatTransport } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react"
+
+// AFTER
+import type { UIMessage } from "@ai-sdk/react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+```
+
+**Step 3.1.2:** Add manual input state (before useChat call)
+```typescript
+// Add AFTER existing state declarations, BEFORE useChat
+const [input, setInput] = useState(draftValue || '');
+```
+
+**Step 3.1.3:** Update useChat configuration
+```typescript
+// BEFORE
+const {
+  messages,
+  handleSubmit,
+  status,
+  error,
+  reload,
+  stop,
+  setMessages,
+  setInput,
+  append
+} = useChat({
   initialMessages,
   initialInput: draftValue,
-  onFinish: (m) => { ... },
+  onFinish: async (m) => { ... },
   onError: handleError,
 })
 
 // AFTER
-import { DefaultChatTransport } from 'ai';
-
 const transport = useMemo(
-  () => new DefaultChatTransport({ api: '/api/chat' }),
+  () => new DefaultChatTransport({ api: API_ROUTE_CHAT }),
   []
 );
 
-const { messages, sendMessage, regenerate, status, setMessages, stop } = useChat({
+const {
+  messages,
+  sendMessage,
+  regenerate,
+  status,
+  error,
+  stop,
+  setMessages,
+} = useChat({
   transport,
   messages: initialMessages,
-  onFinish: ({ message, isAbort, isError }) => {
+  onFinish: async ({ message, isAbort, isError }) => {
     if (isAbort || isError) return;
-    cacheAndAddMessage(message, effectiveChatId);
-    // ... existing logic
+    
+    const effectiveChatId = chatId || prevChatIdRef.current || 
+      (typeof window !== "undefined" ? localStorage.getItem("guestChatId") : null);
+    
+    if (effectiveChatId) {
+      cacheAndAddMessage(message, effectiveChatId);
+    }
+    
+    try {
+      if (!effectiveChatId) return;
+      await syncRecentMessages(effectiveChatId, setMessages, 2);
+    } catch (error) {
+      console.error("Message ID reconciliation failed: ", error);
+    }
   },
   onError: handleError,
-})
+});
 ```
 
-### 3.2 Update Submit Handler
-**File:** `app/components/chat/use-chat-core.ts`
-
-**Find:** `handleSubmit` usage
-**Replace with:** `sendMessage` pattern
-
+**Step 3.1.4:** Update submit function
 ```typescript
+// Find all handleSubmit calls and replace with sendMessage pattern
 // BEFORE
 handleSubmit(undefined, {
   body: { chatId, userId, model, systemPrompt, enableSearch },
   experimental_attachments: attachments,
 })
 
-// AFTER
+// AFTER  
+import { convertAttachmentsToFiles } from '@/lib/ai/message-conversion';
+
 sendMessage(
   {
     text: input,
-    files: attachments ? convertAttachmentsToFiles(attachments) : undefined,
+    files: attachments?.length ? convertAttachmentsToFiles(attachments) : undefined,
   },
   {
     body: { chatId, userId, model, systemPrompt, enableSearch },
   }
 );
-setInput(''); // Clear input manually
+setInput(''); // Clear input manually after sending
 ```
 
-### 3.3 Update Edit Flow
-**File:** `app/components/chat/use-chat-core.ts`
-
-**Find:** `submitEdit` function using `append`
-**Update:** Use `sendMessage` with proper message trimming
-
+**Step 3.1.5:** Update reload/regenerate calls
 ```typescript
-// The edit flow:
-// 1. Trim messages to edit point
-// 2. Send new message with updated content
-// 3. Let server regenerate response
+// Simple rename - options structure is compatible
+// BEFORE
+reload({ body: { ... } })
 
-// In submitEdit:
+// AFTER
+regenerate({ body: { ... } })
+```
+
+**Step 3.1.6:** Update edit flow (append → sendMessage)
+```typescript
+// In submitEdit function:
+// BEFORE
+append({ role: "user", content: newContent }, options)
+
+// AFTER
 setMessages((prev) => prev.slice(0, editIndex));
 sendMessage(
   {
@@ -379,111 +458,222 @@ sendMessage(
       : undefined,
   },
   {
-    body: {
-      chatId: currentChatId,
-      userId: uid,
-      model: selectedModel,
-      systemPrompt,
-    },
+    body: { chatId, userId, model, systemPrompt },
   }
 );
 ```
 
-### 3.4 Update Reload/Regenerate
-**File:** `app/components/chat/use-chat-core.ts`
+### 3.2 Update project-view.tsx
+**File:** `app/p/[projectId]/project-view.tsx`
+**DEPENDS:** 3.1 complete (follow same patterns)
 
-**Find:** `reload(options)` calls
-**Replace:** `regenerate(options)` — same options structure works!
+Apply identical changes:
+1. Fix imports (`UIMessage`, `DefaultChatTransport` from 'ai')
+2. Add manual input state
+3. Update useChat configuration
+4. Replace `handleSubmit` → `sendMessage`
+5. Replace `reload` → `regenerate`
 
-```typescript
-// BEFORE
-reload({
-  body: { chatId, userId, model, systemPrompt },
-})
-
-// AFTER (simple rename)
-regenerate({
-  body: { chatId, userId, model, systemPrompt },
-})
-```
-
-### 3.5 Update Input Change Handler
-**File:** `app/components/chat/use-chat-core.ts`
+### 3.3 Update use-multi-chat.ts
+**File:** `app/components/multi-chat/use-multi-chat.ts`
 
 ```typescript
+// Replace api option with transport
 // BEFORE
-const handleInputChange = useCallback(
-  (value: string) => {
-    setInput(value)      // From useChat
-    setDraftValue(value)
-  },
-  [setInput, setDraftValue]
-)
+useChat({ api: "/api/chat", onError: handleError })
 
 // AFTER
-const handleInputChange = useCallback(
-  (value: string) => {
-    setInput(value)      // From useState (local)
-    setDraftValue(value)
-  },
-  [setDraftValue] // setInput from useState is stable, can omit
-)
+useChat({ 
+  transport: new DefaultChatTransport({ api: "/api/chat" }),
+  onError: handleError 
+})
+
+// Replace append → sendMessage
+// Replace isLoading check with status check
+// isLoading → status !== 'ready'
 ```
 
-### 3.6 Verify Hook Migration
+### 3.4 Update Message Structure in Optimistic Updates
+**Files:** `use-chat-core.ts`, `project-view.tsx`
+
+Messages must now use `parts` array, not `content` string:
+
+```typescript
+// BEFORE (v4 format)
+const optimisticMessage = {
+  id: `optimistic-${Date.now()}`,
+  content: input,
+  role: "user",
+  createdAt: new Date(),
+  experimental_attachments: attachments,
+}
+
+// AFTER (v5 format with parts)
+const optimisticMessage: UIMessage = {
+  id: `optimistic-${Date.now()}`,
+  role: "user",
+  createdAt: new Date(),
+  parts: [
+    { type: "text", text: input },
+    ...(attachments?.map(att => ({
+      type: "file" as const,
+      filename: att.name,
+      mediaType: att.contentType,
+      url: att.url,
+    })) || []),
+  ],
+}
+```
+
+### 3.5 Verify Hook Migration
 ```bash
-bun run typecheck 2>&1 | grep "use-chat-core" | head -20
+bun run typecheck 2>&1 | grep -E "(use-chat|multi-chat|project-view)" | head -20
+# Should show zero errors in hook files
 ```
 
 ### [COMMIT] Checkpoint 3
 ```bash
 git add -A
-git commit -m "feat: migrate useChat hook to v5 transport architecture"
+git commit -m "feat: migrate useChat hooks to v5 transport architecture"
 ```
+
+### Phase 3 Completion Notes (2026-02-04)
+
+Phase 3 completed with the following changes:
+
+| File | Changes Made |
+|------|--------------|
+| `app/components/chat/use-chat-core.ts` | Manual input state, `sendMessage`/`regenerate` instead of `handleSubmit`/`reload`/`append`, v5 `onFinish` callback, optimistic messages with parts format |
+| `app/p/[projectId]/project-view.tsx` | Same v5 patterns as use-chat-core.ts |
+| `app/components/multi-chat/use-multi-chat.ts` | Updated to use `sendMessage`, `status !== 'ready'` for loading, memoized transports |
+| `app/components/multi-chat/multi-chat.tsx` | Updated to call `sendMessage` instead of `append` |
+| `lib/chat-store/messages/provider.tsx` | Fixed `undefined` types from codemod, created `ExtendedUIMessage` type for app compatibility |
+| `lib/chat-store/messages/api.ts` | Fixed `undefined` types from codemod, created `ExtendedUIMessage` type |
+| `app/components/chat/syncRecentMessages.ts` | Fixed type issues with `ExtendedUIMessage` |
+
+**Key Patterns Established:**
+- Created `OptimisticUIMessage` / `ExtendedUIMessage` types for app compatibility (includes `createdAt`, `content`, `experimental_attachments`)
+- v5 `useChat` returns `sendMessage` (replaces `handleSubmit` and `append`) and `regenerate` (replaces `reload`)
+- `input` and `setInput` must be managed locally with `useState` - no longer returned from `useChat`
+- Optimistic messages use v5 `parts` array format: `{ type: "text", text: "..." }`, `{ type: "file", filename, mediaType, url }`
+- `onFinish` callback receives `{ message, isAbort, isError }` instead of just the message
+
+**Hook-level errors: 0** (remaining errors are in rendering components for Phase 4)
 
 ---
 
 ## Phase 4: Message Rendering Migration (45 min)
 
-> 📚 **Reference:** [UIMessage Format](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence) | [Data Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0-data)
+> 📚 **Reference:** [UIMessage Format](https://ai-sdk.dev/docs/ai-sdk-ui/chatbot-message-persistence) | [Tool Parts](https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#tool-part-type-changes-uimessage)
 
-### 4.1 Update Message Parts Rendering
-**Files (PARALLEL):**
-- `app/components/chat/message-assistant.tsx`
-- `app/components/chat/tool-invocation.tsx`
-- Any file rendering `message.parts`
+**DEPENDS:** Phase 3 complete
 
-**Key Changes:**
+### 4.1 Update Reasoning Display
+**File:** `app/components/chat/reasoning.tsx`
 
-| v4 Pattern | v5 Pattern |
-|------------|------------|
-| `part.reasoning` | `part.text` (on reasoning parts) |
-| `part.type === "tool-invocation"` | `isStaticToolUIPart(part)` |
-| `part.toolInvocation.toolName` | `getStaticToolName(part)` |
-| `part.toolInvocation.args` | `part.input` |
-| `part.toolInvocation.result` | `part.output` |
+The codemod added FIXME markers. Update reasoning property access:
 
-**Example transformation:**
+```typescript
+// BEFORE
+const reasoningContent = reasoningPart?.reasoning
+
+// AFTER
+const reasoningContent = reasoningPart?.text
+```
+
+Also check the `ReasoningProps` interface - the prop should be `text` not `reasoning`.
+
+### 4.2 Update Message Assistant Component
+**File:** `app/components/chat/message-assistant.tsx`
+
 ```typescript
 // BEFORE
 const reasoningParts = parts?.find((part) => part.type === "reasoning")
-const reasoningContent = reasoningParts?.reasoning
+// Access: reasoningParts.reasoning
 
-// AFTER
+// AFTER  
 const reasoningParts = parts?.find((part) => part.type === "reasoning")
-const reasoningContent = reasoningParts?.text
+// Access: reasoningParts.text
 ```
 
-### 4.2 Update File Part Properties
-**Files:** Any rendering file attachments
+### 4.3 Update Tool Invocation Component
+**File:** `app/components/chat/tool-invocation.tsx`
 
-| v4 Property | v5 Property |
-|-------------|-------------|
-| `part.contentType` | `part.mediaType` |
-| `part.name` | `part.filename` |
+```typescript
+// BEFORE (v4)
+import { ToolInvocationUIPart } from "ai";
+// Access: part.toolInvocation.toolName, part.toolInvocation.args, part.toolInvocation.result
 
-### 4.3 Apply Message Conversion at API Boundary
+// AFTER (v5) - Use helper functions for catch-all pattern
+import { isToolUIPart, getToolName, type UIToolInvocation } from "ai";
+
+// For filtering tool parts:
+const toolParts = parts?.filter(part => isToolUIPart(part));
+
+// For accessing properties:
+const toolName = getToolName(part);
+const input = part.input;   // was: part.toolInvocation.args
+const output = part.output; // was: part.toolInvocation.result
+
+// States changed:
+// 'partial-call' → 'input-streaming'
+// 'call' → 'input-available'  
+// 'result' → 'output-available'
+// NEW: 'output-error'
+```
+
+### 4.4 Update Sources List
+**File:** `app/components/chat/sources-list.tsx`
+
+```typescript
+// BEFORE
+import { SourceUIPart } from "ai";
+
+// AFTER
+import { SourceUrlUIPart } from "ai";
+// or import both: SourceUrlUIPart, SourceDocumentUIPart
+```
+
+### 4.5 Update get-sources.ts  
+**File:** `app/components/chat/get-sources.ts`
+
+Resolve FIXME markers for tool invocation patterns:
+
+```typescript
+// BEFORE
+if (part.toolInvocation?.state === "result" && 
+    part.toolInvocation?.toolName === "exa_search") {
+  // ...
+}
+
+// AFTER - Use helper functions
+import { isToolUIPart, getToolName } from "ai";
+
+if (isToolUIPart(part) && 
+    part.state === "output-available" && 
+    getToolName(part) === "exa_search") {
+  // Access results via part.output instead of part.toolInvocation.result
+}
+```
+
+### 4.6 Resolve FIXME Markers for experimental_attachments
+**Files with FIXME markers:**
+- `use-chat-core.ts` (10 locations)
+- `project-view.tsx` (7 locations)
+- `lib/chat-store/types.ts` (3 locations)
+- `lib/ai/message-conversion.ts` (4 locations)
+- `multi-conversation.tsx` (2 locations)
+- `messages/provider.tsx` (3 locations)
+- `conversation.tsx` (1 location)
+
+**Pattern:** Replace `experimental_attachments` with file parts in `parts` array where v5 message format is expected.
+
+For backward compatibility in storage types, keep the property but note it's deprecated.
+
+### 4.7 Apply Message Conversion at API Boundary
 **File:** `lib/chat-store/messages/api.ts`
+
+Ensure messages from storage are converted to v5 format:
 
 ```typescript
 import { ensureV5Format } from '@/lib/ai/message-conversion';
@@ -501,9 +691,9 @@ export async function getCachedMessages(chatId: string): Promise<UIMessage[]> {
 }
 ```
 
-### 4.4 Verify Rendering Changes
+### 4.8 Verify Rendering Changes
 ```bash
-bun run typecheck
+bun run typecheck 2>&1 | grep -E "components/chat" | head -20
 bun run lint
 ```
 
@@ -517,30 +707,42 @@ git commit -m "feat: migrate message rendering to v5 parts format"
 
 ## Phase 5: v5 → v6 Upgrade (30 min)
 
-> 📚 **Reference:** [v6 Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-6-0) | [AI SDK v6 Codemods](https://github.com/vercel/ai/tree/main/packages/codemod)
+> 📚 **Reference:** [v6 Migration Guide](https://ai-sdk.dev/docs/migration-guides/migration-guide-6-0)
 
-### 5.1 Upgrade Packages to v6
-**DEPENDS:** Phase 4 complete and verified
+**DEPENDS:** Phase 4 complete AND `bun run typecheck` passes
 
+### 5.1 Verify v5 Stability First
+```bash
+bun run typecheck  # MUST pass before proceeding
+bun run lint       # MUST pass before proceeding
+bun run build      # Recommended to verify build works
+```
+
+### 5.2 Upgrade Packages to v6
 ```bash
 bun add ai@6 @ai-sdk/react@latest \
   @ai-sdk/anthropic@3 @ai-sdk/google@3 @ai-sdk/mistral@3 \
   @ai-sdk/openai@3 @ai-sdk/perplexity@3 @ai-sdk/xai@3 \
-  @ai-sdk/provider@3 @ai-sdk/provider-utils@4 \
-  @openrouter/ai-sdk-provider@2
+  @ai-sdk/provider@3 @ai-sdk/provider-utils@4
+
+# OpenRouter v2.x for AI SDK v6
+bun add @openrouter/ai-sdk-provider@2
 ```
 
-### 5.2 Run v6 Codemods
+### 5.3 Run v6 Codemods
 ```bash
-npx @ai-sdk/codemod v6
+npx @ai-sdk/codemod v6 --verbose ./
 ```
 
-### 5.3 Update Type Imports for v6
+### 5.4 Update Type Imports for v6
 **Files (PARALLEL):**
-- `lib/openproviders/index.ts` — `LanguageModelV2` → `LanguageModelV3`
-- `lib/models/types.ts` — `LanguageModelV2` → `LanguageModelV3`
 
-### 5.4 Update Tool Helper Functions (if used)
+| File | v5 Type | v6 Type |
+|------|---------|---------|
+| `lib/openproviders/index.ts` | `LanguageModelV2` | `LanguageModelV3` |
+| `lib/models/types.ts` | `LanguageModelV2` | `LanguageModelV3` |
+
+### 5.5 Update Tool Helper Functions
 ```typescript
 // v5
 import { isToolUIPart, getToolName } from 'ai';
@@ -549,16 +751,16 @@ import { isToolUIPart, getToolName } from 'ai';
 import { isStaticToolUIPart, getStaticToolName } from 'ai';
 ```
 
-### 5.5 Make convertToModelMessages Async (if used)
+### 5.6 Make convertToModelMessages Async (if used)
 ```typescript
-// BEFORE
+// BEFORE (v5)
 const modelMessages = convertToModelMessages(messages)
 
-// AFTER
+// AFTER (v6)
 const modelMessages = await convertToModelMessages(messages)
 ```
 
-### 5.6 Verify v6 Migration
+### 5.7 Verify v6 Migration
 ```bash
 bun run typecheck
 bun run lint
@@ -610,17 +812,23 @@ git commit -m "test: verify AI SDK v6 upgrade functionality"
 
 ## Phase 7: Cleanup & Documentation (15 min)
 
-### 7.1 Remove Deprecated Code
+### 7.1 Remove FIXME Comments
+```bash
+# Search and remove resolved FIXME markers
+grep -r "FIXME(@ai-sdk-upgrade-v5)" --include="*.ts" --include="*.tsx" app/ lib/
+```
+
+### 7.2 Remove Deprecated Code
 - [ ] Remove any `// TODO: v5` comments
 - [ ] Remove any backward-compat shims that are no longer needed
 - [ ] Clean up unused imports
 
-### 7.2 Update Documentation
+### 7.3 Update Documentation
 **File:** `AGENTS.md` (if patterns changed significantly)
 
 Update the "Gold Standard Examples" section if API route pattern changed.
 
-### 7.3 Archive Research Document
+### 7.4 Archive Research Document
 ```bash
 mv .agents/context/research/ai-sdk-upgrade-research.md .agents/archive/
 ```
@@ -644,7 +852,7 @@ git revert <commit-hash>
 
 # Option 2: Full rollback
 git checkout main
-git branch -D feat/ai-sdk-v6-upgrade
+git branch -D give-these-pipes-an-upgrade
 ```
 
 ---
@@ -669,22 +877,25 @@ All must pass before merging:
 ## Dependency Graph
 
 ```
-Phase 0 (Setup)
+Phase 0 (Setup) ✅
     │
     ▼
-Phase 1 (Package Upgrades)
+Phase 1 (Package Upgrades) ✅
     │
     ▼
-Phase 2 (Server-Side) ──────┐
-    │                       │
-    ▼                       │
-Phase 3 (Client-Side) ◄─────┘
+Phase 1.5 (Pre-Implementation Cleanup) ✅
     │
     ▼
-Phase 4 (Rendering)
+Phase 2 (Server-Side) ✅
     │
     ▼
-Phase 5 (v6 Upgrade)
+Phase 3 (Client-Side) ✅
+    │
+    ▼
+Phase 4 (Rendering) ◄── NEXT
+    │
+    ▼
+Phase 5 (v6 Upgrade) ──── Only after v5 stable
     │
     ▼
 Phase 6 (Testing)
@@ -705,24 +916,38 @@ When executing this plan as an AI agent:
 4. **Report blockers immediately** — If a step fails, stop and diagnose
 5. **Use StrReplace** — Prefer targeted string replacement over full file rewrites
 6. **Parallel where marked** — Tasks in `[PARALLEL]` blocks can run simultaneously
+7. **Follow FIXME comments** — The codemod added markers where manual work is needed
+
+### Key Files to Modify (Priority Order)
+
+| Priority | File | Complexity | Notes |
+|----------|------|------------|-------|
+| 1 | `app/components/chat/use-chat-core.ts` | HIGH | Gold standard - other hooks follow this |
+| 2 | `app/p/[projectId]/project-view.tsx` | HIGH | Similar to use-chat-core |
+| 3 | `app/api/chat/route.ts` | MEDIUM | Server-side streaming |
+| 4 | `app/components/chat/message-assistant.tsx` | MEDIUM | Rendering changes |
+| 5 | `app/components/chat/tool-invocation.tsx` | MEDIUM | Tool UI patterns |
+| 6 | `lib/openproviders/index.ts` | LOW | Type import only |
 
 ---
 
-## Estimated Timeline
+## Estimated Timeline (Updated)
 
-| Phase | Duration | Cumulative |
-|-------|----------|------------|
-| Phase 0: Setup | 10 min | 10 min |
-| Phase 1: Packages | 15 min | 25 min |
-| Phase 2: Server | 45 min | 1h 10m |
-| Phase 3: Client | 90 min | 2h 40m |
-| Phase 4: Rendering | 45 min | 3h 25m |
-| Phase 5: v6 | 30 min | 3h 55m |
-| Phase 6: Testing | 60 min | 4h 55m |
-| Phase 7: Cleanup | 15 min | **5h 10m** |
+| Phase | Duration | Status |
+|-------|----------|--------|
+| Phase 0: Setup | 10 min | ✅ Complete |
+| Phase 1: Packages | 15 min | ✅ Complete |
+| Phase 1.5: Cleanup | 30 min | ✅ Complete |
+| Phase 2: Server | 45 min | ✅ Complete |
+| Phase 3: Client | 90 min | ✅ Complete |
+| Phase 4: Rendering | 45 min | Pending |
+| Phase 5: v6 | 30 min | Pending |
+| Phase 6: Testing | 60 min | Pending |
+| Phase 7: Cleanup | 15 min | Pending |
+| **Total Remaining** | **~2.5 hours** | |
 
-**Buffer for issues:** +2-3 hours
-**Total estimate:** 6-8 hours
+**Buffer for issues:** +1 hour
+**Total estimate:** 3-4 hours remaining
 
 ---
 
@@ -730,12 +955,11 @@ When executing this plan as an AI agent:
 
 If you encounter issues during migration:
 
-1. **Check the research document first** — `.agents/context/research/ai-sdk-upgrade-research.md` contains detailed Q&A for common scenarios
-2. **Review GitHub Issues** — [AI SDK Issues](https://github.com/vercel/ai/issues) for similar problems
-3. **Consult the Changelog** — [CHANGELOG.md](https://github.com/vercel/ai/blob/main/CHANGELOG.md) for breaking change details
-4. **Type errors after codemod** — Run `bun run typecheck 2>&1 | head -50` to see first errors; often import path issues
-5. **Streaming not working** — Verify `toUIMessageStreamResponse()` is used (not `toDataStreamResponse()`)
-6. **Messages not displaying** — Check that `message.parts` is being used, not `message.content`
+1. **Check the research document first** — `.agents/context/research/ai-sdk-upgrade-research.md` contains detailed Q&A
+2. **Review FIXME comments** — The codemod added markers at locations needing manual work
+3. **Type errors after codemod** — Usually import path issues; check imports first
+4. **Streaming not working** — Verify `toUIMessageStreamResponse()` is used
+5. **Messages not displaying** — Check that `message.parts` is being used
 
 ### Common Error Resolutions
 
@@ -746,7 +970,37 @@ If you encounter issues during migration:
 | `handleSubmit is not a function` | v5 API change | Replace with `sendMessage()` |
 | `maxSteps is not a valid option` | v5 API change | Replace with `stopWhen: stepCountIs(N)` |
 | `LanguageModelV1 not exported` | v5/v6 type change | Use `LanguageModelV2` (v5) or `LanguageModelV3` (v6) |
+| `DefaultChatTransport` used as value with type import | Import error | Import from `'ai'` not `'@ai-sdk/react'` |
+| `'Message' not exported from @ai-sdk/react` | v5 type rename | Use `UIMessage` instead |
+
+---
+
+## Investigation Findings (2026-02-04)
+
+### Codemod Behavior
+
+- **Execution time:** ~44 seconds
+- **Files modified:** 36
+- **FIXME markers added:** 26 locations
+- **Blocking issues:** Syntax errors in partially migrated files (fixed)
+
+### OpenRouter Provider Versions
+
+| Version | AI SDK | Peer Dependency |
+|---------|--------|-----------------|
+| v0.7.x | v4 | `ai: ^4.3.17` |
+| v1.5.4 | v5 | `ai: ^5.0.0` ✅ Installed |
+| v2.x | v6 | `ai: ^6.0.0` |
+
+### FIXME Marker Categories
+
+| Category | Count | Primary Files |
+|----------|-------|---------------|
+| `experimental_attachments` → parts | 23 | use-chat-core.ts, project-view.tsx |
+| Tool invocation patterns | 2 | get-sources.ts |
+| Reasoning property | 1 | reasoning.tsx |
 
 ---
 
 *Plan created from research document: `.agents/context/research/ai-sdk-upgrade-research.md`*
+*Last updated: 2026-02-04 with codemod findings and Phase 1.5 additions*

@@ -1,7 +1,18 @@
-import type { Message as MessageAISDK } from "ai"
+import type { UIMessage } from "ai"
 import { readFromIndexedDB, writeToIndexedDB } from "../persist"
 
-export interface ExtendedMessageAISDK extends MessageAISDK {
+// Extended UIMessage type for app compatibility (includes optional properties from v4)
+export type ExtendedUIMessage = UIMessage & {
+  createdAt?: Date
+  content?: string
+  experimental_attachments?: Array<{
+    name: string
+    contentType: string
+    url: string
+  }>
+}
+
+export interface ExtendedMessageAISDK extends ExtendedUIMessage {
   message_group_id?: string
   model?: string
 }
@@ -12,12 +23,12 @@ export interface ExtendedMessageAISDK extends MessageAISDK {
 
 type ChatMessageEntry = {
   id: string
-  messages: MessageAISDK[]
+  messages: ExtendedUIMessage[]
 }
 
 export async function getCachedMessages(
   chatId: string
-): Promise<MessageAISDK[]> {
+): Promise<ExtendedUIMessage[]> {
   const entry = await readFromIndexedDB<ChatMessageEntry>("messages", chatId)
 
   if (!entry || Array.isArray(entry)) return []
@@ -29,7 +40,7 @@ export async function getCachedMessages(
 
 export async function cacheMessages(
   chatId: string,
-  messages: MessageAISDK[]
+  messages: ExtendedUIMessage[]
 ): Promise<void> {
   await writeToIndexedDB("messages", { id: chatId, messages })
 }
@@ -42,7 +53,7 @@ export async function cacheMessages(
 
 export async function getMessagesFromDb(
   chatId: string
-): Promise<MessageAISDK[]> {
+): Promise<ExtendedUIMessage[]> {
   // With Convex, messages are fetched via the provider using useQuery
   return await getCachedMessages(chatId)
 }
@@ -50,14 +61,14 @@ export async function getMessagesFromDb(
 export async function getLastMessagesFromDb(
   chatId: string,
   limit: number = 2
-): Promise<MessageAISDK[]> {
+): Promise<ExtendedUIMessage[]> {
   const cached = await getCachedMessages(chatId)
   return cached.slice(-limit)
 }
 
 export async function addMessage(
   chatId: string,
-  message: MessageAISDK
+  message: ExtendedUIMessage
 ): Promise<void> {
   // With Convex, the provider handles database operations
   const current = await getCachedMessages(chatId)
@@ -67,7 +78,7 @@ export async function addMessage(
 
 export async function setMessages(
   chatId: string,
-  messages: MessageAISDK[]
+  messages: ExtendedUIMessage[]
 ): Promise<void> {
   // With Convex, the provider handles database operations
   await writeToIndexedDB("messages", { id: chatId, messages })
