@@ -138,7 +138,7 @@ export async function POST(req: Request) {
     }
 
     // Convert UIMessage[] to ModelMessage[] for streamText in v5
-    const modelMessages = convertToModelMessages(messages)
+    const modelMessages = await convertToModelMessages(messages)
 
     const result = streamText({
       model: aiModel,

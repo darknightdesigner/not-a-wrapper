@@ -15,6 +15,11 @@ import {
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
 
+// v5 helper: Get tool name from ToolUIPart (tool name is in the type: "tool-{toolName}")
+function getToolNameFromPart(part: ToolUIPart): string {
+  return part.type.replace(/^tool-/, "")
+}
+
 interface ToolInvocationProps {
   toolInvocations: ToolUIPart[]
   className?: string
@@ -189,7 +194,7 @@ function SingleToolView({
       <div className="space-y-4">
         {toolsToDisplay.map((tool) => (
           <SingleToolCard
-            key={tool.toolInvocation.toolCallId}
+            key={tool.toolCallId}
             toolData={tool}
             defaultOpen={defaultOpen}
           />
@@ -211,8 +216,9 @@ function SingleToolCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
   const { state, toolCallId } = toolData
-  const toolName = toolData.toolName
-  const args = toolData.input
+  // v5: Tool name is extracted from type (e.g., "tool-exa_search" → "exa_search")
+  const toolName = getToolNameFromPart(toolData)
+  const args = toolData.input as Record<string, unknown> | undefined
   const isLoading = state === "input-available"
   const isCompleted = state === "output-available"
   const result = isCompleted ? toolData.output : undefined
@@ -230,8 +236,9 @@ function SingleToolCard({
         result !== null &&
         "content" in result
       ) {
-        const textContent = result.content?.find(
-          (item: { type: string }) => item.type === "text"
+        const resultObj = result as { content?: Array<{ type: string; text?: string }> }
+        const textContent = resultObj.content?.find(
+          (item) => item.type === "text"
         )
         if (!textContent?.text) return { parsedResult: null, parseError: null }
 

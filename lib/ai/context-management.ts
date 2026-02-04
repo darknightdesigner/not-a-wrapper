@@ -99,7 +99,7 @@ export function estimateTokens(text: string): number {
  * @param messages - Array of AI SDK messages
  * @returns Token estimate with breakdown
  */
-export function estimateMessageTokens(messages: undefined[]): TokenEstimate {
+export function estimateMessageTokens(messages: AIMessage[]): TokenEstimate {
   const result: TokenEstimate = {
     total: 0,
     byRole: {
@@ -111,10 +111,17 @@ export function estimateMessageTokens(messages: undefined[]): TokenEstimate {
   }
 
   for (const message of messages) {
-    const content =
-      typeof message.content === "string"
-        ? message.content
-        : JSON.stringify(message.content)
+    if (!message) continue
+
+    // In v5, messages use parts array instead of content string
+    // Extract text from parts for token estimation
+    let content = ""
+    if (message.parts && Array.isArray(message.parts)) {
+      content = message.parts
+        .filter((part) => part.type === "text")
+        .map((part) => (part as { type: "text"; text: string }).text)
+        .join("")
+    }
 
     const tokens = estimateTokens(content)
     result.total += tokens
@@ -140,7 +147,7 @@ export function estimateMessageTokens(messages: undefined[]): TokenEstimate {
  * @returns Whether compaction is needed
  */
 export function shouldCompact(
-  messages: undefined[],
+  messages: AIMessage[],
   threshold: number = DEFAULT_COMPACTION_THRESHOLD
 ): boolean {
   const estimate = estimateMessageTokens(messages)
@@ -169,9 +176,9 @@ export function shouldCompact(
  * TODO: Store summaries in Convex for retrieval
  */
 export async function compactContext(
-  messages: undefined[],
+  messages: AIMessage[],
   config: Partial<ContextManagementConfig> = {}
-): Promise<{ messages: undefined[]; result: CompactionResult }> {
+): Promise<{ messages: AIMessage[]; result: CompactionResult }> {
   const preserveCount = config.preserveRecentMessages ?? DEFAULT_PRESERVE_RECENT
   const threshold = config.compactionThreshold ?? DEFAULT_COMPACTION_THRESHOLD
 
@@ -211,12 +218,11 @@ export async function compactContext(
   // Generate summary of older messages
   // TODO: Replace with actual LLM call using Claude Haiku
   const summary = generatePlaceholderSummary(olderMessages)
-  const summaryMessage: undefined = {
+  const summaryMessage: AIMessage = {
     id: `summary-${Date.now()}`,
     role: "system",
-    content: `[Context Summary]\n${summary}`,
-     
-  } as any
+    parts: [{ type: "text", text: `[Context Summary]\n${summary}` }],
+  }
 
   const compactedMessages = [summaryMessage, ...recentMessages]
   const newEstimate = estimateMessageTokens(compactedMessages)
@@ -237,9 +243,9 @@ export async function compactContext(
  * Placeholder summary generator.
  * In production, this would use Claude Haiku for summarization.
  */
-function generatePlaceholderSummary(messages: undefined[]): string {
-  const userMessages = messages.filter((m) => m.role === "user")
-  const assistantMessages = messages.filter((m) => m.role === "assistant")
+function generatePlaceholderSummary(messages: AIMessage[]): string {
+  const userMessages = messages.filter((m) => m?.role === "user")
+  const assistantMessages = messages.filter((m) => m?.role === "assistant")
 
   return `Previous conversation context (${messages.length} messages):
 - User messages: ${userMessages.length}
@@ -294,8 +300,7 @@ export function formatNote(note: StructuredNote): string {
  * @returns Array of structured notes
  */
 export async function extractNotesFromConversation(
-   
-  _messages: undefined[]
+  _messages: AIMessage[]
 ): Promise<StructuredNote[]> {
   // TODO: Implement with Claude Haiku
   // This would analyze the conversation and extract key information

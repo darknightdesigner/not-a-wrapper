@@ -34,9 +34,16 @@ const getTextFromDataUrl = (dataUrl: string) => {
   return base64
 }
 
+// Attachment type for backward compatibility with v4 format
+type MessageAttachment = {
+  name: string
+  contentType: string
+  url: string
+}
+
 export type MessageUserProps = {
   hasScrollAnchor?: boolean
-  attachments?: MessageType["experimental_attachments"]
+  attachments?: MessageAttachment[]
   children: string
   copied: boolean
   copyToClipboard: () => void

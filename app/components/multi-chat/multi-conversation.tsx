@@ -11,8 +11,33 @@ import { getModelInfo } from "@/lib/models"
 import { PROVIDERS } from "@/lib/providers"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { Message } from "../chat/message"
+
+// v5 helper: Extract text content from UIMessage parts array
+function getMessageText(message: MessageType): string {
+  const textPart = message.parts?.find((p) => p.type === "text")
+  return (textPart as { text?: string })?.text || ""
+}
+
+// v5 helper: Extract file attachments from parts array for backward compatibility
+function getMessageAttachments(
+  message: MessageType
+): Array<{ name: string; contentType: string; url: string }> | undefined {
+  const extMessage = message as ExtendedMessageAISDK
+  // First check if legacy experimental_attachments exists on extended type
+  if (extMessage.experimental_attachments) {
+    return extMessage.experimental_attachments
+  }
+  // Otherwise extract from file parts
+  const fileParts = message.parts?.filter((p) => p.type === "file")
+  if (!fileParts || fileParts.length === 0) return undefined
+  return fileParts.map((p) => ({
+    name: (p as { filename?: string }).filename || "file",
+    contentType: (p as { mediaType?: string }).mediaType || "application/octet-stream",
+    url: (p as { url?: string }).url || "",
+  }))
+}
 
 type GroupedMessage = {
   userMessage: MessageType
@@ -39,19 +64,14 @@ type ResponseCardProps = {
 function ResponseCard({ response, group }: ResponseCardProps) {
   const model = getModelInfo(response.model)
   const providerIcon = PROVIDERS.find((p) => p.id === model?.baseProviderId)
+  
+  // v5: Extract text and attachments using helper functions
+  const messageText = response.message ? getMessageText(response.message) : ""
+  const messageAttachments = response.message ? getMessageAttachments(response.message) : undefined
 
-  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   return (
     <div className="relative">
       <div className="bg-background pointer-events-auto relative rounded border p-3">
-        {/* <button
-          className="bg-background absolute top-2 right-2 z-30 cursor-grab p-1 active:cursor-grabbing"
-          type="button"
-          onPointerDown={(e) => dragControls.start(e)}
-        >
-          <DotsSixVerticalIcon className="text-muted-foreground size-4" />
-        </button> */}
-
         <div className="text-muted-foreground mb-2 flex items-center gap-1">
           <span>
             {providerIcon?.icon && <providerIcon.icon className="size-4" />}
@@ -65,10 +85,10 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             variant="assistant"
             parts={
               response.message.parts || [
-                { type: "text", text: response.message.content },
+                { type: "text", text: messageText },
               ]
             }
-            attachments={response.message.experimental_attachments}
+            attachments={messageAttachments}
             onDelete={() => group.onDelete(response.model, response.message.id)}
             onEdit={(id, newText) => group.onEdit(response.model, id, newText)}
             onReload={() => group.onReload(response.model)}
@@ -77,7 +97,7 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             hasScrollAnchor={false}
             className="bg-transparent p-0 px-0"
           >
-            {response.message.content}
+            {messageText}
           </Message>
         ) : response.isLoading ? (
           <div className="space-y-2">
@@ -134,7 +154,10 @@ export function MultiModelConversation({
           {messageGroups.length === 0
             ? null
             : messageGroups.map((group, groupIndex) => {
-                /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
+                // v5: Extract text and attachments using helper functions
+                const userMessageText = getMessageText(group.userMessage)
+                const userMessageAttachments = getMessageAttachments(group.userMessage)
+                
                 return (
                   <div key={groupIndex} className="mb-10 w-full space-y-3">
                     <div className="mx-auto w-full max-w-3xl">
@@ -143,10 +166,10 @@ export function MultiModelConversation({
                         variant="user"
                         parts={
                           group.userMessage.parts || [
-                            { type: "text", text: group.userMessage.content },
+                            { type: "text", text: userMessageText },
                           ]
                         }
-                        attachments={group.userMessage.experimental_attachments}
+                        attachments={userMessageAttachments}
                         onDelete={() => {}}
                         onEdit={() => {}}
                         onReload={() => {}}
@@ -156,7 +179,7 @@ export function MultiModelConversation({
                             .message_group_id ?? null
                         }
                       >
-                        {group.userMessage.content}
+                        {userMessageText}
                       </Message>
                     </div>
                     <div

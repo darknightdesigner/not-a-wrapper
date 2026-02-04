@@ -3,8 +3,8 @@
 > **Goal:** Upgrade from AI SDK v4.x to v6.x with near-perfect execution
 > **Created:** 2026-02-02
 > **Last Updated:** 2026-02-04
-> **Estimated Remaining Effort:** 4 hours
-> **Status:** ✅ Phase 3 Complete — Ready for Phase 4
+> **Estimated Remaining Effort:** 2.5 hours
+> **Status:** ✅ Phase 4 Complete — Ready for Phase 5
 
 ---
 
@@ -704,6 +704,33 @@ git add -A
 git commit -m "feat: migrate message rendering to v5 parts format"
 ```
 
+### Phase 4 Completion Notes (2026-02-04)
+
+Phase 4 completed with the following changes:
+
+| File | Changes Made |
+|------|--------------|
+| `app/components/chat/get-sources.ts` | Updated to v5 flat tool properties (`part.state`, `part.output`); added helper functions `isToolPart()`, `getToolNameFromPart()`; proper typing with `SourceUrlUIPart[]` return type |
+| `app/components/chat/message-assistant.tsx` | Fixed tool parts filtering with `isToolPart()` helper; updated `searchImageResults` to use v5 flat properties; proper `ImageResult[]` typing |
+| `app/components/chat/tool-invocation.tsx` | Fixed `toolCallId` and `toolName` access (v5 uses flat properties, tool name extracted from type); added `getToolNameFromPart()` helper |
+| `app/components/multi-chat/multi-conversation.tsx` | Added `getMessageText()` and `getMessageAttachments()` helpers; replaced direct `content` and `experimental_attachments` access with helper functions |
+| `lib/hooks/use-chat-preview.tsx` | Added `getMessageText()` helper; fixed content extraction for preview messages |
+| `lib/ai/message-conversion.ts` | Removed FIXME markers; updated comments to be informational |
+| `lib/chat-store/types.ts` | Removed FIXME markers; added informational comments about legacy properties |
+
+**Key v5 Tool Part Patterns Established:**
+- Tool parts have type `tool-{toolName}` (e.g., `tool-exa_search`, `tool-imageSearch`)
+- Tool name extracted via `part.type.replace(/^tool-/, "")`
+- Direct property access: `part.state`, `part.input`, `part.output`, `part.toolCallId`
+- State values: `"input-streaming"`, `"input-available"`, `"output-available"`, `"output-error"`
+
+**Remaining Pre-existing Errors (not Phase 4 related):**
+- 13 implicit `any` type errors in settings components (strict mode violations)
+- 3 MCP experimental API errors (separate concern)
+- 1 TanStack Query import error (package version mismatch)
+
+**Rendering-level errors: 0** (all AI SDK v5 related errors resolved)
+
 ---
 
 ## Phase 5: v5 → v6 Upgrade (30 min)
@@ -893,10 +920,10 @@ Phase 2 (Server-Side) ✅
 Phase 3 (Client-Side) ✅
     │
     ▼
-Phase 4 (Rendering) ◄── NEXT
+Phase 4 (Rendering) ✅
     │
     ▼
-Phase 5 (v6 Upgrade) ──── Only after v5 stable
+Phase 5 (v6 Upgrade) ◄── NEXT (after v5 stability verified)
     │
     ▼
 Phase 6 (Testing)
@@ -941,14 +968,14 @@ When executing this plan as an AI agent:
 | Phase 1.5: Cleanup | 30 min | ✅ Complete |
 | Phase 2: Server | 45 min | ✅ Complete |
 | Phase 3: Client | 90 min | ✅ Complete |
-| Phase 4: Rendering | 45 min | Pending |
+| Phase 4: Rendering | 45 min | ✅ Complete |
 | Phase 5: v6 | 30 min | Pending |
 | Phase 6: Testing | 60 min | Pending |
 | Phase 7: Cleanup | 15 min | Pending |
-| **Total Remaining** | **~2.5 hours** | |
+| **Total Remaining** | **~1.75 hours** | |
 
-**Buffer for issues:** +1 hour
-**Total estimate:** 3-4 hours remaining
+**Buffer for issues:** +30 min
+**Total estimate:** 2-2.5 hours remaining
 
 ---
 

@@ -9,6 +9,31 @@ import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
 
+// v5 helper: Extract text content from UIMessage parts array
+function getMessageText(message: MessageType): string {
+  const textPart = message.parts?.find((p) => p.type === "text")
+  return (textPart as { text?: string })?.text || ""
+}
+
+// v5 helper: Extract file attachments from parts array for backward compatibility
+function getMessageAttachments(
+  message: MessageType
+): Array<{ name: string; contentType: string; url: string }> | undefined {
+  const extMessage = message as ExtendedMessageAISDK
+  // First check if legacy experimental_attachments exists
+  if (extMessage.experimental_attachments) {
+    return extMessage.experimental_attachments
+  }
+  // Otherwise extract from file parts
+  const fileParts = message.parts?.filter((p) => p.type === "file")
+  if (!fileParts || fileParts.length === 0) return undefined
+  return fileParts.map((p) => ({
+    name: (p as { filename?: string }).filename || "file",
+    contentType: (p as { mediaType?: string }).mediaType || "application/octet-stream",
+    url: (p as { url?: string }).url || "",
+  }))
+}
+
 type ConversationProps = {
   messages: MessageType[]
   status?: "streaming" | "ready" | "submitted" | "error"
@@ -53,13 +78,12 @@ export function Conversation({
               index === messages.length - 1 && status !== "submitted"
             const hasScrollAnchor = isLast && messages.length > initialCount
 
-            /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
             return (
               <Message
                 key={message.id}
                 id={message.id}
                 variant={message.role}
-                attachments={message.experimental_attachments}
+                attachments={getMessageAttachments(message)}
                 isLast={isLast}
                 onDelete={onDelete}
                 onEdit={onEdit}
@@ -73,7 +97,7 @@ export function Conversation({
                 }
                 isUserAuthenticated={isUserAuthenticated}
               >
-                {message.content}
+                {getMessageText(message)}
               </Message>
             );
           })}

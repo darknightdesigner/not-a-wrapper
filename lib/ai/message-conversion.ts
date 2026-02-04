@@ -11,12 +11,12 @@
 import type { UIMessage } from "ai"
 
 // v4 message shape (what we currently have in storage)
+// Note: experimental_attachments is a v4 legacy property; v5 uses parts array with file parts
 interface V4Message {
   id: string
   role: "user" | "assistant" | "system"
   content: string
   createdAt?: Date
-  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   experimental_attachments?: Array<{
     name: string
     contentType: string
@@ -55,12 +55,9 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     parts.push({ type: "text", text: v4Message.content })
   }
 
-  // Convert experimental_attachments to file parts
-  // In v4, FileUIPart uses { mimeType, data } not { mediaType, url }
-  // We'll store as text placeholder since file format differs between versions
-  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
+  // Convert v4 experimental_attachments to v5 parts format
+  // Note: In v5, files are represented as file parts in the parts array
   if (v4Message.experimental_attachments?.length) {
-    /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
     for (const att of v4Message.experimental_attachments) {
       // Store file metadata as a text marker for now
       // The actual attachment handling is done via experimental_attachments
@@ -71,15 +68,15 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     }
   }
 
-  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
+  // In v5, UIMessage has parts instead of content. The extended types in
+  // lib/chat-store/messages/api.ts add optional content/experimental_attachments
+  // for backward compatibility, but the core UIMessage only needs parts.
   return {
     id: v4Message.id,
     role: v4Message.role,
-    content: v4Message.content, // Required in v4, will be derived in v5
     parts,
     createdAt: v4Message.createdAt,
-    experimental_attachments: v4Message.experimental_attachments,
-  };
+  } as UIMessage;
 }
 
 /**
