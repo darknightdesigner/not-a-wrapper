@@ -8,6 +8,7 @@ import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
 import type { ToolUIPart } from "ai"
+import { isStaticToolUIPart, getStaticToolName } from "ai"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   RefreshIcon,
@@ -22,16 +23,6 @@ import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
 import { useAssistantMessageSelection } from "./useAssistantMessageSelection"
-
-// v5 helper: Check if part is a tool part (type starts with "tool-")
-function isToolPart(part: NonNullable<MessageAISDK["parts"]>[number]): part is ToolUIPart {
-  return part.type.startsWith("tool-")
-}
-
-// v5 helper: Get tool name from ToolUIPart
-function getToolNameFromPart(part: ToolUIPart): string {
-  return part.type.replace(/^tool-/, "")
-}
 
 type MessageAssistantProps = {
   children: string
@@ -63,8 +54,8 @@ export function MessageAssistant({
   const { preferences } = useUserPreferences()
   const sources = getSources(parts || [])
   
-  // v5: Filter tool parts using helper (tool parts have type like "tool-{name}")
-  const toolInvocationParts = parts?.filter(isToolPart) as ToolUIPart[] | undefined
+  // v6: Filter tool parts using official helper
+  const toolInvocationParts = parts?.filter(isStaticToolUIPart) as ToolUIPart[] | undefined
   
   const reasoningParts = parts?.find((part) => part.type === "reasoning")
   const contentNullOrEmpty = children === null || children === ""
@@ -73,13 +64,13 @@ export function MessageAssistant({
   // Type for image search results
   type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
   
-  // v5: Use flat properties instead of toolInvocation.* - tool name is extracted from type
+  // v6: Use flat properties and official helper for tool name
   const searchImageResults: ImageResult[] =
     parts
       ?.filter((part): part is ToolUIPart =>
-        isToolPart(part) &&
+        isStaticToolUIPart(part) &&
         part.state === "output-available" &&
-        getToolNameFromPart(part) === "imageSearch" &&
+        getStaticToolName(part) === "imageSearch" &&
         (part.output as { content?: Array<{ type: string }> })?.content?.[0]?.type === "images"
       )
       .flatMap((part) => {

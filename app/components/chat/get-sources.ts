@@ -1,23 +1,12 @@
 import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
 import type { SourceUrlUIPart, ToolUIPart } from "ai"
+import { isStaticToolUIPart, getStaticToolName } from "ai"
 
 // Source type for validation
 interface SourceLike {
   url: string
   title?: string
   sourceId?: string
-}
-
-// v5 helper: Check if part is a tool part (type starts with "tool-")
-function isToolPart(part: NonNullable<MessageAISDK["parts"]>[number]): part is ToolUIPart {
-  return part.type.startsWith("tool-")
-}
-
-// v5 helper: Get tool name from ToolUIPart (in v5, it's extracted from the type: "tool-{toolName}")
-function getToolNameFromPart(part: ToolUIPart): string {
-  // In v5, tool parts have type like "tool-exa_search", "tool-summarizeSources", etc.
-  // The toolName is part of the type string after "tool-"
-  return part.type.replace(/^tool-/, "")
 }
 
 // Type guard to check if an object is a valid source
@@ -34,17 +23,17 @@ function isValidSource(source: unknown): source is SourceLike {
 export function getSources(parts: MessageAISDK["parts"]): SourceUrlUIPart[] {
   const sources = parts
     ?.filter(
-      (part) => part.type === "source-url" || isToolPart(part)
+      (part) => part.type === "source-url" || isStaticToolUIPart(part)
     )
     .map((part) => {
       if (part.type === "source-url") {
-        return part // In v5, the source-url part IS the source object
+        return part // In v6, the source-url part IS the source object
       }
 
-      // v5: Tool parts are flat - use part.state, part.output, etc. instead of part.toolInvocation.*
-      if (isToolPart(part) && part.state === "output-available") {
+      // v6: Tool parts use flat properties - use part.state, part.output, etc.
+      if (isStaticToolUIPart(part) && part.state === "output-available") {
         const result = part.output as unknown
-        const toolName = getToolNameFromPart(part)
+        const toolName = getStaticToolName(part)
 
         // Handle summarizeSources tool which returns citations
         if (toolName === "summarizeSources") {

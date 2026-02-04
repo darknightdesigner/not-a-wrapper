@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import type { ToolUIPart } from 'ai'
+import { getStaticToolName } from 'ai'
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowDown01Icon,
@@ -14,11 +15,6 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
-
-// v5 helper: Get tool name from ToolUIPart (tool name is in the type: "tool-{toolName}")
-function getToolNameFromPart(part: ToolUIPart): string {
-  return part.type.replace(/^tool-/, "")
-}
 
 interface ToolInvocationProps {
   toolInvocations: ToolUIPart[]
@@ -216,8 +212,8 @@ function SingleToolCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
   const { state, toolCallId } = toolData
-  // v5: Tool name is extracted from type (e.g., "tool-exa_search" → "exa_search")
-  const toolName = getToolNameFromPart(toolData)
+  // v6: Get tool name using official helper
+  const toolName = getStaticToolName(toolData)
   const args = toolData.input as Record<string, unknown> | undefined
   const isLoading = state === "input-available"
   const isCompleted = state === "output-available"

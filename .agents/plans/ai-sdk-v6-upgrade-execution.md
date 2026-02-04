@@ -3,8 +3,8 @@
 > **Goal:** Upgrade from AI SDK v4.x to v6.x with near-perfect execution
 > **Created:** 2026-02-02
 > **Last Updated:** 2026-02-04
-> **Estimated Remaining Effort:** 2.5 hours
-> **Status:** ✅ Phase 4 Complete — Ready for Phase 5
+> **Estimated Remaining Effort:** 1.25 hours
+> **Status:** ✅ Phase 5 Complete — Ready for Phase 6 (Testing)
 
 ---
 
@@ -800,6 +800,33 @@ git add -A
 git commit -m "chore: upgrade to AI SDK v6"
 ```
 
+### Phase 5 Completion Notes (2026-02-04)
+
+Phase 5 completed successfully with the following changes:
+
+| File | Changes Made |
+|------|--------------|
+| `lib/openproviders/index.ts` | Updated `LanguageModelV2` → `LanguageModelV3` import and return type |
+| `lib/models/types.ts` | Updated `LanguageModelV2` → `LanguageModelV3` in `apiSdk` return type |
+| `app/components/chat/get-sources.ts` | Updated to use v6 official helpers (`isStaticToolUIPart`, `getStaticToolName`) |
+| `app/components/chat/message-assistant.tsx` | Updated to use v6 official helpers |
+| `app/components/chat/tool-invocation.tsx` | Updated to use v6 official helper (`getStaticToolName`) |
+
+**Key v6 Changes:**
+- Provider packages upgraded: `@ai-sdk/*@3`, `@ai-sdk/provider-utils@4`
+- Core package: `ai@6`
+- OpenRouter provider: `@openrouter/ai-sdk-provider@2`
+- `LanguageModelV2` → `LanguageModelV3` for all provider returns
+- Official tool helpers: `isStaticToolUIPart()`, `getStaticToolName()` for type-safe tool rendering
+- `convertToModelMessages` is now async (already handled by codemod with `await`)
+
+**Remaining Pre-existing Errors (not v6 related):**
+- 13 implicit `any` type errors in settings components (strict mode violations)
+- 3 MCP experimental API errors (`experimental_createMCPClient` removed in v6)
+- 1 TanStack Query import error (package version mismatch)
+
+**AI SDK v6 related errors: 0** ✅
+
 ---
 
 ## Phase 6: Testing & Verification (60 min)
@@ -923,10 +950,10 @@ Phase 3 (Client-Side) ✅
 Phase 4 (Rendering) ✅
     │
     ▼
-Phase 5 (v6 Upgrade) ◄── NEXT (after v5 stability verified)
+Phase 5 (v6 Upgrade) ✅
     │
     ▼
-Phase 6 (Testing)
+Phase 6 (Testing) ◄── NEXT
     │
     ▼
 Phase 7 (Cleanup)
@@ -969,10 +996,10 @@ When executing this plan as an AI agent:
 | Phase 2: Server | 45 min | ✅ Complete |
 | Phase 3: Client | 90 min | ✅ Complete |
 | Phase 4: Rendering | 45 min | ✅ Complete |
-| Phase 5: v6 | 30 min | Pending |
+| Phase 5: v6 | 30 min | ✅ Complete |
 | Phase 6: Testing | 60 min | Pending |
 | Phase 7: Cleanup | 15 min | Pending |
-| **Total Remaining** | **~1.75 hours** | |
+| **Total Remaining** | **~1.25 hours** | |
 
 **Buffer for issues:** +30 min
 **Total estimate:** 2-2.5 hours remaining

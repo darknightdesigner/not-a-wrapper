@@ -3,7 +3,7 @@ import { createGoogleGenerativeAI, google } from "@ai-sdk/google"
 import { createMistral, mistral } from "@ai-sdk/mistral"
 import { createOpenAI, openai } from "@ai-sdk/openai"
 import { createPerplexity, perplexity } from "@ai-sdk/perplexity"
-import type { LanguageModelV2 } from "@ai-sdk/provider"
+import type { LanguageModelV3 } from "@ai-sdk/provider"
 import { createXai, xai } from "@ai-sdk/xai"
 import { getProviderForModel } from "./provider-map"
 import type {
@@ -52,7 +52,7 @@ export function openproviders<T extends SupportedModel>(
   modelId: T,
   _settings?: unknown,
   apiKey?: string
-): LanguageModelV2 {
+): LanguageModelV3 {
   const provider = getProviderForModel(modelId)
 
   if (provider === "openai") {
