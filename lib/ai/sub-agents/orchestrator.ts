@@ -46,7 +46,7 @@ export const DEFAULT_SUB_AGENT_CONFIGS: Record<SubAgentType, SubAgentConfig> = {
 - Help with documentation
 
 Focus on clean, maintainable, and efficient code. Consider edge cases and error handling.`,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: 0.3,
     tools: ["search", "read"],
   },
@@ -63,7 +63,7 @@ Focus on clean, maintainable, and efficient code. Consider edge cases and error 
 - Create outlines and drafts
 
 Focus on clarity, engagement, and meeting the user's goals for the content.`,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: 0.7,
     tools: ["search"],
   },
@@ -80,7 +80,7 @@ Focus on clarity, engagement, and meeting the user's goals for the content.`,
 - Highlight limitations and uncertainties
 
 Focus on accuracy, depth, and providing actionable insights.`,
-    maxTokens: 4096,
+    maxOutputTokens: 4096,
     temperature: 0.5,
     tools: ["search", "web"],
   },
@@ -97,7 +97,7 @@ Focus on accuracy, depth, and providing actionable insights.`,
 - Help with statistical analysis
 
 Focus on actionable insights and clear communication of findings.`,
-    maxTokens: 3072,
+    maxOutputTokens: 3072,
     temperature: 0.4,
     tools: ["calculate"],
   },

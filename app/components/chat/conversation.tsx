@@ -5,7 +5,7 @@ import {
 import { Loader } from "@/components/ui/loader"
 import { ScrollButton } from "@/components/ui/scroll-button"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
 
@@ -53,6 +53,7 @@ export function Conversation({
               index === messages.length - 1 && status !== "submitted"
             const hasScrollAnchor = isLast && messages.length > initialCount
 
+            /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
             return (
               <Message
                 key={message.id}
@@ -74,7 +75,7 @@ export function Conversation({
               >
                 {message.content}
               </Message>
-            )
+            );
           })}
           {status === "submitted" &&
             messages.length > 0 &&
@@ -89,5 +90,5 @@ export function Conversation({
         </ChatContainerContent>
       </ChatContainerRoot>
     </div>
-  )
+  );
 }

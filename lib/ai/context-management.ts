@@ -10,7 +10,7 @@
  * @see .agents/context/ai-context-engineering-guide.md for implementation details
  */
 
-import type { Message as AIMessage } from "ai"
+import type { UIMessage as AIMessage } from "ai"
 
 // ============================================================================
 // Constants
@@ -99,7 +99,7 @@ export function estimateTokens(text: string): number {
  * @param messages - Array of AI SDK messages
  * @returns Token estimate with breakdown
  */
-export function estimateMessageTokens(messages: AIMessage[]): TokenEstimate {
+export function estimateMessageTokens(messages: undefined[]): TokenEstimate {
   const result: TokenEstimate = {
     total: 0,
     byRole: {
@@ -140,7 +140,7 @@ export function estimateMessageTokens(messages: AIMessage[]): TokenEstimate {
  * @returns Whether compaction is needed
  */
 export function shouldCompact(
-  messages: AIMessage[],
+  messages: undefined[],
   threshold: number = DEFAULT_COMPACTION_THRESHOLD
 ): boolean {
   const estimate = estimateMessageTokens(messages)
@@ -169,9 +169,9 @@ export function shouldCompact(
  * TODO: Store summaries in Convex for retrieval
  */
 export async function compactContext(
-  messages: AIMessage[],
+  messages: undefined[],
   config: Partial<ContextManagementConfig> = {}
-): Promise<{ messages: AIMessage[]; result: CompactionResult }> {
+): Promise<{ messages: undefined[]; result: CompactionResult }> {
   const preserveCount = config.preserveRecentMessages ?? DEFAULT_PRESERVE_RECENT
   const threshold = config.compactionThreshold ?? DEFAULT_COMPACTION_THRESHOLD
 
@@ -211,7 +211,7 @@ export async function compactContext(
   // Generate summary of older messages
   // TODO: Replace with actual LLM call using Claude Haiku
   const summary = generatePlaceholderSummary(olderMessages)
-  const summaryMessage: AIMessage = {
+  const summaryMessage: undefined = {
     id: `summary-${Date.now()}`,
     role: "system",
     content: `[Context Summary]\n${summary}`,
@@ -237,7 +237,7 @@ export async function compactContext(
  * Placeholder summary generator.
  * In production, this would use Claude Haiku for summarization.
  */
-function generatePlaceholderSummary(messages: AIMessage[]): string {
+function generatePlaceholderSummary(messages: undefined[]): string {
   const userMessages = messages.filter((m) => m.role === "user")
   const assistantMessages = messages.filter((m) => m.role === "assistant")
 
@@ -295,7 +295,7 @@ export function formatNote(note: StructuredNote): string {
  */
 export async function extractNotesFromConversation(
    
-  _messages: AIMessage[]
+  _messages: undefined[]
 ): Promise<StructuredNote[]> {
   // TODO: Implement with Claude Haiku
   // This would analyze the conversation and extract key information

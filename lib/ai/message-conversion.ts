@@ -8,7 +8,7 @@
  * during the package upgrade when UIMessage changes to require parts instead of content.
  */
 
-import type { Message, UIMessage } from "ai"
+import type { UIMessage } from "ai"
 
 // v4 message shape (what we currently have in storage)
 interface V4Message {
@@ -16,6 +16,7 @@ interface V4Message {
   role: "user" | "assistant" | "system"
   content: string
   createdAt?: Date
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   experimental_attachments?: Array<{
     name: string
     contentType: string
@@ -28,7 +29,7 @@ interface V4Message {
  */
 export function hasPartsArray(
   message: unknown
-): message is Message & { parts: NonNullable<UIMessage["parts"]> } {
+): message is UIMessage & { parts: NonNullable<UIMessage["parts"]> } {
   return (
     typeof message === "object" &&
     message !== null &&
@@ -57,7 +58,9 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
   // Convert experimental_attachments to file parts
   // In v4, FileUIPart uses { mimeType, data } not { mediaType, url }
   // We'll store as text placeholder since file format differs between versions
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   if (v4Message.experimental_attachments?.length) {
+    /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
     for (const att of v4Message.experimental_attachments) {
       // Store file metadata as a text marker for now
       // The actual attachment handling is done via experimental_attachments
@@ -68,6 +71,7 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     }
   }
 
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   return {
     id: v4Message.id,
     role: v4Message.role,
@@ -75,7 +79,7 @@ export function convertV4ToV5Message(v4Message: V4Message): UIMessage {
     parts,
     createdAt: v4Message.createdAt,
     experimental_attachments: v4Message.experimental_attachments,
-  }
+  };
 }
 
 /**

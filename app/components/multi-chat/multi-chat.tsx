@@ -34,6 +34,12 @@ type GroupedMessage = {
   onReload: (model: string) => void
 }
 
+// v5 helper: Extract text content from UIMessage parts array
+function getMessageText(message: MessageType): string {
+  const textPart = message.parts?.find((p) => p.type === "text")
+  return (textPart as { text?: string })?.text || ""
+}
+
 export function MultiChat() {
   const [prompt, setPrompt] = useState("")
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
@@ -112,7 +118,7 @@ export function MultiChat() {
       const message = persistedMessages[i]
 
       if (message.role === "user") {
-        const groupKey = message.content
+        const groupKey = getMessageText(message)
         if (!groups[groupKey]) {
           groups[groupKey] = {
             userMessage: message,
@@ -129,7 +135,7 @@ export function MultiChat() {
         }
 
         if (associatedUserMessage) {
-          const groupKey = associatedUserMessage.content
+          const groupKey = getMessageText(associatedUserMessage)
           if (!groups[groupKey]) {
             groups[groupKey] = {
               userMessage: associatedUserMessage,
@@ -178,7 +184,7 @@ export function MultiChat() {
         const assistantMsg = chat.messages[i + 1]
 
         if (userMsg?.role === "user") {
-          const groupKey = userMsg.content
+          const groupKey = getMessageText(userMsg)
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -205,13 +211,13 @@ export function MultiChat() {
             }
           } else if (
             chat.isLoading &&
-            userMsg.content === prompt &&
+            getMessageText(userMsg) === prompt &&
             selectedModelIds.includes(chat.model.id)
           ) {
             const placeholderMessage: MessageType = {
               id: `loading-${chat.model.id}`,
               role: "assistant",
-              content: "",
+              parts: [{ type: "text", text: "" }],
             }
             liveGroups[groupKey].responses.push({
               model: chat.model.id,

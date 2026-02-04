@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { isConvexId } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
-import { Message as MessageType } from "@ai-sdk/react"
+import { UIMessage as MessageType } from "@ai-sdk/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Tick02Icon,

@@ -9,7 +9,7 @@ import {
   getPostHogClient,
 } from "@/lib/posthog"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
-import { Message as MessageAISDK, streamText, ToolSet } from "ai"
+import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
 import {
   checkServerSideUsage,
   incrementServerSideUsage,
@@ -137,12 +137,16 @@ export async function POST(req: Request) {
       })
     }
 
+    // Convert UIMessage[] to ModelMessage[] for streamText in v5
+    const modelMessages = convertToModelMessages(messages)
+
     const result = streamText({
       model: aiModel,
       system: effectiveSystemPrompt,
-      messages: messages,
+      messages: modelMessages,
       tools: {} as ToolSet,
-      maxSteps: 10,
+      stopWhen: stepCountIs(10),
+
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
 
@@ -172,6 +176,7 @@ export async function POST(req: Request) {
           }
         }
       },
+
       onFinish: ({ text, usage }) => {
         // Manually capture LLM generation for PostHog analytics
         // This ensures accurate output capture (withTracing has issues with streaming)
@@ -185,8 +190,8 @@ export async function POST(req: Request) {
               provider,
               input: messages,
               output: text,
-              inputTokens: usage?.promptTokens,
-              outputTokens: usage?.completionTokens,
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
               latencyMs,
               properties: {
                 isAuthenticated,
@@ -201,17 +206,17 @@ export async function POST(req: Request) {
             )
           }
         }
-      },
+      }
     })
 
-    return result.toDataStreamResponse({
+    return result.toUIMessageStreamResponse({
       sendReasoning: true,
       sendSources: true,
-      getErrorMessage: (error: unknown) => {
+      onError: (error: unknown) => {
         console.error("Error forwarded to client:", error)
         return extractErrorMessage(error)
       },
-    })
+    });
   } catch (err: unknown) {
     console.error("Error in /api/chat:", err)
     const error = err as {

@@ -546,7 +546,7 @@ Phase 3 completed with the following changes:
 | `app/components/chat/use-chat-core.ts` | Manual input state, `sendMessage`/`regenerate` instead of `handleSubmit`/`reload`/`append`, v5 `onFinish` callback, optimistic messages with parts format |
 | `app/p/[projectId]/project-view.tsx` | Same v5 patterns as use-chat-core.ts |
 | `app/components/multi-chat/use-multi-chat.ts` | Updated to use `sendMessage`, `status !== 'ready'` for loading, memoized transports |
-| `app/components/multi-chat/multi-chat.tsx` | Updated to call `sendMessage` instead of `append` |
+| `app/components/multi-chat/multi-chat.tsx` | Updated to call `sendMessage` instead of `append`; added `getMessageText()` helper to extract text from parts; placeholder messages now use `parts` format |
 | `lib/chat-store/messages/provider.tsx` | Fixed `undefined` types from codemod, created `ExtendedUIMessage` type for app compatibility |
 | `lib/chat-store/messages/api.ts` | Fixed `undefined` types from codemod, created `ExtendedUIMessage` type |
 | `app/components/chat/syncRecentMessages.ts` | Fixed type issues with `ExtendedUIMessage` |
@@ -557,6 +557,7 @@ Phase 3 completed with the following changes:
 - `input` and `setInput` must be managed locally with `useState` - no longer returned from `useChat`
 - Optimistic messages use v5 `parts` array format: `{ type: "text", text: "..." }`, `{ type: "file", filename, mediaType, url }`
 - `onFinish` callback receives `{ message, isAbort, isError }` instead of just the message
+- Use `getMessageText(message)` helper to extract text from `parts` array (replaces direct `content` access)
 
 **Hook-level errors: 0** (remaining errors are in rendering components for Phase 4)
 

@@ -1,9 +1,18 @@
-import { Message as MessageAISDK } from "ai"
+import { UIMessage as MessageAISDK } from "ai"
+
+/**
+ * Check if a part is tool-related (v5 uses parts with type starting with 'tool-')
+ */
+function isToolPart(part: { type: string }): boolean {
+  return part.type.startsWith('tool-')
+}
 
 /**
  * Clean messages when switching between agents with different tool capabilities.
  * This removes tool invocations and tool-related content from messages when tools are not available
  * to prevent OpenAI API errors.
+ * 
+ * In v5, messages use `parts` array instead of `content` and `toolInvocations`.
  */
 export function cleanMessagesForTools(
   messages: MessageAISDK[],
@@ -17,90 +26,26 @@ export function cleanMessagesForTools(
   const cleanedMessages = messages
     .map((message) => {
       // Skip tool messages entirely when no tools are available
-      // Note: Using type assertion since AI SDK types might not include 'tool' role
       if ((message as { role: string }).role === "tool") {
         return null
       }
 
-      if (message.role === "assistant") {
-        const cleanedMessage: MessageAISDK = { ...message }
+      // Filter out tool-related parts from the message
+      const filteredParts = message.parts.filter(part => !isToolPart(part))
 
-        if (message.toolInvocations && message.toolInvocations.length > 0) {
-          delete cleanedMessage.toolInvocations
+      // If all parts were tool-related, provide a fallback text part
+      if (filteredParts.length === 0) {
+        return {
+          ...message,
+          parts: [{ type: 'text' as const, text: '[Response]' }],
         }
-
-        if (Array.isArray(message.content)) {
-          const filteredContent = (
-            message.content as Array<{ type?: string; text?: string }>
-          ).filter((part: { type?: string }) => {
-            if (part && typeof part === "object" && part.type) {
-              // Remove tool-call, tool-result, and tool-invocation parts
-              const isToolPart =
-                part.type === "tool-call" ||
-                part.type === "tool-result" ||
-                part.type === "tool-invocation"
-              return !isToolPart
-            }
-            return true
-          })
-
-          // Extract text content
-          const textParts = filteredContent.filter(
-            (part: { type?: string }) =>
-              part && typeof part === "object" && part.type === "text"
-          )
-
-          if (textParts.length > 0) {
-            // Combine text parts into a single string
-            const textContent = textParts
-              .map((part: { text?: string }) => part.text || "")
-              .join("\n")
-              .trim()
-            cleanedMessage.content = textContent || "[Assistant response]"
-          } else if (filteredContent.length === 0) {
-            // If no content remains after filtering, provide fallback
-            cleanedMessage.content = "[Assistant response]"
-          } else {
-            // Keep the filtered content as string if possible
-            cleanedMessage.content = "[Assistant response]"
-          }
-        }
-
-        // If the message has no meaningful content after cleaning, provide fallback
-        if (
-          !cleanedMessage.content ||
-          (typeof cleanedMessage.content === "string" &&
-            cleanedMessage.content.trim() === "")
-        ) {
-          cleanedMessage.content = "[Assistant response]"
-        }
-
-        return cleanedMessage
       }
 
-      // For user messages, clean any tool-related content from array content
-      if (message.role === "user" && Array.isArray(message.content)) {
-        const filteredContent = (
-          message.content as Array<{ type?: string }>
-        ).filter((part: { type?: string }) => {
-          if (part && typeof part === "object" && part.type) {
-            const isToolPart =
-              part.type === "tool-call" ||
-              part.type === "tool-result" ||
-              part.type === "tool-invocation"
-            return !isToolPart
-          }
-          return true
-        })
-
-        if (
-          filteredContent.length !== (message.content as Array<unknown>).length
-        ) {
-          return {
-            ...message,
-            content:
-              filteredContent.length > 0 ? filteredContent : "User message",
-          }
+      // If parts were filtered, return updated message
+      if (filteredParts.length !== message.parts.length) {
+        return {
+          ...message,
+          parts: filteredParts,
         }
       }
 
@@ -113,21 +58,12 @@ export function cleanMessagesForTools(
 
 /**
  * Check if a message contains tool-related content
+ * In v5, tool parts have types starting with 'tool-' in the parts array
  */
 export function messageHasToolContent(message: MessageAISDK): boolean {
-  return !!(
-    message.toolInvocations?.length ||
+  return (
     (message as { role: string }).role === "tool" ||
-    (Array.isArray(message.content) &&
-      (message.content as Array<{ type?: string }>).some(
-        (part: { type?: string }) =>
-          part &&
-          typeof part === "object" &&
-          part.type &&
-          (part.type === "tool-call" ||
-            part.type === "tool-result" ||
-            part.type === "tool-invocation")
-      ))
+    message.parts.some(part => isToolPart(part))
   )
 }
 

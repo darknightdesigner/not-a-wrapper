@@ -40,6 +40,8 @@ export interface Message {
   role: "user" | "assistant" | "system" | "data"
   content: string | null
   parts?: unknown
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   experimental_attachments?: unknown[]
   message_group_id?: string | null
   model?: string | null
@@ -80,6 +82,7 @@ export function convexChatToChat(convexChat: ConvexChat): Chat {
  * Convert Convex message to unified Message type
  */
 export function convexMessageToMessage(convexMessage: ConvexMessage): Message {
+  /* FIXME(@ai-sdk-upgrade-v5): The `experimental_attachments` property has been replaced with the parts array. Please manually migrate following https://ai-sdk.dev/docs/migration-guides/migration-guide-5-0#attachments--file-parts */
   return {
     id: convexMessage._id,
     chat_id: convexMessage.chatId,
@@ -91,7 +94,7 @@ export function convexMessageToMessage(convexMessage: ConvexMessage): Message {
     message_group_id: convexMessage.messageGroupId ?? null,
     model: convexMessage.model ?? null,
     created_at: new Date(convexMessage._creationTime).toISOString(),
-  }
+  };
 }
 
 /**

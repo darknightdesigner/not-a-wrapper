@@ -6,7 +6,7 @@ import {
 } from "@/components/ui/message"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
-import type { Message as MessageAISDK } from "@ai-sdk/react"
+import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   RefreshIcon,
@@ -104,9 +104,9 @@ export function MessageAssistant({
         )}
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
-        {reasoningParts && reasoningParts.reasoning && (
+        {reasoningParts && reasoningParts.text && (
           <Reasoning
-            reasoning={reasoningParts.reasoning}
+            reasoning={reasoningParts.text}
             isStreaming={status === "streaming"}
           />
         )}
@@ -187,5 +187,5 @@ export function MessageAssistant({
         )}
       </div>
     </Message>
-  )
+  );
 }
