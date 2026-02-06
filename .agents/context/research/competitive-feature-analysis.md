@@ -251,18 +251,18 @@
 | Stop generation | Yes | Yes | Yes | **None** |
 | Copy message | Yes | Yes | Yes | **None** |
 | Quoted text selection | No | No | Yes | **Opportunity** |
-| Multi-model comparison | No | No | Yes (up to 10) | **Opportunity** |
+| Multi-model comparison | No | No | Yes (up to 5 by default) | **Opportunity** |
 | BYOK encryption | No | No | Yes (AES-256-GCM) | **Opportunity** |
-| 10 providers / 73+ models | No (1 provider) | No (1 provider) | Yes | **Opportunity** |
-| Local model support (Ollama) | No | No | Yes | **Opportunity** |
+| 9 providers / 94+ models | No (1 provider) | No (1 provider) | Yes | **Opportunity** |
+| Local model support (Ollama) | No | No | Yes (dev-only; prod disabled) | **Opportunity** |
 | Open source | No | No | Yes | **Opportunity** |
 | Model picker with metadata | Basic | Basic | Rich (speed, cost, context) | **None** |
 | Message reactions / feedback | Yes | Yes | No | **Major** |
 | Branching chats | Yes | No | No | **Minor** |
 | Image upload / vision | Yes | Yes | Yes | **None** |
-| File upload (PDF, docs) | Yes | Yes | Yes (limited formats) | **Minor** |
+| File upload (PDF, docs) | Yes | Yes | Yes (PDF/CSV/Excel/MD/images) | **Minor** |
 | Audio input / voice | Yes | No | No | **Major** |
-| Drag and drop files | Yes | Yes | No | **Minor** |
+| Drag and drop files | Yes | Yes | Yes (global dropzone) | **None** |
 | Image generation | Yes (native) | No | No | **Major** |
 | Code execution sandbox | Yes | Yes | No | **Major** |
 | Artifacts / Canvas | Yes | Yes | No | **Major** |
@@ -277,7 +277,7 @@
 | Custom instructions | Yes | Yes | Yes (system prompt) | **None** |
 | Memory management UI | Yes | Yes | No | **Major** |
 | Chat history sidebar | Yes | Yes | Yes | **None** |
-| Full-text search | Yes | Yes | Yes (Cmd+K) | **None** |
+| Full-text search | Yes | Yes | Limited (chat titles only) | **Minor** |
 | Projects / folders | Yes | Yes | Yes | **None** |
 | Pinned chats | Yes | Yes | Yes | **None** |
 | Chat archiving | Yes | Yes | No | **Minor** |
@@ -289,9 +289,9 @@
 | Code block copy | Yes | Yes | Yes | **None** |
 | Dark/light theme | Yes | Yes | Yes | **None** |
 | Responsive mobile | Yes | Yes | Yes | **None** |
-| Command palette | No | No | Yes (Cmd+K) | **Opportunity** |
-| Keyboard shortcuts (10+) | Yes | Limited | Limited | **Minor** |
-| Onboarding flow | Yes | Yes | No | **Minor** |
+| Command palette | No | No | Limited (chat actions + search) | **Opportunity** |
+| Keyboard shortcuts (10+) | Yes | Limited | Limited (Cmd+K, Cmd+Shift+U/P/M) | **Minor** |
+| Onboarding flow | Yes | Yes | Limited (empty-state prompt) | **Minor** |
 | Scheduled tasks | Yes | No | No | **Minor** |
 | Agent mode | Yes | No | No | **Major** |
 

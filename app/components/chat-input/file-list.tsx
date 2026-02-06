@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "motion/react"
+import { memo } from "react"
 import { FileItem } from "./file-items"
 
 type FileListProps = {
@@ -12,7 +13,10 @@ const TRANSITION = {
   bounce: 0,
 } as const
 
-export function FileList({ files, onFileRemove }: FileListProps) {
+export const FileList = memo(function FileList({
+  files,
+  onFileRemove,
+}: FileListProps) {
   return (
     <AnimatePresence initial={false}>
       {files.length > 0 && (
@@ -48,4 +52,6 @@ export function FileList({ files, onFileRemove }: FileListProps) {
       )}
     </AnimatePresence>
   )
-}
+})
+
+FileList.displayName = "FileList"
