@@ -1,0 +1,56 @@
+---
+description: "Rules for creating and organizing markdown documentation files"
+globs: "**/*.md"
+---
+
+# Documentation & Markdown Organization
+
+## Core Rule
+
+**All AI-generated documentation MUST be placed in `.agents/`** — never in the project root or arbitrary locations.
+
+## File Placement Guide
+
+| Content Type | Target Directory | Naming Convention |
+|-------------|-----------------|-------------------|
+| Research, analysis, evaluation | `.agents/context/research/` | `[topic]-[type].md` (e.g., `tech-stack-evaluation.md`) |
+| Architecture Decision Record | `.agents/context/decisions/` | `NNN-[topic].md` (e.g., `004-caching-strategy.md`) |
+| Domain reference docs | `.agents/context/` | `[topic].md` (e.g., `api.md`, `database.md`) |
+| Troubleshooting guides | `.agents/context/troubleshooting/` | `[topic].md` |
+| Implementation plans | `.agents/plans/` | `[feature]-[plan-type].md` |
+| Skills (multi-step guides) | `.agents/skills/[name]/` | `SKILL.md` + optional `references/` |
+| Workflows / procedures | `.agents/workflows/` | `[workflow-name].md` |
+| Outdated/superseded docs | `.agents/archive/` | Move existing file, don't delete |
+
+## Allowed Root-Level Markdown
+
+Only these markdown files may exist at the project root:
+
+- `README.md` — Project readme (public-facing)
+- `AGENTS.md` — Universal AI agent context (always loaded)
+- `CLAUDE.md` — Claude-specific context (always loaded)
+- `INSTALL.md` — Installation instructions
+- `NOTES.md` — Temporary session scratch notes
+
+**Everything else goes in `.agents/`.**
+
+## When Creating Documentation
+
+1. **Determine the type** — Is it research, a plan, a decision, a reference, or a workflow?
+2. **Place in the correct directory** — Use the table above
+3. **Follow naming conventions** — Lowercase, hyphenated, descriptive
+4. **Add front matter if relevant** — Title, date, status
+5. **Reference from AGENTS.md** — If the doc should be discoverable, add it to the Context System table
+
+## When Archiving
+
+Move files to `.agents/archive/` when:
+- A plan has been fully executed
+- Research has been superseded by newer findings
+- A decision has been reversed
+
+Never delete — always archive for historical context.
+
+## Distributed CLAUDE.md Files
+
+`CLAUDE.md` files in source directories (e.g., `app/CLAUDE.md`, `lib/CLAUDE.md`) are part of the hierarchical context system. These are NOT documentation — they are Claude-specific configuration and should follow patterns in the root `CLAUDE.md`.

@@ -67,11 +67,18 @@ When you need additional context, use the `@` import syntax:
 
 | Location | Purpose |
 |----------|---------|
-| `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
 | `.agents/context/` | Architecture, API, database, and deployment docs |
+| `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
+| `.agents/context/research/` | Research, evaluations, analyses |
+| `.agents/context/decisions/` | Architecture Decision Records |
+| `.agents/context/troubleshooting/` | Known issues & fixes |
+| `.agents/plans/` | Implementation plans |
 | `.agents/skills/` | Multi-step task guides |
 | `.agents/workflows/` | Development workflows and procedures |
+| `.agents/archive/` | Superseded documents |
 | `.cursor/rules/` | Cursor-specific patterns (auto-loaded) |
+
+> **Documentation rule**: All AI-generated markdown belongs in `.agents/`. See `.cursor/rules/070-documentation.mdc` for placement guide.
 
 ## Development Workflow
 
@@ -107,7 +114,8 @@ For critical paths (auth, data transforms, rate limiting):
 
 When sessions get long:
 - Summarize older messages (keep last 10)
-- Write discoveries to `NOTES.md`
+- Write session discoveries to `NOTES.md` (project root — scratch notes only)
+- Write lasting research/analysis to `.agents/context/research/`
 - Reference `@` files instead of pasting content
 - Use context compaction strategies
 

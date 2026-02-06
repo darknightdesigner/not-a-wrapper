@@ -33,10 +33,15 @@ This project uses a structured context system for AI assistants:
 |----------|---------|-------------|
 | `AGENTS.md` | Quick reference (this file) | Always |
 | `.cursor/rules/` | Cursor-specific patterns | Auto by Cursor |
+| `.agents/context/` | Domain knowledge & references | On-demand |
 | `.agents/context/glossary.md` | Domain terminology | On-demand |
-| `.agents/skills/` | Multi-step task guides | On-demand |
-| `.agents/workflows/` | Step-by-step procedures | On-demand |
+| `.agents/context/research/` | Research, evaluations, analyses | On-demand |
 | `.agents/context/decisions/` | Architecture Decision Records | On-demand |
+| `.agents/context/troubleshooting/` | Known issues & fixes | On-demand |
+| `.agents/plans/` | Implementation plans | On-demand |
+| `.agents/skills/` | Multi-step task guides | On-demand |
+| `.agents/workflows/` | Development procedures | On-demand |
+| `.agents/archive/` | Superseded documents | On-demand |
 
 ### Key Skills
 
@@ -85,8 +90,18 @@ lib/                    # Shared utilities
 
 components/            # Shadcn UI components
 convex/               # Convex DB schema & functions
-.agents/              # AI context (skills, glossary)
-.cursor/rules/        # Cursor-specific rules
+
+.agents/               # AI context & knowledge base
+├── context/          # Domain knowledge & references
+│   ├── decisions/   # Architecture Decision Records
+│   ├── research/    # Research & evaluations
+│   └── troubleshooting/ # Known issues & fixes
+├── plans/            # Implementation plans
+├── skills/           # Multi-step task guides
+├── workflows/        # Development procedures
+└── archive/          # Superseded documents
+
+.cursor/rules/         # Cursor-specific rules
 ```
 
 ## Gold Standard Examples
@@ -137,6 +152,7 @@ catch { if (previous) setState(previous) }
 - Read any source file
 - Run: `dev`, `build`, `lint`, `typecheck`, `test`
 - Create/edit in: `app/`, `lib/`, `components/`, `hooks/`
+- Create/edit documentation in: `.agents/` (follow `.cursor/rules/070-documentation.mdc`)
 
 ### ⚠️ Ask First
 
