@@ -23,7 +23,7 @@ export async function createChatInDb({
   return {
     id: crypto.randomUUID(), // Temporary ID, replaced by Convex
     user_id: userId,
-    title: title || "New Chat",
+    title: title || "New chat",
     model,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

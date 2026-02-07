@@ -4,8 +4,8 @@
   "private": true,
   "packageManager": "bun@1.3.1",
   "scripts": {
-    "dev": "concurrently --names \"next,convex\" -c \"cyan,magenta\" \"next dev --webpack\" \"convex dev\"",
-    "dev:next": "next dev --webpack",
+    "dev": "concurrently --names \"next,convex\" -c \"cyan,magenta\" \"next dev\" \"convex dev\"",
+    "dev:next": "next dev",
     "dev:convex": "convex dev",
     "build": "convex deploy --cmd 'next build' --yes",
     "build:next": "next build",

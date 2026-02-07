@@ -36,9 +36,8 @@ const baseClassName = cn(
   "h-9 pointer-coarse:h-auto",
   // Spacing using CSS variables
   "gap-(--sidebar-item-gap) px-2 py-2 pointer-coarse:py-3",
-  // Colors and transitions
+  // Colors (instant hover — no transition)
   "text-primary hover:bg-accent/80 hover:text-foreground",
-  "motion-safe:transition-colors",
   // Focus states
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 )
@@ -89,7 +88,7 @@ export const SidebarMenuItem = forwardRef<
       </div>
       {/* Trailing content - hidden when collapsed */}
       {trailing && (
-        <div className="text-muted-foreground ml-auto opacity-0 motion-safe:transition-opacity group-hover/menu-item:opacity-100 group-data-[collapsible=icon]:hidden">
+        <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100 group-data-[collapsible=icon]:hidden">
           {trailing}
         </div>
       )}

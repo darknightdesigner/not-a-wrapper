@@ -4,7 +4,7 @@ import { ModelConfig } from "../types"
 const claudeModels: ModelConfig[] = [
   {
     id: "claude-opus-4-6",
-    name: "Claude Opus 4.6",
+    name: "Opus 4.6",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 4.6",
@@ -33,7 +33,7 @@ const claudeModels: ModelConfig[] = [
   },
   {
     id: "claude-sonnet-4-5",
-    name: "Claude Sonnet 4.5",
+    name: "Sonnet 4.5",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 4.5",
@@ -61,7 +61,7 @@ const claudeModels: ModelConfig[] = [
   },
   {
     id: "claude-haiku-4-5",
-    name: "Claude Haiku 4.5",
+    name: "Haiku 4.5",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 4.5",
@@ -88,7 +88,7 @@ const claudeModels: ModelConfig[] = [
   },
   {
     id: "claude-3-haiku-20240307",
-    name: "Claude 3 Haiku",
+    name: "3 Haiku",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 3",
@@ -116,7 +116,7 @@ const claudeModels: ModelConfig[] = [
   },
   {
     id: "claude-opus-4-20250514",
-    name: "Claude Opus 4",
+    name: "Opus 4",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 4",
@@ -144,7 +144,7 @@ const claudeModels: ModelConfig[] = [
   },
   {
     id: "claude-sonnet-4-20250514",
-    name: "Claude Sonnet 4",
+    name: "Sonnet 4",
     provider: "Anthropic",
     providerId: "anthropic",
     modelFamily: "Claude 4",

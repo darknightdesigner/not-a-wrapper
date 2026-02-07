@@ -4,6 +4,13 @@
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
+/* Exclude documentation directories from Tailwind's automatic content detection.
+   .agents/ contains markdown docs with code examples that include raw Tailwind class
+   strings. Without this exclusion, Tailwind extracts those strings as class candidates
+   and generates CSS for them — including invalid patterns documented as "wrong" examples,
+   which crash Turbopack's CSS parser. */
+@source not "../.agents";
+
 @custom-variant dark (&:is(.dark *));
 
 /* Touch device detection - hides elements on coarse pointer (touch) devices */

@@ -1,6 +1,5 @@
 "use client"
 
-import { groupChatsByDate } from "@/app/components/history/utils"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { NawIcon } from "@/components/icons/naw"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
@@ -52,10 +51,10 @@ export function AppSidebar() {
 
   const scrollViewportRef = useRef<HTMLDivElement>(null)
 
-  const groupedChats = useMemo(() => {
-    const result = groupChatsByDate(chats, "")
-    return result
-  }, [chats])
+  const nonPinnedChats = useMemo(
+    () => chats.filter((chat) => !chat.pinned && !chat.project_id),
+    [chats]
+  )
   const hasChats = chats.length > 0
 
   return (
@@ -98,7 +97,7 @@ export function AppSidebar() {
             <button
               type="button"
               onClick={() => setOpenMobile(false)}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={24} />
             </button>
@@ -111,7 +110,7 @@ export function AppSidebar() {
         <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-center gap-0">
           <CollapsedMenuItem
             icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
-            label="New Chat"
+            label="New chat"
             href="/"
             shortcut="⇧⌘O"
           />
@@ -160,16 +159,16 @@ export function AppSidebar() {
               <button
                 type="button"
                 onClick={() => setOpenMobile(false)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-              >
-                <HugeiconsIcon icon={Cancel01Icon} size={24} />
-              </button>
-            ) : (
-              <Tooltip>
+              className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            >
+              <HugeiconsIcon icon={Cancel01Icon} size={24} />
+            </button>
+          ) : (
+            <Tooltip>
                 <TooltipTrigger asChild>
                   <Link
                     href="/"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent motion-safe:transition-colors"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
                     data-sidebar-item="true"
                   >
                     <NawIcon className="size-5" />
@@ -195,7 +194,7 @@ export function AppSidebar() {
                 <div className="flex w-full flex-col items-start gap-0">
                   <SidebarMenuItem
                     icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
-                    label="New Chat"
+                    label="New chat"
                     href="/"
                     testId="new-chat-button"
                     trailing={
@@ -208,12 +207,12 @@ export function AppSidebar() {
                   />
                   <HistoryTrigger
                     hasSidebar={false}
-                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex h-9 w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm motion-safe:transition-colors"
+                    classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex h-9 w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm"
                     icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
                     label={
                       <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">
                         <span className="truncate">Search</span>
-                        <div className="text-muted-foreground ml-auto opacity-0 motion-safe:transition-opacity group-hover/menu-item:opacity-100">
+                        <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100">
                           <KbdGroup>
                             <Kbd label="Command">⌘</Kbd>
                             <Kbd>K</Kbd>
@@ -247,15 +246,15 @@ export function AppSidebar() {
                       collapsible={false}
                     />
                   )}
-                  {groupedChats?.map((group) => (
+                  {nonPinnedChats.length > 0 && (
                     <SidebarList
-                      key={group.name}
-                      title={group.name}
-                      items={group.chats}
+                      title="Chats"
+                      items={nonPinnedChats}
                       currentChatId={currentChatId}
-                      storageKey={`sidebar-section-${group.name.toLowerCase().replace(/\s+/g, "-")}`}
+                      collapsible={true}
+                      storageKey="sidebar-section-your-chats"
                     />
-                  ))}
+                  )}
                 </div>
               ) : (
                 <div className="flex py-20 flex-col items-center justify-center">
@@ -282,7 +281,7 @@ export function AppSidebar() {
               <TooltipTrigger asChild>
                 <Link
                   href="/auth/login"
-                  className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium motion-safe:transition-colors"
+                  className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium"
                 >
                   Log in
                 </Link>
@@ -313,7 +312,7 @@ function CollapsedHeaderToggle() {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent motion-safe:transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           aria-label="Open sidebar"
         >
           {/* Default: Logo icon */}
@@ -359,7 +358,7 @@ function CollapsedMenuItem({
 
   const className = cn(
     "flex h-9 w-9 items-center justify-center rounded-lg",
-    "hover:bg-accent motion-safe:transition-colors",
+    "hover:bg-accent",
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
   )
 
@@ -401,7 +400,7 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
         <TooltipTrigger asChild>
           <Link
             href="/auth/login"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent motion-safe:transition-colors mx-auto"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent mx-auto"
           >
             <NawIcon className="size-5" />
           </Link>
@@ -417,7 +416,7 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
         <button
           type="button"
           onClick={toggleSidebar}
-          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent motion-safe:transition-colors mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
           aria-label={`${user.display_name} - Open profile`}
         >
           <div className="flex items-center justify-center">

@@ -1,16 +1,16 @@
 # Competitive Feature Analysis: Not A Wrapper vs. ChatGPT & Claude
 
-> **Date**: February 6, 2026
+> **Date**: February 6, 2026 (updated February 7, 2026)
 > **Scope**: Web-based chat features of ChatGPT (chat.openai.com) and Claude (claude.ai) compared against the Not A Wrapper open-source codebase.
 
 ---
 
 ## 1. Executive Summary
 
-- **ChatGPT** has evolved into a full-stack productivity platform with GPT-5, native image generation, deep research, agent mode (Operator integrated), an apps/connectors ecosystem (60+ apps on Business plan), branching chats, tasks/scheduling, and the industry's most mature app directory. Its six-tier pricing (Free → Go $8/mo → Plus $20/mo → Pro $200/mo → Business → Enterprise) covers every segment.
+- **ChatGPT** has evolved into a full-stack productivity platform with GPT-5, native image generation, deep research, agent mode (Operator integrated), an apps/connectors ecosystem (60+ apps on Business plan, with developer mode for unverified connectors), branching chats, tasks/scheduling with a dedicated schedules UI, orders/shopping, granular personalization (base style & tone, characteristics, profile info, record mode, per-feature toggles for search/code/canvas/voice), push and email notifications with per-category controls, comprehensive data controls (training opt-out, remote browser data, bulk archive/delete, shared links management), and robust account security (passkeys, MFA, per-device session management). Its six-tier pricing (Free → Go $8/mo → Plus $20/mo → Pro $200/mo → Business → Enterprise) covers every segment.
 - **Claude** has differentiated through Artifacts (interactive app creation), connectors/MCP integrations (Google Workspace, Slack), memory across conversations (Pro), deep extended thinking, Projects with RAG, and Research mode. Its Max plan ($100-$200/mo) targets power users with 5-20x usage limits.
-- **Not A Wrapper** has strong fundamentals — 10 providers, 73+ models, BYOK encryption, multi-model comparison, web search, projects, and sharing. However, it still has major feature gaps including no image generation, no code execution, no artifacts/canvas, no conversation export, no memory, no branching, and no native integrations.
-- The four highest-impact gaps to close are: **(1) MCP integration into chat flow** (unlocks the "universal AI interface" positioning), **(2) Message reactions** (low-effort UX polish; drag-and-drop exists but needs minor accept/UX polish), **(3) Conversation export** (leapfrogs competitors who both have weak native export), and **(4) Artifacts/interactive outputs** (transformational).
+- **Not A Wrapper** has strong fundamentals — 10 providers, 73+ models, BYOK encryption, multi-model comparison, web search, projects, and sharing. However, it still has major feature gaps including no image generation, no code execution, no artifacts/canvas, no conversation export, no memory, no branching, no native integrations, no notifications, no granular personalization, no data controls beyond Clerk defaults, and no schedules/orders.
+- The four highest-impact gaps to close remain: **(1) MCP integration into chat flow** (unlocks the "universal AI interface" positioning), **(2) Message reactions** (low-effort UX polish; drag-and-drop exists but needs minor accept/UX polish), **(3) Conversation export** (leapfrogs competitors who both have weak native export), and **(4) Artifacts/interactive outputs** (transformational). Additionally, ChatGPT's expanding platform features — notifications, granular personalization, schedules, orders, data controls, and passkey/MFA security — widen the "platform maturity" gap and should be tracked for future prioritization.
 - Not A Wrapper's unique positioning (multi-provider, BYOK, open-source, local models) is a genuine competitive moat. The roadmap should lean into this by becoming the **universal AI interface** rather than cloning any single provider's walled garden.
 
 ---
@@ -88,6 +88,8 @@
 | GitHub integration | Yes (connector; plan/region dependent) | Limited (Claude Code) | Access repos, search code, cite commits | Medium |
 | Slack integration | Yes (connector/app; plan dependent) | Yes (connector/app; plan dependent) | Read/write Slack messages | Medium |
 | Tasks / scheduling | Yes | No | Set reminders and recurring automated tasks | Medium |
+| Schedules management UI | Yes | No | Dedicated UI to view, edit, pause, and delete scheduled/recurring tasks | Medium |
+| Developer mode (custom connectors) | Yes | No | Allow adding unverified/custom MCP connectors for testing and development | Medium |
 
 ### 2.7 Memory & Personalization
 
@@ -98,6 +100,11 @@
 | Memory management UI | Yes | Yes | View, edit, delete stored memories | Medium |
 | Personalization signals | Yes | Limited | Learn from interaction patterns | Medium |
 | Project-scoped instructions | Yes (Projects) | Yes (Projects) | Different instructions per project context | Medium |
+| Profile info ("About You") | Yes | No | Store personal/professional context the AI references across all chats | Medium |
+| Base style & tone | Yes | No | Set response style preferences (casual, formal, concise, detailed) applied globally | Medium |
+| Personality characteristics | Yes | No | Define AI personality traits (creative, analytical, direct, encouraging, etc.) | Medium |
+| Record mode | Yes | No | Record and transcribe voice input for text-based messages | Low |
+| Feature-level toggles | Yes | No | Per-feature on/off controls: web search, code interpreter, canvas, ChatGPT voice, advanced voice, connector search | Medium |
 
 ### 2.8 Conversation Management
 
@@ -165,6 +172,130 @@
 | Autonomous web agent | Yes (Agent Mode) | No (web) | Browse websites, fill forms, complete tasks | High |
 | Computer use (screen control) | Yes (agent mode virtual browser) | Yes (API only, beta) | View screen, move cursor, click, type via AI | Low |
 | Custom GPTs | Yes (GPT Builder + Store) | No | Build and share custom AI agents | High |
+| Orders / Shopping | Yes | No | Place orders and make purchases through AI agent (integrated commerce) | Medium |
+
+### 2.14 Notifications
+
+| Feature | ChatGPT | Claude | Description | User Value |
+|---------|---------|--------|-------------|------------|
+| Push notifications | Yes | No | Browser/mobile push notifications for responses, tasks, and recommendations | Medium |
+| Email notifications | Yes | No | Email alerts for responses, group chats, tasks, projects, and usage summaries | Medium |
+| Notification categories | Yes | No | Granular per-category control: responses, group chats, tasks, projects, recommendations, usage | Medium |
+
+### 2.15 Data Controls & Privacy
+
+| Feature | ChatGPT | Claude | Description | User Value |
+|---------|---------|--------|-------------|------------|
+| Training data opt-out | Yes ("Improve model for everyone") | Yes | Toggle whether conversations are used for model training | High |
+| Remote browser data | Yes | No | Control retention of data from agent web browsing sessions | Medium |
+| Shared links management | Yes | Yes | View, manage, and revoke publicly shared conversation links | Medium |
+| Manage archived chats | Yes | No | Browse, restore, or permanently delete archived conversations | Medium |
+| Archive all chats | Yes | No | Bulk archive all conversations at once | Low |
+| Delete all chats | Yes | Yes | Bulk delete entire conversation history | Medium |
+| Export data | Yes (zip download) | Yes (email link) | Download all account data as an archive file | Medium |
+
+### 2.16 Account Security
+
+| Feature | ChatGPT | Claude | Description | User Value |
+|---------|---------|--------|-------------|------------|
+| Password authentication | Yes | Yes | Traditional password-based login | High |
+| Passkeys (FIDO2/WebAuthn) | Yes | No | Passwordless biometric or hardware key authentication | Medium |
+| Multi-factor authentication | Yes | Yes | TOTP or SMS second-factor verification | High |
+| Per-device session management | Yes | Limited | View active sessions and log out of specific devices | Medium |
+| Log out all devices | Yes | Yes | Force logout across all active sessions at once | Medium |
+
+### 2.17 Prompt Box Interaction Patterns
+
+These are the UX mechanisms users use to **discover and invoke features** directly from the chat input area. Both ChatGPT and Claude have converged on similar patterns, making them emerging conventions that users now expect.
+
+#### `/` Slash Command Menu
+
+Both platforms surface a popover menu when the user types `/` in the prompt box. This is the **primary discoverability mechanism** for input-level features.
+
+| Menu Item | ChatGPT | Claude | Description |
+|-----------|---------|--------|-------------|
+| Attach files/photos | Yes ("Add files or photos") | Yes ("Add photos & files") | Opens file picker for uploads |
+| Screenshot capture | Yes ("Take a screenshot") | No | Capture and attach a screenshot |
+| Add to project | Yes ("Add to project" → submenu) | No | Assign prompt to a project folder |
+| Web search toggle | Yes ("Web search" ✓ toggle) | No | Enable/disable web search for this message |
+| Style/tone presets | Yes ("Use style" → submenu) | No | Apply a writing style to the response |
+| Image generation | No (auto-routed) | Yes ("Create image") | Invoke image generation mode |
+| Deep research | No (model picker) | Yes ("Deep research") | Invoke multi-step research mode |
+| Agent mode | No (model picker) | Yes ("Agent mode") | Enable autonomous agent behavior |
+| Add sources | No | Yes ("Add sources") | Attach reference sources/context |
+| Filter/search | Yes ("Type to filter" at bottom) | No | Filter menu items by typing |
+
+**Key design observations:**
+- **ChatGPT** uses `/` primarily for **input configuration** (what to attach, how to search, what style to use). Feature modes like deep research and agent are accessed via the model picker dropdown instead.
+- **Claude** uses `/` primarily for **mode switching** (research, agent, image gen) plus basic file attachment. Configuration like web search lives elsewhere.
+- Both show icons + labels for each item, with `>` chevrons for items that have submenus.
+- ChatGPT includes a filter/search input at the bottom of the menu for discoverability at scale.
+- Items can show state indicators (ChatGPT shows a checkmark `✓` next to "Web search" when enabled).
+
+#### `@` Mention System (Integrations/Apps)
+
+ChatGPT surfaces connected apps and integrations when the user types `@` in the prompt box. Claude does not have an equivalent `@` pattern on the web app.
+
+| App/Integration | ChatGPT | Claude | Description |
+|-----------------|---------|--------|-------------|
+| Shopping research | Yes | No | Product research and comparison |
+| Figma | Yes | No | Access Figma designs and components |
+| Instacart | Yes | No | Grocery ordering integration |
+| OpenTable | Yes | No | Restaurant reservation integration |
+| Adobe Acrobat | Yes | No | PDF tools and document processing |
+| Google Drive | Yes | No | Access Drive files (connector-based) |
+| Slack | Yes | No | Access Slack messages (connector-based) |
+| _Custom connectors_ | Yes (developer mode) | No | User-added MCP/connector integrations |
+
+**Key design observations:**
+- The `@` menu is scoped exclusively to **external integrations/apps** — it's the tool invocation mechanism.
+- Each item shows the app's icon/logo for instant recognition.
+- Available items vary by plan (60+ on Business, fewer on Plus/Free).
+- ChatGPT's `@` mention stays in the prompt as visible text (e.g., `@Figma design specs for...`), giving users a clear signal that a tool will be invoked.
+- This pattern is analogous to `@`-mentioning a person in Slack/Discord — intuitive and well-understood.
+
+#### Other Prompt Box Affordances
+
+| Affordance | ChatGPT | Claude | Description |
+|------------|---------|--------|-------------|
+| Persistent action buttons | Yes (attach, search, voice) | Yes (attach) | Always-visible icon buttons below/beside input |
+| Model picker in input area | Yes (dropdown above input) | Yes (dropdown above input) | Switch models without leaving the prompt |
+| Submit button position | Right side of input | Right side of input | Send message button |
+| Multiline input | Yes (auto-expand) | Yes (auto-expand) | Input grows as user types |
+| Keyboard submit | Enter (Shift+Enter for newline) | Enter (Shift+Enter for newline) | Standard submit pattern |
+| Character/token indicator | No | No | Neither shows remaining capacity |
+| Drag-drop overlay | Yes | Yes | Visual overlay when dragging files over input |
+
+#### Competitive Pattern Summary
+
+```
+┌─────────────────────────────────────────────────┐
+│ ChatGPT Prompt Box Architecture                 │
+│                                                 │
+│  [Model Picker ▾]                               │
+│  ┌─────────────────────────────────────────────┐│
+│  │ Message input area...                       ││
+│  │                                             ││
+│  │ /  → Feature menu (attach, search, style)   ││
+│  │ @  → App/integration menu (Figma, etc.)     ││
+│  ├─────────────────────────────────────────────┤│
+│  │ 📎 🔍 🎤              [Send ➤]             ││
+│  └─────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────┐
+│ Claude Prompt Box Architecture                  │
+│                                                 │
+│  [Model Picker ▾]                               │
+│  ┌─────────────────────────────────────────────┐│
+│  │ Message input area...                       ││
+│  │                                             ││
+│  │ /  → Mode menu (image, research, agent)     ││
+│  ├─────────────────────────────────────────────┤│
+│  │ 📎                     [Send ➤]             ││
+│  └─────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -236,6 +367,33 @@
 | **Rate Limiting** | Tiered limits (anonymous/auth/pro) | Fully implemented | `lib/config.ts`, `convex/usage.ts` |
 | **Auth** | Clerk (login, signup, OAuth, guest) | Fully implemented | `middleware.ts` |
 | **Analytics** | PostHog LLM tracking | Fully implemented | `lib/posthog/` |
+| **Notifications** | Push notifications | **Not implemented** | — |
+| | Email notifications | **Not implemented** | — |
+| | Notification preferences (per-category) | **Not implemented** | — |
+| **Personalization** | Base style & tone settings | **Not implemented** | — |
+| | Personality characteristics | **Not implemented** | — |
+| | Profile info ("About You") | **Not implemented** | — |
+| | Record mode | **Not implemented** | — |
+| | Feature-level toggles | **Not implemented** | — |
+| **Data Controls** | Training data opt-out | **Not implemented** | — |
+| | Shared links management | **Not implemented** (share creation exists) | `dialog-publish.tsx` |
+| | Bulk archive/delete chats | **Not implemented** | — |
+| | Data export (account) | **Not implemented** | — |
+| | Remote browser data controls | N/A (no agent browsing) | — |
+| **Account Security** | Password authentication | Delegated to Clerk | `middleware.ts` |
+| | Passkeys (FIDO2/WebAuthn) | Delegated to Clerk (if enabled) | `middleware.ts` |
+| | Multi-factor authentication | Delegated to Clerk (if enabled) | `middleware.ts` |
+| | Per-device session management | Delegated to Clerk | `middleware.ts` |
+| | Log out all devices | Delegated to Clerk | `middleware.ts` |
+| **Schedules** | Scheduled/recurring tasks | **Not implemented** | — |
+| | Schedules management UI | **Not implemented** | — |
+| **Orders** | Shopping/ordering via AI | **Not implemented** | — |
+| **Prompt Box Patterns** | `/` slash command menu | **Not implemented** | — |
+| | `@` mention for integrations/apps | **Not implemented** | — |
+| | Persistent action buttons (attach, search, voice) | Partially implemented (attach, search toggle) | `button-file-upload.tsx`, `button-search.tsx` |
+| | Model picker in input area | Fully implemented | `chat-input/` |
+| | Multiline auto-expand input | Fully implemented | `chat-input/` |
+| | Drag-drop overlay | Fully implemented | `components/ui/file-upload.tsx` |
 
 ---
 
@@ -294,6 +452,26 @@
 | Onboarding flow | Yes | Yes | No (empty state only) | **Minor** |
 | Scheduled tasks | Yes | No | No | **Minor** |
 | Agent mode | Yes | No | No | **Major** |
+| Push/email notifications | Yes | No | No | **Moderate** |
+| Notification preferences (per-category) | Yes | No | No | **Moderate** |
+| Granular personalization (style, tone, traits) | Yes | No | No | **Moderate** |
+| Profile info ("About You") | Yes | No | No | **Moderate** |
+| Feature-level toggles (search, code, canvas, voice) | Yes | No | No | **Minor** |
+| Record mode | Yes | No | No | **Minor** |
+| Developer mode (unverified connectors) | Yes | No | No | **Minor** |
+| Schedules management UI | Yes | No | No | **Minor** |
+| Orders / Shopping | Yes | No | No | **Minor** |
+| Training data opt-out | Yes | Yes | No | **Moderate** |
+| Remote browser data controls | Yes | No | N/A (no agent browsing) | **Minor** |
+| Shared links management | Yes | Yes | No (creation only) | **Minor** |
+| Bulk archive/delete all chats | Yes | Partial | No | **Minor** |
+| Data export (full account) | Yes | Yes | No | **Moderate** |
+| Passkeys (FIDO2/WebAuthn) | Yes | No | Clerk (if enabled) | **Minor** |
+| In-app security settings UI | Yes | Limited | Clerk-managed (no in-app UI) | **Minor** |
+| Per-device session management | Yes | Limited | Clerk (if enabled) | **Minor** |
+| `/` slash command menu | Yes | Yes | No | **Major** |
+| `@` mention for integrations | Yes | No | No | **Moderate** |
+| Persistent action buttons in input | Yes (attach, search, voice) | Yes (attach) | Partial (attach, search) | **Minor** |
 
 ### 4b. Prioritized Gaps
 
@@ -635,4 +813,4 @@ ChatGPT now offers six tiers from Free to Enterprise, including a Go plan at **$
 
 ---
 
-*Analysis produced February 6, 2026. Reviewed and corrected February 6, 2026 (factual corrections: ChatGPT agent mode/computer use, pinned chats, file upload limits, connectors/MCP naming, Claude export/memory plan gating, removal of unverified artifact counts; recommendation updates: MCP trust model, staged export PDF, deep research background workflow; nuance updates from code scan: drag-and-drop implemented with picker accept mismatch, title-only Cmd+K search, image search renderer-only, multi-chat search disabled, onboarding is empty-state only, shortcuts limited to Cmd+K and Cmd+Shift+U). Based on publicly available features and the Not A Wrapper codebase at current commit.*
+*Analysis produced February 6, 2026. Updated February 7, 2026 (added: ChatGPT push/email notifications with per-category controls, granular personalization settings — base style & tone, characteristics, profile info, record mode, per-feature toggles — developer mode for unverified connectors, dedicated schedules management UI, orders/shopping capability, comprehensive data controls — training opt-out, remote browser data, shared links management, bulk archive/delete — and account security features — passkeys, MFA, per-device session management; expanded sections 2.6, 2.7, 2.13; added new sections 2.14 Notifications, 2.15 Data Controls & Privacy, 2.16 Account Security; updated gap analysis matrix and NaW inventory). Updated February 7, 2026 (added: section 2.17 Prompt Box Interaction Patterns — `/` slash command menu, `@` mention system, persistent action buttons, prompt box architecture diagrams for both ChatGPT and Claude; added Prompt Box Patterns to NaW inventory and gap analysis matrix; based on user-provided screenshots of ChatGPT and Claude prompt UX). Based on publicly available features and the Not A Wrapper codebase at current commit.*
