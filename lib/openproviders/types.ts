@@ -34,6 +34,14 @@ export type OpenAIModel =
   | "gpt-3.5-turbo-1106"
   | "chatgpt-4o-latest"
   | "gpt-3.5-turbo-instruct"
+  | "gpt-5.2"
+  | "gpt-5.2-2025-12-11"
+  | "gpt-5"
+  | "gpt-5-2025-08-07"
+  | "gpt-5-mini"
+  | "gpt-5-mini-2025-08-07"
+  | "gpt-5-nano"
+  | "gpt-5-nano-2025-08-07"
 
 export type MistralModel =
   | "ministral-3b-latest"
@@ -72,11 +80,22 @@ export type GeminiModel =
   | "gemini-exp-1206"
   | "gemma-3-27b-it"
   | "learnlm-1.5-pro-experimental"
+  | "gemini-2.0-flash-lite"
+  | "gemini-2.0-flash-lite-001"
+  | "gemini-2.5-flash"
+  | "gemini-2.5-flash-lite"
+  | "gemini-2.5-pro"
+  | "gemini-3-pro-preview"
 
 export type AnthropicModel =
   | "claude-3-haiku-20240307"
   | "claude-opus-4-20250514"
   | "claude-sonnet-4-20250514"
+  | "claude-opus-4-6"
+  | "claude-sonnet-4-5"
+  | "claude-sonnet-4-5-20250929"
+  | "claude-haiku-4-5"
+  | "claude-haiku-4-5-20251001"
 
 export type XaiModel =
   | "grok-2-vision-1212"
@@ -90,6 +109,12 @@ export type XaiModel =
   | "grok-2-latest"
   | "grok-vision-beta"
   | "grok-beta"
+  | "grok-4"
+  | "grok-4-fast-reasoning"
+  | "grok-4-fast-non-reasoning"
+  | "grok-4-1-fast-reasoning"
+  | "grok-4-1-fast-non-reasoning"
+  | "grok-code-fast-1"
 
 export type OpenRouterModel =
   | "openrouter:deepseek/deepseek-r1:free"

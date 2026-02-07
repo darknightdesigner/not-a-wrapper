@@ -41,6 +41,14 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "o3-2025-04-16": "openai",
   "o4-mini": "openai",
   "o4-mini-2025-04-16": "openai",
+  "gpt-5.2": "openai",
+  "gpt-5.2-2025-12-11": "openai",
+  "gpt-5": "openai",
+  "gpt-5-2025-08-07": "openai",
+  "gpt-5-mini": "openai",
+  "gpt-5-mini-2025-08-07": "openai",
+  "gpt-5-nano": "openai",
+  "gpt-5-nano-2025-08-07": "openai",
 
   // Mistral
   "ministral-3b-latest": "mistral",
@@ -79,11 +87,22 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gemini-exp-1206": "google",
   "gemma-3-27b-it": "google",
   "learnlm-1.5-pro-experimental": "google",
+  "gemini-2.0-flash-lite": "google",
+  "gemini-2.0-flash-lite-001": "google",
+  "gemini-2.5-flash": "google",
+  "gemini-2.5-flash-lite": "google",
+  "gemini-2.5-pro": "google",
+  "gemini-3-pro-preview": "google",
 
   // Anthropic
   "claude-3-haiku-20240307": "anthropic",
   "claude-opus-4-20250514": "anthropic",
   "claude-sonnet-4-20250514": "anthropic",
+  "claude-opus-4-6": "anthropic",
+  "claude-sonnet-4-5": "anthropic",
+  "claude-sonnet-4-5-20250929": "anthropic",
+  "claude-haiku-4-5": "anthropic",
+  "claude-haiku-4-5-20251001": "anthropic",
 
   // XAI
   "grok-2-vision-1212": "xai",
@@ -97,6 +116,12 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "grok-2-latest": "xai",
   "grok-vision-beta": "xai",
   "grok-beta": "xai",
+  "grok-4": "xai",
+  "grok-4-fast-reasoning": "xai",
+  "grok-4-fast-non-reasoning": "xai",
+  "grok-4-1-fast-reasoning": "xai",
+  "grok-4-1-fast-non-reasoning": "xai",
+  "grok-code-fast-1": "xai",
 
   // Static Ollama models
   "llama3.2:latest": "ollama",
