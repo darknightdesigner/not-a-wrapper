@@ -13,7 +13,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 
 type FileItemProps = {
   file: File
@@ -21,8 +21,29 @@ type FileItemProps = {
 }
 
 export function FileItem({ file, onRemove }: FileItemProps) {
+  const isImage = file.type.includes("image")
   const [isRemoving, setIsRemoving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  // Lazy initializer — URL available on first render (no flash)
+  const [imageUrl, setImageUrl] = useState<string | null>(() =>
+    isImage ? URL.createObjectURL(file) : null
+  )
+  const [prevFile, setPrevFile] = useState(file)
+
+  // Adjust state during render when file changes
+  // React-approved pattern: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (file !== prevFile) {
+    setPrevFile(file)
+    const newUrl = isImage ? URL.createObjectURL(file) : null
+    setImageUrl(newUrl)
+  }
+
+  // Revoke object URL on cleanup (when imageUrl changes or unmount)
+  useEffect(() => {
+    return () => {
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
+    }
+  }, [imageUrl])
 
   const handleRemove = () => {
     setIsRemoving(true)
@@ -32,15 +53,15 @@ export function FileItem({ file, onRemove }: FileItemProps) {
   return (
     <div className="relative mr-2 mb-0 flex items-center">
       <HoverCard
-        open={file.type.includes("image") ? isOpen : false}
+        open={isImage ? isOpen : false}
         onOpenChange={setIsOpen}
       >
         <HoverCardTrigger className="w-full">
           <div className="bg-background hover:bg-accent border-input flex w-full items-center gap-3 rounded-2xl border p-2 pr-3 transition-colors">
             <div className="bg-accent-foreground flex h-10 w-10 flex-shrink-0 items-center justify-center overflow-hidden rounded-md">
-              {file.type.includes("image") ? (
+              {isImage && imageUrl ? (
                 <Image
-                  src={URL.createObjectURL(file)}
+                  src={imageUrl}
                   alt={file.name}
                   width={40}
                   height={40}
@@ -60,15 +81,17 @@ export function FileItem({ file, onRemove }: FileItemProps) {
             </div>
           </div>
         </HoverCardTrigger>
-        <HoverCardContent side="top">
-          <Image
-            src={URL.createObjectURL(file)}
-            alt={file.name}
-            width={200}
-            height={200}
-            className="h-full w-full object-cover"
-          />
-        </HoverCardContent>
+        {isImage && imageUrl ? (
+          <HoverCardContent side="top">
+            <Image
+              src={imageUrl}
+              alt={file.name}
+              width={200}
+              height={200}
+              className="h-full w-full object-cover"
+            />
+          </HoverCardContent>
+        ) : null}
       </HoverCard>
       {!isRemoving ? (
         <Tooltip>

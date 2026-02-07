@@ -25,6 +25,16 @@ lib/                   # Shared utilities
 
 components/           # Shadcn UI components (shared)
 convex/              # Database schema & functions
+
+.agents/              # AI context & knowledge base
+├── context/         # Domain knowledge & references
+│   ├── decisions/  # Architecture Decision Records
+│   ├── research/   # Research & evaluations
+│   └── troubleshooting/ # Known issues & fixes
+├── plans/           # Implementation plans
+├── skills/          # Multi-step task guides
+├── workflows/       # Development procedures
+└── archive/         # Superseded documents
 ```
 
 ## Where to Add Code
@@ -39,6 +49,22 @@ convex/              # Database schema & functions
 | Utility function | `lib/utils.ts` or `lib/[feature].ts` |
 | Database function | `convex/[table].ts` |
 | Type definition | Colocate with feature or `app/types/` |
+
+## Where to Add Documentation
+
+| Type | Location |
+|------|----------|
+| Research / evaluation | `.agents/context/research/` |
+| Architecture decision | `.agents/context/decisions/NNN-topic.md` |
+| Known issue / fix | `.agents/context/troubleshooting/` |
+| Domain reference | `.agents/context/` |
+| Implementation plan | `.agents/plans/` |
+| New skill guide | `.agents/skills/[name]/SKILL.md` |
+| Workflow / procedure | `.agents/workflows/` |
+| Superseded document | `.agents/archive/` |
+| Session scratch notes | `NOTES.md` (project root) |
+
+> **Rule**: Never create loose markdown files in the project root. All documentation belongs in `.agents/` unless it is `README.md`, `AGENTS.md`, `CLAUDE.md`, `NOTES.md`, or `INSTALL.md`.
 
 ## Gold Standard Examples
 

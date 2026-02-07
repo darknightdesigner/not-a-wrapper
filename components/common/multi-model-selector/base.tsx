@@ -166,7 +166,7 @@ export function MultiModelSelector({
     <Button
       variant="outline"
       className={cn(
-        "dark:bg-secondary min-w-[200px] justify-between rounded-full",
+        "dark:bg-secondary w-auto min-w-0 justify-between rounded-full",
         className
       )}
       disabled={isLoadingModels}

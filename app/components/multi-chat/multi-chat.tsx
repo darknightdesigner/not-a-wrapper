@@ -1,18 +1,21 @@
 "use client"
 
 import { MultiModelConversation } from "@/app/components/multi-chat/multi-conversation"
+import { useFileUpload } from "@/app/components/chat/use-file-upload"
 import { toast } from "@/components/ui/toast"
+import { convertAttachmentsToFiles } from "@/lib/ai/message-conversion"
 import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
+import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { MultiChatInput } from "./multi-chat-input"
 import { useMultiChat } from "./use-multi-chat"
 
@@ -43,12 +46,19 @@ function getMessageText(message: MessageType): string {
 export function MultiChat() {
   const [prompt, setPrompt] = useState("")
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
-  const [files, setFiles] = useState<File[]>([])
   const [multiChatId, setMultiChatId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { user } = useUser()
   const { models } = useModel()
+  const { preferences } = useUserPreferences()
+  const {
+    files,
+    setFiles,
+    handleFileUploads,
+    handleFileUpload,
+    handleFileRemove,
+  } = useFileUpload()
   const { chatId } = useChatSession()
   const { messages: persistedMessages, isLoading: messagesLoading } =
     useMessages()
@@ -91,9 +101,32 @@ export function MultiChat() {
     return availableModels.filter((model) => combined.includes(model.id))
   }, [availableModels, selectedModelIds, modelsFromPersisted])
 
-  if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
-    setSelectedModelIds(modelsFromLastGroup)
-  }
+  const selectedModels = useMemo(
+    () =>
+      selectedModelIds
+        .map((id) => models.find((model) => model.id === id))
+        .filter(Boolean),
+    [selectedModelIds, models]
+  )
+
+  const fileUploadState = useMemo<"supported" | "unsupported" | "no-selection">(
+    () => {
+      if (selectedModelIds.length === 0) return "no-selection"
+      if (selectedModels.length !== selectedModelIds.length) return "unsupported"
+      return selectedModels.every((model) => model?.vision)
+        ? "supported"
+        : "unsupported"
+    },
+    [selectedModelIds.length, selectedModels]
+  )
+
+  const fileUploadModelId = selectedModels[0]?.id
+
+  useEffect(() => {
+    if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
+      setSelectedModelIds(modelsFromLastGroup)
+    }
+  }, [selectedModelIds.length, modelsFromLastGroup])
 
   const modelChats = useMultiChat(allModelsToMaintain)
   const systemPrompt = useMemo(
@@ -233,13 +266,23 @@ export function MultiChat() {
     return Object.values(liveGroups)
   }, [createPersistedGroups, modelChats, prompt, selectedModelIds])
 
-  const handleSubmit = useCallback(async () => {
-    if (!prompt.trim()) return
+  const handleSubmit = useCallback(async (overridePrompt?: string) => {
+    const promptToSend = (overridePrompt ?? prompt).trim()
+    if (!promptToSend) return
 
     if (selectedModelIds.length === 0) {
       toast({
         title: "No models selected",
         description: "Please select at least one model to chat with.",
+        status: "error",
+      })
+      return
+    }
+
+    if (files.length > 0 && fileUploadState !== "supported") {
+      toast({
+        title: "File uploads unavailable",
+        description: "All selected models must support file uploads.",
         status: "error",
       })
       return
@@ -257,7 +300,7 @@ export function MultiChat() {
       if (!chatIdToUse) {
         const createdChat = await createNewChat(
           uid,
-          prompt,
+          promptToSend,
           selectedModelIds[0],
           !!user?.id
         )
@@ -272,6 +315,17 @@ export function MultiChat() {
       const selectedChats = modelChats.filter((chat) =>
         selectedModelIds.includes(chat.model.id)
       )
+
+      let attachments: Array<{ name: string; contentType: string; url: string }> =
+        []
+      if (files.length > 0) {
+        const uploaded = await handleFileUploads(chatIdToUse)
+        if (uploaded === null) {
+          setIsSubmitting(false)
+          return
+        }
+        attachments = uploaded
+      }
 
       await Promise.all(
         selectedChats.map(async (chat) => {
@@ -288,7 +342,15 @@ export function MultiChat() {
           }
 
           // v5: Use sendMessage instead of append
-          chat.sendMessage({ text: prompt }, options)
+          chat.sendMessage(
+            {
+              text: promptToSend,
+              files: attachments.length
+                ? convertAttachmentsToFiles(attachments)
+                : undefined,
+            },
+            options
+          )
         })
       )
 
@@ -313,15 +375,18 @@ export function MultiChat() {
     multiChatId,
     chatId,
     createNewChat,
+    files,
+    handleFileUploads,
+    fileUploadState,
+    setFiles,
   ])
 
-  const handleFileUpload = useCallback((newFiles: File[]) => {
-    setFiles((prev) => [...prev, ...newFiles])
-  }, [])
-
-  const handleFileRemove = useCallback((fileToRemove: File) => {
-    setFiles((prev) => prev.filter((file) => file !== fileToRemove))
-  }, [])
+  const handleSuggestion = useCallback(
+    (suggestion: string) => {
+      handleSubmit(suggestion)
+    },
+    [handleSubmit]
+  )
 
   const handleStop = useCallback(() => {
     modelChats.forEach((chat) => {
@@ -345,6 +410,8 @@ export function MultiChat() {
     () => ({
       value: prompt,
       onValueChange: setPrompt,
+      onSuggestion: handleSuggestion,
+      hasSuggestions: preferences.promptSuggestions && messageGroups.length === 0,
       onSend: handleSubmit,
       isSubmitting,
       files,
@@ -353,6 +420,8 @@ export function MultiChat() {
       selectedModelIds,
       onSelectedModelIdsChange: setSelectedModelIds,
       isUserAuthenticated: isAuthenticated,
+      fileUploadState,
+      fileUploadModelId,
       stop: handleStop,
       status: anyLoading ? ("streaming" as const) : ("ready" as const),
       anyLoading,
@@ -360,12 +429,17 @@ export function MultiChat() {
     [
       prompt,
       handleSubmit,
+      handleSuggestion,
+      preferences.promptSuggestions,
+      messageGroups.length,
       isSubmitting,
       files,
       handleFileUpload,
       handleFileRemove,
       selectedModelIds,
       isAuthenticated,
+      fileUploadState,
+      fileUploadModelId,
       handleStop,
       anyLoading,
     ]

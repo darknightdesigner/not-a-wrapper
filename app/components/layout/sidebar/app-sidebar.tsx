@@ -21,6 +21,7 @@ import {
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 import Link from "next/link"
 import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import {
@@ -421,9 +422,11 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
         >
           <div className="flex items-center justify-center">
             {user.profile_image ? (
-              <img
+              <Image
                 src={user.profile_image}
                 alt=""
+                width={24}
+                height={24}
                 className="h-6 w-6 shrink-0 rounded-full object-cover"
               />
             ) : (
