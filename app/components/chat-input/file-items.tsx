@@ -13,7 +13,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 
 type FileItemProps = {
   file: File
@@ -24,36 +24,26 @@ export function FileItem({ file, onRemove }: FileItemProps) {
   const isImage = file.type.includes("image")
   const [isRemoving, setIsRemoving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-  // Lazy initializer — creates URL only on first render
+  // Lazy initializer — URL available on first render (no flash)
   const [imageUrl, setImageUrl] = useState<string | null>(() =>
     isImage ? URL.createObjectURL(file) : null
   )
+  const [prevFile, setPrevFile] = useState(file)
 
-  // Track previous file to detect prop changes
-  const prevFileRef = useRef(file)
-
-  // Track current URL in a ref so unmount cleanup isn't stale
-  const imageUrlRef = useRef(imageUrl)
-  imageUrlRef.current = imageUrl
-
-  // Adjust state during render when file changes (React-approved pattern)
-  if (file !== prevFileRef.current) {
-    prevFileRef.current = file
-    if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current)
+  // Adjust state during render when file changes
+  // React-approved pattern: https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  if (file !== prevFile) {
+    setPrevFile(file)
     const newUrl = isImage ? URL.createObjectURL(file) : null
-    imageUrlRef.current = newUrl
     setImageUrl(newUrl)
   }
 
-  // Cleanup on unmount only
+  // Revoke object URL on cleanup (when imageUrl changes or unmount)
   useEffect(() => {
     return () => {
-      if (imageUrlRef.current) {
-        URL.revokeObjectURL(imageUrlRef.current)
-        imageUrlRef.current = null
-      }
+      if (imageUrl) URL.revokeObjectURL(imageUrl)
     }
-  }, [])
+  }, [imageUrl])
 
   const handleRemove = () => {
     setIsRemoving(true)
