@@ -13,7 +13,7 @@ import {
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 type FileItemProps = {
   file: File
@@ -24,21 +24,36 @@ export function FileItem({ file, onRemove }: FileItemProps) {
   const isImage = file.type.includes("image")
   const [isRemoving, setIsRemoving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  // Lazy initializer — creates URL only on first render
+  const [imageUrl, setImageUrl] = useState<string | null>(() =>
+    isImage ? URL.createObjectURL(file) : null
+  )
 
+  // Track previous file to detect prop changes
+  const prevFileRef = useRef(file)
+
+  // Track current URL in a ref so unmount cleanup isn't stale
+  const imageUrlRef = useRef(imageUrl)
+  imageUrlRef.current = imageUrl
+
+  // Adjust state during render when file changes (React-approved pattern)
+  if (file !== prevFileRef.current) {
+    prevFileRef.current = file
+    if (imageUrlRef.current) URL.revokeObjectURL(imageUrlRef.current)
+    const newUrl = isImage ? URL.createObjectURL(file) : null
+    imageUrlRef.current = newUrl
+    setImageUrl(newUrl)
+  }
+
+  // Cleanup on unmount only
   useEffect(() => {
-    if (!isImage) {
-      setImageUrl(null)
-      return
-    }
-
-    const objectUrl = URL.createObjectURL(file)
-    setImageUrl(objectUrl)
-
     return () => {
-      URL.revokeObjectURL(objectUrl)
+      if (imageUrlRef.current) {
+        URL.revokeObjectURL(imageUrlRef.current)
+        imageUrlRef.current = null
+      }
     }
-  }, [file, isImage])
+  }, [])
 
   const handleRemove = () => {
     setIsRemoving(true)
