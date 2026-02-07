@@ -9,8 +9,8 @@
 
 - **ChatGPT** has evolved into a full-stack productivity platform with GPT-5, native image generation, deep research, agent mode (Operator integrated), an apps/connectors ecosystem (60+ apps on Business plan), branching chats, tasks/scheduling, and the industry's most mature app directory. Its six-tier pricing (Free → Go $8/mo → Plus $20/mo → Pro $200/mo → Business → Enterprise) covers every segment.
 - **Claude** has differentiated through Artifacts (interactive app creation), connectors/MCP integrations (Google Workspace, Slack), memory across conversations (Pro), deep extended thinking, Projects with RAG, and Research mode. Its Max plan ($100-$200/mo) targets power users with 5-20x usage limits.
-- **Not A Wrapper** has strong fundamentals — 10 providers, 73+ models, BYOK encryption, multi-model comparison, web search, projects, and sharing. However, it has **16 major feature gaps** including no image generation, no code execution, no artifacts/canvas, no conversation export, no memory, no branching, and no native integrations.
-- The four highest-impact gaps to close are: **(1) MCP integration into chat flow** (unlocks the "universal AI interface" positioning), **(2) Drag-and-drop + message reactions** (low-effort UX polish), **(3) Conversation export** (leapfrogs competitors who both have weak native export), and **(4) Artifacts/interactive outputs** (transformational).
+- **Not A Wrapper** has strong fundamentals — 10 providers, 73+ models, BYOK encryption, multi-model comparison, web search, projects, and sharing. However, it still has major feature gaps including no image generation, no code execution, no artifacts/canvas, no conversation export, no memory, no branching, and no native integrations.
+- The four highest-impact gaps to close are: **(1) MCP integration into chat flow** (unlocks the "universal AI interface" positioning), **(2) Message reactions** (low-effort UX polish; drag-and-drop exists but needs minor accept/UX polish), **(3) Conversation export** (leapfrogs competitors who both have weak native export), and **(4) Artifacts/interactive outputs** (transformational).
 - Not A Wrapper's unique positioning (multi-provider, BYOK, open-source, local models) is a genuine competitive moat. The roadmap should lean into this by becoming the **universal AI interface** rather than cloning any single provider's walled garden.
 
 ---
@@ -187,22 +187,22 @@
 | | 10 providers, 73+ models | Fully implemented | `lib/models/data/` |
 | | Per-model capability flags | Fully implemented | `ModelConfig` type |
 | | Reasoning display | Fully implemented | `reasoning.tsx` |
-| | Multi-model comparison (up to 10) | Implemented (has TODOs) | `multi-chat.tsx` |
+| | Multi-model comparison (up to 10) | Implemented (MAX_MODELS=10; search disabled in multi-chat) | `multi-chat.tsx`, `use-multi-chat.ts` |
 | **Multi-Modal Input** | Image upload + vision | Fully implemented | `convex/files.ts` |
-| | PDF upload | Fully implemented | File type whitelist |
-| | File upload (TXT, MD, JSON, CSV, Excel) | Fully implemented | 10MB limit, 5/day |
+| | PDF upload | Partially implemented (validation allows; picker accept list missing; 10MB, 5/day) | `lib/file-handling.ts`, `convex/files.ts`, `button-file-upload.tsx` |
+| | File upload (TXT, MD, JSON, CSV, Excel) | Implemented (10MB limit, 5/day; validation allows; picker accept list limited) | `lib/file-handling.ts`, `convex/files.ts`, `button-file-upload.tsx` |
 | | Clipboard paste (images) | Fully implemented | `chat-input/` |
 | | Audio input | **Not implemented** | — |
-| | Drag and drop | **Not implemented** | — |
+| | Drag and drop | Fully implemented (global drag/drop via FileUpload) | `components/ui/file-upload.tsx` |
 | **Multi-Modal Output** | Image generation | **Not implemented** | — |
 | | Audio output | **Not implemented** | — |
 | | Code execution sandbox | **Not implemented** | — |
 | | Artifacts / interactive outputs | **Not implemented** | — |
-| | Data visualization | **Not implemented** | — |
+| | Data visualization | **Not implemented** (UI components only) | `components/ui/chart.tsx` |
 | **Web Search** | Per-message search toggle | Fully implemented | `button-search.tsx` |
 | | Model capability gating | Fully implemented | `webSearch` flag |
 | | Source citations with favicons | Fully implemented | `sources-list.tsx` |
-| | Image search results | Fully implemented | `search-images.tsx` |
+| | Image search results | Renderer only (expects tool output) | `message-assistant.tsx`, `search-images.tsx` |
 | | Deep research | **Not implemented** | — |
 | **Tools & Integrations** | Tool invocation display | Fully implemented | `tool-invocation.tsx` |
 | | MCP client (stdio + SSE) | Library only, not integrated | `lib/mcp/` |
@@ -211,7 +211,7 @@
 | | System prompt (custom instructions) | Fully implemented | `convex/users.ts` |
 | | Memory management UI | **Not implemented** | — |
 | **Conversation Mgmt** | Chat history sidebar | Fully implemented | `app-sidebar.tsx` |
-| | Command palette search (Cmd+K) | Fully implemented | `command-history.tsx` |
+| | Command palette search (Cmd+K) | Partially implemented (title-only search) | `command-history.tsx` |
 | | Date-grouped chat list | Fully implemented | `sidebar-list.tsx` |
 | | Pinned chats | Fully implemented | `togglePin` mutation |
 | | Projects / folders | Fully implemented | `convex/projects.ts` |
@@ -228,8 +228,8 @@
 | **UI/UX** | Dark/light theme | Fully implemented | `theme-selection.tsx` |
 | | Responsive/mobile | Fully implemented | Drawer variants |
 | | Command palette | Fully implemented | `Cmd+K` |
-| | Keyboard shortcuts | Limited (Cmd+K only) | — |
-| | Onboarding flow | **Not implemented** | — |
+| | Keyboard shortcuts | Limited (Cmd+K, Cmd+Shift+U) | `command-history.tsx`, `button-new-chat.tsx` |
+| | Onboarding flow | No guided flow (empty state only) | `chat.tsx`, `multi-chat.tsx` |
 | **BYOK & Security** | Per-provider key storage (AES-256-GCM) | Fully implemented | `lib/encryption.ts` |
 | | Provider status check | Fully implemented | `user-key-status` API |
 | | Settings UI | Fully implemented | Settings 5-tab layout |
@@ -251,25 +251,25 @@
 | Stop generation | Yes | Yes | Yes | **None** |
 | Copy message | Yes | Yes | Yes | **None** |
 | Quoted text selection | No | No | Yes | **Opportunity** |
-| Multi-model comparison | No | No | Yes (up to 5 by default) | **Opportunity** |
+| Multi-model comparison | No | No | Yes (up to 10; search disabled) | **Opportunity** |
 | BYOK encryption | No | No | Yes (AES-256-GCM) | **Opportunity** |
-| 9 providers / 94+ models | No (1 provider) | No (1 provider) | Yes | **Opportunity** |
-| Local model support (Ollama) | No | No | Yes (dev-only; prod disabled) | **Opportunity** |
+| 10 providers / 73+ models | No (1 provider) | No (1 provider) | Yes | **Opportunity** |
+| Local model support (Ollama) | No | No | Yes | **Opportunity** |
 | Open source | No | No | Yes | **Opportunity** |
 | Model picker with metadata | Basic | Basic | Rich (speed, cost, context) | **None** |
-| Message reactions / feedback | Yes | Yes | No | **Major** |
+| Message reactions / feedback | Yes | Yes | No (feedback table only) | **Major** |
 | Branching chats | Yes | No | No | **Minor** |
 | Image upload / vision | Yes | Yes | Yes | **None** |
-| File upload (PDF, docs) | Yes | Yes | Yes (PDF/CSV/Excel/MD/images) | **Minor** |
+| File upload (PDF, docs) | Yes | Yes | Yes (PDF/CSV/JSON/Excel; picker limited) | **Minor** |
 | Audio input / voice | Yes | No | No | **Major** |
-| Drag and drop files | Yes | Yes | Yes (global dropzone) | **None** |
+| Drag and drop files | Yes | Yes | Yes (FileUpload drag/drop) | **None** |
 | Image generation | Yes (native) | No | No | **Major** |
 | Code execution sandbox | Yes | Yes | No | **Major** |
 | Artifacts / Canvas | Yes | Yes | No | **Major** |
-| Data visualization | Yes | Yes | No | **Major** |
-| Web search | Yes | Yes | Yes | **None** |
+| Data visualization | Yes | Yes | No (UI components only) | **Major** |
+| Web search | Yes | Yes | Yes (model-gated) | **None** |
 | Source citations | Yes | Yes | Yes | **None** |
-| Image search results | Yes | No | Yes | **None** |
+| Image search results | Yes | No | No (renderer only) | **Minor** |
 | Deep research | Yes | Yes | No | **Major** |
 | App integrations (apps/connectors) | Yes (plan-based) | Yes (plan-based) | No | **Major** |
 | MCP integration | Yes | Yes | Library only | **Major** |
@@ -277,21 +277,21 @@
 | Custom instructions | Yes | Yes | Yes (system prompt) | **None** |
 | Memory management UI | Yes | Yes | No | **Major** |
 | Chat history sidebar | Yes | Yes | Yes | **None** |
-| Full-text search | Yes | Yes | Limited (chat titles only) | **Minor** |
+| Full-text search | Yes | Yes | Title-only (Cmd+K) | **Minor** |
 | Projects / folders | Yes | Yes | Yes | **None** |
 | Pinned chats | Yes | Yes | Yes | **None** |
 | Chat archiving | Yes | Yes | No | **Minor** |
 | Conversation export | Limited (account data export) | Limited (account export via email link) | No | **Moderate** |
 | Public share links | Yes | Yes | Yes | **None** |
 | Team workspaces | Yes | Yes | No | **Major** |
-| Custom GPTs / agents | Yes | No | No (planned sub-agents) | **Major** |
+| Custom GPTs / agents | Yes | No | No (sub-agent types only) | **Major** |
 | Syntax highlighting | Yes | Yes | Yes | **None** |
 | Code block copy | Yes | Yes | Yes | **None** |
 | Dark/light theme | Yes | Yes | Yes | **None** |
 | Responsive mobile | Yes | Yes | Yes | **None** |
-| Command palette | No | No | Limited (chat actions + search) | **Opportunity** |
-| Keyboard shortcuts (10+) | Yes | Limited | Limited (Cmd+K, Cmd+Shift+U/P/M) | **Minor** |
-| Onboarding flow | Yes | Yes | Limited (empty-state prompt) | **Minor** |
+| Command palette | No | No | Yes (Cmd+K) | **Opportunity** |
+| Keyboard shortcuts (10+) | Yes | Limited | Limited (Cmd+K, Cmd+Shift+U) | **Minor** |
+| Onboarding flow | Yes | Yes | No (empty state only) | **Minor** |
 | Scheduled tasks | Yes | No | No | **Minor** |
 | Agent mode | Yes | No | No | **Major** |
 
@@ -299,7 +299,7 @@
 
 #### P0 — Critical (Ship within 1-2 months)
 
-These features close the most visible UX gaps and unlock the "universal AI interface" positioning. Item 1 (MCP) is the strategic priority and highest-impact work. Items 2-4 are small (1-2 days each) and should ship as a parallel UX polish sprint.
+These features close the most visible UX gaps and unlock the "universal AI interface" positioning. Item 1 (MCP) is the strategic priority and highest-impact work. Items 2-3 are small (0.5-2 days each) and should ship as a parallel UX polish sprint.
 
 ---
 
@@ -314,13 +314,13 @@ These features close the most visible UX gaps and unlock the "universal AI inter
 
 ---
 
-**2. Drag and Drop File Upload**
+**2. Drag and Drop File Upload (Implemented, needs polish)**
 
 - **What competitors offer**: Both ChatGPT and Claude support dragging files directly onto the chat interface.
-- **Current state in Not A Wrapper**: File upload exists via button (`ButtonFileUpload`) and clipboard paste, but no drag-and-drop zone.
-- **Recommended approach**: Add a `onDragOver`/`onDrop` handler to the chat container or input area. Reuse the existing `handleFileUpload` logic from the chat input. Show a visual drop zone overlay when dragging.
-- **Estimated complexity**: Small (1 day)
-- **Dependencies**: None — file upload infrastructure already exists.
+- **Current state in Not A Wrapper**: Drag-and-drop is already implemented globally via `FileUpload` and is wired in `ButtonFileUpload`. The drop overlay appears on drag. However, the file picker `accept` list only includes text + images, while validation allows PDF/CSV/JSON/Excel; this creates a UX mismatch.
+- **Recommended approach**: Align the picker `accept` list with `lib/file-handling.ts` allowed types and consider a small affordance in the empty state to hint drag-and-drop. No backend changes required.
+- **Estimated complexity**: Very small (0.5 day)
+- **Dependencies**: None.
 
 ---
 
@@ -394,7 +394,7 @@ These features significantly improve retention and satisfaction. Users coming fr
 **9. Image Generation (via Provider APIs)**
 
 - **What competitors offer**: ChatGPT has native image generation via GPT-4o. Users can generate and iteratively edit images within conversations.
-- **Current state in Not A Wrapper**: No image generation. The infrastructure for displaying images exists (image search results grid, attachment previews).
+- **Current state in Not A Wrapper**: No image generation. The infrastructure for displaying images exists (image search results grid is renderer-only; attachment previews work).
 - **Recommended approach**: Since Not A Wrapper already connects to OpenAI, add image generation as a tool call. Use the OpenAI Images API (`dall-e-3` or the new GPT-4o image model) via the existing BYOK key system. Render generated images using the existing `search-images.tsx` pattern. Gating: require BYOK OpenAI key or Pro plan. This leverages existing provider infrastructure without building a generation engine.
 - **Estimated complexity**: Medium (1-2 weeks)
 - **Dependencies**: OpenAI API key (via BYOK); new tool definition; image result rendering component.
@@ -509,11 +509,11 @@ Rather than building native integrations for Google Drive, GitHub, Slack, etc. (
 
 ---
 
-**3. Ship the "UX Polish Sprint" Immediately (Drag & Drop, Reactions, Export)**
+**3. Ship the "UX Polish Sprint" Immediately (Drag & Drop polish, Reactions, Export)**
 
-These three P0 items are Small complexity (1-2 days each) and their absence creates a perception of incompleteness. Ship them in parallel with MCP work to bring the product to baseline parity in the areas users most commonly notice. Note: per-conversation export would actually **leapfrog** both ChatGPT and Claude, neither of which offers native per-conversation export (both only have bulk data exports).
+These P0 items are small complexity. Reactions/export are missing, and drag-and-drop needs minor UX/picker alignment. Ship them in parallel with MCP work to bring the product to baseline parity in the areas users most commonly notice. Note: per-conversation export would actually **leapfrog** both ChatGPT and Claude, neither of which offers native per-conversation export (both only have bulk data exports).
 
-**Action**: Prioritize drag-and-drop, thumbs up/down reactions, and export (Markdown + JSON first; PDF follow-up if needed) as a single 1-week sprint.
+**Action**: Prioritize drag-and-drop polish (accept list + affordance), thumbs up/down reactions, and export (Markdown + JSON first; PDF follow-up if needed) as a single 1-week sprint.
 
 ---
 
@@ -635,4 +635,4 @@ ChatGPT now offers six tiers from Free to Enterprise, including a Go plan at **$
 
 ---
 
-*Analysis produced February 6, 2026. Reviewed and corrected February 6, 2026 (factual corrections: ChatGPT agent mode/computer use, pinned chats, file upload limits, connectors/MCP naming, Claude export/memory plan gating, removal of unverified artifact counts; recommendation updates: MCP trust model, staged export PDF, deep research background workflow). Based on publicly available features and the Not A Wrapper codebase at current commit.*
+*Analysis produced February 6, 2026. Reviewed and corrected February 6, 2026 (factual corrections: ChatGPT agent mode/computer use, pinned chats, file upload limits, connectors/MCP naming, Claude export/memory plan gating, removal of unverified artifact counts; recommendation updates: MCP trust model, staged export PDF, deep research background workflow; nuance updates from code scan: drag-and-drop implemented with picker accept mismatch, title-only Cmd+K search, image search renderer-only, multi-chat search disabled, onboarding is empty-state only, shortcuts limited to Cmd+K and Cmd+Shift+U). Based on publicly available features and the Not A Wrapper codebase at current commit.*
