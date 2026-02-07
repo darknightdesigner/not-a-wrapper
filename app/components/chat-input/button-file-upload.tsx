@@ -14,6 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { ACCEPTED_FILE_PICKER_TYPES } from "@/lib/file-handling"
 import { getModelInfo } from "@/lib/models"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -96,7 +97,7 @@ export function ButtonFileUpload({
       onFilesAdded={onFileUpload}
       multiple
       disabled={!isUserAuthenticated}
-      accept=".txt,.md,image/jpeg,image/png,image/gif,image/webp,image/svg,image/heic,image/heif"
+      accept={ACCEPTED_FILE_PICKER_TYPES}
     >
       <Tooltip>
         <TooltipTrigger asChild>
@@ -123,7 +124,7 @@ export function ButtonFileUpload({
           <HugeiconsIcon icon={FileUploadIcon} size={32} className="text-muted-foreground" />
           <span className="mt-4 mb-1 text-lg font-medium">Drop files here</span>
           <span className="text-muted-foreground text-sm">
-            Drop any files here to add it to the conversation
+            Drop files here to add them to the conversation
           </span>
         </div>
       </FileUploadContent>
