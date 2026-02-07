@@ -64,7 +64,7 @@ The `--spacing(N)` syntax is a Tailwind v4 theme function resolved at build time
 - Result: `var(calc(var(--spacing) * N))` — `var()` cannot wrap `calc()`
 
 **Valid alternatives:**
-- `var(--spacing) * N` — use the raw CSS custom property with multiplication
+- `calc(var(--spacing) * N)` — multiplication must be inside `calc()`; e.g. `w-[calc(var(--spacing)*4)]`
 - `--spacing(N)` bare — only in Tailwind theme contexts like `@theme` or `[--custom:--spacing(N)]`
 - Hardcoded value — `spacing(4)` = `1rem` in Tailwind v4 default config
 
@@ -72,7 +72,7 @@ See `components/ui/sidebar.tsx` lines 245, 258 for correct usage.
 
 ## Solution Checklist
 
-1. **Fix source code** — Replace any `var(--spacing(N))` with `var(--spacing)*N` in component files
+1. **Fix source code** — Replace any `var(--spacing(N))` with `calc(var(--spacing)*N)` in component files
 2. **Add `@source not`** — Ensure `app/globals.css` has `@source not "../.agents"` (already done)
 3. **Clear cache** — Stop dev server, `rm -rf .next`, restart
 4. **Verify** — `GET /` returns 200, not 500
@@ -97,7 +97,7 @@ When documenting Tailwind class issues in `.agents/` or any non-gitignored direc
 ## Related Files
 
 - `app/globals.css` — `@source not` directive and Tailwind v4 entry point
-- `components/ui/sidebar.tsx` — Lines 245, 258: correct `var(--spacing)*N` pattern
+- `components/ui/sidebar.tsx` — Lines 245, 258: correct `calc(var(--spacing)*N)` pattern
 - `postcss.config.mjs` — PostCSS config using `@tailwindcss/postcss` plugin
 - `.next/dev/cache/turbopack/` — Turbopack's persistent cache (SST files)
 - `.agents/context/troubleshooting/turbopack-sst-write-failure.md` — Related issue where `.next` stays empty (different root cause, similar symptoms)
