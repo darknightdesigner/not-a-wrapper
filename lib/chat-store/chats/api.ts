@@ -143,7 +143,7 @@ export async function createNewChat(
       projectId?: string
     } = {
       userId,
-      title: title || "New Chat",
+      title: title || "New chat",
       model: model || MODEL_DEFAULT,
       isAuthenticated,
     }

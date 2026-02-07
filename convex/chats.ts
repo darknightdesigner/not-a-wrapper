@@ -89,7 +89,7 @@ export const create = mutation({
 
     return await ctx.db.insert("chats", {
       userId: user._id,
-      title: args.title ?? "New Chat",
+      title: args.title ?? "New chat",
       model: args.model,
       systemPrompt: args.systemPrompt,
       projectId: args.projectId,

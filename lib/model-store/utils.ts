@@ -1,5 +1,32 @@
-import { FREE_MODELS_IDS } from "@/lib/config"
 import { ModelConfig } from "@/lib/models/types"
+
+/**
+ * Curated default model order for the model selector.
+ * Models in this list appear first, in the exact order specified.
+ * Models not in this list preserve their original array-declaration order.
+ */
+export const DEFAULT_MODEL_ORDER: string[] = [
+  // Top 3 Anthropic (most recent first)
+  "claude-opus-4-6",
+  "claude-sonnet-4-5",
+  "claude-haiku-4-5",
+  // Top 3 OpenAI (most recent first)
+  "gpt-5.2",
+  "o4-mini",
+  "gpt-5",
+  // Top 1 Google
+  "gemini-3-pro-preview",
+  // Top 1 Grok
+  "grok-4-1-fast-reasoning",
+  // Remaining popular models
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gpt-5-mini",
+  "deepseek-r1",
+  "grok-4",
+  "mistral-large-latest",
+  "pixtral-large-latest",
+]
 
 /**
  * Utility function to filter and sort models based on favorites, search, and visibility
@@ -36,9 +63,15 @@ export function filterAndSortModels(
         return aIndex - bIndex
       }
 
-      // Fallback to original sorting (free models first)
-      const aIsFree = FREE_MODELS_IDS.includes(a.id)
-      const bIsFree = FREE_MODELS_IDS.includes(b.id)
-      return aIsFree === bIsFree ? 0 : aIsFree ? -1 : 1
+      // Fallback: curated showcase order
+      const aOrder = DEFAULT_MODEL_ORDER.indexOf(a.id)
+      const bOrder = DEFAULT_MODEL_ORDER.indexOf(b.id)
+      const aInList = aOrder !== -1
+      const bInList = bOrder !== -1
+
+      if (aInList && bInList) return aOrder - bOrder
+      if (aInList) return -1
+      if (bInList) return 1
+      return 0 // preserve original array-declaration order
     })
 }

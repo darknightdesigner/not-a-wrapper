@@ -28,12 +28,12 @@ export function ButtonNewChat() {
           href="/"
           className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
           prefetch
-          aria-label="New Chat"
+          aria-label="New chat"
         >
           <HugeiconsIcon icon={PencilEdit02Icon} size={24} />
         </Link>
       </TooltipTrigger>
-      <TooltipContent>New Chat ⌘⇧U</TooltipContent>
+      <TooltipContent>New chat ⌘⇧U</TooltipContent>
     </Tooltip>
   )
 }

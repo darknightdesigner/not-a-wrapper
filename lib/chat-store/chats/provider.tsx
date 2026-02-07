@@ -181,7 +181,7 @@ export function ChatsProvider({
       const localChatId = `local-${Date.now().toString()}`
       const localChat: Chats = {
         id: localChatId,
-        title: title || "New Chat",
+        title: title || "New chat",
         created_at: new Date().toISOString(),
         model: model || MODEL_DEFAULT,
         system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
@@ -210,7 +210,7 @@ export function ChatsProvider({
     const optimisticId = `optimistic-${Date.now().toString()}`
     const optimisticChat: Chats = {
       id: optimisticId,
-      title: title || "New Chat",
+      title: title || "New chat",
       created_at: new Date().toISOString(),
       model: model || MODEL_DEFAULT,
       system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
@@ -227,7 +227,7 @@ export function ChatsProvider({
 
     try {
       const chatId = await createChatMutation({
-        title: title || "New Chat",
+        title: title || "New chat",
         model: model || MODEL_DEFAULT,
         systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
         projectId: projectId as Id<"projects"> | undefined,
