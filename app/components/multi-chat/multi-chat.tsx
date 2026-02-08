@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/toast"
 import { convertAttachmentsToFiles } from "@/lib/ai/message-conversion"
 import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
-import { useMessages } from "@/lib/chat-store/messages/provider"
+import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
@@ -15,7 +15,7 @@ import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MultiChatInput } from "./multi-chat-input"
 import { useMultiChat } from "./use-multi-chat"
 
@@ -60,7 +60,7 @@ export function MultiChat() {
     handleFileRemove,
   } = useFileUpload()
   const { chatId } = useChatSession()
-  const { messages: persistedMessages, isLoading: messagesLoading } =
+  const { messages: persistedMessages, isLoading: messagesLoading, cacheAndAddMessage } =
     useMessages()
   const { createNewChat } = useChats()
 
@@ -128,7 +128,31 @@ export function MultiChat() {
     }
   }, [selectedModelIds.length, modelsFromLastGroup])
 
-  const modelChats = useMultiChat(allModelsToMaintain)
+  // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
+  const chatIdRef = useRef<string | null>(multiChatId || chatId)
+  const messageGroupIdRef = useRef<string | null>(null)
+
+  // Keep chatIdRef in sync with reactive state
+  useEffect(() => {
+    chatIdRef.current = multiChatId || chatId
+  }, [multiChatId, chatId])
+
+  // Callback invoked when each model's stream finishes — persists the assistant response
+  const handleModelFinish = useCallback((modelId: string, message: MessageType) => {
+    const effectiveChatId = chatIdRef.current
+    const effectiveGroupId = messageGroupIdRef.current
+    if (!effectiveChatId) return
+
+    const persistedMessage: ExtendedUIMessage = {
+      ...message,
+      model: modelId,
+      messageGroupId: effectiveGroupId ?? undefined,
+    }
+
+    cacheAndAddMessage(persistedMessage, effectiveChatId)
+  }, [cacheAndAddMessage])
+
+  const modelChats = useMultiChat(allModelsToMaintain, handleModelFinish)
   const systemPrompt = useMemo(
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
     [user?.system_prompt]
@@ -151,7 +175,8 @@ export function MultiChat() {
       const message = persistedMessages[i]
 
       if (message.role === "user") {
-        const groupKey = getMessageText(message)
+        // Prefer messageGroupId for grouping; fall back to text content for backward compat
+        const groupKey = message.messageGroupId || getMessageText(message)
         if (!groups[groupKey]) {
           groups[groupKey] = {
             userMessage: message,
@@ -159,23 +184,30 @@ export function MultiChat() {
           }
         }
       } else if (message.role === "assistant") {
-        let associatedUserMessage = null
-        for (let j = i - 1; j >= 0; j--) {
-          if (persistedMessages[j].role === "user") {
-            associatedUserMessage = persistedMessages[j]
-            break
-          }
-        }
-
-        if (associatedUserMessage) {
-          const groupKey = getMessageText(associatedUserMessage)
-          if (!groups[groupKey]) {
-            groups[groupKey] = {
-              userMessage: associatedUserMessage,
-              assistantMessages: [],
+        // If the assistant message has a messageGroupId, use it to find its group directly
+        const msgGroupId = message.messageGroupId
+        if (msgGroupId && groups[msgGroupId]) {
+          groups[msgGroupId].assistantMessages.push(message)
+        } else {
+          // Fallback: scan backward for the nearest user message
+          let associatedUserMessage: (typeof persistedMessages)[number] | null = null
+          for (let j = i - 1; j >= 0; j--) {
+            if (persistedMessages[j].role === "user") {
+              associatedUserMessage = persistedMessages[j]
+              break
             }
           }
-          groups[groupKey].assistantMessages.push(message)
+
+          if (associatedUserMessage) {
+            const groupKey = associatedUserMessage.messageGroupId || getMessageText(associatedUserMessage)
+            if (!groups[groupKey]) {
+              groups[groupKey] = {
+                userMessage: associatedUserMessage,
+                assistantMessages: [],
+              }
+            }
+            groups[groupKey].assistantMessages.push(message)
+          }
         }
       }
     }
@@ -312,6 +344,19 @@ export function MultiChat() {
         window.history.pushState(null, "", `/c/${chatIdToUse}`)
       }
 
+      // Update refs so the onFinish callback captures the correct values
+      chatIdRef.current = chatIdToUse
+      messageGroupIdRef.current = message_group_id
+
+      // Persist the user message to Convex before dispatching to models
+      const userMessage: ExtendedUIMessage = {
+        id: crypto.randomUUID(),
+        role: "user" as const,
+        parts: [{ type: "text", text: promptToSend }],
+        messageGroupId: message_group_id,
+      }
+      cacheAndAddMessage(userMessage, chatIdToUse)
+
       const selectedChats = modelChats.filter((chat) =>
         selectedModelIds.includes(chat.model.id)
       )
@@ -379,6 +424,7 @@ export function MultiChat() {
     handleFileUploads,
     fileUploadState,
     setFiles,
+    cacheAndAddMessage,
   ])
 
   const handleSuggestion = useCallback(
