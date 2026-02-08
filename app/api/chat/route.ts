@@ -1,6 +1,10 @@
 import { auth } from "@clerk/nextjs/server"
 import { after } from "next/server"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import {
+  SYSTEM_PROMPT_DEFAULT,
+  MCP_CONNECTION_TIMEOUT_MS,
+  MCP_MAX_STEP_COUNT,
+} from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import {
@@ -16,6 +20,10 @@ import {
   validateAndTrackUsage,
 } from "./api"
 import { createErrorResponse, extractErrorMessage } from "./utils"
+import {
+  loadUserMcpTools,
+  type LoadToolsResult,
+} from "@/lib/mcp/load-tools"
 
 export const maxDuration = 60
 
@@ -30,6 +38,9 @@ type ChatRequest = {
 }
 
 export async function POST(req: Request) {
+  // MCP clients — declared outside try for cleanup in both after() and catch
+  let mcpClients: LoadToolsResult["clients"] = []
+
   try {
     // Server-side authentication - derive userId from Clerk session
     const { userId: authUserId, getToken } = await auth()
@@ -123,6 +134,28 @@ export async function POST(req: Request) {
     // Create base model from config
     const aiModel = modelConfig.apiSdk(apiKey, { enableSearch })
 
+    // -----------------------------------------------------------------------
+    // MCP Tool Loading
+    // Gate on: auth + Convex token + feature flag + model capability
+    // -----------------------------------------------------------------------
+    let mcpTools: ToolSet = {} as ToolSet
+
+    if (
+      isAuthenticated &&
+      convexToken &&
+      process.env.ENABLE_MCP === "true" &&
+      modelConfig.tools !== false
+    ) {
+      const mcpResult = await loadUserMcpTools(convexToken, {
+        timeout: MCP_CONNECTION_TIMEOUT_MS,
+      })
+      mcpTools = mcpResult.tools as ToolSet
+      mcpClients = mcpResult.clients
+    }
+
+    const hasMcpTools = Object.keys(mcpTools).length > 0
+    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : 10
+
     // Check if PostHog is configured for LLM analytics
     const phClient = getPostHogClient()
     const provider = getProviderForModel(model)
@@ -137,6 +170,14 @@ export async function POST(req: Request) {
       })
     }
 
+    // Close MCP clients after streaming response completes or aborts.
+    // after() always runs — including on client disconnect — unlike onFinish.
+    if (mcpClients.length > 0) {
+      after(async () => {
+        await Promise.allSettled(mcpClients.map((c) => c.close()))
+      })
+    }
+
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
     const modelMessages = await convertToModelMessages(messages)
 
@@ -144,8 +185,8 @@ export async function POST(req: Request) {
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
-      tools: {} as ToolSet,
-      stopWhen: stepCountIs(10),
+      tools: mcpTools,
+      stopWhen: stepCountIs(maxSteps),
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
@@ -218,6 +259,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: unknown) {
+    // Clean up any MCP clients that were opened before the error
+    await Promise.allSettled(mcpClients.map((c) => c.close()))
+
     console.error("Error in /api/chat:", err)
     const error = err as {
       code?: string
