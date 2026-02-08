@@ -7,6 +7,11 @@ import {
   MCP_CONNECTION_TIMEOUT_MS,
   MCP_MAX_TOOLS_PER_REQUEST,
 } from "@/lib/config"
+import {
+  isCircuitOpen,
+  recordFailure,
+  recordSuccess,
+} from "./circuit-breaker"
 
 // =============================================================================
 // Types
@@ -57,7 +62,7 @@ export type LoadToolsOptions = {
  *
  * @example slugify("My GitHub Server") → "my_github_server"
  */
-function slugify(name: string): string {
+export function slugify(name: string): string {
   return (
     name
       .toLowerCase()
@@ -182,12 +187,27 @@ export async function loadUserMcpTools(
   }
 
   // -------------------------------------------------------------------------
-  // 2. Create MCP clients in parallel with per-server timeout
+  // 2. Filter out servers with open circuits (too many consecutive failures)
+  // -------------------------------------------------------------------------
+  const serversToConnect = enabledServers.filter((server) => {
+    if (isCircuitOpen(server._id)) {
+      console.warn(
+        `[MCP] Circuit open for "${server.name}" (consecutive failures >= threshold), skipping`
+      )
+      return false
+    }
+    return true
+  })
+
+  if (serversToConnect.length === 0) return emptyResult
+
+  // -------------------------------------------------------------------------
+  // 3. Create MCP clients in parallel with per-server timeout
   //    Total time = max(individual server times), not sum.
   //    A slow server doesn't block fast servers.
   // -------------------------------------------------------------------------
   const clientResults = await Promise.allSettled(
-    enabledServers.map((server) => {
+    serversToConnect.map((server) => {
       const headers = buildAuthHeaders(server)
       return Promise.race([
         createMCPClient({
@@ -208,7 +228,7 @@ export async function loadUserMcpTools(
   )
 
   // -------------------------------------------------------------------------
-  // 3. Collect tools from successful clients
+  // 4. Collect tools from successful clients
   // -------------------------------------------------------------------------
   const clients: MCPClient[] = []
   const mergedTools: Record<string, unknown> = {}
@@ -217,9 +237,9 @@ export async function loadUserMcpTools(
 
   for (let i = 0; i < clientResults.length; i++) {
     const result = clientResults[i]
-    const server = enabledServers[i]
+    const server = serversToConnect[i]
 
-    // --- Failed connection: log and skip ---
+    // --- Failed connection: log, record failure for circuit breaker, skip ---
     if (result.status === "rejected") {
       const errorMsg =
         result.reason instanceof Error
@@ -227,13 +247,15 @@ export async function loadUserMcpTools(
           : "Connection failed"
 
       console.error(`[MCP] Connection failed for "${server.name}":`, errorMsg)
+      recordFailure(server._id)
       updateConnectionStatus(server._id, { lastError: errorMsg }, convexToken)
       continue
     }
 
-    // --- Successful connection ---
+    // --- Successful connection: reset circuit breaker ---
     const client = result.value
     clients.push(client)
+    recordSuccess(server._id)
 
     try {
       const tools = await client.tools()

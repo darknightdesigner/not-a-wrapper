@@ -38,8 +38,9 @@ type ChatRequest = {
 }
 
 export async function POST(req: Request) {
-  // MCP clients — declared outside try for cleanup in both after() and catch
+  // MCP state — declared outside try for cleanup in both after() and catch
   let mcpClients: LoadToolsResult["clients"] = []
+  let mcpToolServerMap: LoadToolsResult["toolServerMap"] = new Map()
 
   try {
     // Server-side authentication - derive userId from Clerk session
@@ -146,11 +147,27 @@ export async function POST(req: Request) {
       process.env.ENABLE_MCP === "true" &&
       modelConfig.tools !== false
     ) {
+      const mcpLoadStart = Date.now()
       const mcpResult = await loadUserMcpTools(convexToken, {
         timeout: MCP_CONNECTION_TIMEOUT_MS,
       })
       mcpTools = mcpResult.tools as ToolSet
       mcpClients = mcpResult.clients
+      mcpToolServerMap = mcpResult.toolServerMap
+
+      // PostHog: MCP tool loading observability
+      const phClientForMcp = getPostHogClient()
+      if (phClientForMcp) {
+        phClientForMcp.capture({
+          distinctId: userId,
+          event: "mcp_tool_load",
+          properties: {
+            serverCount: mcpResult.clients.length,
+            toolCount: Object.keys(mcpResult.tools).length,
+            loadTimeMs: Date.now() - mcpLoadStart,
+          },
+        })
+      }
     }
 
     const hasMcpTools = Object.keys(mcpTools).length > 0
@@ -218,7 +235,7 @@ export async function POST(req: Request) {
         }
       },
 
-      onFinish: ({ text, usage }) => {
+      onFinish: ({ text, usage, steps }) => {
         // Manually capture LLM generation for PostHog analytics
         // This ensures accurate output capture (withTracing has issues with streaming)
         if (phClient) {
@@ -239,6 +256,33 @@ export async function POST(req: Request) {
                 messageGroupId: message_group_id,
               },
             })
+
+            // PostHog: MCP tool call events — one event per tool invocation
+            // Iterates through all steps to find tool calls that map to MCP tools.
+            // durationMs per tool call requires wrapping tool.execute (future enhancement).
+            if (steps && mcpToolServerMap.size > 0) {
+              for (const step of steps) {
+                if (step.toolCalls) {
+                  for (const toolCall of step.toolCalls) {
+                    const serverInfo = mcpToolServerMap.get(toolCall.toolName)
+                    if (serverInfo) {
+                      phClient.capture({
+                        distinctId: userId,
+                        event: "mcp_tool_call",
+                        properties: {
+                          toolName: serverInfo.displayName,
+                          serverName: serverInfo.serverName,
+                          serverId: serverInfo.serverId,
+                          namespacedToolName: toolCall.toolName,
+                          success: true,
+                          chatId,
+                        },
+                      })
+                    }
+                  }
+                }
+              }
+            }
           } catch (captureErr) {
             // Analytics failure should never break the response
             console.error(

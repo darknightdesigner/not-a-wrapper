@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
       "@hugeicons/react",
       "@hugeicons-pro/core-stroke-rounded",
     ],
+    turbopackFileSystemCacheForDev: false,
   },
   serverExternalPackages: ["shiki", "vscode-oniguruma"],
   images: {
