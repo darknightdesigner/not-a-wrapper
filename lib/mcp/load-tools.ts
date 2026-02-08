@@ -41,6 +41,8 @@ export type LoadToolsResult = {
   clients: MCPClient[]
   /** Namespaced tool name → server info. Used for UI display and audit logging. */
   toolServerMap: Map<string, ServerInfo>
+  /** Number of enabled servers that failed to connect (rejected + circuit-breaker-skipped). */
+  failedServerCount: number
 }
 
 export type LoadToolsOptions = {
@@ -164,6 +166,7 @@ export async function loadUserMcpTools(
     tools: {} as MCPToolSet,
     clients: [],
     toolServerMap: new Map(),
+    failedServerCount: 0,
   }
 
   // -------------------------------------------------------------------------
@@ -189,17 +192,21 @@ export async function loadUserMcpTools(
   // -------------------------------------------------------------------------
   // 2. Filter out servers with open circuits (too many consecutive failures)
   // -------------------------------------------------------------------------
+  let circuitBreakerSkipped = 0
   const serversToConnect = enabledServers.filter((server) => {
     if (isCircuitOpen(server._id)) {
       console.warn(
         `[MCP] Circuit open for "${server.name}" (consecutive failures >= threshold), skipping`
       )
+      circuitBreakerSkipped++
       return false
     }
     return true
   })
 
-  if (serversToConnect.length === 0) return emptyResult
+  if (serversToConnect.length === 0) {
+    return { ...emptyResult, failedServerCount: circuitBreakerSkipped }
+  }
 
   // -------------------------------------------------------------------------
   // 3. Create MCP clients in parallel with per-server timeout
@@ -231,9 +238,14 @@ export async function loadUserMcpTools(
   // 4. Collect tools from successful clients
   // -------------------------------------------------------------------------
   const clients: MCPClient[] = []
+  // MCPToolSet is an opaque mapped type from @ai-sdk/mcp that does not expose a
+  // mutable builder interface. We accumulate tools as Record<string, unknown> and
+  // cast to MCPToolSet at the return boundary — this is the only safe escape hatch
+  // without introducing a runtime wrapper around each tool descriptor.
   const mergedTools: Record<string, unknown> = {}
   const toolServerMap = new Map<string, ServerInfo>()
   let toolCount = 0
+  let connectionFailures = 0
 
   for (let i = 0; i < clientResults.length; i++) {
     const result = clientResults[i]
@@ -249,6 +261,7 @@ export async function loadUserMcpTools(
       console.error(`[MCP] Connection failed for "${server.name}":`, errorMsg)
       recordFailure(server._id)
       updateConnectionStatus(server._id, { lastError: errorMsg }, convexToken)
+      connectionFailures++
       continue
     }
 
@@ -309,5 +322,6 @@ export async function loadUserMcpTools(
     tools: mergedTools as MCPToolSet,
     clients,
     toolServerMap,
+    failedServerCount: connectionFailures + circuitBreakerSkipped,
   }
 }

@@ -139,7 +139,8 @@ export function McpServerForm({
           status: "error",
         })
       }
-    } catch {
+    } catch (error) {
+      console.error("Failed to test MCP connection:", error)
       setTestResult({ success: false, error: "Network error" })
       toast({
         title: "Connection failed",

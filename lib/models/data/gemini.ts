@@ -84,15 +84,15 @@ const geminiModels: ModelConfig[] = [
       openproviders("gemini-2.5-pro", undefined, apiKey),
   },
   {
-    id: "gemini-3-pro-preview",
-    name: "Gemini 3 Pro Preview",
+    id: "gemini-3-pro",
+    name: "Gemini 3 Pro",
     provider: "Google",
     providerId: "google",
     modelFamily: "Gemini",
     baseProviderId: "google",
     description:
       "Google's most intelligent model for multimodal reasoning and agentic tasks.",
-    tags: ["preview", "flagship", "reasoning", "multimodal", "advanced"],
+    tags: ["flagship", "reasoning", "multimodal", "advanced"],
     contextWindow: 1048576,
     inputCost: 2.0,
     outputCost: 12.0,
@@ -108,7 +108,7 @@ const geminiModels: ModelConfig[] = [
     apiDocs: "https://ai.google.dev/api/docs",
     icon: "gemini",
     apiSdk: (apiKey?: string) =>
-      openproviders("gemini-3-pro-preview", undefined, apiKey),
+      openproviders("gemini-3-pro", undefined, apiKey),
   },
   {
     id: "gemma-3-27b-it",

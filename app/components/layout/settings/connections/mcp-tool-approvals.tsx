@@ -34,7 +34,8 @@ export function McpToolApprovals({ serverId }: McpToolApprovalsProps) {
   const handleToggle = async (approvalId: Id<"mcpToolApprovals">) => {
     try {
       await toggleApproval({ approvalId })
-    } catch {
+    } catch (error) {
+      console.error("Failed to update tool approval:", error)
       toast({ title: "Failed to update tool approval", status: "error" })
     }
   }

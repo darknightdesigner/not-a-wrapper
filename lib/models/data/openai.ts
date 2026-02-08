@@ -225,7 +225,7 @@ const openaiModels: ModelConfig[] = [
     modelFamily: "o4",
     baseProviderId: "openai",
     description: "Faster, more affordable reasoning model",
-    tags: ["reasoning", "next-gen", "preview"],
+    tags: ["reasoning", "next-gen"],
     contextWindow: 200000,
     inputCost: 1.1,
     outputCost: 4.4,

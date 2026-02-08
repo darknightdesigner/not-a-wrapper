@@ -212,7 +212,10 @@ function SingleToolCard({
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
   const { state, toolCallId } = toolData
-  // v6: Get tool name using official helper
+  // v6: Get tool name using official helper.
+  // NOTE: For MCP tools, this returns the namespaced name (e.g. "my_github_server_create_issue").
+  // Displaying a cleaner name requires passing toolServerMap from the chat route via stream
+  // metadata, which is planned for v1.1. Until then, the namespaced name is shown as-is.
   const toolName = getStaticToolName(toolData)
   const args = toolData.input as Record<string, unknown> | undefined
   const isLoading = state === "input-available" || state === "input-streaming"

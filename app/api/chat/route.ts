@@ -14,6 +14,9 @@ import {
 } from "@/lib/posthog"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import { fetchMutation } from "convex/nextjs"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import {
   checkServerSideUsage,
   incrementServerSideUsage,
@@ -164,6 +167,7 @@ export async function POST(req: Request) {
           properties: {
             serverCount: mcpResult.clients.length,
             toolCount: Object.keys(mcpResult.tools).length,
+            failedServers: mcpResult.failedServerCount,
             loadTimeMs: Date.now() - mcpLoadStart,
           },
         })
@@ -289,6 +293,45 @@ export async function POST(req: Request) {
               "[PostHog] Failed to capture generation event:",
               captureErr
             )
+          }
+        }
+
+        // Audit log: persist MCP tool calls to mcpToolCallLog (fire-and-forget).
+        // These writes are best-effort — failures are swallowed to avoid breaking
+        // the streaming response. Follows the same pattern as updateConnectionStatus
+        // in lib/mcp/load-tools.ts.
+        if (convexToken && steps && mcpToolServerMap.size > 0) {
+          for (const step of steps) {
+            if (step.toolCalls) {
+              for (const toolCall of step.toolCalls) {
+                const serverInfo = mcpToolServerMap.get(toolCall.toolName)
+                if (!serverInfo) continue
+
+                // Find matching tool result for output preview
+                const toolResult = step.toolResults?.find(
+                  (r: { toolCallId: string }) =>
+                    r.toolCallId === toolCall.toolCallId
+                )
+
+                void fetchMutation(
+                  api.mcpToolCallLog.log,
+                  {
+                    chatId: chatId as Id<"chats">,
+                    serverId: serverInfo.serverId as Id<"mcpServers">,
+                    toolName: serverInfo.displayName,
+                    toolCallId: toolCall.toolCallId,
+                    inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
+                    outputPreview: toolResult
+                      ? JSON.stringify(toolResult.output).slice(0, 500)
+                      : undefined,
+                    success: true,
+                  },
+                  { token: convexToken }
+                ).catch(() => {
+                  // Intentionally swallowed — audit logging is best-effort
+                })
+              }
+            }
           }
         }
       }

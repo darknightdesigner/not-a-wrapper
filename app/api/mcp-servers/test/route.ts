@@ -76,6 +76,6 @@ export async function POST(request: Request) {
     console.error("Error in POST /api/mcp-servers/test:", error)
     const message =
       error instanceof Error ? error.message : "Connection failed"
-    return NextResponse.json({ error: message, success: false })
+    return NextResponse.json({ error: message, success: false }, { status: 500 })
   }
 }

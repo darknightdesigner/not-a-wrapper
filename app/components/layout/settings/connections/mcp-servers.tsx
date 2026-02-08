@@ -108,7 +108,8 @@ export function McpServers() {
         title: "Server deleted",
         description: `${serverToDelete.name} has been removed.`,
       })
-    } catch {
+    } catch (error) {
+      console.error("Failed to delete MCP server:", error)
       toast({ title: "Failed to delete server", status: "error" })
     }
     setDeleteDialogOpen(false)
@@ -118,7 +119,8 @@ export function McpServers() {
   const handleToggle = async (server: (typeof servers)[number]) => {
     try {
       await toggleEnabled({ serverId: server._id })
-    } catch {
+    } catch (error) {
+      console.error("Failed to toggle MCP server:", error)
       toast({ title: "Failed to toggle server", status: "error" })
     }
   }
