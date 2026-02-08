@@ -196,7 +196,7 @@ export function MultiModelConversation({
                             (response) => {
                               return (
                                 <div
-                                  key={response.model}
+                                  key={`${response.model}-${response.message.id}`}
                                   className="max-w-[420px] min-w-[320px] flex-shrink-0"
                                 >
                                   <ResponseCard

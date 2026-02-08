@@ -132,6 +132,10 @@ export function MultiChat() {
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
   const messageGroupIdRef = useRef<string | null>(null)
 
+  // Maps message text → messageGroupId so live useChat messages resolve to
+  // the same group key as persisted messages (which use UUID-based keys).
+  const textToGroupIdRef = useRef<Map<string, string>>(new Map())
+
   // Keep chatIdRef in sync with reactive state
   useEffect(() => {
     chatIdRef.current = multiChatId || chatId
@@ -249,7 +253,10 @@ export function MultiChat() {
         const assistantMsg = chat.messages[i + 1]
 
         if (userMsg?.role === "user") {
-          const groupKey = getMessageText(userMsg)
+          const messageText = getMessageText(userMsg)
+          // Resolve to the UUID-based key used by persisted groups so
+          // live and persisted data merge into a single group.
+          const groupKey = textToGroupIdRef.current.get(messageText) || messageText
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -327,6 +334,10 @@ export function MultiChat() {
       if (!uid) return
 
       const message_group_id = crypto.randomUUID()
+
+      // Track text→groupId so the live grouping loop uses the same key
+      // as createPersistedGroups (which keys by messageGroupId/UUID).
+      textToGroupIdRef.current.set(promptToSend, message_group_id)
 
       let chatIdToUse = multiChatId || chatId
       if (!chatIdToUse) {

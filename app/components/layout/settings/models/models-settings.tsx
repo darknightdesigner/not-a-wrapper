@@ -63,7 +63,11 @@ export function ModelsSettings() {
 
     return availableModels.reduce(
       (acc, model) => {
-        const iconKey = model.icon || "unknown"
+        // OpenRouter models get their own section instead of mixing with direct providers
+        const iconKey =
+          model.providerId === "openrouter"
+            ? "openrouter"
+            : model.icon || "unknown"
 
         if (!acc[iconKey]) {
           acc[iconKey] = []
@@ -222,8 +226,8 @@ export function ModelsSettings() {
         <div className="space-y-6 pb-6">
           {Object.entries(availableModelsByProvider).map(
             ([iconKey, modelsGroup]) => {
-              const firstModel = modelsGroup[0]
-              const provider = PROVIDERS.find((p) => p.id === firstModel.icon)
+              // Use the group key to find the provider (handles OpenRouter section correctly)
+              const provider = PROVIDERS.find((p) => p.id === iconKey)
 
               return (
                 <div key={iconKey} className="space-y-3">
@@ -237,9 +241,13 @@ export function ModelsSettings() {
 
                   <div className="space-y-2 pl-7">
                     {modelsGroup.map((model) => {
-                      const modelProvider = PROVIDERS.find(
-                        (p) => p.id === model.provider
-                      )
+                      // For OpenRouter models, show the underlying provider (e.g., "via Claude")
+                      // For direct models, show the model's provider name
+                      const viaProvider =
+                        model.providerId === "openrouter"
+                          ? PROVIDERS.find((p) => p.id === model.icon)
+                          : null
+                      const viaLabel = viaProvider?.name || model.provider
 
                       return (
                         <motion.div
@@ -253,9 +261,14 @@ export function ModelsSettings() {
                         >
                           <div className="flex flex-col">
                             <div className="flex items-center gap-2">
+                              {/* Show underlying provider icon for OpenRouter models */}
+                              {model.providerId === "openrouter" &&
+                                viaProvider?.icon && (
+                                  <viaProvider.icon className="size-4 shrink-0" />
+                                )}
                               <span className="text-sm">{model.name}</span>
                               <span className="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-xs">
-                                via {modelProvider?.name || model.provider}
+                                via {viaLabel}
                               </span>
                             </div>
                             {model.description && (
