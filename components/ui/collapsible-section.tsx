@@ -71,8 +71,10 @@ export function CollapsibleSection({
           icon={ArrowRight01Icon}
           size={12}
           className={cn(
-            "shrink-0 opacity-0 motion-safe:transition-transform duration-150 group-hover/collapsible-section:opacity-100",
-            isOpen && "rotate-90"
+            "shrink-0 motion-safe:transition-all duration-150",
+            isOpen
+              ? "rotate-90 opacity-0 group-hover/collapsible-section:opacity-100"
+              : "opacity-100"
           )}
         />
       </CollapsiblePrimitive.Trigger>

@@ -29,7 +29,7 @@ import {
   PencilEdit02Icon,
   Search01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { Pin, PanelLeft } from "@/lib/icons"
+import { PanelLeft } from "@/lib/icons"
 import { useParams } from "next/navigation"
 import React, { useMemo, useRef } from "react"
 import { HistoryTrigger } from "../../history/history-trigger"
@@ -240,10 +240,9 @@ export function AppSidebar() {
                     <SidebarList
                       key="pinned"
                       title="Pinned"
-                      icon={<HugeiconsIcon icon={Pin} size={12} />}
                       items={pinnedChats}
                       currentChatId={currentChatId}
-                      collapsible={false}
+                      storageKey="sidebar-section-pinned"
                     />
                   )}
                   {nonPinnedChats.length > 0 && (
@@ -251,7 +250,6 @@ export function AppSidebar() {
                       title="Chats"
                       items={nonPinnedChats}
                       currentChatId={currentChatId}
-                      collapsible={true}
                       storageKey="sidebar-section-your-chats"
                     />
                   )}
