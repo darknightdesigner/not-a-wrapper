@@ -11,6 +11,9 @@
 import type * as chats from "../chats.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
+import type * as mcpServers from "../mcpServers.js";
+import type * as mcpToolApprovals from "../mcpToolApprovals.js";
+import type * as mcpToolCallLog from "../mcpToolCallLog.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
 import type * as usage from "../usage.js";
@@ -28,6 +31,9 @@ declare const fullApi: ApiFromModules<{
   chats: typeof chats;
   feedback: typeof feedback;
   files: typeof files;
+  mcpServers: typeof mcpServers;
+  mcpToolApprovals: typeof mcpToolApprovals;
+  mcpToolCallLog: typeof mcpToolCallLog;
   messages: typeof messages;
   projects: typeof projects;
   usage: typeof usage;

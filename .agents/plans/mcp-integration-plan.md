@@ -1,164 +1,65 @@
-# MCP Integration Plan: Not A Wrapper
+# MCP Integration Plan — Execution Guide
 
-> **Date**: February 7, 2026
-> **Status**: Draft
-> **Priority**: P0 — Critical (per competitive-feature-analysis.md)
-> **Author**: AI Agent (research + architecture)
-
----
-
-## Table of Contents
-
-1. [Executive Summary](#1-executive-summary)
-2. [Current State Analysis](#2-current-state-analysis)
-3. [Key Architectural Decisions](#3-key-architectural-decisions)
-4. [Option A: Per-Request MCP Client (Stateless Serverless)](#4-option-a-per-request-mcp-client-stateless-serverless)
-5. [Option B: Cached Tool Registry with Background Sync](#5-option-b-cached-tool-registry-with-background-sync)
-6. [Option C: Client-Side MCP Resolution with Server Proxy](#6-option-c-client-side-mcp-resolution-with-server-proxy)
-7. [Comparison Matrix](#7-comparison-matrix)
-8. [Recommendation](#8-recommendation)
-9. [Appendix: Shared Implementation Details](#9-appendix-shared-implementation-details)
+> **Status**: Ready for Implementation
+> **Decision**: Option A — Per-Request MCP Client (Stateless Serverless)
+> **Priority**: P0 — Critical
+> **Timeline**: 2–3 weeks (6 phases)
+> **Date**: February 7, 2026 | Revised: February 7, 2026
 
 ---
 
-## 1. Executive Summary
+## How to Use This Plan
 
-MCP (Model Context Protocol) integration is the single most strategically important feature for Not A Wrapper. It transforms the app from a multi-model chat interface into a **universal AI interface** that can interact with any tool ecosystem — without building native integrations for each service.
+This plan is structured for AI agent step-by-step execution. Each phase is self-contained with:
 
-Both ChatGPT (60+ apps/connectors, remote MCP servers) and Claude (connectors/MCP for Google Workspace, Slack) are investing heavily here. Not A Wrapper already has `@ai-sdk/mcp` installed (v1.0.18) and two utility files (`lib/mcp/load-mcp-from-local.ts`, `lib/mcp/load-mcp-from-url.ts`), but these are **not wired into the chat flow** — the chat route passes `tools: {} as ToolSet` to `streamText()`.
+- **Context to load** — files to read before starting the phase
+- **Steps** — atomic actions in execution order
+- **Verify** — how to confirm the phase is complete
+- **Decision gates** — questions that must be answered before proceeding
 
-This plan presents three architecturally distinct approaches to closing this gap, each making different tradeoffs on latency, complexity, security, and scope.
+Phases can be resumed independently. An agent starting at Phase 3 only needs to read Phase 3's context files, not the entire plan.
 
-### Constraints Applied to All Options
-
-- **No stdio transport in v1.** The chat API runs on Vercel serverless functions (`app/api/chat/route.ts`, `maxDuration = 60`), which cannot maintain persistent child processes. Only HTTP-based transports (Streamable HTTP and SSE) are viable for v1.
-- **Streamable HTTP is preferred over SSE.** Per Vercel's official guidance (June 2025), Streamable HTTP is the recommended transport — it eliminates persistent connections and reduces CPU usage by ~50% vs SSE. The existing `lib/mcp/load-mcp-from-url.ts` uses SSE and should be updated. **Pre-implementation spike required:** The AI SDK docs list `'sse' | 'http'` as valid transport types, but `type: 'http'` support should be verified at the installed `@ai-sdk/mcp` `^1.0.18` version before committing to it. Write a minimal integration test against a known public MCP server. If `type: 'http'` fails, fall back to `type: 'sse'` for v1 (already proven to work). Pin the `@ai-sdk/mcp` version in `package.json` rather than relying on the caret range to avoid surprise breakage.
-- **Security is non-negotiable.** Each option addresses trust models, allowlisting, per-tool approval, and audit logging.
-- **Convex is the database.** All persistent state (server configs, tool registries, audit logs) lives in Convex, consistent with the rest of the app.
+**Permission note**: Phase 2 modifies `convex/schema.ts`, which requires explicit user approval per `AGENTS.md`.
 
 ---
 
-## 2. Current State Analysis
+## Decision Summary
 
-### What Exists Today
+**Implementing Option A: Per-Request MCP Client.** On every chat request, the API route creates MCP clients for the user's configured servers, loads tools, passes them to `streamText()`, and closes clients after streaming.
 
-| Component | File | Status |
-|-----------|------|--------|
-| MCP client (stdio) | `lib/mcp/load-mcp-from-local.ts` | Working utility, not integrated |
-| MCP client (SSE) | `lib/mcp/load-mcp-from-url.ts` | Working utility, not integrated |
-| Chat streaming route | `app/api/chat/route.ts` | Production — `tools: {} as ToolSet` (empty) |
-| Tool invocation UI | `app/components/chat/tool-invocation.tsx` | Production — renders tool calls with args/results |
-| Connections settings tab | `app/components/layout/settings/connections/` | Placeholder UI (`ConnectionsPlaceholder`, `OllamaSection`, `DeveloperTools`) |
-| BYOK encryption | `lib/encryption.ts` | Production — AES-256-GCM for API keys |
-| Rate limiting | `app/api/chat/api.ts`, `convex/usage.ts` | Production — tiered daily limits |
-| User keys (Convex) | `convex/userKeys.ts` | Production — encrypted key storage with provider lookup |
-| `@ai-sdk/mcp` package | `package.json` | Installed v1.0.18 |
+**Why Option A**: Fastest path to value (2–3 weeks vs 3–4), lowest risk, follows existing per-request patterns (like BYOK key resolution), and all schema/UI work is reusable for future Options B/C. See [Architecture Reference](#architecture-reference) at the end for full option comparison.
 
-### What's Missing
+**Evolution path**: v1 (this plan) → v1.0.1 (in-memory warm cache) → v1.1 (persistent Convex cache + granular pre-approval) → v2 (client-side tool awareness, @-mention UX).
 
-1. **No MCP server configuration storage** — No Convex table for user-configured MCP servers
-2. **No tool loading in chat route** — `streamText()` receives empty tools
-3. **No Connections UI** — The settings tab is a placeholder
-4. **No trust/approval model** — No allowlisting, no per-tool approval, no audit logging
-5. **No tool call rate limiting** — Usage tracking counts messages, not tool calls
-6. **Transport needs updating** — Existing SSE transport should be updated to Streamable HTTP per latest spec
+---
 
-### AI SDK MCP API (v6)
+## Constants Reference
 
-The `createMCPClient()` from `@ai-sdk/mcp` supports:
+All MCP constants to add to `lib/config.ts`. Referenced by multiple phases.
 
 ```typescript
-// HTTP transport (recommended for production)
-const client = await createMCPClient({
-  transport: {
-    type: 'http',
-    url: 'https://server.example.com/mcp',
-    headers: { Authorization: 'Bearer token' },
-  },
-});
-
-// SSE transport (legacy, still supported)
-const client = await createMCPClient({
-  transport: { type: 'sse', url: 'https://server.example.com/sse' },
-});
-
-// Get tools compatible with streamText()
-const tools = await client.tools();
-
-// Must close after use (critical in serverless)
-await client.close();
+// MCP Integration Constants
+export const MAX_MCP_SERVERS_PER_USER = 10
+export const MAX_TOOL_RESULT_SIZE = 100 * 1024    // 100KB
+export const MCP_CONNECTION_TIMEOUT_MS = 5000
+export const MCP_CIRCUIT_BREAKER_THRESHOLD = 3
+export const MCP_MAX_STEP_COUNT = 20
+export const MCP_MAX_TOOLS_PER_REQUEST = 50
 ```
-
-The `tools()` method returns a `ToolSet` directly compatible with `streamText()`. Tool results are rendered by the existing `tool-invocation.tsx` component.
 
 ---
 
-## 3. Key Architectural Decisions
+## Schema Reference
 
-Before evaluating options, these are the cross-cutting decisions each option must address:
-
-### D1: Where are MCP server configurations stored?
-
-All options store configs in a new `mcpServers` Convex table. The question is what metadata is stored alongside the URL.
-
-### D2: When are tool definitions loaded?
-
-This is the key differentiator between options. Loading tools requires connecting to an MCP server, which has latency and reliability implications in a serverless context.
-
-### D3: How are tools passed to `streamText()`?
-
-The AI SDK expects a `ToolSet` object. MCP tools from `client.tools()` are already in this format. The question is how to merge tools from multiple servers and how to filter by user approval.
-
-### D4: How does trust and approval work?
-
-Options range from "all tools from allowlisted servers are auto-approved" to "each tool requires explicit per-user approval before first use."
-
-### D5: How does this interact with BYOK and rate limiting?
-
-MCP tool calls consume model tokens (the model decides to call tools). Some MCP servers may also require authentication. The system must handle both.
-
-### D6: How are MCP connections cleaned up in serverless?
-
-`createMCPClient()` returns a `close()` method that must be called. In serverless, this must happen in `onFinish` or via `after()` from `next/server`. Failure to close leaks connections.
-
----
-
-## 4. Option A: Per-Request MCP Client (Stateless Serverless)
-
-### Architecture
-
-The simplest approach: on every chat request, the API route creates MCP clients for the user's configured servers, loads tools, passes them to `streamText()`, and closes clients when streaming finishes.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    POST /api/chat                            │
-│                                                             │
-│  1. Auth + rate limit check (existing)                      │
-│  2. Fetch user's MCP servers from Convex                    │
-│  3. For each enabled server:                                │
-│     a. createMCPClient({ transport: { type: 'http', url }}) │
-│     b. client.tools() → ToolSet                            │
-│  4. Merge all tools + filter by user's approved tools       │
-│  5. streamText({ ..., tools: mergedTools })                 │
-│  6. onFinish: close all MCP clients + log tool calls        │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Database Schema Changes
+Three new Convex tables. This is the canonical schema — copy directly into `convex/schema.ts`.
 
 ```typescript
-// convex/schema.ts — new tables
-
 mcpServers: defineTable({
   userId: v.id("users"),
-  name: v.string(),                          // "My GitHub MCP"
-  url: v.string(),                           // "https://mcp.example.com/mcp"
-  transport: v.union(
-    v.literal("http"),
-    v.literal("sse")
-  ),
+  name: v.string(),
+  url: v.string(),
+  transport: v.union(v.literal("http"), v.literal("sse")),
   enabled: v.boolean(),
-  // Optional auth — encrypted like BYOK keys
   authType: v.optional(v.union(
     v.literal("none"),
     v.literal("bearer"),
@@ -166,7 +67,7 @@ mcpServers: defineTable({
   )),
   encryptedAuthValue: v.optional(v.string()),
   authIv: v.optional(v.string()),
-  headerName: v.optional(v.string()),        // For custom header auth
+  headerName: v.optional(v.string()),
   createdAt: v.number(),
   lastConnectedAt: v.optional(v.number()),
   lastError: v.optional(v.string()),
@@ -183,16 +84,17 @@ mcpToolApprovals: defineTable({
 })
   .index("by_user", ["userId"])
   .index("by_server", ["serverId"])
-  .index("by_user_server", ["userId", "serverId"]),
+  .index("by_user_server", ["userId", "serverId"])
+  .index("by_user_server_tool", ["userId", "serverId", "toolName"]),
 
 mcpToolCallLog: defineTable({
   userId: v.id("users"),
-  chatId: v.optional(v.id("chats")),   // Optional — may be absent in tool-testing flows
+  chatId: v.optional(v.id("chats")),
   serverId: v.id("mcpServers"),
   toolName: v.string(),
   toolCallId: v.string(),
-  inputPreview: v.optional(v.string()), // Truncated first 500 chars (avoid storing sensitive data)
-  outputPreview: v.optional(v.string()),// Truncated first 500 chars
+  inputPreview: v.optional(v.string()),
+  outputPreview: v.optional(v.string()),
   success: v.boolean(),
   durationMs: v.optional(v.number()),
   error: v.optional(v.string()),
@@ -203,558 +105,658 @@ mcpToolCallLog: defineTable({
   .index("by_server", ["serverId"]),
 ```
 
-### Files to Create or Modify
+---
 
-| File | Action | Description |
-|------|--------|-------------|
-| `convex/schema.ts` | Modify | Add `mcpServers`, `mcpToolApprovals`, `mcpToolCallLog` tables |
-| `convex/mcpServers.ts` | Create | CRUD mutations/queries for MCP server configs |
-| `convex/mcpToolApprovals.ts` | Create | Tool approval mutations/queries |
-| `convex/mcpToolCallLog.ts` | Create | Audit log mutations |
-| `lib/mcp/load-tools.ts` | Create | Orchestrates multi-server tool loading with filtering |
-| `lib/mcp/load-mcp-from-url.ts` | Modify | Update to support `type: 'http'` transport (currently SSE-only) |
-| `app/api/chat/route.ts` | Modify | Wire tool loading before `streamText()`, close clients in `onFinish` |
-| `app/components/layout/settings/connections/mcp-servers.tsx` | Create | MCP server management UI |
-| `app/components/layout/settings/connections/mcp-server-form.tsx` | Create | Add/edit server form with URL validation and test connection |
-| `app/components/layout/settings/connections/mcp-tool-approvals.tsx` | Create | Per-tool approval management |
-| `app/components/layout/settings/settings-content.tsx` | Modify | Replace `ConnectionsPlaceholder` with MCP UI. **Note:** The current file conditionally renders `{!isDev && <ConnectionsPlaceholder />}` and shows `OllamaSection`/`DeveloperTools` only in dev mode. The MCP server UI should be visible to **all** users (not gated on `isDev`), while keeping Ollama/DevTools as dev-only alongside the new MCP section. |
+## File Map
 
-### Modified Chat Route (Conceptual)
+Every file to create or modify, organized by phase. Use as a progress tracker.
+
+| Phase | File | Action |
+|-------|------|--------|
+| 0 | `package.json` | Modify — pin `@ai-sdk/mcp` version |
+| 1 | `lib/config.ts` | Modify — add MCP constants |
+| 1 | `.env.example` | Modify — add `ENABLE_MCP` |
+| 2 | `convex/schema.ts` | Modify — add 3 tables (**Ask First**) |
+| 2 | `convex/mcpServers.ts` | Create — CRUD + URL validation |
+| 2 | `convex/mcpToolApprovals.ts` | Create — approval mutations/queries |
+| 2 | `convex/mcpToolCallLog.ts` | Create — audit log mutations |
+| 3 | `lib/models/types.ts` | Modify — add `supportsTools` field |
+| 3 | `lib/mcp/load-mcp-from-url.ts` | Modify — add `type: 'http'` support |
+| 3 | `lib/mcp/load-tools.ts` | Create — multi-server tool orchestrator |
+| 4 | `app/api/chat/route.ts` | Modify — wire MCP tools into `streamText()` |
+| 5 | Settings UI files (see Phase 5) | Create/Modify — connections management |
+| 6 | `lib/mcp/__tests__/*.test.ts` | Create — unit tests |
+
+---
+
+## Phase 0: Transport Spike
+
+> **Goal**: Verify `type: 'http'` transport works before committing to it.
+> **Dependencies**: None.
+> **Can run in parallel with**: Phase 1.
+
+### Context to Load
+
+- `lib/mcp/load-mcp-from-url.ts` — existing SSE implementation
+- `lib/mcp/load-mcp-from-local.ts` — stdio implementation (reference only)
+- `package.json` — check `@ai-sdk/mcp` version
+
+### Steps
+
+1. Pin `@ai-sdk/mcp` version in `package.json` — remove the `^` caret from `^1.0.18` to prevent surprise breakage
+2. Write a minimal test script that creates an MCP client with HTTP transport:
+   ```typescript
+   import { createMCPClient } from "@ai-sdk/mcp"
+   const client = await createMCPClient({
+     transport: { type: 'http', url: '<public-mcp-server-url>' }
+   })
+   const tools = await client.tools()
+   console.log('Tools discovered:', Object.keys(tools))
+   await client.close()
+   ```
+3. If `type: 'http'` works → use as primary transport for all subsequent phases
+4. If `type: 'http'` fails → confirm `type: 'sse'` works, use as v1 transport, update all references in this plan
+
+### Verify
+
+- Script runs without errors
+- `tools()` returns a valid `ToolSet` object with at least one tool
+
+### Decision Gate
+
+**Transport decision**: `'http'` or `'sse'`? This affects the default transport value in Phase 2 schema and Phase 3 client creation.
+
+---
+
+## Phase 1: Configuration and Feature Flag
+
+> **Goal**: Add constants and feature flag infrastructure.
+> **Dependencies**: None.
+> **Can run in parallel with**: Phase 0.
+
+### Context to Load
+
+- `lib/config.ts` — find the right section for new constants
+- `.env.example` — see existing env var documentation style
+
+### Steps
+
+1. Read `lib/config.ts` and add all MCP constants after the existing rate limit section. Use the exact values from [Constants Reference](#constants-reference) above.
+2. Read `.env.example` and add at the end:
+   ```
+   # MCP Tool Integration
+   # Set to 'true' to enable MCP tool loading in the chat route.
+   # Can be toggled via Vercel env vars without a deploy (instant kill-switch).
+   ENABLE_MCP=
+   ```
+3. Add `ENABLE_MCP=true` to your local `.env` for development.
+
+### Verify
+
+```bash
+bun run typecheck  # No new errors
+```
+
+---
+
+## Phase 2: Database Layer
+
+> **Goal**: Create Convex tables and CRUD operations for MCP servers, approvals, and audit logs.
+> **Dependencies**: Phase 1 (constants referenced in mutations).
+> **Permission**: Modifying `convex/schema.ts` requires explicit user approval per `AGENTS.md`.
+
+### Context to Load
+
+- `convex/schema.ts` — existing table structure, understand the pattern
+- `convex/userKeys.ts` — **pattern reference** for auth checking and encrypted field handling
+- `lib/encryption.ts` — encryption/decryption functions for auth tokens
+- `lib/config.ts` — `MAX_MCP_SERVERS_PER_USER` constant
+
+### Step 2.1: Add Schema Tables
+
+1. Read `convex/schema.ts` to understand the existing table definitions
+2. Add the three tables from [Schema Reference](#schema-reference) above
+3. Note: `convex deploy` (used in the build script) auto-applies schema changes — adding tables is non-destructive
+
+**Verify**: `bun run typecheck`
+
+### Step 2.2: Server CRUD — `convex/mcpServers.ts`
+
+1. Read `convex/userKeys.ts` — follow its auth pattern: `ctx.auth.getUserIdentity()` → resolve Convex user ID via `users.by_clerk_id` → verify ownership
+2. Create `convex/mcpServers.ts` with these functions:
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `list` | query | Returns all MCP servers for the authenticated user |
+| `get` | query | Single server by ID, verify ownership |
+| `create` | mutation | URL validation + `MAX_MCP_SERVERS_PER_USER` enforcement + encrypt auth |
+| `update` | mutation | URL re-validation, ownership check, re-encrypt auth if changed |
+| `remove` | mutation | Delete server + cascade delete associated approvals |
+| `toggleEnabled` | mutation | Quick enable/disable toggle |
+
+3. **SSRF validation in `create` and `update`** — reject these URL patterns:
+   - Private IP ranges: `10.x.x.x`, `172.16-31.x.x`, `192.168.x.x`, `169.254.x.x`, `127.x.x.x`
+   - Hostnames: `localhost`, `0.0.0.0`
+   - Non-HTTPS URLs in production (allow HTTP in development)
+4. **Server limit enforcement in `create`** — count existing servers for user, reject if `>= MAX_MCP_SERVERS_PER_USER`
+5. **Auth encryption** — encrypt `authValue` using the same AES-256-GCM pattern as `lib/encryption.ts`, store in `encryptedAuthValue` + `authIv` fields
+
+**Verify**: `bun run typecheck`
+
+### Step 2.3: Tool Approvals — `convex/mcpToolApprovals.ts`
+
+1. Create with these functions:
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `listByServer` | query | All approvals for a specific server |
+| `listByUser` | query | All approvals across all servers for a user |
+| `upsertApproval` | mutation | Check `by_user_server_tool` index before insert to avoid duplicates |
+| `bulkApprove` | mutation | Auto-approve all tools for a server (called on server add) |
+| `toggleApproval` | mutation | Flip individual tool approved status |
+| `removeByServer` | internal mutation | Cleanup when server is deleted (called from `mcpServers.remove`) |
+
+2. **v1 trust model**: When a user adds an MCP server, ALL discovered tools are auto-approved. The trust boundary is server-level — the user chose to add the URL. Users can individually disable tools after discovery. This is a conscious security tradeoff for v1 usability.
+
+**Verify**: `bun run typecheck`
+
+### Step 2.4: Audit Log — `convex/mcpToolCallLog.ts`
+
+1. Create with these functions:
+
+| Function | Type | Description |
+|----------|------|-------------|
+| `log` | mutation | Write a tool call entry. Truncate `inputPreview` and `outputPreview` to 500 chars. |
+| `listByChat` | query | Audit trail for a conversation |
+| `listByUser` | query | User's tool call history (paginated) |
+
+2. Intentionally store only truncated previews — avoid persisting sensitive data (PII, tokens) that MCP tools may process.
+
+**Verify**: `bun run typecheck` — all Convex functions compile and have auth checks.
+
+---
+
+## Phase 3: Core MCP Logic
+
+> **Goal**: Build the tool loading orchestration layer that connects MCP servers and prepares tools for `streamText()`.
+> **Dependencies**: Phase 0 (transport decision), Phase 2 (Convex queries for server configs).
+
+### Context to Load
+
+- `lib/mcp/load-mcp-from-url.ts` — existing SSE client, will be updated
+- `lib/user-keys.ts` — pattern reference for per-request key resolution
+- `lib/models/types.ts` — model type definitions
+- `lib/config.ts` — MCP constants from Phase 1
+- `convex/mcpServers.ts` — server query functions from Phase 2
+
+### Step 3.1: Add Model Capability Field
+
+1. Read `lib/models/types.ts`
+2. Add `supportsTools?: boolean` to the `ModelConfig` interface (or equivalent type). Default is `true` — only explicitly set to `false` for models known not to support tools.
+3. Read through model definition files in `lib/models/data/` and set `supportsTools: false` for any models that don't support tool use (some smaller/free-tier models, reasoning-only models).
+
+**Verify**: `bun run typecheck`
+
+### Step 3.2: Update Transport Support
+
+1. Read `lib/mcp/load-mcp-from-url.ts`
+2. Update to support both `type: 'http'` (preferred, per Phase 0 results) and `type: 'sse'` (fallback)
+3. Add auth header support:
+   ```typescript
+   headers: serverConfig.authType === 'bearer'
+     ? { Authorization: `Bearer ${decryptedAuthValue}` }
+     : serverConfig.authType === 'header'
+       ? { [serverConfig.headerName!]: decryptedAuthValue! }
+       : undefined,
+   ```
+
+**Verify**: `bun run typecheck`
+
+### Step 3.3: Tool Loading Orchestrator — `lib/mcp/load-tools.ts`
+
+This is the most complex new file. It orchestrates multi-server tool loading for a single chat request.
+
+**Input**: Convex auth token (NOT a raw userId string)
+
+**Output**: `{ tools: ToolSet, clients: MCPClient[], toolServerMap: Map<string, ServerInfo> }`
+
+**Implementation requirements**:
+
+1. **Resolve user identity internally** — use `fetchQuery` with the Convex token to resolve the Convex user ID. Follow the same pattern as `convex/userKeys.ts` which uses `ctx.auth.getUserIdentity()` → `users.by_clerk_id`. The chat route passes a Clerk ID string (`"user_2abc..."`), NOT a Convex `v.id("users")`.
+
+2. **Load server configs** — `fetchQuery` to read enabled servers from `mcpServers` table. This adds ~50-100ms of Convex round-trip latency before MCP connections begin.
+
+3. **Create clients in parallel** — use `Promise.allSettled()` with per-server timeout:
+   ```typescript
+   const results = await Promise.allSettled(
+     enabledServers.map(server =>
+       Promise.race([
+         createMCPClient({ transport: { type: 'http', url: server.url, headers } }),
+         new Promise((_, reject) =>
+           setTimeout(() => reject(new Error('MCP connection timeout')), MCP_CONNECTION_TIMEOUT_MS)
+         ),
+       ])
+     )
+   )
+   ```
+   Total loading time = `max(individual server times)`, not sum. A slow server doesn't block fast servers.
+
+4. **Collect tools from successful clients** — skip failed servers, log errors to `mcpServers.lastError`.
+
+5. **Namespace tool names** — prefix with server slug to prevent collisions: `${serverSlug}_${toolName}`. The slug must be immutable once set (changing it orphans historical tool names in message history).
+
+6. **Filter by approved tools** — query `mcpToolApprovals`, only include tools where `approved === true`.
+
+7. **Enforce `MCP_MAX_TOOLS_PER_REQUEST`** — if combined tools exceed limit, prioritize recently-used or prompt user to select.
+
+8. **Truncate tool results** — cap at `MAX_TOOL_RESULT_SIZE` (100KB) before passing to model and audit log.
+
+9. **Circuit-breaker** — skip servers with `MCP_CIRCUIT_BREAKER_THRESHOLD` (3) consecutive failures. Reset on success.
+
+10. **Return `toolServerMap`** — maps namespaced tool names to `{ displayName, serverName, serverId }`. Needed for:
+    - Audit logging (which server handled the call)
+    - UI display name mapping (`tool-invocation.tsx` should strip namespace prefix)
+    - Message history compatibility
+
+**Verify**: `bun run typecheck`, write unit tests for URL validation and tool merging (Phase 6)
+
+---
+
+## Phase 4: Chat Route Integration
+
+> **Goal**: Wire MCP tools into the streaming chat pipeline.
+> **Dependencies**: Phase 3 (load-tools.ts must exist).
+> **This is the critical integration phase** — read the existing route carefully before modifying.
+
+### Context to Load
+
+- `app/api/chat/route.ts` — **read the entire file thoroughly** before making changes. This is the gold standard API route.
+- `app/api/chat/api.ts` — business logic, rate limiting
+- `lib/mcp/load-tools.ts` — the tool loader from Phase 3
+
+### Step 4.1: Add Import and MCP Variables
+
+1. Add import at the top:
+   ```typescript
+   import { loadUserMcpTools } from "@/lib/mcp/load-tools"
+   ```
+2. After existing auth and rate limit checks, add MCP variables:
+   ```typescript
+   let mcpTools: ToolSet = {} as ToolSet
+   let mcpClients: MCPClient[] = []
+   ```
+
+### Step 4.2: Add Gated Tool Loading
+
+After the auth/rate-limit section, before `streamText()`:
 
 ```typescript
-// app/api/chat/route.ts — key changes (conceptual, not implementation)
+// Gate on: auth + feature flag + model capability
+const mcpEnabled = isAuthenticated
+  && convexToken
+  && process.env.ENABLE_MCP === 'true'
+  && modelConfig.supportsTools !== false
 
-import { loadUserMcpTools, closeMcpClients } from "@/lib/mcp/load-tools"
-
-// Inside POST handler, after auth and rate limiting:
-
-// IMPORTANT: The chat route's `userId` is a Clerk ID string (e.g., "user_2abc..."),
-// NOT a Convex v.id("users"). The MCP tool loading function must resolve the Convex
-// user ID internally using the convexToken, following the same pattern as
-// convex/userKeys.ts (which uses ctx.auth.getUserIdentity() → users.by_clerk_id).
-//
-// The loadUserMcpTools function accepts the convexToken and resolves the user
-// internally via Convex auth — it does NOT accept a raw userId string.
-
-// Only load MCP tools for authenticated users (see Appendix F)
-let mcpTools: ToolSet = {} as ToolSet
-let mcpClients: MCPClient[] = []
-
-if (isAuthenticated && convexToken && process.env.ENABLE_MCP === 'true') {
-  const result = await loadUserMcpTools(convexToken, { timeout: 5000 })
+if (mcpEnabled) {
+  const result = await loadUserMcpTools(convexToken, {
+    timeout: MCP_CONNECTION_TIMEOUT_MS,
+  })
   mcpTools = result.tools
   mcpClients = result.clients
 }
+```
 
+**Key notes**:
+- `isAuthenticated` — existing check in the route. MCP is auth-only, never for anonymous users.
+- `convexToken` — needed for `loadUserMcpTools` to query Convex.
+- `modelConfig.supportsTools` — from Phase 3. Prevents confusing errors for non-tool-capable models.
+
+### Step 4.3: Adjust Step Limit
+
+```typescript
+const hasMcpTools = Object.keys(mcpTools).length > 0
+const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : 10
+```
+
+Complex MCP tool chains can easily exceed the default 10 steps (e.g., research → process → follow-up). 20 steps with `maxDuration=60` is a reasonable balance.
+
+**Timeout risk**: With 20 steps, worst-case is 20 tool calls × 2-3s each = 40-60s of execution, plus LLM inference. The circuit-breaker and tool output truncation mitigate this. Monitor p95 function duration after launch.
+
+### Step 4.4: Update `streamText()` Call
+
+- Replace `tools: {} as ToolSet` with `tools: mcpTools`
+- Update `stopWhen: stepCountIs(maxSteps)`
+
+```typescript
 const result = streamText({
   model: aiModel,
   system: effectiveSystemPrompt,
   messages: modelMessages,
-  tools: mcpTools, // Previously: {} as ToolSet
-  stopWhen: stepCountIs(10),
-
-  onFinish: async ({ text, usage }) => {
-    // Close all MCP clients
-    await closeMcpClients(mcpClients)
-
-    // Log tool calls to Convex audit log
+  tools: mcpTools,              // Was: {} as ToolSet
+  stopWhen: stepCountIs(maxSteps),
+  // onFinish is for LOGGING ONLY — does NOT fire on client disconnect
+  onFinish: ({ text, usage }) => {
     // ... existing PostHog tracking ...
+    // Add: log tool calls to mcpToolCallLog (truncated previews)
   },
 })
 ```
 
-### Security Model
-
-- **Server allowlisting**: Users add servers manually via Settings > Connections. No curated directory in v1.
-- **URL validation (SSRF protection)**: All user-provided MCP server URLs are validated before storage and connection. The server rejects: private IP ranges (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x), `localhost` and `0.0.0.0`, non-HTTPS URLs (plain HTTP disallowed in production). Validation runs in the `convex/mcpServers.ts` creation/update mutations.
-- **Auto-approve on server add (v1)**: When a user adds an MCP server, all discovered tools are auto-inserted into `mcpToolApprovals` with `approved: true`. The trust boundary in v1 is server-level — the user explicitly chose to add the server URL. Users can individually disable tools from Settings > Connections after discovery. New tools discovered on subsequent requests from an already-added server are also auto-approved (with a notification in the UI). Granular per-tool pre-approval can be added in v1.1.
-- **Audit logging**: Tool calls are logged to `mcpToolCallLog` with: tool name, duration, success/failure status, and a truncated input/output preview (first 500 chars). Full input/output is intentionally not stored to avoid persisting sensitive data (PII, tokens) that MCP tools may process. A `debugMode` user preference can enable full logging in v1.1.
-- **Tool output size limit**: Tool results are capped at `MAX_TOOL_RESULT_SIZE` (100KB). Results exceeding this are truncated before being passed to the model and before audit logging, preventing memory pressure in the serverless function and token waste in the LLM context.
-- **Auth for MCP servers**: Server auth tokens are encrypted using the same AES-256-GCM pattern as BYOK keys (`lib/encryption.ts`). The same `ENCRYPTION_KEY` environment variable is reused.
-- **Connection timeout**: Each MCP server connection has a 5-second timeout. Failing servers are skipped with an error logged.
-
-### Pros
-
-1. **Simplest architecture.** No caching layer, no background jobs, no additional infrastructure. The chat route remains a pure function: request in, stream out.
-2. **Always-fresh tools.** Every request gets the latest tool definitions from MCP servers. No stale cache issues if a server adds/removes tools.
-3. **Minimal blast radius.** A failing MCP server only affects the current request. No global cache corruption, no background sync failures to debug.
-4. **Natural cleanup.** MCP clients are created and closed within a single request lifecycle. The `onFinish` callback on `streamText()` provides a clean hook, and `after()` from `next/server` provides a fallback.
-5. **Reuses existing patterns.** Follows the same per-request pattern as API key resolution (`getEffectiveApiKey` in `lib/user-keys.ts`) and rate limiting. No new infrastructure patterns to learn.
-
-### Cons
-
-1. **Added latency on every request.** Creating MCP clients and calling `tools()` adds network round-trips per server. With 3 servers, this could add 500ms–2s to initial response time. Users with many configured servers will feel this.
-2. **Vercel function timeout pressure.** The function has `maxDuration = 60` seconds. MCP client creation + tool loading + LLM streaming + tool execution all share this budget. Complex multi-tool conversations may timeout.
-3. **Connection overhead at scale.** Each chat message creates new TCP/HTTP connections to all configured MCP servers. This doesn't cache or reuse connections between requests, even within warm Vercel function containers.
-4. **No offline awareness.** If an MCP server is down, the user discovers this only when they send a message. There's no pre-flight health check or status indicator.
-5. **No granular pre-approval.** Tools are auto-approved at the server level in v1. Users who want to selectively disable specific tools must do so after discovery via Settings. This is acceptable for v1 but a granular pre-approval flow should be added in v1.1.
-
-### Risks and Open Questions
-
-- **Timeout risk**: What if MCP servers are slow to respond? Need a circuit-breaker pattern: skip servers that fail 3+ times in a row.
-- **Tool name collisions**: Two MCP servers may expose tools with the same name. Need a namespacing strategy (e.g., `server-slug:tool-name`).
-- **Max tools limit**: LLMs have practical limits on how many tools they can reason about (~20-50). Need a tool count limit or selection mechanism.
-- **Anonymous users**: Should anonymous users have access to MCP tools? The current rate limiting separates auth/anon. Recommendation: MCP is auth-only.
-
-### Estimated Complexity and Timeline
-
-- **Complexity**: Medium
-- **Timeline**: 2–3 weeks
-  - Week 1: Convex schema, server CRUD, basic connections UI
-  - Week 2: Tool loading in chat route, tool approval flow, audit logging
-  - Week 3: Error handling, timeout/circuit-breaker, testing, polish
-
----
-
-## 5. Option B: Cached Tool Registry with Background Sync
-
-### Architecture
-
-Tool definitions are fetched from MCP servers in the background and cached in Convex. The chat route reads tools from the cache instead of connecting to MCP servers on every request, eliminating per-request latency.
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                  Background Sync (Convex Action / Cron)              │
-│                                                                      │
-│  1. For each enabled MCP server:                                     │
-│     a. createMCPClient({ transport: { type: 'http', url }})         │
-│     b. client.tools() → tool definitions (schemas)                  │
-│     c. Store tool schemas in mcpToolCache table                     │
-│     d. Close client                                                  │
-│  2. Runs on: server add/edit, manual refresh, periodic (every 15m)  │
-└──────────────────────────────────────────────────────────────────────┘
-
-┌──────────────────────────────────────────────────────────────────────┐
-│                       POST /api/chat                                 │
-│                                                                      │
-│  1. Auth + rate limit check (existing)                               │
-│  2. Read cached tool definitions from Convex                         │
-│  3. Build runtime tool executors using cached schemas                 │
-│  4. For each tool call during streaming:                             │
-│     a. Create ephemeral MCP client to target server                  │
-│     b. Execute the tool call                                         │
-│     c. Close client                                                  │
-│  5. Log tool calls for audit                                         │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-### Database Schema Changes
-
-Same as Option A, plus:
+### Step 4.5: Add Client Cleanup via `after()`
 
 ```typescript
-// convex/schema.ts — additional table
-
-mcpToolCache: defineTable({
-  serverId: v.id("mcpServers"),
-  userId: v.id("users"),
-  toolName: v.string(),
-  description: v.optional(v.string()),
-  inputSchema: v.any(),          // JSON Schema for tool parameters
-  outputSchema: v.optional(v.any()),
-  lastSyncedAt: v.number(),
-  syncError: v.optional(v.string()),
+// PRIMARY CLEANUP — after() always runs after response completes or aborts,
+// including client disconnects. The route already uses after() for PostHog flushing.
+after(async () => {
+  await Promise.allSettled(mcpClients.map(c => c.close()))
 })
-  .index("by_server", ["serverId"])
-  .index("by_user", ["userId"])
-  .index("by_user_server", ["userId", "serverId"]),
 ```
 
-### Files to Create or Modify
+**Why `after()` and not `onFinish`?** `onFinish` does NOT fire if the client disconnects mid-stream (user closes tab, network drop). `after()` from `next/server` always runs — it is the only reliable cleanup path. Use `onFinish` exclusively for audit logging.
 
-Everything from Option A, plus:
+### Step 4.6: Add Error Cleanup Path
 
-| File | Action | Description |
-|------|--------|-------------|
-| `convex/mcpToolCache.ts` | Create | Tool cache CRUD + sync logic |
-| `convex/mcpSync.ts` | Create | Convex action for background tool sync |
-| `lib/mcp/build-tools-from-cache.ts` | Create | Reconstructs AI SDK ToolSet from cached schemas |
-| `lib/mcp/tool-executor.ts` | Create | Ephemeral MCP client for executing individual tool calls |
-
-### How Tool Execution Works
-
-The cache stores **tool schemas** (name, description, input/output schema), not executable tool functions. At request time, the system builds AI SDK-compatible tool definitions with custom `execute` functions that:
-
-1. Look up which MCP server owns the tool (from the cache metadata)
-2. Create an ephemeral MCP client to that server
-3. Execute the specific tool call
-4. Close the client
-5. Return the result
+If an error occurs before `streamText()` is called (e.g., during tool loading), `after()` may not have been registered yet. Add explicit cleanup in the catch block:
 
 ```typescript
-// Conceptual: building executable tools from cached schemas
-function buildToolFromCache(
-  cachedTool: CachedTool,
-  serverUrl: string,
-  serverAuth?: { type: string; value: string }
-): Tool {
-  return tool({
-    description: cachedTool.description,
-    parameters: jsonSchema(cachedTool.inputSchema),
-    execute: async (args) => {
-      const client = await createMCPClient({
-        transport: { type: 'http', url: serverUrl, headers: buildAuthHeaders(serverAuth) },
-      });
-      try {
-        const serverTools = await client.tools();
-        const result = await serverTools[cachedTool.toolName].execute(args);
-        return result;
-      } finally {
-        await client.close();
-      }
-    },
-  });
-}
-```
-
-### Security Model
-
-Same as Option A, plus:
-
-- **Sync-time validation**: When syncing tools, validate tool schemas against a size/complexity limit (e.g., max 50 tools per server, max 10KB per schema). Reject servers with suspicious tool definitions.
-- **Cache freshness indicators**: UI shows "Last synced: 5 minutes ago" with a manual refresh button. Stale caches (>1 hour) show a warning.
-- **Sync audit trail**: All sync operations are logged, including which tools appeared/disappeared between syncs.
-
-### Pros
-
-1. **Near-zero chat latency impact.** The chat route reads tool schemas from Convex (fast database read) instead of connecting to MCP servers. Tool loading adds ~50ms instead of ~500ms–2s.
-2. **Pre-flight tool discovery.** Users can see available tools before sending a message. The UI can show "3 servers connected, 12 tools available" in the chat input area.
-3. **Resilience to MCP server downtime.** If an MCP server goes down, cached tools are still visible. Execution will fail, but the user sees a clear error rather than a silent omission of tools.
-4. **Tool browsing and approval UX.** Cached tool metadata enables a rich approval UI: browse all available tools, see descriptions and parameters, approve/reject before ever sending a message.
-5. **Tool count management.** The cache enables intelligent tool selection: if a user has 50+ tools, the system can select the most relevant ones per conversation based on tool descriptions and conversation context.
-
-### Cons
-
-1. **Significant added complexity.** Introduces a background sync system, cache invalidation, and a custom tool executor layer. This is a meaningful increase in moving parts vs Option A.
-2. **Cache staleness.** Tools may change on the MCP server between syncs. A tool that was cached 15 minutes ago may have different parameters or no longer exist. This leads to runtime errors that are confusing to debug.
-3. **Custom tool executor is non-trivial.** Reconstructing AI SDK tools from cached schemas and building ephemeral clients for execution requires careful engineering. The `@ai-sdk/mcp` library doesn't natively support this pattern — it expects `createMCPClient` → `tools()` → `streamText()` as a unit.
-4. **Convex action limitations.** Convex actions (server-side functions that can make HTTP requests) have their own timeout limits. Syncing many servers with many tools may hit these limits.
-5. **Double connection cost for execution.** When a tool is actually called, an ephemeral MCP client is still created for execution. This means the background sync saved latency on the initial tool listing, but execution still pays the connection cost.
-
-### Risks and Open Questions
-
-- **Convex action reliability**: Background sync runs as Convex actions. What happens if the sync fails repeatedly? Need a retry strategy with exponential backoff and a "sync failed" status visible to users.
-- **Schema compatibility**: Cached JSON schemas must be 100% compatible with what the AI SDK expects. Any version mismatches could cause silent failures.
-- **Stale tool execution**: What if a cached tool is called but no longer exists on the server? Need graceful error handling that surfaces "Tool no longer available" to the user.
-- **Sync frequency**: 15-minute sync interval is a balance between freshness and server load. Configurable per-server?
-
-### Estimated Complexity and Timeline
-
-- **Complexity**: High
-- **Timeline**: 3–4 weeks
-  - Week 1: Convex schema, server CRUD, cache table, connections UI
-  - Week 2: Background sync system (Convex actions), cache management
-  - Week 3: Custom tool executor, integration with chat route, tool approval UI
-  - Week 4: Error handling, sync monitoring, cache invalidation, testing
-
----
-
-## 6. Option C: Client-Side MCP Resolution with Server Proxy
-
-### Architecture
-
-A fundamentally different approach: MCP server connections are managed by the **client (browser)**, not the API route. The browser connects to MCP servers, discovers tools, and sends tool definitions as part of the chat request. The server acts as a proxy, executing tool calls on behalf of the client during streaming.
-
-This is closer to how Cursor IDE handles MCP: the client is aware of available tools and explicitly provides them to the AI.
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Browser (Client)                     │
-│                                                         │
-│  1. User configures MCP servers in Settings              │
-│  2. Client connects to each server via fetch/SSE         │
-│  3. Client discovers tools → stores in local state       │
-│  4. On chat submit: sends messages + toolDefinitions[]   │
-│     to POST /api/chat                                    │
-│  5. During streaming, when tool call is needed:          │
-│     Server pauses → client executes tool via MCP         │
-│     → sends result back → streaming resumes              │
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                    POST /api/chat                        │
-│                                                         │
-│  1. Receives messages + toolDefinitions from client      │
-│  2. Validates tool definitions against allowlist         │
-│  3. streamText({ tools: validatedTools })                │
-│  4. Tool execution is handled client-side via            │
-│     the AI SDK's tool result protocol                    │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Variant: Server-Proxied Execution
-
-Since MCP servers may require authentication that shouldn't be exposed to the browser, a hybrid variant uses client-side tool discovery but server-side execution:
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                     Browser (Client)                     │
-│                                                         │
-│  1. Fetches tool catalog from API (server-rendered)      │
-│  2. Sends selected tools + messages to POST /api/chat    │
-│                                                         │
-│                    POST /api/chat                        │
-│  3. For tool calls: creates ephemeral MCP client         │
-│     on server, executes tool, returns result in stream   │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Database Schema Changes
-
-Same `mcpServers`, `mcpToolApprovals`, `mcpToolCallLog` tables as Option A.
-
-Additional:
-
-```typescript
-// No mcpToolCache table needed — client manages tool state
-
-// API endpoint for tool catalog
-// GET /api/mcp/tools → returns tool definitions for user's servers
-// POST /api/mcp/execute → proxies a tool call to the target MCP server
-```
-
-### Files to Create or Modify
-
-| File | Action | Description |
-|------|--------|-------------|
-| `convex/schema.ts` | Modify | Add `mcpServers`, `mcpToolApprovals`, `mcpToolCallLog` |
-| `convex/mcpServers.ts` | Create | Server config CRUD |
-| `app/api/mcp/tools/route.ts` | Create | API to fetch tool catalog (connects to servers, returns tool schemas) |
-| `app/api/mcp/execute/route.ts` | Create | API to proxy tool execution to MCP servers |
-| `app/api/chat/route.ts` | Modify | Accept `toolDefinitions` in request, validate, build tools |
-| `lib/mcp/load-mcp-from-url.ts` | Modify | Update to `type: 'http'` transport |
-| `app/hooks/use-mcp-tools.ts` | Create | Client hook to manage MCP tool state |
-| `app/components/chat/chat-input/mcp-tool-indicator.tsx` | Create | Shows active tools in input area |
-| `app/components/layout/settings/connections/mcp-servers.tsx` | Create | Server management UI |
-| `app/components/layout/settings/settings-content.tsx` | Modify | Wire MCP UI into connections tab |
-
-### Modified Chat Request Type
-
-```typescript
-type ChatRequest = {
-  messages: MessageAISDK[]
-  chatId: string
-  model: string
-  systemPrompt: string
-  enableSearch: boolean
-  message_group_id?: string
-  userId?: string
-  // New: client-provided MCP tool definitions
-  mcpTools?: Array<{
-    serverId: string       // Convex ID of the MCP server
-    toolName: string
-    description?: string
-    inputSchema: object    // JSON Schema
-  }>
-}
-```
-
-### Security Model
-
-This option requires the **most careful security design** because tool definitions come from the client:
-
-- **Server-side validation**: Every tool definition received from the client is validated against the user's `mcpServers` table. The server never trusts client-provided server URLs — it looks up the URL from Convex using the `serverId`.
-- **Tool allowlist enforcement**: The server checks `mcpToolApprovals` before including any tool. Unapproved tools are silently dropped.
-- **Schema validation**: Tool input schemas are validated for size and structure. Malicious schemas (e.g., extremely large, recursive) are rejected.
-- **Execution proxy**: Tool calls are executed server-side through the proxy endpoint, never from the browser directly. This keeps MCP server auth tokens on the server.
-- **Rate limiting for tool execution**: The `/api/mcp/execute` endpoint has its own rate limits, separate from chat message limits.
-
-### Pros
-
-1. **Decouples tool discovery from chat latency.** Tool discovery happens before the user sends a message (via the `use-mcp-tools` hook). The chat route receives pre-resolved tool definitions, adding zero latency for tool loading.
-2. **Rich client-side tool UX.** The browser has full knowledge of available tools, enabling: tool search/filter in the input area, `@`-mention style tool invocation (a la ChatGPT), visual indicators of which tools are active, and per-message tool selection.
-3. **Graceful degradation.** If an MCP server is unreachable, the client knows immediately (during tool discovery) and can show a status indicator. The user can still send messages — they just won't have that server's tools.
-4. **Client-side tool selection.** Users can explicitly enable/disable specific tools per conversation or per message. This gives fine-grained control and prevents tool overload (too many tools confusing the model).
-5. **Future-proof for `@`-mention UX.** The competitive analysis identified ChatGPT's `@`-mention system for integrations as an important pattern. This architecture naturally supports it: the client knows all tools and can surface them via `@` mention.
-
-### Cons
-
-1. **Increased attack surface.** Tool definitions arrive from the client, requiring rigorous server-side validation. A malicious client could attempt to inject tools that point to unauthorized servers. The server must independently verify every server ID against Convex.
-2. **Client-side MCP connections are limited.** Browser fetch/SSE connections have CORS restrictions. Many MCP servers won't have CORS headers configured for browser access. This means the "client connects directly to MCP servers" variant is impractical — the server proxy variant is required.
-3. **Two-API design.** Requires both `/api/mcp/tools` (tool catalog) and `/api/mcp/execute` (tool proxy) endpoints in addition to the existing `/api/chat`. This is more API surface to maintain, test, and secure.
-4. **Complex client-side state.** The `use-mcp-tools` hook must manage connections, tool caching, error states, and reconnection for multiple MCP servers. This is significant client-side complexity.
-5. **Message payload bloat.** Tool definitions are sent with every chat request. With 20+ tools, this adds meaningful payload size to each request (tool schemas can be large).
-
-### Risks and Open Questions
-
-- **CORS is a blocker for direct client connections.** Most MCP servers are not configured for browser CORS. The server-proxied variant is more practical but loses some of the client-side benefits.
-- **Tool schema serialization**: JSON Schema objects must round-trip from server → client → server without losing fidelity. Need careful serialization.
-- **Stale client state**: If tools change on the MCP server while the user has a browser tab open, the client's tool catalog becomes stale. Need a refresh mechanism.
-- **Multi-tab consistency**: If a user has two tabs open, tool states may diverge. Need to sync via IndexedDB or similar.
-
-### Estimated Complexity and Timeline
-
-- **Complexity**: High
-- **Timeline**: 3–4 weeks
-  - Week 1: Convex schema, server CRUD, connections UI
-  - Week 2: `/api/mcp/tools` and `/api/mcp/execute` endpoints, server-side validation
-  - Week 3: `use-mcp-tools` client hook, tool indicator UI, integration with chat route
-  - Week 4: `@`-mention UX, error handling, CORS/proxy edge cases, testing
-
----
-
-## 7. Comparison Matrix
-
-| Dimension | Option A: Per-Request | Option B: Cached Registry | Option C: Client-Side |
-|-----------|----------------------|--------------------------|----------------------|
-| **Tool loading latency** | 500ms–2s per request | ~50ms (cache read) | ~0ms (pre-loaded) |
-| **Tool freshness** | Always fresh | 15-min staleness window | Refreshed on page load |
-| **Serverless compatibility** | Excellent | Good (sync via Convex actions) | Excellent |
-| **Architecture complexity** | Low | High | High |
-| **New Convex tables** | 3 | 4 | 3 |
-| **New API endpoints** | 0 | 0 | 2 |
-| **Client-side changes** | Settings UI only | Settings UI + tool browser | Settings UI + hook + indicator + `@`-mention |
-| **Security complexity** | Low | Medium (sync validation) | High (client-sent tool validation) |
-| **Offline/degraded UX** | Poor (fails on send) | Good (cached tools visible) | Good (status indicators) |
-| **`@`-mention potential** | Possible but awkward | Possible via cached catalog | Natural fit |
-| **Risk level** | Low | Medium | Medium-High |
-| **Timeline** | 2–3 weeks | 3–4 weeks | 3–4 weeks |
-| **v1 viability** | Best | Good | Risky for v1 |
-
----
-
-## 8. Recommendation
-
-### Recommended: Option A for v1, evolve toward Option C for v2
-
-**Start with Option A (Per-Request MCP Client)** because:
-
-1. **Fastest path to value.** MCP integration is the #1 strategic priority. Getting it into users' hands in 2–3 weeks matters more than optimizing latency that can be improved later.
-2. **Lowest risk.** The architecture is simple, follows existing patterns (per-request key resolution, per-request rate limiting), and has minimal new infrastructure.
-3. **Foundation for evolution.** The Convex schema (servers, approvals, audit logs) and UI components (connections settings, tool approval) created in Option A are reused by all other options. Nothing is throwaway.
-4. **Latency is manageable.** The 500ms–2s overhead for tool loading is noticeable but acceptable for v1. Users are already accustomed to ~1s before streaming starts (auth, rate limit check, model initialization). Most users will have 1–3 MCP servers, not 10+.
-
-**Plan the evolution:**
-
-- **v1.1** (2–4 weeks after v1): Add a simple tool cache in Convex to eliminate repeated tool loading for servers that haven't changed. This borrows from Option B but without the full background sync system — just cache tool schemas after the first load and refresh on user action.
-- **v2** (longer term): Implement client-side tool awareness from Option C, enabling `@`-mention tool invocation and per-message tool selection. This requires the server proxy endpoints and the client hook. By this point, the MCP ecosystem will be more mature and CORS/auth patterns will be more standardized.
-
-### Immediate Next Steps (if approved)
-
-1. Update `lib/mcp/load-mcp-from-url.ts` to support `type: 'http'` transport (Streamable HTTP)
-2. Add `mcpServers`, `mcpToolApprovals`, `mcpToolCallLog` tables to `convex/schema.ts`
-3. Build `convex/mcpServers.ts` with CRUD operations
-4. Build the Connections settings UI (replace `ConnectionsPlaceholder`)
-5. Implement `lib/mcp/load-tools.ts` — multi-server tool loading with timeout and approval filtering
-6. Wire into `app/api/chat/route.ts` — load tools before `streamText()`, close in `onFinish`
-7. Test with a public MCP server (e.g., the Vercel MCP template)
-8. Add circuit-breaker for failing servers
-9. Add tool call audit logging
-
----
-
-## 9. Appendix: Shared Implementation Details
-
-### A. Dependencies
-
-| Package | Current Version | Action | Justification |
-|---------|----------------|--------|---------------|
-| `@ai-sdk/mcp` | v1.0.18 | Keep / update | Already installed. Provides `createMCPClient()` and transport types. Check for updates to ensure Streamable HTTP support. |
-| `@modelcontextprotocol/sdk` | Not installed | Consider for v1.1+ | Official MCP SDK provides `StreamableHTTPClientTransport` for more control. Not required for v1 since `@ai-sdk/mcp` wraps it. |
-
-No new dependencies are required for Option A. The existing `@ai-sdk/mcp` package supports both `http` and `sse` transport types via configuration.
-
-### B. Transport Strategy
-
-```typescript
-// v1: Use @ai-sdk/mcp's built-in http transport
-const client = await createMCPClient({
-  transport: {
-    type: 'http', // Streamable HTTP (recommended)
-    url: serverConfig.url,
-    headers: serverConfig.authType === 'bearer'
-      ? { Authorization: `Bearer ${decryptedAuthValue}` }
-      : serverConfig.authType === 'header'
-        ? { [serverConfig.headerName!]: decryptedAuthValue! }
-        : undefined,
-  },
-});
-
-// Fallback: SSE for servers that don't support Streamable HTTP
-const client = await createMCPClient({
-  transport: {
-    type: 'sse',
-    url: serverConfig.url,
-    headers: buildAuthHeaders(serverConfig),
-  },
-});
-```
-
-### C. Tool Namespacing Strategy
-
-To prevent tool name collisions between MCP servers:
-
-```typescript
-// Prefix tool names with a server slug
-const namespacedTools: ToolSet = {};
-for (const [toolName, toolDef] of Object.entries(serverTools)) {
-  const key = `${serverSlug}_${toolName}`;
-  namespacedTools[key] = toolDef;
-}
-```
-
-The `tool-invocation.tsx` component should strip the namespace prefix for display, showing only the tool name to the user.
-
-### D. Connection Lifecycle in Serverless
-
-```typescript
-// Correct pattern for Vercel serverless
-const clients: MCPClient[] = [];
-
-try {
-  // Create clients
-  for (const server of enabledServers) {
-    const client = await createMCPClient({ transport: { type: 'http', url: server.url } });
-    clients.push(client);
-  }
-
-  // Use tools
-  const result = streamText({
-    tools: mergedTools,
-    onFinish: async () => {
-      // Primary cleanup: close in onFinish
-      await Promise.allSettled(clients.map(c => c.close()));
-    },
-  });
-
-  // Fallback cleanup: after() runs after response is sent
-  after(async () => {
-    await Promise.allSettled(clients.map(c => c.close()));
-  });
-
-  return result.toUIMessageStreamResponse({ ... });
 } catch (error) {
-  // Error cleanup
-  await Promise.allSettled(clients.map(c => c.close()));
-  throw error;
+  await Promise.allSettled(mcpClients.map(c => c.close()))
+  throw error
 }
 ```
 
-### E. Rate Limiting Interaction
+### Verify
 
-Tool calls consume model tokens (the LLM generates tool call tokens), so they're already counted by the existing message-level rate limiting in `convex/usage.ts`. No separate tool call rate limiting is needed for v1.
+```bash
+bun run typecheck
+bun run lint
+```
 
-For v2, consider adding tool-call-specific limits to prevent abuse (e.g., a user configuring a loop that makes hundreds of tool calls).
-
-### F. Anonymous User Policy
-
-MCP tools should be **restricted to authenticated users only** in v1. Reasons:
-- MCP servers may expose sensitive operations
-- Tool calls increase token consumption (rate limiting is already tighter for anonymous users)
-- The approval model requires persistent user identity
-
-The chat route already checks `isAuthenticated` — MCP tool loading should be gated on this flag.
-
-### G. Stdio Transport (Future Work)
-
-Stdio-based MCP servers require persistent child processes, which are incompatible with Vercel serverless. Future options for stdio support:
-
-1. **Local proxy**: A desktop app or CLI that runs stdio MCP servers locally and exposes them via HTTP for Not A Wrapper to connect to.
-2. **MCP bridge service**: A separate long-running service (e.g., on Fly.io or Railway) that maintains stdio connections and exposes them via Streamable HTTP.
-3. **Vercel Fluid Compute**: Vercel's evolving compute model may eventually support long-running processes. Monitor for updates.
-
-For now, the `lib/mcp/load-mcp-from-local.ts` file should be preserved but clearly documented as dev-only and not used in the chat route.
+Then manual test:
+1. With `ENABLE_MCP=false` — verify no behavior change (tools still empty)
+2. With `ENABLE_MCP=true` but no MCP servers configured — verify no errors, tools still empty
 
 ---
 
-*Plan produced February 7, 2026. Based on: AI SDK v6 documentation, @ai-sdk/mcp v1.0.18 API, Vercel MCP deployment guidance (June 2025), and the Not A Wrapper codebase at current commit on the `americas-top-model` branch.*
+## Phase 5: Settings UI
+
+> **Goal**: Replace the ConnectionsPlaceholder with MCP server management UI.
+> **Dependencies**: Phase 2 (Convex CRUD for data layer).
+
+### Context to Load
+
+- `app/components/layout/settings/connections/connections-placeholder.tsx` — being replaced
+- `app/components/layout/settings/connections/ollama-section.tsx` — pattern reference
+- `app/components/layout/settings/connections/developer-tools.tsx` — pattern reference
+- `app/components/layout/settings/settings-content.tsx` — **critical**: has BOTH mobile and desktop layouts, both must be updated. Currently gates connections on `!isDev`.
+
+### Step 5.1: MCP Server List — `mcp-servers.tsx`
+
+Create `app/components/layout/settings/connections/mcp-servers.tsx`:
+
+- List of configured MCP servers with: name, URL (masked), enabled status toggle
+- Per-server actions: edit, delete, connection status badge (`lastError`, `lastConnectedAt`)
+- "Add Server" button
+- Empty state when no servers configured
+- Use Convex `useQuery(api.mcpServers.list)` for reactive data
+
+### Step 5.2: Server Form — `mcp-server-form.tsx`
+
+Create `app/components/layout/settings/connections/mcp-server-form.tsx`:
+
+- Fields: name, URL, transport type (http/sse), auth type (none/bearer/custom header)
+- URL validation feedback (SSRF rules from Phase 2)
+- **Test Connection button** — connects to the server, calls `tools()`, displays discovered tool count or error. Essential for debugging configuration before sending a chat message.
+- Supports both create and edit modes
+
+### Step 5.3: Tool Approvals — `mcp-tool-approvals.tsx`
+
+Create `app/components/layout/settings/connections/mcp-tool-approvals.tsx`:
+
+- Per-server expandable tool list
+- Each tool: name, description, approved toggle
+- "Auto-approved" badge for newly discovered tools
+- Bulk approve/reject actions
+
+### Step 5.4: Wire into Settings Layout
+
+1. Read `settings-content.tsx` — locate BOTH the mobile and desktop rendering paths for the Connections tab
+2. Replace `ConnectionsPlaceholder` with the new MCP server management component
+3. **Visibility rules**:
+   - MCP UI: visible to ALL users (not gated on `isDev`), but only when MCP is enabled
+   - `OllamaSection` and `DeveloperTools`: remain dev-only, alongside the MCP section
+4. **Feature flag gating**: Check `ENABLE_MCP` status via API response (recommended approach: add `mcpEnabled: boolean` to an existing settings/status endpoint). When MCP is disabled, show a message: "MCP integration is currently disabled."
+
+### Verify
+
+- UI renders correctly in both mobile and desktop layouts
+- CRUD operations work (add, edit, delete, toggle)
+- Test Connection button returns tool count or error
+
+---
+
+## Phase 6: Testing and Validation
+
+> **Goal**: Verify the full integration end-to-end.
+> **Dependencies**: All previous phases.
+
+### Context to Load
+
+- `lib/mcp/load-tools.ts` — to write tests against
+- `convex/mcpServers.ts` — to verify SSRF validation
+
+### Step 6.1: Unit Tests
+
+| Test File | What It Tests |
+|-----------|---------------|
+| `lib/mcp/__tests__/url-validation.test.ts` | SSRF protection: reject private IPs, localhost, non-HTTPS |
+| `lib/mcp/__tests__/load-tools.test.ts` | Multi-server tool merging, approval filtering, namespace collisions |
+| `lib/mcp/__tests__/truncation.test.ts` | Output >100KB is truncated correctly |
+| `lib/mcp/__tests__/circuit-breaker.test.ts` | Skip servers after 3 consecutive failures, reset on success |
+
+### Step 6.2: Integration Test Checklist
+
+Run manually against a public MCP server (e.g., Vercel MCP template):
+
+- [ ] Configure server in Settings > Connections
+- [ ] Tools appear in approval list (auto-approved)
+- [ ] Send a chat message that should trigger a tool call
+- [ ] Tool invocation renders in `tool-invocation.tsx` with correct display name (namespace stripped)
+- [ ] Audit log entry appears in Convex dashboard
+- [ ] Disable the server → send message → graceful degradation (no tools, no error)
+- [ ] Set `ENABLE_MCP=false` → verify tools are not loaded
+- [ ] Select a model with `supportsTools: false` → verify tools are not loaded
+- [ ] Anonymous user → verify MCP tools never loaded
+
+### Step 6.3: Monitoring Setup
+
+Add PostHog events for production observability:
+
+| Event | Properties |
+|-------|------------|
+| `mcp_tool_load` | `serverCount`, `toolCount`, `loadTimeMs`, `failedServers` |
+| `mcp_tool_call` | `toolName`, `serverSlug`, `durationMs`, `success` |
+
+Alert thresholds to configure:
+- MCP connection failures: >50% for any server
+- Tool loading latency p95: >3s
+- Tool execution error rate: >10%
+- Serverless function timeouts: any increase post-launch
+
+### Verify
+
+```bash
+bun run test
+bun run lint
+bun run typecheck
+bun run build
+```
+
+---
+
+## Security Checklist
+
+Apply throughout all phases. Review before marking any phase complete.
+
+- [ ] All Convex mutations verify user ownership via `ctx.auth.getUserIdentity()`
+- [ ] MCP server URLs validated against SSRF rules (no private IPs, no localhost, HTTPS-only in prod)
+- [ ] Auth tokens encrypted with AES-256-GCM via `lib/encryption.ts` (same `ENCRYPTION_KEY` env var)
+- [ ] `MAX_MCP_SERVERS_PER_USER` enforced in create mutation
+- [ ] Tool results truncated to `MAX_TOOL_RESULT_SIZE` before model and audit log
+- [ ] Audit log stores truncated previews only (500 chars max, no full sensitive data)
+- [ ] MCP tools restricted to authenticated users only (never anonymous)
+- [ ] Feature flag `ENABLE_MCP` gates all MCP logic
+- [ ] `after()` is used for MCP client cleanup (not `onFinish`)
+- [ ] `onFinish` used ONLY for logging/audit (does not fire on client disconnect)
+- [ ] Never log OAuth tokens, API keys, credentials, session tokens
+
+---
+
+## Critical Implementation Patterns
+
+### Tool Namespacing
+
+Prefix tool names with server slug to prevent collisions across servers:
+
+```typescript
+const key = `${serverSlug}_${toolName}`
+```
+
+**Side-effects to handle**:
+
+1. **`tool-invocation.tsx` display**: The component uses `getStaticToolName()` which returns the raw namespaced name. Update to strip the prefix for display, show server name as a badge: `create_issue (GitHub)`.
+2. **Build a mapping during tool loading**: `{ namespacedName → { displayName, serverName, serverId } }` — passed to UI via stream metadata or separate query.
+3. **Message history**: Tool call/result parts in message history contain namespaced names. The namespace must match current tool definitions. The server slug must be **immutable** once set — changing it orphans historical tool names.
+
+### Connection Lifecycle in Serverless
+
+```typescript
+// Create clients IN PARALLEL with per-server timeout
+const results = await Promise.allSettled(
+  enabledServers.map(server =>
+    Promise.race([
+      createMCPClient({ transport: { type: 'http', url: server.url, headers } }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('MCP connection timeout')), MCP_CONNECTION_TIMEOUT_MS)
+      ),
+    ])
+  )
+)
+
+// PRIMARY CLEANUP — after() always runs, even on client disconnect
+after(async () => {
+  await Promise.allSettled(clients.map(c => c.close()))
+})
+```
+
+### Error Propagation
+
+| Failure Point | Behavior |
+|---------------|----------|
+| Tool loading fails (before `streamText`) | Failed servers skipped, proceed with available tools. If ALL fail → `tools: {}` (graceful degradation). Error logged to `mcpServers.lastError`. |
+| Tool execution fails (during streaming) | AI SDK propagates `CallToolError` through stream → `tool-invocation.tsx` renders error → model sees error and can retry or explain. Logged to `mcpToolCallLog` with `success: false`. |
+| Server unreachable mid-stream | Caught as tool execution failure (above). |
+| Tool output exceeds size limit | Truncated to `MAX_TOOL_RESULT_SIZE` transparently before model and audit log. |
+
+### Feature Flag Behavior
+
+| `ENABLE_MCP` | Chat Route | Settings UI |
+|--------------|------------|-------------|
+| `false` (or unset) | `tools: {} as ToolSet` (current behavior, no change) | Shows `ConnectionsPlaceholder` or "MCP currently disabled" |
+| `true` | Loads MCP tools for authenticated users with tool-capable models | Shows MCP server management UI for all users |
+
+**Kill procedure**: Set `ENABLE_MCP=false` in Vercel env vars → instant disable, no deploy needed.
+
+---
+
+## Architecture Reference
+
+This section preserves the full analysis for context. Not needed for execution — refer only when making architectural decisions or if a phase raises questions.
+
+### Current State
+
+| Component | File | Status |
+|-----------|------|--------|
+| MCP client (stdio) | `lib/mcp/load-mcp-from-local.ts` | Working utility, dev-only, not integrated |
+| MCP client (SSE) | `lib/mcp/load-mcp-from-url.ts` | Working utility, not integrated |
+| Chat streaming route | `app/api/chat/route.ts` | Production — `tools: {} as ToolSet` (empty) |
+| Tool invocation UI | `app/components/chat/tool-invocation.tsx` | Production — renders tool calls with args/results |
+| Connections settings tab | `app/components/layout/settings/connections/` | Placeholder UI |
+| BYOK encryption | `lib/encryption.ts` | Production — AES-256-GCM |
+| Rate limiting | `app/api/chat/api.ts`, `convex/usage.ts` | Production — tiered daily limits |
+| User keys (Convex) | `convex/userKeys.ts` | Production — encrypted key storage |
+| `@ai-sdk/mcp` package | `package.json` | Installed `^1.0.18` |
+
+### AI SDK MCP API (v6)
+
+```typescript
+// HTTP transport (recommended)
+const client = await createMCPClient({
+  transport: {
+    type: 'http',
+    url: 'https://server.example.com/mcp',
+    headers: { Authorization: 'Bearer token' },
+  },
+})
+
+// SSE transport (legacy, still supported)
+const client = await createMCPClient({
+  transport: { type: 'sse', url: 'https://server.example.com/sse' },
+})
+
+// Get tools compatible with streamText()
+const tools = await client.tools()
+
+// Must close after use (critical in serverless)
+await client.close()
+```
+
+### Constraints Applied to All Options
+
+- **No stdio transport in v1.** Vercel serverless cannot maintain persistent child processes. Only HTTP-based transports are viable.
+- **Streamable HTTP preferred over SSE.** Per Vercel guidance (June 2025), reduces CPU usage ~50%.
+- **Security is non-negotiable.** Allowlisting, per-tool approval, and audit logging required.
+- **Convex is the database.** All persistent state lives in Convex.
+
+### Option A: Per-Request MCP Client (Chosen)
+
+**Architecture**: On every chat request, create MCP clients → load tools → pass to `streamText()` → close via `after()`.
+
+**Pros**: (1) Simplest architecture — no caching, no background jobs. (2) Always-fresh tools. (3) Minimal blast radius — failing server only affects current request. (4) Reliable cleanup via `after()`. (5) Follows existing per-request patterns.
+
+**Cons**: (1) 500ms–2s latency per request for tool loading. (2) Shares `maxDuration=60s` timeout with streaming and tool execution. (3) No connection reuse between requests. (4) No offline awareness — failures discovered on send. (5) Auto-approval in v1 (server-level trust).
+
+### Option B: Cached Tool Registry with Background Sync (v1.1 candidate)
+
+**Architecture**: Tool schemas fetched in background via Convex actions, cached in a `mcpToolCache` table. Chat route reads cached schemas (~50ms) and creates ephemeral clients only for tool execution.
+
+**Pros**: Near-zero chat latency, pre-flight tool discovery, resilient to server downtime.
+**Cons**: Cache staleness (15-min window), custom tool executor complexity, double connection cost (sync + execution), Convex action timeout limits.
+**Timeline**: 3–4 weeks. **Complexity**: High.
+
+### Option C: Client-Side MCP Resolution with Server Proxy (v2 candidate)
+
+**Architecture**: Browser discovers tools via API endpoints, sends tool definitions with chat requests. Server validates and proxies tool execution.
+
+**Pros**: Zero chat latency for tool loading, rich client-side UX, natural fit for @-mention tool invocation.
+**Cons**: Increased attack surface (client-sent tools), CORS blockers for direct connections, two-API design, complex client state, payload bloat.
+**Timeline**: 3–4 weeks. **Complexity**: High.
+
+### Comparison Matrix
+
+| Dimension | A: Per-Request | B: Cached | C: Client-Side |
+|-----------|---------------|-----------|----------------|
+| Tool loading latency | 500ms–2s/req | ~50ms | ~0ms |
+| Tool freshness | Always fresh | 15-min window | On page load |
+| Architecture complexity | Low | High | High |
+| Security complexity | Low | Medium | High |
+| Timeline | 2–3 weeks | 3–4 weeks | 3–4 weeks |
+| v1 viability | **Best** | Good | Risky |
+
+### Stdio Transport — Future Work
+
+Stdio-based MCP servers require persistent child processes, incompatible with Vercel serverless. Future options: (1) Local proxy desktop app, (2) MCP bridge service on Fly.io/Railway, (3) Vercel Fluid Compute evolution. Preserve `lib/mcp/load-mcp-from-local.ts` as dev-only.
+
+---
+
+*Plan produced February 7, 2026. Optimized for AI agent execution February 7, 2026. Based on: AI SDK v6, @ai-sdk/mcp v1.0.18, Vercel MCP deployment guidance (June 2025), and the Not A Wrapper codebase on the `upgrade-bishhhhhhhhh` branch.*

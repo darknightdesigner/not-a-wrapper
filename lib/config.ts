@@ -187,6 +187,21 @@ export const ANTHROPIC_BETA_HEADERS = {
  * @see lib/ai/sub-agents/types.ts
  * @see .agents/context/research/tech-stack-evaluation.md
  */
+// ============================================================================
+// MCP Integration
+// ============================================================================
+
+export const MAX_MCP_SERVERS_PER_USER = 10
+export const MAX_TOOL_RESULT_SIZE = 100 * 1024 // 100KB
+export const MCP_CONNECTION_TIMEOUT_MS = 5000
+export const MCP_CIRCUIT_BREAKER_THRESHOLD = 3
+export const MCP_MAX_STEP_COUNT = 20
+export const MCP_MAX_TOOLS_PER_REQUEST = 50
+
+// ============================================================================
+// Sub-Agent Model Configuration
+// ============================================================================
+
 export const SUB_AGENT_MODELS = {
   /** Main orchestrator - complex reasoning */
   orchestrator: "claude-opus-4-5-20250929",
