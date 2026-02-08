@@ -84,7 +84,7 @@ const geminiModels: ModelConfig[] = [
       openproviders("gemini-2.5-pro", undefined, apiKey),
   },
   {
-    id: "gemini-3-pro",
+    id: "gemini-3-pro-preview",
     name: "Gemini 3 Pro",
     provider: "Google",
     providerId: "google",
@@ -108,7 +108,7 @@ const geminiModels: ModelConfig[] = [
     apiDocs: "https://ai.google.dev/api/docs",
     icon: "gemini",
     apiSdk: (apiKey?: string) =>
-      openproviders("gemini-3-pro", undefined, apiKey),
+      openproviders("gemini-3-pro-preview", undefined, apiKey),
   },
   {
     id: "gemma-3-27b-it",

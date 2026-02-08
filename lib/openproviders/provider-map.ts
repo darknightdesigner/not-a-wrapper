@@ -54,6 +54,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gpt-5-nano-2025-08-07": "openai",
 
   // Mistral
+  "codestral-latest": "mistral",
   "ministral-3b-latest": "mistral",
   "ministral-8b-latest": "mistral",
   "mistral-large-latest": "mistral",

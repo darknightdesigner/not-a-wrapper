@@ -3,8 +3,12 @@ export type OpenAIModel =
   | "o1-2024-12-17"
   | "o1-preview"
   | "o1-preview-2024-09-12"
+  | "o3"
+  | "o3-2025-04-16"
   | "o3-mini"
   | "o3-mini-2025-01-31"
+  | "o4-mini"
+  | "o4-mini-2025-04-16"
   | "gpt-4.1"
   | "gpt-4.1-2025-04-14"
   | "gpt-4.1-mini"
@@ -47,6 +51,7 @@ export type OpenAIModel =
   | "gpt-5-nano-2025-08-07"
 
 export type MistralModel =
+  | "codestral-latest"
   | "ministral-3b-latest"
   | "ministral-8b-latest"
   | "mistral-large-latest"
