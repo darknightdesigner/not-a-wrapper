@@ -17,12 +17,13 @@ Open-source multi-AI chat application with unified model interface. Supports 100
 ## Commands
 
 ```bash
-bun install      # Install deps
-bun run dev      # Dev server (:3000)
-bun run lint     # ESLint
-bun run typecheck # tsc --noEmit
-bun run build    # Production build
-bun run test     # Vitest (critical paths)
+bun install        # Install deps
+bun run dev        # Dev server (:3000)
+bun run dev:clean  # Dev server with fresh .next cache
+bun run lint       # ESLint
+bun run typecheck  # tsc --noEmit
+bun run build      # Production build
+bun run test       # Vitest (critical paths)
 ```
 
 ## Context System
