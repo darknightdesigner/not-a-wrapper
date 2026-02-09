@@ -306,7 +306,7 @@ import { cn } from "@/lib/utils"
 ### Component Styling
 
 ```tsx
-// ✅ DO: Use Shadcn/Radix primitives
+// ✅ DO: Use Shadcn/Base UI primitives
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
 

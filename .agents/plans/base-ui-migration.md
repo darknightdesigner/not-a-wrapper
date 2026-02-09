@@ -1,9 +1,10 @@
 # Base UI Migration — Execution Guide
 
-> **Status**: Ready for Implementation
+> **Status**: Completed (February 9, 2026)
 > **Decision**: Approach C — shadcn Registry Reference + Compatibility Shim Layer
 > **Priority**: P1 — Strategic alignment with shadcn/ui ecosystem direction
 > **Date**: February 9, 2026 | Revised: February 9, 2026 (CLI verification + registry research)
+> **Completed**: February 9, 2026 — All 32 components migrated, 26 Radix packages removed, `components.json` updated to `base-vega`
 
 ---
 

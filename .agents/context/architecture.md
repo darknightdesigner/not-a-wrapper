@@ -52,7 +52,7 @@ Not A Wrapper is an open-source multi-AI chat application that provides a unifie
 | Component | Purpose | Technology |
 |-----------|---------|------------|
 | **App Router** | Routing, layouts, server components | Next.js 16 |
-| **UI Components** | Design system, accessibility | Shadcn/Radix |
+| **UI Components** | Design system, accessibility | Shadcn/Base UI |
 | **Chat Interface** | Real-time messaging, streaming | Custom + Vercel AI SDK |
 | **State Management** | Client-side state, caching | Zustand + TanStack Query |
 

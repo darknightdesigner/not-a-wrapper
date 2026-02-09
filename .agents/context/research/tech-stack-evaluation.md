@@ -81,7 +81,7 @@ A platform that:
 | **Database** | Convex | Latest | ✅ Migrated from Supabase |
 | **State Management** | Zustand | 5.0.9 | ✅ Current |
 | **Server State** | TanStack Query | 5.80.6 | ✅ Current |
-| **UI Components** | Shadcn/Radix | Latest | ✅ Current |
+| **UI Components** | Shadcn/Base UI | Latest | ✅ Current (migrated from Radix, Feb 2026) |
 | **Styling** | Tailwind CSS | 4.1.5 | ✅ Latest |
 | **Animation** | Motion | 12.25.0 | ✅ Current |
 | **AI SDK** | Vercel AI SDK | 4.3.13 | ✅ Current |

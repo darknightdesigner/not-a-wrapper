@@ -12,7 +12,7 @@ Open-source multi-AI chat application with unified model interface. Supports 100
 | Payments | Flowglad |
 | AI | Vercel AI SDK → Multi-provider (OpenAI, Claude, Gemini, etc.) |
 | State | Zustand + TanStack Query |
-| UI | Shadcn/Radix + Tailwind 4 |
+| UI | Shadcn/Base UI + Tailwind 4 |
 
 ## Commands
 
@@ -89,7 +89,7 @@ lib/                    # Shared utilities
 ├── models/            # AI model definitions
 └── openproviders/     # AI provider abstraction
 
-components/            # Shadcn UI components
+components/            # Shadcn UI components (Base UI primitives)
 convex/               # Convex DB schema & functions
 
 .agents/               # AI context & knowledge base
