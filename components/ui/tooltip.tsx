@@ -8,33 +8,26 @@ import { cn } from "@/lib/utils"
 
 function TooltipProvider({
   delay = 0,
-  delayDuration,
-  skipDelayDuration: _skipDelayDuration,
   ...props
-}: TooltipPrimitive.Provider.Props & {
-  /** @deprecated Use `delay` instead. Radix compat alias. */
-  delayDuration?: number
-  /** @deprecated No Base UI equivalent. Accepted for backward compat. */
-  skipDelayDuration?: number
-}) {
+}: TooltipPrimitive.Provider.Props) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
-      delay={delayDuration ?? delay}
+      delay={delay}
       {...props}
     />
   )
 }
 
 function Tooltip({
-  delayDuration,
+  delay,
   ...props
 }: TooltipPrimitive.Root.Props & {
-  /** @deprecated Use TooltipProvider `delay` instead. Radix compat alias. */
-  delayDuration?: number
+  /** Per-tooltip delay override (wraps in its own TooltipProvider). */
+  delay?: number
 }) {
   return (
-    <TooltipProvider {...(delayDuration !== undefined ? { delay: delayDuration } : {})}>
+    <TooltipProvider {...(delay !== undefined ? { delay } : {})}>
       <TooltipPrimitive.Root data-slot="tooltip" {...props} />
     </TooltipProvider>
   )

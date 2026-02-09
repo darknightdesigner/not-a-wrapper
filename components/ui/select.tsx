@@ -62,17 +62,13 @@ function SelectContent({
   sideOffset = 4,
   align = "center",
   alignOffset = 0,
-  position = "item-aligned",
+  alignItemWithTrigger = true,
   ...props
 }: SelectPrimitive.Popup.Props &
   Pick<
     SelectPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
-  > & {
-    /** @deprecated Use `alignItemWithTrigger` instead. Radix compat alias. */
-    position?: "item-aligned" | "popper"
-  }) {
-  const alignItemWithTrigger = position === "item-aligned"
+  >) {
   return (
     <SelectPrimitive.Portal>
       <SelectPrimitive.Positioner

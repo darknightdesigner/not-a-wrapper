@@ -66,10 +66,7 @@ export default async function RootLayout({
                       userId={userProfile?.id}
                       initialPreferences={userProfile?.preferences}
                     >
-                      <TooltipProvider
-                        delayDuration={200}
-                        skipDelayDuration={500}
-                      >
+                      <TooltipProvider delay={200}>
                         <ThemeProvider
                           attribute="class"
                           defaultTheme="system"

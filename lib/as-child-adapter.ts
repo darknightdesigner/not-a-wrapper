@@ -1,7 +1,6 @@
 // lib/as-child-adapter.ts
-// Compatibility shim: translates Radix-style asChild prop to Base UI render prop.
-// This allows all existing app code using <Component asChild> to continue working
-// while the underlying primitives migrate from Radix to Base UI.
+// Compatibility shim: translates the asChild prop to Base UI's render prop.
+// This allows existing app code using <Component asChild> to continue working.
 //
 // Deprecation plan: remove this file once all app/ call sites migrate to render prop.
 
