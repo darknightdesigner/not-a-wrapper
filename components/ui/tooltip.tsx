@@ -1,64 +1,99 @@
 "use client"
 
 import * as React from "react"
-import * as TooltipPrimitive from "@radix-ui/react-tooltip"
+import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
+import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
 function TooltipProvider({
-  delayDuration = 0,
+  delay = 0,
+  delayDuration,
+  skipDelayDuration: _skipDelayDuration,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
+}: TooltipPrimitive.Provider.Props & {
+  /** @deprecated Use `delay` instead. Radix compat alias. */
+  delayDuration?: number
+  /** @deprecated No Base UI equivalent. Accepted for backward compat. */
+  skipDelayDuration?: number
+}) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
-      delayDuration={delayDuration}
+      delay={delayDuration ?? delay}
       {...props}
     />
   )
 }
 
 function Tooltip({
+  delayDuration,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Root>) {
+}: TooltipPrimitive.Root.Props & {
+  /** @deprecated Use TooltipProvider `delay` instead. Radix compat alias. */
+  delayDuration?: number
+}) {
   return (
-    <TooltipProvider>
+    <TooltipProvider {...(delayDuration !== undefined ? { delay: delayDuration } : {})}>
       <TooltipPrimitive.Root data-slot="tooltip" {...props} />
     </TooltipProvider>
   )
 }
 
 function TooltipTrigger({
+  asChild,
+  children,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+}: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
+  const adapted = adaptAsChild(asChild, children)
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      render={adapted.render}
+      {...props}
+    >
+      {adapted.children}
+    </TooltipPrimitive.Trigger>
+  )
 }
 
 function TooltipContent({
   className,
   sideOffset = 0,
+  side = "top",
+  align = "center",
   children,
   hideArrow = false,
   ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content> & {
-  hideArrow?: boolean
-}) {
+}: TooltipPrimitive.Popup.Props &
+  Pick<
+    TooltipPrimitive.Positioner.Props,
+    "align" | "side" | "sideOffset"
+  > & {
+    hideArrow?: boolean
+  }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
+      <TooltipPrimitive.Positioner
+        side={side}
         sideOffset={sideOffset}
-        className={cn(
-          "bg-foreground text-background z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
-          className
-        )}
-        {...props}
+        align={align}
+        className="isolate z-50"
       >
-        {children}
-        {!hideArrow && (
-          <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
-        )}
-      </TooltipPrimitive.Content>
+        <TooltipPrimitive.Popup
+          data-slot="tooltip-content"
+          className={cn(
+            "bg-foreground text-background z-50 w-fit origin-(--transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
+            className
+          )}
+          {...props}
+        >
+          {children}
+          {!hideArrow && (
+            <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+          )}
+        </TooltipPrimitive.Popup>
+      </TooltipPrimitive.Positioner>
     </TooltipPrimitive.Portal>
   )
 }
