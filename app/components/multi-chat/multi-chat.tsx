@@ -164,6 +164,11 @@ export function MultiChat() {
   // message before all models finish the first).
   const modelGroupIdRef = useRef<Map<string, string>>(new Map())
 
+  // Ref to latest modelChats — declared before handleModelFinish so the
+  // callback can clear a model's hook messages after persistence.
+  // Populated after useMultiChat returns on every render cycle.
+  const modelChatsRef = useRef<ReturnType<typeof useMultiChat>>([])
+
   // Keep chatIdRef in sync with reactive state
   useEffect(() => {
     chatIdRef.current = multiChatId || chatId
@@ -187,6 +192,16 @@ export function MultiChat() {
 
     cacheAndAddMessage(persistedMessage, effectiveChatId)
 
+    // Clear this model's useChat hook messages now that the response is persisted.
+    // The persisted/optimistic data in MessagesProvider takes over from here.
+    // Without this cleanup, stale live messages produce a duplicate group
+    // (keyed by raw text) alongside the persisted group (keyed by UUID)
+    // once the submission registry entry is cleaned up.
+    const modelChat = modelChatsRef.current.find(c => c.model.id === modelId)
+    if (modelChat) {
+      modelChat.setMessages([])
+    }
+
     // Clean up per-model groupId mapping
     modelGroupIdRef.current.delete(modelId)
 
@@ -208,9 +223,8 @@ export function MultiChat() {
 
   const modelChats = useMultiChat(allModelsToMaintain, handleModelFinish)
 
-  // Ref to latest modelChats to avoid stale closures in the navigation effect
-  // (modelChats changes every stream chunk, which would cause the effect to re-fire)
-  const modelChatsRef = useRef(modelChats)
+  // Keep modelChatsRef in sync with latest modelChats (ref declared earlier
+  // so handleModelFinish can access it; updated here on every render).
   modelChatsRef.current = modelChats
 
   // Handle chat transitions: stop all active streams and reset state when navigating away
@@ -340,6 +354,18 @@ export function MultiChat() {
     const persistedGroups = createPersistedGroups()
     const liveGroups = { ...persistedGroups }
 
+    // Build reverse lookup: message text → persisted group key (UUID).
+    // When the submission registry has been cleaned up (all models completed)
+    // but useChat hooks still hold stale messages on a transitional render frame,
+    // this map lets live messages resolve to the correct UUID-based persisted
+    // group key — preventing duplicate groups (one keyed by UUID from Convex,
+    // one by raw text from hooks).
+    const textToPersistedKey = new Map<string, string>()
+    for (const [key, group] of Object.entries(persistedGroups)) {
+      const text = getMessageText(group.userMessage)
+      textToPersistedKey.set(text, key)
+    }
+
     modelChats.forEach((chat) => {
       for (let i = 0; i < chat.messages.length; i += 2) {
         const userMsg = chat.messages[i]
@@ -347,12 +373,14 @@ export function MultiChat() {
 
         if (userMsg?.role === "user") {
           const messageText = getMessageText(userMsg)
-          // Resolve to the UUID-based key used by persisted groups so
-          // live and persisted data merge into a single group.
-          // Uses the submission registry which is lifecycle-managed (only cleaned
-          // up when ALL models complete, not on first Convex persistence).
+          // Resolve group key through a three-tier fallback:
+          // 1. Submission registry (lifecycle-managed, active during streaming)
+          // 2. Persisted group reverse lookup (text → UUID, handles post-completion)
+          // 3. Raw text (initial render before any persistence)
           const submission = submissionRegistryRef.current.get(messageText)
-          const groupKey = submission?.groupId || messageText
+          const groupKey = submission?.groupId
+            || textToPersistedKey.get(messageText)
+            || messageText
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {

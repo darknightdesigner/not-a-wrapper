@@ -21,6 +21,7 @@ function isPrivateIPv4(ip: string): boolean {
   return (
     a === 10 || // 10.0.0.0/8
     a === 127 || // 127.0.0.0/8
+    (a === 100 && b >= 64 && b <= 127) || // 100.64.0.0/10 — CGNAT (RFC 6598)
     (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
     (a === 192 && b === 168) || // 192.168.0.0/16
     (a === 169 && b === 254) || // 169.254.0.0/16
@@ -99,7 +100,7 @@ function validateServerUrl(url: string): string | null {
   if (hostname.startsWith("[") && hostname.endsWith("]")) {
     const ipv6 = hostname.slice(1, -1)
     if (isPrivateIPv6(ipv6)) {
-      return "Localhost and local network URLs are not allowed"
+      return "Private IPv6 addresses are not allowed"
     }
   }
 

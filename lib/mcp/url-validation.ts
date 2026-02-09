@@ -13,6 +13,7 @@ export function isPrivateIP(ip: string): boolean {
   return (
     a === 10 || // 10.0.0.0/8
     a === 127 || // 127.0.0.0/8
+    (a === 100 && b >= 64 && b <= 127) || // 100.64.0.0/10 — CGNAT (RFC 6598)
     (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
     (a === 192 && b === 168) || // 192.168.0.0/16
     (a === 169 && b === 254) || // 169.254.0.0/16
@@ -88,7 +89,7 @@ export function isPrivateIPv6(rawIpv6: string): boolean {
  * from lib/). Both must stay in sync — changes to one should be reflected in
  * the other.
  *
- * Rejects: private IPs (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x),
+ * Rejects: private IPs (10.x, 127.x, 100.64-127.x, 172.16-31.x, 192.168.x, 169.254.x),
  * localhost, 0.0.0.0, .local hostnames, and private/reserved IPv6 addresses
  * (::1, ::, fe80::/10, fc00::/7, ::ffff:private-ip).
  *
