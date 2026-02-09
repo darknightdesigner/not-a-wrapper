@@ -188,10 +188,16 @@ export function MultiChat() {
           }
         }
       } else if (message.role === "assistant") {
+        const modelId = (message as MessageWithModel).model
         // If the assistant message has a messageGroupId, use it to find its group directly
         const msgGroupId = message.messageGroupId
         if (msgGroupId && groups[msgGroupId]) {
-          groups[msgGroupId].assistantMessages.push(message)
+          const alreadyHasModel = modelId && groups[msgGroupId].assistantMessages.some(
+            (existing) => (existing as MessageWithModel).model === modelId
+          )
+          if (!alreadyHasModel) {
+            groups[msgGroupId].assistantMessages.push(message)
+          }
         } else {
           // Fallback: scan backward for the nearest user message
           let associatedUserMessage: (typeof persistedMessages)[number] | null = null
@@ -210,7 +216,12 @@ export function MultiChat() {
                 assistantMessages: [],
               }
             }
-            groups[groupKey].assistantMessages.push(message)
+            const alreadyHasModelFb = modelId && groups[groupKey].assistantMessages.some(
+              (existing) => (existing as MessageWithModel).model === modelId
+            )
+            if (!alreadyHasModelFb) {
+              groups[groupKey].assistantMessages.push(message)
+            }
           }
         }
       }
