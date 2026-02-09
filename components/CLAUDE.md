@@ -14,6 +14,15 @@ This directory contains reusable UI components, primarily Shadcn/Base UI primiti
 - The `asChild` prop is supported via a compatibility shim (`lib/as-child-adapter.ts`) that translates to Base UI's `render` prop internally
 - **Deprecation plan**: The `asChild` shim will eventually be removed; app-level code should migrate to the `render` prop pattern
 
+### Third-Party Dependencies
+
+| Package | Used In | Notes |
+|---------|---------|-------|
+| `cmdk` | `components/ui/command.tsx` | Command palette search/filter engine. Radix is a transitive dep inside cmdk but our code wraps cmdk in our own Base UI Dialog — cmdk's Radix Dialog is never used. |
+| `vaul-base` | `components/ui/drawer.tsx` | Base UI port of vaul (drawer with touch gestures). Replaced `vaul` (Radix-based, unmaintained) in February 2026. |
+
+> **No direct `@radix-ui/*` imports exist in source code.** The only Radix presence is as a transitive dependency of `cmdk`.
+
 ## Structure Overview
 
 ```

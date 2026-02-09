@@ -7,16 +7,23 @@ import { adaptAsChild } from "@/lib/as-child-adapter"
 import { cn } from "@/lib/utils"
 
 function HoverCard({
-  openDelay: _openDelay,
+  openDelay,
   closeDelay: _closeDelay,
+  delay,
   ...props
 }: HoverCardPrimitive.Root.Props & {
-  /** @deprecated No Base UI equivalent on PreviewCard. Accepted for backward compat. */
+  /** @deprecated Use `delay` instead. Maps to Base UI's single delay prop. */
   openDelay?: number
-  /** @deprecated No Base UI equivalent on PreviewCard. Accepted for backward compat. */
+  /** @deprecated No Base UI equivalent. Base UI uses a single `delay` prop. */
   closeDelay?: number
 }) {
-  return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />
+  return (
+    <HoverCardPrimitive.Root
+      data-slot="hover-card"
+      delay={delay ?? openDelay}
+      {...props}
+    />
+  )
 }
 
 function HoverCardTrigger({

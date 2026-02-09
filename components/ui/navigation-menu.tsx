@@ -144,6 +144,12 @@ function NavigationMenuLink({
   )
 }
 
+/**
+ * @deprecated Base UI NavigationMenu has no Indicator equivalent.
+ * This renders a static div — it does NOT track or animate between
+ * active trigger positions like the original Radix NavigationMenu.Indicator.
+ * Remove this export or implement custom tracking logic if needed.
+ */
 function NavigationMenuIndicator({
   className,
   ...props

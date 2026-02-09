@@ -5,7 +5,6 @@
 // Deprecation plan: remove this file once all app/ call sites migrate to render prop.
 
 import {
-  Children,
   createElement,
   isValidElement,
   type ReactElement,
@@ -30,18 +29,14 @@ export function adaptAsChild(
   asChild: boolean | undefined,
   children: ReactNode,
 ): { render?: ReactElement; children: ReactNode } {
-  if (!asChild) {
-    return { children }
-  }
-  const child = Children.only(children)
-  if (!isValidElement(child)) {
+  if (!asChild || !isValidElement(children)) {
     return { children }
   }
   // Base UI's render prop accepts a ReactElement.
   // The child's own children become the content rendered inside.
   return {
-    render: child as ReactElement,
-    children: (child.props as { children?: ReactNode }).children,
+    render: children as ReactElement,
+    children: (children.props as { children?: ReactNode }).children,
   }
 }
 
@@ -65,13 +60,10 @@ export function adaptSlotAsChild(
   children: ReactNode,
   defaultTag: keyof React.JSX.IntrinsicElements = "button",
 ): { render: ReactElement; children: ReactNode } {
-  if (asChild) {
-    const child = Children.only(children)
-    if (isValidElement(child)) {
-      return {
-        render: child as ReactElement,
-        children: (child.props as { children?: ReactNode }).children,
-      }
+  if (asChild && isValidElement(children)) {
+    return {
+      render: children as ReactElement,
+      children: (children.props as { children?: ReactNode }).children,
     }
   }
   // Create the default element — useRender will apply props to it

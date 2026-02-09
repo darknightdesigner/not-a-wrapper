@@ -65,18 +65,22 @@ describe("adaptAsChild", () => {
       expect(result.children).toBeUndefined()
     })
 
-    it("throws when given a non-element child (string)", () => {
-      // Children.only throws when the child is not a React element
-      expect(() => adaptAsChild(true, "plain text")).toThrow()
+    it("gracefully falls back for non-element child (string)", () => {
+      const result = adaptAsChild(true, "plain text")
+
+      expect(result.render).toBeUndefined()
+      expect(result.children).toBe("plain text")
     })
 
-    it("throws when given multiple children", () => {
-      // Children.only throws when there are multiple children
+    it("gracefully falls back for multiple children", () => {
       const children = [
         createElement("span", { key: "1" }, "a"),
         createElement("span", { key: "2" }, "b"),
       ]
-      expect(() => adaptAsChild(true, children)).toThrow()
+      const result = adaptAsChild(true, children)
+
+      expect(result.render).toBeUndefined()
+      expect(result.children).toBe(children)
     })
   })
 })
@@ -153,17 +157,24 @@ describe("adaptSlotAsChild", () => {
       expect(result.children).toBeDefined()
     })
 
-    it("throws when given a non-element child (string)", () => {
-      // Children.only throws for non-element children
-      expect(() => adaptSlotAsChild(true, "plain text")).toThrow()
+    it("gracefully falls back for non-element child (string)", () => {
+      const result = adaptSlotAsChild(true, "plain text")
+
+      expect(result.render).toBeDefined()
+      expect((result.render as ReactElement).type).toBe("button")
+      expect(result.children).toBe("plain text")
     })
 
-    it("throws when given multiple children", () => {
+    it("gracefully falls back for multiple children", () => {
       const children = [
         createElement("span", { key: "1" }, "a"),
         createElement("span", { key: "2" }, "b"),
       ]
-      expect(() => adaptSlotAsChild(true, children)).toThrow()
+      const result = adaptSlotAsChild(true, children)
+
+      expect(result.render).toBeDefined()
+      expect((result.render as ReactElement).type).toBe("button")
+      expect(result.children).toBe(children)
     })
   })
 })

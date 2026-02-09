@@ -106,11 +106,13 @@ function FormLabel({
 function FormControl({
   children,
   ...props
-}: React.ComponentProps<"div">) {
+}: Omit<React.ComponentProps<"div">, "children"> & {
+  children: React.ReactElement
+}) {
   const { error, formItemId, formDescriptionId, formMessageId } = useFormField()
 
   return useRender({
-    render: React.Children.only(children) as React.ReactElement,
+    render: children,
     props: {
       "data-slot": "form-control",
       id: formItemId,
