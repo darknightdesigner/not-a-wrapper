@@ -37,6 +37,20 @@ type GroupedMessage = {
   onReload: (model: string) => void
 }
 
+/**
+ * Tracks the lifecycle of a multi-model submission from dispatch through completion.
+ *
+ * A submission is created when the user sends a message and all selected models
+ * begin streaming. As each model finishes, it is removed from `pendingModels`.
+ * The entry is cleaned up only when *all* models have completed — preventing the
+ * premature bridge removal that caused duplicate message groups.
+ */
+type SubmissionRecord = {
+  groupId: string
+  text: string
+  pendingModels: Set<string>
+}
+
 // v5 helper: Extract text content from UIMessage parts array
 function getMessageText(message: MessageType): string {
   const textPart = message.parts?.find((p) => p.type === "text")
@@ -130,40 +144,39 @@ export function MultiChat() {
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
-  const messageGroupIdRef = useRef<string | null>(null)
 
   // Ref to track previous chatId for navigation detection
   const prevNavChatIdRef = useRef<string | null>(chatId)
 
-  // Maps message text → messageGroupId so live useChat messages resolve to
-  // the same group key as persisted messages (which use UUID-based keys).
-  const textToGroupIdRef = useRef<Map<string, string>>(new Map())
+  // Submission registry: tracks each multi-model submission through its full lifecycle.
+  // Maps message text → SubmissionRecord so live useChat messages resolve to the same
+  // group key as persisted messages (which use UUID-based groupIds).
+  //
+  // Unlike the previous textToGroupIdRef, cleanup is lifecycle-based: entries are removed
+  // only when ALL models have completed streaming — not when messages first appear in
+  // Convex. This prevents the race condition where fast models trigger premature bridge
+  // removal while slower models are still streaming.
+  const submissionRegistryRef = useRef<Map<string, SubmissionRecord>>(new Map())
+
+  // Per-model groupId tracking: maps model ID → messageGroupId for each in-flight
+  // submission. This replaces the single messageGroupIdRef which suffered from stale
+  // closure issues when multiple submissions overlapped (e.g., user sends a second
+  // message before all models finish the first).
+  const modelGroupIdRef = useRef<Map<string, string>>(new Map())
 
   // Keep chatIdRef in sync with reactive state
   useEffect(() => {
     chatIdRef.current = multiChatId || chatId
   }, [multiChatId, chatId])
 
-  // Clean up textToGroupIdRef entries once persisted — the bridge is no longer needed
-  useEffect(() => {
-    const map = textToGroupIdRef.current
-    if (map.size === 0) return
-    const persistedGroupIds = new Set(
-      persistedMessages
-        .filter((msg) => msg.messageGroupId)
-        .map((msg) => msg.messageGroupId)
-    )
-    for (const [text, groupId] of map) {
-      if (persistedGroupIds.has(groupId)) {
-        map.delete(text)
-      }
-    }
-  }, [persistedMessages])
-
   // Callback invoked when each model's stream finishes — persists the assistant response
+  // and updates the submission registry lifecycle.
   const handleModelFinish = useCallback((modelId: string, message: MessageType) => {
     const effectiveChatId = chatIdRef.current
-    const effectiveGroupId = messageGroupIdRef.current
+    // Look up the groupId that was captured for THIS specific model at submission time,
+    // rather than reading a single shared ref (which could be stale if a second
+    // submission was dispatched before all models from the first one finished).
+    const effectiveGroupId = modelGroupIdRef.current.get(modelId) ?? null
     if (!effectiveChatId) return
 
     const persistedMessage: ExtendedUIMessage = {
@@ -173,6 +186,24 @@ export function MultiChat() {
     }
 
     cacheAndAddMessage(persistedMessage, effectiveChatId)
+
+    // Clean up per-model groupId mapping
+    modelGroupIdRef.current.delete(modelId)
+
+    // Update submission registry: mark this model as completed.
+    // Only remove the registry entry when ALL models have finished streaming —
+    // this is the core fix that prevents premature bridge removal.
+    if (effectiveGroupId) {
+      for (const [text, record] of submissionRegistryRef.current) {
+        if (record.groupId === effectiveGroupId) {
+          record.pendingModels.delete(modelId)
+          if (record.pendingModels.size === 0) {
+            submissionRegistryRef.current.delete(text)
+          }
+          break
+        }
+      }
+    }
   }, [cacheAndAddMessage])
 
   const modelChats = useMultiChat(allModelsToMaintain, handleModelFinish)
@@ -201,8 +232,8 @@ export function MultiChat() {
     // When navigating to home, reset all local state
     if (chatId === null) {
       setMultiChatId(null)
-      messageGroupIdRef.current = null
-      textToGroupIdRef.current.clear()
+      submissionRegistryRef.current.clear()
+      modelGroupIdRef.current.clear()
     }
   }, [chatId])
 
@@ -318,7 +349,10 @@ export function MultiChat() {
           const messageText = getMessageText(userMsg)
           // Resolve to the UUID-based key used by persisted groups so
           // live and persisted data merge into a single group.
-          const groupKey = textToGroupIdRef.current.get(messageText) || messageText
+          // Uses the submission registry which is lifecycle-managed (only cleaned
+          // up when ALL models complete, not on first Convex persistence).
+          const submission = submissionRegistryRef.current.get(messageText)
+          const groupKey = submission?.groupId || messageText
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -397,10 +431,6 @@ export function MultiChat() {
 
       const message_group_id = crypto.randomUUID()
 
-      // Track text→groupId so the live grouping loop uses the same key
-      // as createPersistedGroups (which keys by messageGroupId/UUID).
-      textToGroupIdRef.current.set(promptToSend, message_group_id)
-
       let chatIdToUse = multiChatId || chatId
       if (!chatIdToUse) {
         const createdChat = await createNewChat(
@@ -419,7 +449,21 @@ export function MultiChat() {
 
       // Update refs so the onFinish callback captures the correct values
       chatIdRef.current = chatIdToUse
-      messageGroupIdRef.current = message_group_id
+
+      // Register this submission in the lifecycle-managed registry.
+      // The entry persists until ALL models have completed streaming, ensuring
+      // the text→groupId bridge remains available for the entire submission duration.
+      submissionRegistryRef.current.set(promptToSend, {
+        groupId: message_group_id,
+        text: promptToSend,
+        pendingModels: new Set(selectedModelIds),
+      })
+
+      // Capture the groupId for each model so handleModelFinish can retrieve
+      // the correct groupId even if the user dispatches another submission.
+      for (const modelId of selectedModelIds) {
+        modelGroupIdRef.current.set(modelId, message_group_id)
+      }
 
       // Persist the user message to Convex before dispatching to models
       const userMessage: ExtendedUIMessage = {
