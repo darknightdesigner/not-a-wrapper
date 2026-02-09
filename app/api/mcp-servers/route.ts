@@ -143,8 +143,26 @@ export async function PATCH(request: Request) {
       headerName?: string
     } = {}
 
-    if (name !== undefined) updates.name = name.trim()
-    if (url !== undefined) updates.url = url.trim()
+    if (name !== undefined) {
+      const trimmed = name.trim()
+      if (!trimmed) {
+        return NextResponse.json(
+          { error: "Name cannot be empty" },
+          { status: 400 }
+        )
+      }
+      updates.name = trimmed
+    }
+    if (url !== undefined) {
+      const trimmed = url.trim()
+      if (!trimmed) {
+        return NextResponse.json(
+          { error: "URL cannot be empty" },
+          { status: 400 }
+        )
+      }
+      updates.url = trimmed
+    }
     if (transport !== undefined)
       updates.transport = transport === "sse" ? "sse" : "http"
     if (authType !== undefined) {

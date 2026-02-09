@@ -475,6 +475,70 @@ describe("loadUserMcpTools", () => {
   })
 
   // ===========================================================================
+  // Timeout orphan cleanup (resource leak prevention)
+  // ===========================================================================
+
+  describe("timeout orphan cleanup", () => {
+    it("closes orphaned client when timeout wins the race", async () => {
+      const server = mockServer({ name: "Slow" })
+      const orphanedClient = mockClient({ tool: mockTool("tool") })
+
+      mockFetchQuery
+        .mockResolvedValueOnce([server])
+        .mockResolvedValueOnce([])
+
+      // Use a deferred promise so the client never resolves during loadUserMcpTools
+      let resolveClient!: (value: typeof orphanedClient) => void
+      mockCreateMCPClient.mockReturnValue(
+        new Promise((resolve) => {
+          resolveClient = resolve
+        })
+      )
+
+      const result = await loadUserMcpTools("test-token", { timeout: 10 })
+
+      // Timeout should have won — no clients in the result
+      expect(result.clients).toHaveLength(0)
+      expect(result.failedServerCount).toBe(1)
+
+      // Now resolve the orphaned client — simulates a slow server eventually connecting
+      resolveClient(orphanedClient)
+      // Flush microtasks so the .then() cleanup handler runs
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // The orphaned client should have been closed
+      expect(orphanedClient.close).toHaveBeenCalledTimes(1)
+    })
+
+    it("does not crash when orphaned client also rejects", async () => {
+      const server = mockServer({ name: "Broken" })
+
+      mockFetchQuery
+        .mockResolvedValueOnce([server])
+        .mockResolvedValueOnce([])
+
+      // Client promise will also reject (after the timeout)
+      let rejectClient!: (reason: Error) => void
+      mockCreateMCPClient.mockReturnValue(
+        new Promise((_, reject) => {
+          rejectClient = reject
+        })
+      )
+
+      const result = await loadUserMcpTools("test-token", { timeout: 10 })
+
+      expect(result.clients).toHaveLength(0)
+      expect(result.failedServerCount).toBe(1)
+
+      // Client also fails — the empty rejection handler should absorb it
+      rejectClient(new Error("Connection also failed"))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+
+      // No unhandled rejection — test passes if it reaches here
+    })
+  })
+
+  // ===========================================================================
   // Options
   // ===========================================================================
 

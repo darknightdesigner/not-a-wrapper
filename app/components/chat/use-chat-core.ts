@@ -117,9 +117,9 @@ export function useChatCore({
     transport,
     messages: initialMessages,
 
-    onFinish: async ({ message, isAbort, isError }) => {
-      // Skip processing for aborted or errored responses
-      if (isAbort || isError) return
+    onFinish: async ({ message, isAbort, isDisconnect, isError }) => {
+      // Skip processing for aborted, disconnected, or errored responses
+      if (isAbort || isDisconnect || isError) return
 
       // Use effectiveChatId to handle stale closures during chat creation
       const effectiveChatId =
@@ -144,6 +144,32 @@ export function useChatCore({
     onError: handleError,
   })
 
+  // Ref to latest stop function to avoid stale closures in effects
+  const stopRef = useRef(stop)
+  stopRef.current = stop
+
+  // Handle chat transitions: stop active streams, reset state.
+  // IMPORTANT: This effect MUST run before the hydration effect below so that
+  // chat-to-chat navigation correctly stops the old stream before setting new messages.
+  useEffect(() => {
+    const prevChatId = prevChatIdRef.current
+    prevChatIdRef.current = chatId
+
+    // Only act when chatId actually changed
+    if (prevChatId === chatId) return
+
+    // Stop any active stream from the previous chat
+    if (prevChatId !== null) {
+      stopRef.current()
+    }
+
+    // When navigating to home, clear messages and reset tracking state
+    if (chatId === null) {
+      setMessages([])
+      setHasSentFirstMessage(false)
+    }
+  }, [chatId, setMessages])
+
   useEffect(() => {
     if (!chatId) return
 
@@ -165,18 +191,6 @@ export function useChatCore({
       requestAnimationFrame(() => setInput(prompt))
     }
   }, [prompt, setInput])
-
-  // Reset messages when navigating from a chat to home
-  useEffect(() => {
-    if (
-      prevChatIdRef.current !== null &&
-      chatId === null &&
-      messages.length > 0
-    ) {
-      setMessages([])
-    }
-    prevChatIdRef.current = chatId
-  }, [chatId, messages.length, setMessages])
 
   // Submit action
   const submit = useCallback(async () => {

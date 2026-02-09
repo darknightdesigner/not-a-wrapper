@@ -16,6 +16,7 @@ type ModelChat = {
   isLoading: boolean
   sendMessage: (message: any, options?: any) => void
   stop: () => void
+  setMessages: (messages: any[]) => void
 }
 
 // Maximum number of models we support
@@ -35,8 +36,8 @@ export function useMultiChat(
   const chatHooks = Array.from({ length: MAX_MODELS }, (_, index) =>
     // eslint-disable-next-line react-hooks/rules-of-hooks
     useChat({
-      onFinish: ({ message, isAbort, isError }) => {
-        if (isAbort || isError) return
+      onFinish: ({ message, isAbort, isDisconnect, isError }) => {
+        if (isAbort || isDisconnect || isError) return
         const model = models[index]
         if (model && onFinish) {
           onFinish(model.id, message)
@@ -72,6 +73,7 @@ export function useMultiChat(
           return chatHook.sendMessage(message, options)
         },
         stop: chatHook.stop,
+        setMessages: chatHook.setMessages,
       }
     })
 

@@ -8,13 +8,73 @@ const MAX_MCP_SERVERS_PER_USER = 10
 // SSRF Validation
 // =============================================================================
 
+// These helpers mirror lib/mcp/url-validation.ts — keep both in sync.
+// Convex runtime cannot import from lib/, so the logic is duplicated here.
+
+/** Check whether an IPv4 address falls in a private/reserved range. */
+function isPrivateIPv4(ip: string): boolean {
+  const parts = ip.split(".").map(Number)
+  if (parts.length !== 4 || parts.some((n) => isNaN(n) || n < 0 || n > 255)) {
+    return false
+  }
+  const [a, b] = parts
+  return (
+    a === 10 || // 10.0.0.0/8
+    a === 127 || // 127.0.0.0/8
+    (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
+    (a === 192 && b === 168) || // 192.168.0.0/16
+    (a === 169 && b === 254) || // 169.254.0.0/16
+    a === 0 // 0.0.0.0/8
+  )
+}
+
+/**
+ * Check whether an IPv6 address falls in a private/reserved range.
+ * Covers: loopback (::1), unspecified (::), IPv4-mapped (::ffff:*),
+ * link-local (fe80::/10), unique local (fc00::/7).
+ *
+ * @param rawIpv6 - The raw IPv6 address WITHOUT surrounding brackets
+ */
+function isPrivateIPv6(rawIpv6: string): boolean {
+  const addr = rawIpv6.toLowerCase().replace(/%.*$/, "")
+
+  if (addr === "::1") return true
+  if (addr === "::") return true
+
+  if (addr.startsWith("::ffff:")) {
+    const suffix = addr.slice(7)
+    if (suffix.includes(".")) return isPrivateIPv4(suffix)
+
+    const hexParts = suffix.split(":")
+    if (hexParts.length === 2) {
+      const hi = parseInt(hexParts[0], 16)
+      const lo = parseInt(hexParts[1], 16)
+      if (!isNaN(hi) && !isNaN(lo)) {
+        const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`
+        return isPrivateIPv4(ipv4)
+      }
+    }
+  }
+
+  const firstGroup = addr.split(":")[0]
+  if (!firstGroup) return false
+
+  if (/^fe[89ab][0-9a-f]$/.test(firstGroup)) return true
+  if (/^f[cd][0-9a-f]{2}$/.test(firstGroup)) return true
+
+  return false
+}
+
 /**
  * Validate a URL against SSRF rules.
  * Checks hostname patterns only — no DNS resolution in Convex runtime.
  * Defense-in-depth: the API route also validates before connecting.
  *
+ * Mirrors lib/mcp/url-validation.ts validateServerUrl — keep in sync.
+ *
  * Rejects: private IPs (10.x, 172.16-31.x, 192.168.x, 169.254.x, 127.x),
- * localhost, 0.0.0.0, [::1], .local hostnames.
+ * localhost, 0.0.0.0, .local hostnames, and private/reserved IPv6 addresses
+ * (::1, ::, fe80::/10, fc00::/7, ::ffff:private-ip).
  */
 function validateServerUrl(url: string): string | null {
   let parsed: URL
@@ -30,29 +90,22 @@ function validateServerUrl(url: string): string | null {
   if (
     hostname === "localhost" ||
     hostname === "0.0.0.0" ||
-    hostname === "[::1]" ||
     hostname.endsWith(".local")
   ) {
     return "Localhost and local network URLs are not allowed"
   }
 
-  // Block private IP ranges
-  const ipParts = hostname.split(".").map(Number)
-  if (
-    ipParts.length === 4 &&
-    ipParts.every((n) => !isNaN(n) && n >= 0 && n <= 255)
-  ) {
-    const [a, b] = ipParts
-    if (
-      a === 10 || // 10.0.0.0/8
-      a === 127 || // 127.0.0.0/8
-      (a === 172 && b >= 16 && b <= 31) || // 172.16.0.0/12
-      (a === 192 && b === 168) || // 192.168.0.0/16
-      (a === 169 && b === 254) || // 169.254.0.0/16
-      a === 0 // 0.0.0.0/8
-    ) {
-      return "Private IP addresses are not allowed"
+  // Block private/reserved IPv6 addresses (URL parser wraps IPv6 in brackets)
+  if (hostname.startsWith("[") && hostname.endsWith("]")) {
+    const ipv6 = hostname.slice(1, -1)
+    if (isPrivateIPv6(ipv6)) {
+      return "Localhost and local network URLs are not allowed"
     }
+  }
+
+  // Block private IPv4 ranges
+  if (isPrivateIPv4(hostname)) {
+    return "Private IP addresses are not allowed"
   }
 
   // Must be http or https

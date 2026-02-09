@@ -172,6 +172,13 @@ export async function POST(req: Request) {
           },
         })
       }
+
+      // Register MCP cleanup immediately after loading — before any code that
+      // could throw.  after() runs even when the response errors or the client
+      // disconnects, so this covers both the happy path and streaming failures.
+      after(async () => {
+        await Promise.allSettled(mcpClients.map((c) => c.close()))
+      })
     }
 
     const hasMcpTools = Object.keys(mcpTools).length > 0
@@ -188,14 +195,6 @@ export async function POST(req: Request) {
     if (phClient) {
       after(async () => {
         await flushPostHog()
-      })
-    }
-
-    // Close MCP clients after streaming response completes or aborts.
-    // after() always runs — including on client disconnect — unlike onFinish.
-    if (mcpClients.length > 0) {
-      after(async () => {
-        await Promise.allSettled(mcpClients.map((c) => c.close()))
       })
     }
 
@@ -270,6 +269,13 @@ export async function POST(req: Request) {
                   for (const toolCall of step.toolCalls) {
                     const serverInfo = mcpToolServerMap.get(toolCall.toolName)
                     if (serverInfo) {
+                      const toolResult = step.toolResults?.find(
+                        (r: { toolCallId: string }) =>
+                          r.toolCallId === toolCall.toolCallId
+                      )
+                      const success = toolResult
+                        ? !(toolResult as { isError?: boolean }).isError
+                        : false
                       phClient.capture({
                         distinctId: userId,
                         event: "mcp_tool_call",
@@ -278,7 +284,7 @@ export async function POST(req: Request) {
                           serverName: serverInfo.serverName,
                           serverId: serverInfo.serverId,
                           namespacedToolName: toolCall.toolName,
-                          success: true,
+                          success,
                           chatId,
                         },
                       })
@@ -313,6 +319,10 @@ export async function POST(req: Request) {
                     r.toolCallId === toolCall.toolCallId
                 )
 
+                const success = toolResult
+                  ? !(toolResult as { isError?: boolean }).isError
+                  : false
+
                 void fetchMutation(
                   api.mcpToolCallLog.log,
                   {
@@ -324,7 +334,7 @@ export async function POST(req: Request) {
                     outputPreview: toolResult
                       ? JSON.stringify(toolResult.output).slice(0, 500)
                       : undefined,
-                    success: true,
+                    success,
                   },
                   { token: convexToken }
                 ).catch(() => {

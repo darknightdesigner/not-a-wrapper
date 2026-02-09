@@ -132,6 +132,9 @@ export function MultiChat() {
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
   const messageGroupIdRef = useRef<string | null>(null)
 
+  // Ref to track previous chatId for navigation detection
+  const prevNavChatIdRef = useRef<string | null>(chatId)
+
   // Maps message text → messageGroupId so live useChat messages resolve to
   // the same group key as persisted messages (which use UUID-based keys).
   const textToGroupIdRef = useRef<Map<string, string>>(new Map())
@@ -140,6 +143,22 @@ export function MultiChat() {
   useEffect(() => {
     chatIdRef.current = multiChatId || chatId
   }, [multiChatId, chatId])
+
+  // Clean up textToGroupIdRef entries once persisted — the bridge is no longer needed
+  useEffect(() => {
+    const map = textToGroupIdRef.current
+    if (map.size === 0) return
+    const persistedGroupIds = new Set(
+      persistedMessages
+        .filter((msg) => msg.messageGroupId)
+        .map((msg) => msg.messageGroupId)
+    )
+    for (const [text, groupId] of map) {
+      if (persistedGroupIds.has(groupId)) {
+        map.delete(text)
+      }
+    }
+  }, [persistedMessages])
 
   // Callback invoked when each model's stream finishes — persists the assistant response
   const handleModelFinish = useCallback((modelId: string, message: MessageType) => {
@@ -157,6 +176,36 @@ export function MultiChat() {
   }, [cacheAndAddMessage])
 
   const modelChats = useMultiChat(allModelsToMaintain, handleModelFinish)
+
+  // Ref to latest modelChats to avoid stale closures in the navigation effect
+  // (modelChats changes every stream chunk, which would cause the effect to re-fire)
+  const modelChatsRef = useRef(modelChats)
+  modelChatsRef.current = modelChats
+
+  // Handle chat transitions: stop all active streams and reset state when navigating away
+  useEffect(() => {
+    const prevChatId = prevNavChatIdRef.current
+    prevNavChatIdRef.current = chatId
+
+    // Only act when chatId actually changed
+    if (prevChatId === chatId) return
+
+    // Stop all active model streams and clear their messages
+    if (prevChatId !== null) {
+      modelChatsRef.current.forEach((chat) => {
+        chat.stop()
+        chat.setMessages([])
+      })
+    }
+
+    // When navigating to home, reset all local state
+    if (chatId === null) {
+      setMultiChatId(null)
+      messageGroupIdRef.current = null
+      textToGroupIdRef.current.clear()
+    }
+  }, [chatId])
+
   const systemPrompt = useMemo(
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
     [user?.system_prompt]
@@ -192,10 +241,11 @@ export function MultiChat() {
         // If the assistant message has a messageGroupId, use it to find its group directly
         const msgGroupId = message.messageGroupId
         if (msgGroupId && groups[msgGroupId]) {
-          const alreadyHasModel = modelId && groups[msgGroupId].assistantMessages.some(
-            (existing) => (existing as MessageWithModel).model === modelId
+          const isDuplicate = groups[msgGroupId].assistantMessages.some(
+            (existing) => existing.id === message.id ||
+              (modelId && (existing as MessageWithModel).model === modelId)
           )
-          if (!alreadyHasModel) {
+          if (!isDuplicate) {
             groups[msgGroupId].assistantMessages.push(message)
           }
         } else {
@@ -216,10 +266,11 @@ export function MultiChat() {
                 assistantMessages: [],
               }
             }
-            const alreadyHasModelFb = modelId && groups[groupKey].assistantMessages.some(
-              (existing) => (existing as MessageWithModel).model === modelId
+            const isDuplicateFb = groups[groupKey].assistantMessages.some(
+              (existing) => existing.id === message.id ||
+                (modelId && (existing as MessageWithModel).model === modelId)
             )
-            if (!alreadyHasModelFb) {
+            if (!isDuplicateFb) {
               groups[groupKey].assistantMessages.push(message)
             }
           }

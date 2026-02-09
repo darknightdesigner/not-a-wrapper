@@ -8,6 +8,7 @@ const ALLOWED_FILE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
+  "image/webp",
   "application/pdf",
   "text/plain",
   "text/markdown",
@@ -25,6 +26,7 @@ const MIME_TO_EXTENSIONS: Record<string, string[]> = {
   "image/jpeg": [".jpg", ".jpeg"],
   "image/png": [".png"],
   "image/gif": [".gif"],
+  "image/webp": [".webp"],
   "application/pdf": [".pdf"],
   "text/plain": [".txt"],
   "text/markdown": [".md"],
@@ -39,16 +41,11 @@ const MIME_TO_EXTENSIONS: Record<string, string[]> = {
 /**
  * Comma-separated accept string for HTML `<input type="file" accept="...">`.
  * Derived from ALLOWED_FILE_TYPES so the file picker stays in sync with validation.
- * Includes image/webp and .webp for broader browser support.
  */
-export const ACCEPTED_FILE_PICKER_TYPES = [
-  ...ALLOWED_FILE_TYPES.flatMap((mime) => [
-    mime,
-    ...(MIME_TO_EXTENSIONS[mime] ?? []),
-  ]),
-  "image/webp",
-  ".webp",
-].join(",")
+export const ACCEPTED_FILE_PICKER_TYPES = ALLOWED_FILE_TYPES.flatMap((mime) => [
+  mime,
+  ...(MIME_TO_EXTENSIONS[mime] ?? []),
+]).join(",")
 
 export type Attachment = {
   name: string

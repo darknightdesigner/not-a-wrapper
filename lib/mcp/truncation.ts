@@ -38,13 +38,15 @@ export function truncateToolResult(
   if (byteLength <= maxSize) return text
 
   const suffixBytes = new TextEncoder().encode(TRUNCATION_SUFFIX).length
-  const targetBytes = maxSize - suffixBytes
+  const hasSuffixRoom = suffixBytes < maxSize
+  const targetBytes = hasSuffixRoom ? maxSize - suffixBytes : maxSize
+  const suffix = hasSuffixRoom ? TRUNCATION_SUFFIX : ""
 
-  if (targetBytes <= 0) return TRUNCATION_SUFFIX.trim()
+  if (targetBytes <= 0) return ""
 
   // Fast path: if text is pure ASCII, char count === byte count
   if (byteLength === text.length) {
-    return text.slice(0, targetBytes) + TRUNCATION_SUFFIX
+    return text.slice(0, targetBytes) + suffix
   }
 
   // Slow path: binary search for the right character cut point
@@ -61,5 +63,5 @@ export function truncateToolResult(
     }
   }
 
-  return text.slice(0, lo) + TRUNCATION_SUFFIX
+  return text.slice(0, lo) + suffix
 }

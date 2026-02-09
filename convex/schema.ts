@@ -125,6 +125,11 @@ export default defineSchema({
     url: v.string(),
     transport: v.union(v.literal("http"), v.literal("sse")),
     enabled: v.boolean(),
+    // Auth fields are optional at the schema level because they depend on authType.
+    // Invariant enforced in mcpServers.create/update mutations:
+    //   - bearer/header: encryptedAuthValue + authIv required
+    //   - header: headerName additionally required
+    //   - none: auth fields must be absent
     authType: v.optional(
       v.union(v.literal("none"), v.literal("bearer"), v.literal("header"))
     ),

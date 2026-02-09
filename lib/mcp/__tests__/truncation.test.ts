@@ -140,12 +140,26 @@ describe("truncateToolResult", () => {
   // ===========================================================================
 
   describe("edge cases", () => {
-    it("handles very small max size", () => {
+    it("handles maxSize smaller than truncation suffix", () => {
       const text = "Hello, world!"
       const result = truncateToolResult(text, 10)
 
-      // Should still produce a valid result even if suffix is larger than limit
-      expect(typeof result).toBe("string")
+      // Must respect the size guarantee even when maxSize < suffix length
+      const resultBytes = new TextEncoder().encode(result).length
+      expect(resultBytes).toBeLessThanOrEqual(10)
+      expect(result).toBe("Hello, wor")
+    })
+
+    it("handles maxSize of 1", () => {
+      const result = truncateToolResult("Hello", 1)
+      const resultBytes = new TextEncoder().encode(result).length
+      expect(resultBytes).toBeLessThanOrEqual(1)
+      expect(result).toBe("H")
+    })
+
+    it("handles maxSize of 0", () => {
+      const result = truncateToolResult("Hello", 0)
+      expect(result).toBe("")
     })
 
     it("handles circular references gracefully", () => {

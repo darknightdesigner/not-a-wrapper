@@ -12,6 +12,7 @@ import {
   recordFailure,
   recordSuccess,
 } from "./circuit-breaker"
+import { validateResolvedUrl } from "./url-validation"
 
 // =============================================================================
 // Types
@@ -53,6 +54,19 @@ export type LoadToolsOptions = {
 // =============================================================================
 // Helpers
 // =============================================================================
+
+/**
+ * Minimal runtime guard — confirms a tool value has the shape streamText() expects.
+ * Catches SDK breaking changes at the insertion point rather than inside streamText().
+ */
+function isToolDescriptor(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "execute" in value &&
+    typeof (value as Record<string, unknown>).execute === "function"
+  )
+}
 
 /**
  * Convert a server name to a stable URL-safe slug for tool namespacing.
@@ -214,23 +228,43 @@ export async function loadUserMcpTools(
   //    A slow server doesn't block fast servers.
   // -------------------------------------------------------------------------
   const clientResults = await Promise.allSettled(
-    serversToConnect.map((server) => {
+    serversToConnect.map(async (server) => {
+      // DNS rebinding guard — resolve hostname and reject private IPs
+      const dnsError = await validateResolvedUrl(server.url)
+      if (dnsError) throw new Error(dnsError)
+
       const headers = buildAuthHeaders(server)
-      return Promise.race([
-        createMCPClient({
-          transport: {
-            type: server.transport,
-            url: server.url,
-            ...(headers ? { headers } : {}),
-          },
-        }),
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("MCP connection timeout")),
-            timeout
-          )
-        ),
-      ])
+
+      // Hold a reference to the client promise so we can clean up orphaned
+      // connections when the timeout wins the race (prevents resource leaks).
+      const clientPromise = createMCPClient({
+        transport: {
+          type: server.transport,
+          url: server.url,
+          ...(headers ? { headers } : {}),
+        },
+      })
+
+      try {
+        return await Promise.race([
+          clientPromise,
+          new Promise<never>((_, reject) =>
+            setTimeout(
+              () => reject(new Error("MCP connection timeout")),
+              timeout
+            )
+          ),
+        ])
+      } catch (error) {
+        // When timeout wins the race, createMCPClient may still be in-flight.
+        // If it eventually resolves, the client would never be closed — resource leak.
+        // Attach a cleanup handler to close any orphaned client.
+        clientPromise.then(
+          (orphanedClient) => void orphanedClient.close().catch(() => {}),
+          () => {} // Client also failed — nothing to clean up
+        )
+        throw error
+      }
     })
   )
 
@@ -296,7 +330,15 @@ export async function loadUserMcpTools(
           break
         }
 
-        // 6. Namespace tool name: `${serverSlug}_${toolName}`
+        // 6. Runtime shape check — skip malformed descriptors
+        if (!isToolDescriptor(tool)) {
+          console.warn(
+            `[MCP] Skipping tool "${toolName}" from "${server.name}": unexpected descriptor shape`
+          )
+          continue
+        }
+
+        // 7. Namespace tool name: `${serverSlug}_${toolName}`
         const namespacedName = `${serverSlug}_${toolName}`
         mergedTools[namespacedName] = tool
         toolServerMap.set(namespacedName, {
