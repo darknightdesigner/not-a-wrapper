@@ -23,17 +23,17 @@ export const REMAINING_QUERY_ALERT_THRESHOLD = 2
 export const DAILY_FILE_UPLOAD_LIMIT = 5
 export const DAILY_LIMIT_PRO_MODELS = 500
 
-export const NON_AUTH_ALLOWED_MODELS = ["gpt-4.1-nano"]
+export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini"]
 
 export const FREE_MODELS_IDS = [
   "openrouter:deepseek/deepseek-r1:free",
   "openrouter:meta-llama/llama-3.3-8b-instruct:free",
   "pixtral-large-latest",
   "mistral-large-latest",
-  "gpt-4.1-nano",
+  "gpt-5-mini",
 ]
 
-export const MODEL_DEFAULT = "gpt-4.1-nano"
+export const MODEL_DEFAULT = "gpt-5-mini"
 
 export const APP_NAME = "Not A Wrapper"
 export const APP_DOMAIN = "https://not-a-wrapper.com"
@@ -187,6 +187,21 @@ export const ANTHROPIC_BETA_HEADERS = {
  * @see lib/ai/sub-agents/types.ts
  * @see .agents/context/research/tech-stack-evaluation.md
  */
+// ============================================================================
+// MCP Integration
+// ============================================================================
+
+export const MAX_MCP_SERVERS_PER_USER = 10
+export const MAX_TOOL_RESULT_SIZE = 100 * 1024 // 100KB
+export const MCP_CONNECTION_TIMEOUT_MS = 5000
+export const MCP_CIRCUIT_BREAKER_THRESHOLD = 3
+export const MCP_MAX_STEP_COUNT = 20
+export const MCP_MAX_TOOLS_PER_REQUEST = 50
+
+// ============================================================================
+// Sub-Agent Model Configuration
+// ============================================================================
+
 export const SUB_AGENT_MODELS = {
   /** Main orchestrator - complex reasoning */
   orchestrator: "claude-opus-4-5-20250929",

@@ -8,6 +8,7 @@ const ALLOWED_FILE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
+  "image/webp",
   "application/pdf",
   "text/plain",
   "text/markdown",
@@ -16,6 +17,35 @@ const ALLOWED_FILE_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]
+
+/**
+ * MIME type → file extensions mapping for the HTML file picker accept attribute.
+ * Browsers need both MIME types and extensions for reliable filtering.
+ */
+const MIME_TO_EXTENSIONS: Record<string, string[]> = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+  "image/gif": [".gif"],
+  "image/webp": [".webp"],
+  "application/pdf": [".pdf"],
+  "text/plain": [".txt"],
+  "text/markdown": [".md"],
+  "application/json": [".json"],
+  "text/csv": [".csv"],
+  "application/vnd.ms-excel": [".xls"],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    ".xlsx",
+  ],
+}
+
+/**
+ * Comma-separated accept string for HTML `<input type="file" accept="...">`.
+ * Derived from ALLOWED_FILE_TYPES so the file picker stays in sync with validation.
+ */
+export const ACCEPTED_FILE_PICKER_TYPES = ALLOWED_FILE_TYPES.flatMap((mime) => [
+  mime,
+  ...(MIME_TO_EXTENSIONS[mime] ?? []),
+]).join(",")
 
 export type Attachment = {
   name: string

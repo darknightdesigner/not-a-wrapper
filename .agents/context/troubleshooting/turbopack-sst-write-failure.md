@@ -60,7 +60,7 @@ Start with the fastest diagnostic first:
 ### Common Misdiagnosis Traps
 
 - **Do NOT assume this is Turbopack-specific.** When `node_modules` is corrupted, the `--webpack` flag produces the same ENOENT errors for manifests. Switching bundlers wastes time.
-- **Do NOT assume `turbopackFileSystemCacheForDev: false` will fix it.** This only suppresses the SST persist warnings but does NOT fix the underlying inability to write build outputs. The manifests will still be missing.
+- **Do NOT assume `turbopackFileSystemCacheForDev: false` will fix an active corruption.** During an active incident where `node_modules` is corrupted, this flag only suppresses the SST persist warnings — it does NOT fix the underlying inability to write build outputs. The manifests will still be missing. You must still reinstall `node_modules`. However, the flag *does* help prevent future SST cache corruption by avoiding persistent cache writes entirely (see "If the issue recurs frequently" below).
 - **Do NOT spend time debugging CSS or config issues.** If `.next` has zero files, the problem is at the filesystem/binary level, not in your source code.
 - **Watch for zombie processes.** After force-killing, old `next dev` processes often linger. Always verify ports are free:
   ```bash
@@ -90,7 +90,7 @@ IMPORTANT: Do NOT delete `bun.lock` / `bun.lockb` — that would change resolved
 
 ### If the issue recurs frequently
 
-Add the filesystem cache disable flag to `next.config.ts` as a temporary workaround:
+Add the filesystem cache disable flag to `next.config.ts` as a preventive measure:
 
 ```typescript
 experimental: {
@@ -98,7 +98,11 @@ experimental: {
 }
 ```
 
-This disables Turbopack's persistent SST cache (enabled by default since Next.js 16.1.0). The server will work but won't persist compilation results between restarts, resulting in slightly slower cold starts.
+This disables Turbopack's persistent SST cache (enabled by default since Next.js 16.1.0). The server will work but won't persist compilation results between restarts, resulting in slightly slower cold starts (~5-15s).
+
+**Important distinction:** This flag does NOT fix an active corruption — you still need to reinstall `node_modules` first (see Quick Fix above). What it does is prevent *future* SST cache corruption by eliminating persistent cache writes, reducing the surface area for the bug.
+
+> **Current project status:** This flag is currently enabled in `next.config.ts`. Re-evaluate removal when Next.js patches the underlying SST write issue upstream.
 
 ## Prevention
 

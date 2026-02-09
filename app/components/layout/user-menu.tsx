@@ -27,7 +27,6 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
-import { AppInfoTrigger } from "./app-info/app-info-trigger"
 import { FeedbackTrigger } from "./feedback/feedback-trigger"
 import { SettingsTrigger } from "./settings/settings-trigger"
 
@@ -69,8 +68,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
   // Shared dropdown menu content
   const menuContent = (
     <>
-      <DropdownMenuItem className="flex flex-col items-start gap-0 no-underline hover:bg-transparent focus:bg-transparent">
-        <span>{user?.display_name}</span>
+      <DropdownMenuItem className="flex items-start gap-0 no-underline hover:bg-transparent focus:bg-transparent">
         <span className="text-muted-foreground max-w-full truncate">
           {user?.email}
         </span>
@@ -78,7 +76,6 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
       <DropdownMenuSeparator />
       <SettingsTrigger onOpenChange={handleSettingsOpenChange} />
       <FeedbackTrigger />
-      <AppInfoTrigger />
       <DropdownMenuSeparator />
       <DropdownMenuItem
         onClick={handleSignOut}

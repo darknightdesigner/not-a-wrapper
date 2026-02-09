@@ -1,6 +1,10 @@
 import { auth } from "@clerk/nextjs/server"
 import { after } from "next/server"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import {
+  SYSTEM_PROMPT_DEFAULT,
+  MCP_CONNECTION_TIMEOUT_MS,
+  MCP_MAX_STEP_COUNT,
+} from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
 import {
@@ -10,12 +14,19 @@ import {
 } from "@/lib/posthog"
 import type { ProviderWithoutOllama } from "@/lib/user-keys"
 import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import { fetchMutation } from "convex/nextjs"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 import {
   checkServerSideUsage,
   incrementServerSideUsage,
   validateAndTrackUsage,
 } from "./api"
 import { createErrorResponse, extractErrorMessage } from "./utils"
+import {
+  loadUserMcpTools,
+  type LoadToolsResult,
+} from "@/lib/mcp/load-tools"
 
 export const maxDuration = 60
 
@@ -30,6 +41,10 @@ type ChatRequest = {
 }
 
 export async function POST(req: Request) {
+  // MCP state — declared outside try for cleanup in both after() and catch
+  let mcpClients: LoadToolsResult["clients"] = []
+  let mcpToolServerMap: LoadToolsResult["toolServerMap"] = new Map()
+
   try {
     // Server-side authentication - derive userId from Clerk session
     const { userId: authUserId, getToken } = await auth()
@@ -123,6 +138,52 @@ export async function POST(req: Request) {
     // Create base model from config
     const aiModel = modelConfig.apiSdk(apiKey, { enableSearch })
 
+    // -----------------------------------------------------------------------
+    // MCP Tool Loading
+    // Gate on: auth + Convex token + feature flag + model capability
+    // -----------------------------------------------------------------------
+    let mcpTools: ToolSet = {} as ToolSet
+
+    if (
+      isAuthenticated &&
+      convexToken &&
+      process.env.ENABLE_MCP === "true" &&
+      modelConfig.tools !== false
+    ) {
+      const mcpLoadStart = Date.now()
+      const mcpResult = await loadUserMcpTools(convexToken, {
+        timeout: MCP_CONNECTION_TIMEOUT_MS,
+      })
+      mcpTools = mcpResult.tools as ToolSet
+      mcpClients = mcpResult.clients
+      mcpToolServerMap = mcpResult.toolServerMap
+
+      // PostHog: MCP tool loading observability
+      const phClientForMcp = getPostHogClient()
+      if (phClientForMcp) {
+        phClientForMcp.capture({
+          distinctId: userId,
+          event: "mcp_tool_load",
+          properties: {
+            serverCount: mcpResult.clients.length,
+            toolCount: Object.keys(mcpResult.tools).length,
+            failedServers: mcpResult.failedServerCount,
+            loadTimeMs: Date.now() - mcpLoadStart,
+          },
+        })
+      }
+
+      // Register MCP cleanup immediately after loading — before any code that
+      // could throw.  after() runs even when the response errors or the client
+      // disconnects, so this covers both the happy path and streaming failures.
+      after(async () => {
+        await Promise.allSettled(mcpClients.map((c) => c.close()))
+      })
+    }
+
+    const hasMcpTools = Object.keys(mcpTools).length > 0
+    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : 10
+
     // Check if PostHog is configured for LLM analytics
     const phClient = getPostHogClient()
     const provider = getProviderForModel(model)
@@ -144,8 +205,8 @@ export async function POST(req: Request) {
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
-      tools: {} as ToolSet,
-      stopWhen: stepCountIs(10),
+      tools: mcpTools,
+      stopWhen: stepCountIs(maxSteps),
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
@@ -177,7 +238,7 @@ export async function POST(req: Request) {
         }
       },
 
-      onFinish: ({ text, usage }) => {
+      onFinish: ({ text, usage, steps }) => {
         // Manually capture LLM generation for PostHog analytics
         // This ensures accurate output capture (withTracing has issues with streaming)
         if (phClient) {
@@ -198,12 +259,89 @@ export async function POST(req: Request) {
                 messageGroupId: message_group_id,
               },
             })
+
+            // PostHog: MCP tool call events — one event per tool invocation
+            // Iterates through all steps to find tool calls that map to MCP tools.
+            // durationMs per tool call requires wrapping tool.execute (future enhancement).
+            if (steps && mcpToolServerMap.size > 0) {
+              for (const step of steps) {
+                if (step.toolCalls) {
+                  for (const toolCall of step.toolCalls) {
+                    const serverInfo = mcpToolServerMap.get(toolCall.toolName)
+                    if (serverInfo) {
+                      const toolResult = step.toolResults?.find(
+                        (r: { toolCallId: string }) =>
+                          r.toolCallId === toolCall.toolCallId
+                      )
+                      const success = toolResult
+                        ? !(toolResult as { isError?: boolean }).isError
+                        : false
+                      phClient.capture({
+                        distinctId: userId,
+                        event: "mcp_tool_call",
+                        properties: {
+                          toolName: serverInfo.displayName,
+                          serverName: serverInfo.serverName,
+                          serverId: serverInfo.serverId,
+                          namespacedToolName: toolCall.toolName,
+                          success,
+                          chatId,
+                        },
+                      })
+                    }
+                  }
+                }
+              }
+            }
           } catch (captureErr) {
             // Analytics failure should never break the response
             console.error(
               "[PostHog] Failed to capture generation event:",
               captureErr
             )
+          }
+        }
+
+        // Audit log: persist MCP tool calls to mcpToolCallLog (fire-and-forget).
+        // These writes are best-effort — failures are swallowed to avoid breaking
+        // the streaming response. Follows the same pattern as updateConnectionStatus
+        // in lib/mcp/load-tools.ts.
+        if (convexToken && steps && mcpToolServerMap.size > 0) {
+          for (const step of steps) {
+            if (step.toolCalls) {
+              for (const toolCall of step.toolCalls) {
+                const serverInfo = mcpToolServerMap.get(toolCall.toolName)
+                if (!serverInfo) continue
+
+                // Find matching tool result for output preview
+                const toolResult = step.toolResults?.find(
+                  (r: { toolCallId: string }) =>
+                    r.toolCallId === toolCall.toolCallId
+                )
+
+                const success = toolResult
+                  ? !(toolResult as { isError?: boolean }).isError
+                  : false
+
+                void fetchMutation(
+                  api.mcpToolCallLog.log,
+                  {
+                    chatId: chatId as Id<"chats">,
+                    serverId: serverInfo.serverId as Id<"mcpServers">,
+                    toolName: serverInfo.displayName,
+                    toolCallId: toolCall.toolCallId,
+                    inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
+                    outputPreview: toolResult
+                      ? JSON.stringify(toolResult.output).slice(0, 500)
+                      : undefined,
+                    success,
+                  },
+                  { token: convexToken }
+                ).catch(() => {
+                  // Intentionally swallowed — audit logging is best-effort
+                })
+              }
+            }
           }
         }
       }
@@ -218,6 +356,9 @@ export async function POST(req: Request) {
       },
     });
   } catch (err: unknown) {
+    // Clean up any MCP clients that were opened before the error
+    await Promise.allSettled(mcpClients.map((c) => c.close()))
+
     console.error("Error in /api/chat:", err)
     const error = err as {
       code?: string

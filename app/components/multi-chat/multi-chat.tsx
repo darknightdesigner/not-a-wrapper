@@ -6,7 +6,7 @@ import { toast } from "@/components/ui/toast"
 import { convertAttachmentsToFiles } from "@/lib/ai/message-conversion"
 import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
-import { useMessages } from "@/lib/chat-store/messages/provider"
+import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
@@ -15,7 +15,7 @@ import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MultiChatInput } from "./multi-chat-input"
 import { useMultiChat } from "./use-multi-chat"
 
@@ -35,6 +35,20 @@ type GroupedMessage = {
   onDelete: (model: string, id: string) => void
   onEdit: (model: string, id: string, newText: string) => void
   onReload: (model: string) => void
+}
+
+/**
+ * Tracks the lifecycle of a multi-model submission from dispatch through completion.
+ *
+ * A submission is created when the user sends a message and all selected models
+ * begin streaming. As each model finishes, it is removed from `pendingModels`.
+ * The entry is cleaned up only when *all* models have completed — preventing the
+ * premature bridge removal that caused duplicate message groups.
+ */
+type SubmissionRecord = {
+  groupId: string
+  text: string
+  pendingModels: Set<string>
 }
 
 // v5 helper: Extract text content from UIMessage parts array
@@ -60,7 +74,7 @@ export function MultiChat() {
     handleFileRemove,
   } = useFileUpload()
   const { chatId } = useChatSession()
-  const { messages: persistedMessages, isLoading: messagesLoading } =
+  const { messages: persistedMessages, isLoading: messagesLoading, cacheAndAddMessage } =
     useMessages()
   const { createNewChat } = useChats()
 
@@ -128,7 +142,115 @@ export function MultiChat() {
     }
   }, [selectedModelIds.length, modelsFromLastGroup])
 
-  const modelChats = useMultiChat(allModelsToMaintain)
+  // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
+  const chatIdRef = useRef<string | null>(multiChatId || chatId)
+
+  // Ref to track previous chatId for navigation detection
+  const prevNavChatIdRef = useRef<string | null>(chatId)
+
+  // Submission registry: tracks each multi-model submission through its full lifecycle.
+  // Maps message text → SubmissionRecord so live useChat messages resolve to the same
+  // group key as persisted messages (which use UUID-based groupIds).
+  //
+  // Unlike the previous textToGroupIdRef, cleanup is lifecycle-based: entries are removed
+  // only when ALL models have completed streaming — not when messages first appear in
+  // Convex. This prevents the race condition where fast models trigger premature bridge
+  // removal while slower models are still streaming.
+  const submissionRegistryRef = useRef<Map<string, SubmissionRecord>>(new Map())
+
+  // Per-model groupId tracking: maps model ID → messageGroupId for each in-flight
+  // submission. This replaces the single messageGroupIdRef which suffered from stale
+  // closure issues when multiple submissions overlapped (e.g., user sends a second
+  // message before all models finish the first).
+  const modelGroupIdRef = useRef<Map<string, string>>(new Map())
+
+  // Ref to latest modelChats — declared before handleModelFinish so the
+  // callback can clear a model's hook messages after persistence.
+  // Populated after useMultiChat returns on every render cycle.
+  const modelChatsRef = useRef<ReturnType<typeof useMultiChat>>([])
+
+  // Keep chatIdRef in sync with reactive state
+  useEffect(() => {
+    chatIdRef.current = multiChatId || chatId
+  }, [multiChatId, chatId])
+
+  // Callback invoked when each model's stream finishes — persists the assistant response
+  // and updates the submission registry lifecycle.
+  const handleModelFinish = useCallback((modelId: string, message: MessageType) => {
+    const effectiveChatId = chatIdRef.current
+    // Look up the groupId that was captured for THIS specific model at submission time,
+    // rather than reading a single shared ref (which could be stale if a second
+    // submission was dispatched before all models from the first one finished).
+    const effectiveGroupId = modelGroupIdRef.current.get(modelId) ?? null
+    if (!effectiveChatId) return
+
+    const persistedMessage: ExtendedUIMessage = {
+      ...message,
+      model: modelId,
+      messageGroupId: effectiveGroupId ?? undefined,
+    }
+
+    cacheAndAddMessage(persistedMessage, effectiveChatId)
+
+    // Clear this model's useChat hook messages now that the response is persisted.
+    // The persisted/optimistic data in MessagesProvider takes over from here.
+    // Without this cleanup, stale live messages produce a duplicate group
+    // (keyed by raw text) alongside the persisted group (keyed by UUID)
+    // once the submission registry entry is cleaned up.
+    const modelChat = modelChatsRef.current.find(c => c.model.id === modelId)
+    if (modelChat) {
+      modelChat.setMessages([])
+    }
+
+    // Clean up per-model groupId mapping
+    modelGroupIdRef.current.delete(modelId)
+
+    // Update submission registry: mark this model as completed.
+    // Only remove the registry entry when ALL models have finished streaming —
+    // this is the core fix that prevents premature bridge removal.
+    if (effectiveGroupId) {
+      for (const [text, record] of submissionRegistryRef.current) {
+        if (record.groupId === effectiveGroupId) {
+          record.pendingModels.delete(modelId)
+          if (record.pendingModels.size === 0) {
+            submissionRegistryRef.current.delete(text)
+          }
+          break
+        }
+      }
+    }
+  }, [cacheAndAddMessage])
+
+  const modelChats = useMultiChat(allModelsToMaintain, handleModelFinish)
+
+  // Keep modelChatsRef in sync with latest modelChats (ref declared earlier
+  // so handleModelFinish can access it; updated here on every render).
+  modelChatsRef.current = modelChats
+
+  // Handle chat transitions: stop all active streams and reset state when navigating away
+  useEffect(() => {
+    const prevChatId = prevNavChatIdRef.current
+    prevNavChatIdRef.current = chatId
+
+    // Only act when chatId actually changed
+    if (prevChatId === chatId) return
+
+    // Stop all active model streams and clear their messages
+    if (prevChatId !== null) {
+      modelChatsRef.current.forEach((chat) => {
+        chat.stop()
+        chat.setMessages([])
+      })
+    }
+
+    // When navigating to home, reset all local state
+    if (chatId === null) {
+      setMultiChatId(null)
+      submissionRegistryRef.current.clear()
+      modelGroupIdRef.current.clear()
+    }
+  }, [chatId])
+
   const systemPrompt = useMemo(
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
     [user?.system_prompt]
@@ -151,7 +273,8 @@ export function MultiChat() {
       const message = persistedMessages[i]
 
       if (message.role === "user") {
-        const groupKey = getMessageText(message)
+        // Prefer messageGroupId for grouping; fall back to text content for backward compat
+        const groupKey = message.messageGroupId || getMessageText(message)
         if (!groups[groupKey]) {
           groups[groupKey] = {
             userMessage: message,
@@ -159,23 +282,43 @@ export function MultiChat() {
           }
         }
       } else if (message.role === "assistant") {
-        let associatedUserMessage = null
-        for (let j = i - 1; j >= 0; j--) {
-          if (persistedMessages[j].role === "user") {
-            associatedUserMessage = persistedMessages[j]
-            break
+        const modelId = (message as MessageWithModel).model
+        // If the assistant message has a messageGroupId, use it to find its group directly
+        const msgGroupId = message.messageGroupId
+        if (msgGroupId && groups[msgGroupId]) {
+          const isDuplicate = groups[msgGroupId].assistantMessages.some(
+            (existing) => existing.id === message.id ||
+              (modelId && (existing as MessageWithModel).model === modelId)
+          )
+          if (!isDuplicate) {
+            groups[msgGroupId].assistantMessages.push(message)
           }
-        }
-
-        if (associatedUserMessage) {
-          const groupKey = getMessageText(associatedUserMessage)
-          if (!groups[groupKey]) {
-            groups[groupKey] = {
-              userMessage: associatedUserMessage,
-              assistantMessages: [],
+        } else {
+          // Fallback: scan backward for the nearest user message
+          let associatedUserMessage: (typeof persistedMessages)[number] | null = null
+          for (let j = i - 1; j >= 0; j--) {
+            if (persistedMessages[j].role === "user") {
+              associatedUserMessage = persistedMessages[j]
+              break
             }
           }
-          groups[groupKey].assistantMessages.push(message)
+
+          if (associatedUserMessage) {
+            const groupKey = associatedUserMessage.messageGroupId || getMessageText(associatedUserMessage)
+            if (!groups[groupKey]) {
+              groups[groupKey] = {
+                userMessage: associatedUserMessage,
+                assistantMessages: [],
+              }
+            }
+            const isDuplicateFb = groups[groupKey].assistantMessages.some(
+              (existing) => existing.id === message.id ||
+                (modelId && (existing as MessageWithModel).model === modelId)
+            )
+            if (!isDuplicateFb) {
+              groups[groupKey].assistantMessages.push(message)
+            }
+          }
         }
       }
     }
@@ -211,13 +354,33 @@ export function MultiChat() {
     const persistedGroups = createPersistedGroups()
     const liveGroups = { ...persistedGroups }
 
+    // Build reverse lookup: message text → persisted group key (UUID).
+    // When the submission registry has been cleaned up (all models completed)
+    // but useChat hooks still hold stale messages on a transitional render frame,
+    // this map lets live messages resolve to the correct UUID-based persisted
+    // group key — preventing duplicate groups (one keyed by UUID from Convex,
+    // one by raw text from hooks).
+    const textToPersistedKey = new Map<string, string>()
+    for (const [key, group] of Object.entries(persistedGroups)) {
+      const text = getMessageText(group.userMessage)
+      textToPersistedKey.set(text, key)
+    }
+
     modelChats.forEach((chat) => {
       for (let i = 0; i < chat.messages.length; i += 2) {
         const userMsg = chat.messages[i]
         const assistantMsg = chat.messages[i + 1]
 
         if (userMsg?.role === "user") {
-          const groupKey = getMessageText(userMsg)
+          const messageText = getMessageText(userMsg)
+          // Resolve group key through a three-tier fallback:
+          // 1. Submission registry (lifecycle-managed, active during streaming)
+          // 2. Persisted group reverse lookup (text → UUID, handles post-completion)
+          // 3. Raw text (initial render before any persistence)
+          const submission = submissionRegistryRef.current.get(messageText)
+          const groupKey = submission?.groupId
+            || textToPersistedKey.get(messageText)
+            || messageText
 
           if (!liveGroups[groupKey]) {
             liveGroups[groupKey] = {
@@ -312,6 +475,33 @@ export function MultiChat() {
         window.history.pushState(null, "", `/c/${chatIdToUse}`)
       }
 
+      // Update refs so the onFinish callback captures the correct values
+      chatIdRef.current = chatIdToUse
+
+      // Register this submission in the lifecycle-managed registry.
+      // The entry persists until ALL models have completed streaming, ensuring
+      // the text→groupId bridge remains available for the entire submission duration.
+      submissionRegistryRef.current.set(promptToSend, {
+        groupId: message_group_id,
+        text: promptToSend,
+        pendingModels: new Set(selectedModelIds),
+      })
+
+      // Capture the groupId for each model so handleModelFinish can retrieve
+      // the correct groupId even if the user dispatches another submission.
+      for (const modelId of selectedModelIds) {
+        modelGroupIdRef.current.set(modelId, message_group_id)
+      }
+
+      // Persist the user message to Convex before dispatching to models
+      const userMessage: ExtendedUIMessage = {
+        id: crypto.randomUUID(),
+        role: "user" as const,
+        parts: [{ type: "text", text: promptToSend }],
+        messageGroupId: message_group_id,
+      }
+      cacheAndAddMessage(userMessage, chatIdToUse)
+
       const selectedChats = modelChats.filter((chat) =>
         selectedModelIds.includes(chat.model.id)
       )
@@ -379,6 +569,7 @@ export function MultiChat() {
     handleFileUploads,
     fileUploadState,
     setFiles,
+    cacheAndAddMessage,
   ])
 
   const handleSuggestion = useCallback(

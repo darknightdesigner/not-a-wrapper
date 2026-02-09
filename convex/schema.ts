@@ -114,4 +114,61 @@ export default defineSchema({
     dailyMessageCount: v.number(),
     dailyReset: v.number(), // Unix timestamp (start of day)
   }).index("by_anonymous_id", ["anonymousId"]),
+
+  // ============================================================================
+  // MCP (Model Context Protocol) Integration
+  // ============================================================================
+
+  mcpServers: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    url: v.string(),
+    transport: v.union(v.literal("http"), v.literal("sse")),
+    enabled: v.boolean(),
+    // Auth fields are optional at the schema level because they depend on authType.
+    // Invariant enforced in mcpServers.create/update mutations:
+    //   - bearer/header: encryptedAuthValue + authIv required
+    //   - header: headerName additionally required
+    //   - none: auth fields must be absent
+    authType: v.optional(
+      v.union(v.literal("none"), v.literal("bearer"), v.literal("header"))
+    ),
+    encryptedAuthValue: v.optional(v.string()),
+    authIv: v.optional(v.string()),
+    headerName: v.optional(v.string()),
+    createdAt: v.number(),
+    lastConnectedAt: v.optional(v.number()),
+    lastError: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_enabled", ["userId", "enabled"]),
+
+  mcpToolApprovals: defineTable({
+    userId: v.id("users"),
+    serverId: v.id("mcpServers"),
+    toolName: v.string(),
+    approved: v.boolean(),
+    approvedAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_server", ["serverId"])
+    .index("by_user_server", ["userId", "serverId"])
+    .index("by_user_server_tool", ["userId", "serverId", "toolName"]),
+
+  mcpToolCallLog: defineTable({
+    userId: v.id("users"),
+    chatId: v.optional(v.id("chats")),
+    serverId: v.id("mcpServers"),
+    toolName: v.string(),
+    toolCallId: v.string(),
+    inputPreview: v.optional(v.string()),
+    outputPreview: v.optional(v.string()),
+    success: v.boolean(),
+    durationMs: v.optional(v.number()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_chat", ["chatId"])
+    .index("by_server", ["serverId"]),
 })

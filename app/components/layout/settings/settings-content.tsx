@@ -18,8 +18,8 @@ import { ByokSection } from "./apikeys/byok-section"
 import { InteractionPreferences } from "./appearance/interaction-preferences"
 import { LayoutSettings } from "./appearance/layout-settings"
 import { ThemeSelection } from "./appearance/theme-selection"
-import { ConnectionsPlaceholder } from "./connections/connections-placeholder"
 import { DeveloperTools } from "./connections/developer-tools"
+import { McpServers } from "./connections/mcp-servers"
 import { OllamaSection } from "./connections/ollama-section"
 import { AccountManagement } from "./general/account-management"
 import { UserProfile } from "./general/user-profile"
@@ -126,7 +126,7 @@ export function SettingsContent({
             </TabsContent>
 
             <TabsContent value="connections" className="space-y-6 px-6">
-              {!isDev && <ConnectionsPlaceholder />}
+              <McpServers />
               {isDev && <OllamaSection />}
               {isDev && <DeveloperTools />}
             </TabsContent>
@@ -208,7 +208,7 @@ export function SettingsContent({
               </TabsContent>
 
               <TabsContent value="connections" className="mt-0 space-y-6">
-                {!isDev && <ConnectionsPlaceholder />}
+                <McpServers />
                 {isDev && <OllamaSection />}
                 {isDev && <DeveloperTools />}
               </TabsContent>
