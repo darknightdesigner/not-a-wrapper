@@ -1,15 +1,24 @@
 # Components Directory — Claude Context
 
-This directory contains reusable UI components, primarily Shadcn/Radix primitives.
+This directory contains reusable UI components, primarily Shadcn/Base UI primitives.
 
 > See `@app/components/CLAUDE.md` for app-specific components.
 > These are generic, reusable building blocks.
+
+## Primitive Library
+
+**Base UI** (`@base-ui/react`) — migrated from Radix UI in February 2026.
+
+- All `components/ui/` files import from `@base-ui/react/*` (not `@radix-ui/*`)
+- The `components.json` style is `"base-vega"` — future `npx shadcn@latest add` pulls Base UI variants
+- The `asChild` prop is supported via a compatibility shim (`lib/as-child-adapter.ts`) that translates to Base UI's `render` prop internally
+- **Deprecation plan**: The `asChild` shim will eventually be removed; app-level code should migrate to the `render` prop pattern
 
 ## Structure Overview
 
 ```
 components/
-├── ui/               # Shadcn UI primitives (auto-generated + customized)
+├── ui/               # Shadcn UI primitives (Base UI, auto-generated + customized)
 │   ├── button.tsx
 │   ├── dialog.tsx
 │   ├── toast.tsx
@@ -131,6 +140,7 @@ npx shadcn@latest add [component-name]
 ### Dialog with Form
 
 ```typescript
+// asChild is supported via shim (translates to Base UI render prop internally)
 <Dialog>
   <DialogTrigger asChild>
     <Button>Open</Button>
@@ -163,6 +173,24 @@ npx shadcn@latest add [component-name]
   </DropdownMenuContent>
 </DropdownMenu>
 ```
+
+### asChild Compatibility Shim
+
+The `asChild` prop is preserved for backward compatibility. Internally, `lib/as-child-adapter.ts` translates it to Base UI's `render` prop:
+
+```typescript
+// Current (works via shim — will be deprecated)
+<DialogTrigger asChild>
+  <Button>Open</Button>
+</DialogTrigger>
+
+// Future (native Base UI pattern — preferred for new code)
+<DialogTrigger render={<Button />}>
+  Open
+</DialogTrigger>
+```
+
+When writing **new** code, prefer the `render` prop pattern. Existing `asChild` usages will continue to work until the shim is removed.
 
 ## Notes
 
