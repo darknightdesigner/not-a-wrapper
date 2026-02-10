@@ -18,6 +18,10 @@
 @custom-variant pointer-coarse (@media (pointer: coarse));
 @custom-variant pointer-fine (@media (pointer: fine));
 
+/* Viewport height variants for conditional sticky behavior (ChatGPT pattern) */
+@custom-variant tall (@media (min-height: 40rem));
+@custom-variant not-tall (@media (max-height: 39.99rem));
+
 @keyframes collapsible-down {
   from {
     height: 0;
