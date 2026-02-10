@@ -6,35 +6,47 @@ import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
+// Context bridges Radix-style Root-level delay props to Base UI's Trigger-level delay.
+const HoverCardDelayContext = React.createContext<{
+  delay?: number
+  closeDelay?: number
+}>({})
+
 function HoverCard({
   openDelay,
-  closeDelay: _closeDelay,
-  delay,
+  closeDelay,
   ...props
 }: HoverCardPrimitive.Root.Props & {
-  /** @deprecated Use `delay` instead. Maps to Base UI's single delay prop. */
+  /** @deprecated Use `delay` on HoverCardTrigger. Forwarded via context for backward compat. */
   openDelay?: number
-  /** @deprecated No Base UI equivalent. Base UI uses a single `delay` prop. */
+  /** @deprecated Use `closeDelay` on HoverCardTrigger. Forwarded via context for backward compat. */
   closeDelay?: number
 }) {
+  const delayCtx = React.useMemo(
+    () => ({ delay: openDelay, closeDelay }),
+    [openDelay, closeDelay]
+  )
   return (
-    <HoverCardPrimitive.Root
-      data-slot="hover-card"
-      delay={delay ?? openDelay}
-      {...props}
-    />
+    <HoverCardDelayContext.Provider value={delayCtx}>
+      <HoverCardPrimitive.Root data-slot="hover-card" {...props} />
+    </HoverCardDelayContext.Provider>
   )
 }
 
 function HoverCardTrigger({
   asChild,
   children,
+  delay,
+  closeDelay,
   ...props
 }: HoverCardPrimitive.Trigger.Props & { asChild?: boolean }) {
+  const delayCtx = React.useContext(HoverCardDelayContext)
   const adapted = adaptAsChild(asChild, children)
   return (
     <HoverCardPrimitive.Trigger
       data-slot="hover-card-trigger"
+      delay={delay ?? delayCtx.delay}
+      closeDelay={closeDelay ?? delayCtx.closeDelay}
       render={adapted.render}
       {...props}
     >
