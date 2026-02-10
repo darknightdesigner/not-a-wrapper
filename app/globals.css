@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "@clerk/themes/shadcn.css";
-@import "../node_modules/vaul-base/style.css";
+@import "./vaul-base.css";
 
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
