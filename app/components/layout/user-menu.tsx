@@ -128,7 +128,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
             <DropdownMenuContent
               side="top"
               align="start"
-              className="w-(--radix-popper-anchor-width)"
+              className="w-(--anchor-width)"
               onCloseAutoFocus={(e) => e.preventDefault()}
               onInteractOutside={(e) => {
                 if (isSettingsOpen) {

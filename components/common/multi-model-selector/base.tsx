@@ -124,7 +124,7 @@ export function MultiModelSelector({
             checked={isSelected}
             disabled={isLocked || (!isSelected && isAtLimit)}
             onClick={(e) => e.stopPropagation()}
-            onChange={() => handleModelToggle(model.id, isLocked)}
+            onCheckedChange={() => handleModelToggle(model.id, isLocked)}
           />
           {provider?.icon && <provider.icon className="size-5" />}
           <div className="flex flex-col gap-0">

@@ -34,7 +34,7 @@ This file contains Claude-specific behaviors, preferences, and context for the N
 - Use structured error responses: `{ error: string, code?: string }`
 
 ### When Working on UI Components
-- Use Shadcn/Radix primitives from `components/ui/`
+- Use Shadcn/Base UI primitives from `components/ui/`
 - Follow existing patterns in `app/components/`
 - Prefer composition over configuration
 

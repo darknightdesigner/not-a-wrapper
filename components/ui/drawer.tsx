@@ -1,20 +1,34 @@
 "use client"
 
 import * as React from "react"
-import { Drawer as DrawerPrimitive } from "vaul"
+import { Drawer as DrawerPrimitive } from "vaul-base"
+import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
 function Drawer({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+  return <DrawerPrimitive.Root {...props} />
 }
 
 function DrawerTrigger({
+  asChild,
+  children,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
-  return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
+}: React.ComponentProps<typeof DrawerPrimitive.Trigger> & {
+  asChild?: boolean
+}) {
+  const adapted = adaptAsChild(asChild, children)
+  return (
+    <DrawerPrimitive.Trigger
+      data-slot="drawer-trigger"
+      render={adapted.render}
+      {...props}
+    >
+      {adapted.children}
+    </DrawerPrimitive.Trigger>
+  )
 }
 
 function DrawerPortal({
@@ -24,9 +38,22 @@ function DrawerPortal({
 }
 
 function DrawerClose({
+  asChild,
+  children,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Close>) {
-  return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
+}: React.ComponentProps<typeof DrawerPrimitive.Close> & {
+  asChild?: boolean
+}) {
+  const adapted = adaptAsChild(asChild, children)
+  return (
+    <DrawerPrimitive.Close
+      data-slot="drawer-close"
+      render={adapted.render}
+      {...props}
+    >
+      {adapted.children}
+    </DrawerPrimitive.Close>
+  )
 }
 
 function DrawerOverlay({
@@ -37,7 +64,7 @@ function DrawerOverlay({
     <DrawerPrimitive.Overlay
       data-slot="drawer-overlay"
       className={cn(
-        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
         className
       )}
       {...props}
@@ -51,7 +78,7 @@ function DrawerContent({
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Content>) {
   return (
-    <DrawerPortal data-slot="drawer-portal">
+    <DrawerPortal>
       <DrawerOverlay />
       <DrawerPrimitive.Content
         data-slot="drawer-content"

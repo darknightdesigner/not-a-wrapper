@@ -125,7 +125,7 @@ src/
 ├── api/
 │   └── CLAUDE.md          # "API routes follow REST conventions, see examples in users/"
 └── components/
-    └── CLAUDE.md          # "All components use Radix UI primitives"
+    └── CLAUDE.md          # "All components use Base UI primitives"
 ```
 
 **Benefits:**
@@ -1235,7 +1235,7 @@ After comprehensive research comparing options, the following tech stack was sel
 | **Payments** | **Flowglad** | Open-source, Clerk-native, developer-friendly |
 | **AI** | Vercel AI SDK → Claude Opus 4.5 (primary) | Multi-provider abstraction |
 | **State** | Zustand + TanStack Query | Lightweight, works well with streaming |
-| **UI** | Shadcn/Radix + Tailwind 4 | Modern, accessible, customizable |
+| **UI** | Shadcn/Base UI + Tailwind 4 | Modern, accessible, customizable |
 
 #### Why Convex Over Supabase?
 

@@ -242,7 +242,7 @@ export function MessageUser({
           <MessageAction
             tooltip={isEditing ? "Cancel edit" : "Edit message"}
             side="bottom"
-            delayDuration={0}
+            delay={0}
           >
             <button
               className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"

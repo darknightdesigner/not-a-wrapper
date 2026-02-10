@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
+import { Collapsible } from "@base-ui/react/collapsible"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { cn } from "@/lib/utils"
@@ -53,12 +53,12 @@ export function CollapsibleSection({
   )
 
   return (
-    <CollapsiblePrimitive.Root
+    <Collapsible.Root
       open={isOpen}
       onOpenChange={handleOpenChange}
       className={cn("group/collapsible-section", className)}
     >
-      <CollapsiblePrimitive.Trigger
+      <Collapsible.Trigger
         className={cn(
           "flex w-full items-center gap-1 px-2 py-1.5",
           "text-sm font-medium text-muted-foreground",
@@ -77,17 +77,17 @@ export function CollapsibleSection({
               : "opacity-100"
           )}
         />
-      </CollapsiblePrimitive.Trigger>
+      </Collapsible.Trigger>
 
-      <CollapsiblePrimitive.Content
+      <Collapsible.Panel
         className={cn(
           "overflow-hidden",
-          "data-[state=open]:animate-collapsible-down",
-          "data-[state=closed]:animate-collapsible-up"
+          "data-[open]:animate-collapsible-down",
+          "data-[closed]:animate-collapsible-up"
         )}
       >
         <div className="space-y-0.5 pt-1">{children}</div>
-      </CollapsiblePrimitive.Content>
-    </CollapsiblePrimitive.Root>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   )
 }

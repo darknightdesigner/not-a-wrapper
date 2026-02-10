@@ -189,6 +189,7 @@ export function ChatPreviewPanel({
 }: ChatPreviewPanelProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const viewportRef = useRef<HTMLDivElement>(null)
   const [lastChatId, setLastChatId] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
   const maxRetries = 3
@@ -210,13 +211,8 @@ export function ChatPreviewPanel({
 
   // Immediately scroll to bottom when chatId changes or messages load
   useLayoutEffect(() => {
-    if (chatId && messages.length > 0 && scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      )
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight
-      }
+    if (chatId && messages.length > 0 && viewportRef.current) {
+      viewportRef.current.scrollTop = viewportRef.current.scrollHeight
     }
   }, [chatId, messages.length])
 
@@ -240,7 +236,7 @@ export function ChatPreviewPanel({
           <EmptyState />
         )}
         {chatId && !isLoading && !error && messages.length > 0 && (
-          <ScrollArea ref={scrollAreaRef} className="h-full">
+          <ScrollArea ref={scrollAreaRef} viewportRef={viewportRef} className="h-full">
             <div className="space-y-4 p-6">
               <div className="flex justify-center">
                 <div className="text-muted-foreground bg-muted/50 rounded-full px-2 py-1 text-xs">

@@ -39,7 +39,7 @@ export function SidebarProjectMenu({
   return (
     <>
       <DropdownMenu
-        // shadcn/ui / radix pointer-events-none issue
+        // shadcn/ui pointer-events-none issue on mobile
         modal={isMobile ? true : false}
         onOpenChange={onMenuOpenChange}
       >

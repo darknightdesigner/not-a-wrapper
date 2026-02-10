@@ -55,7 +55,7 @@ export const ChainOfThoughtTrigger = ({
             {leftIcon}
           </span>
           {swapIconOnHover && (
-            <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="absolute opacity-0 transition-opacity group-hover:opacity-100 group-data-[state=open]:rotate-180" />
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="absolute opacity-0 transition-opacity group-hover:opacity-100 group-data-[open]:rotate-180" />
           )}
         </span>
       ) : (
@@ -66,7 +66,7 @@ export const ChainOfThoughtTrigger = ({
       <span>{children}</span>
     </div>
     {!leftIcon && (
-      <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="transition-transform group-data-[state=open]:rotate-180" />
+      <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="transition-transform group-data-[open]:rotate-180" />
     )}
   </CollapsibleTrigger>
 )
@@ -83,7 +83,7 @@ export const ChainOfThoughtContent = ({
   return (
     <CollapsibleContent
       className={cn(
-        "text-popover-foreground data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down overflow-hidden",
+        "text-popover-foreground data-[closed]:animate-collapsible-up data-[open]:animate-collapsible-down overflow-hidden",
         className
       )}
       {...props}
