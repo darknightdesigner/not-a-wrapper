@@ -124,15 +124,42 @@ export async function POST(req: Request) {
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
+    const provider = getProviderForModel(model)
+
     let apiKey: string | undefined
     if (isAuthenticated && convexToken) {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
-      const provider = getProviderForModel(model)
       apiKey =
         (await getEffectiveApiKey(
           provider as ProviderWithoutOllama,
           convexToken
         )) || undefined
+    }
+
+    // Pre-flight check: verify an API key is available before calling the provider.
+    // When apiKey is undefined, the AI SDK falls back to environment variables.
+    // If neither source has a valid key, the provider will reject with a 401.
+    if (!apiKey && provider !== "ollama") {
+      const { env: providerEnv } = await import("@/lib/openproviders/env")
+      const envKeyMap: Record<string, string | undefined> = {
+        openai: providerEnv.OPENAI_API_KEY,
+        mistral: providerEnv.MISTRAL_API_KEY,
+        perplexity: providerEnv.PERPLEXITY_API_KEY,
+        google: providerEnv.GOOGLE_GENERATIVE_AI_API_KEY,
+        anthropic: providerEnv.ANTHROPIC_API_KEY,
+        xai: providerEnv.XAI_API_KEY,
+        openrouter: providerEnv.OPENROUTER_API_KEY,
+      }
+      const envKey = envKeyMap[provider]
+      if (!envKey) {
+        const providerName = modelConfig.provider || provider
+        throw Object.assign(
+          new Error(
+            `No API key configured for ${providerName}. Please add your ${providerName} API key in settings.`
+          ),
+          { statusCode: 401, code: "MISSING_API_KEY" }
+        )
+      }
     }
 
     // Create base model from config
@@ -186,7 +213,6 @@ export async function POST(req: Request) {
 
     // Check if PostHog is configured for LLM analytics
     const phClient = getPostHogClient()
-    const provider = getProviderForModel(model)
     const startTime = Date.now()
 
     // Schedule PostHog flush after streaming response completes

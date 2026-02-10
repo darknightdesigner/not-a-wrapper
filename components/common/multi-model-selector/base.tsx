@@ -463,10 +463,8 @@ export function MultiModelSelector({
                         "flex w-full items-center justify-between px-3 py-2",
                         isSelected && "bg-accent"
                       )}
-                      onSelect={(e) => {
-                        e.preventDefault()
-                        handleModelToggle(model.id, isLocked)
-                      }}
+                      closeOnClick={false}
+                      onClick={() => handleModelToggle(model.id, isLocked)}
                       onFocus={() => {
                         if (isDropdownOpen) {
                           setHoveredModel(model.id)

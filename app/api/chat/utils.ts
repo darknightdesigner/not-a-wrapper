@@ -178,20 +178,24 @@ export function extractErrorMessage(error: unknown): string {
     return error
   }
 
+  // Try to extract the provider name from the error for more helpful messages
+  const providerHint = extractProviderHint(error)
+
   // Handle Error objects
   if (error instanceof Error) {
     // Check for specific error patterns
     if (
       error.message.includes("invalid x-api-key") ||
-      error.message.includes("authentication_error")
+      error.message.includes("authentication_error") ||
+      error.message.includes("Incorrect API key")
     ) {
-      return "Invalid API key or authentication failed. Please check your API key in settings."
+      return `Invalid API key${providerHint}. Please check your API key in settings.`
     } else if (
       error.message.includes("402") ||
       error.message.includes("payment") ||
       error.message.includes("credits")
     ) {
-      return "Insufficient credits or payment required."
+      return `Insufficient credits or payment required${providerHint}.`
     } else if (
       error.message.includes("429") ||
       error.message.includes("rate limit")
@@ -204,29 +208,68 @@ export function extractErrorMessage(error: unknown): string {
 
   // Handle AI SDK error objects
    
-  const aiError = (error as any)?.error
+  const aiError = (error as { error?: { statusCode?: number; responseBody?: string; message?: string } })?.error
   if (aiError) {
+    // Try to extract a detailed message from the response body
+    const detailedMessage = extractResponseBodyMessage(aiError.responseBody)
+
     if (aiError.statusCode === 401) {
-      return "Invalid API key or authentication failed. Please check your API key in settings."
+      return detailedMessage || `Invalid API key${providerHint}. Please check your API key in settings.`
     } else if (aiError.statusCode === 402) {
-      return "Insufficient credits or payment required."
+      return detailedMessage || `Insufficient credits or payment required${providerHint}.`
     } else if (aiError.statusCode === 429) {
-      return "Rate limit exceeded. Please try again later."
-    } else if (aiError.responseBody) {
-      try {
-        const parsed = JSON.parse(aiError.responseBody)
-        if (parsed.error?.message) {
-          return parsed.error.message
-        }
-      } catch {
-        // Fall through to generic message
-      }
+      return detailedMessage || "Rate limit exceeded. Please try again later."
+    } else if (detailedMessage) {
+      return detailedMessage
     }
 
     return aiError.message || "Request failed"
   }
 
   return "An error occurred. Please try again."
+}
+
+/**
+ * Try to extract the AI provider name from an error for more helpful messages
+ */
+function extractProviderHint(error: unknown): string {
+  const errorStr =
+    error instanceof Error
+      ? error.message + (error.stack || "")
+      : JSON.stringify(error)
+
+  if (errorStr.includes("anthropic") || errorStr.includes("x-api-key")) {
+    return " for Anthropic"
+  }
+  if (errorStr.includes("openai.com") || errorStr.includes("Incorrect API key provided")) {
+    return " for OpenAI"
+  }
+  if (errorStr.includes("generativelanguage.googleapis") || errorStr.includes("google")) {
+    return " for Google"
+  }
+  if (errorStr.includes("mistral")) {
+    return " for Mistral"
+  }
+  if (errorStr.includes("perplexity")) {
+    return " for Perplexity"
+  }
+  if (errorStr.includes("x.ai") || errorStr.includes("xai")) {
+    return " for xAI"
+  }
+  return ""
+}
+
+/**
+ * Try to extract an error message from an AI SDK response body
+ */
+function extractResponseBodyMessage(responseBody?: string): string | null {
+  if (!responseBody) return null
+  try {
+    const parsed = JSON.parse(responseBody)
+    return parsed.error?.message || null
+  } catch {
+    return null
+  }
 }
 
 /**

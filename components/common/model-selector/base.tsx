@@ -311,7 +311,7 @@ export function ModelSelector({
                         "flex w-full items-center justify-between px-3 py-2",
                         selectedModelId === model.id && "bg-accent"
                       )}
-                      onSelect={() => {
+                      onClick={() => {
                         if (isLocked) {
                           setSelectedProModel(model.id)
                           setIsProDialogOpen(true)
