@@ -161,7 +161,6 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
         <DropdownMenuContent
           className="w-56"
           align="end"
-          forceMount
         >
           {menuContent}
         </DropdownMenuContent>

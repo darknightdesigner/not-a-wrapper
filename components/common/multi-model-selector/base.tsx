@@ -423,7 +423,6 @@ export function MultiModelSelector({
             className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
-            forceMount
             side="top"
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
