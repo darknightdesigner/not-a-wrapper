@@ -62,7 +62,6 @@ export function SidebarItemMenu({
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {
-              e.preventDefault()
               e.stopPropagation()
               togglePinned(chat.id, !chat.pinned)
             }}
@@ -77,7 +76,6 @@ export function SidebarItemMenu({
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {
-              e.preventDefault()
               e.stopPropagation()
               onStartEditing()
             }}
@@ -89,7 +87,6 @@ export function SidebarItemMenu({
             className="text-destructive"
             variant="destructive"
             onClick={(e) => {
-              e.preventDefault()
               e.stopPropagation()
               setIsDeleteDialogOpen(true)
             }}

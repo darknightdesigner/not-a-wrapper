@@ -55,7 +55,6 @@ export function SidebarProjectMenu({
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {
-              e.preventDefault()
               e.stopPropagation()
               onStartEditing()
             }}
@@ -67,7 +66,6 @@ export function SidebarProjectMenu({
             className="text-destructive"
             variant="destructive"
             onClick={(e) => {
-              e.preventDefault()
               e.stopPropagation()
               setIsDeleteDialogOpen(true)
             }}
