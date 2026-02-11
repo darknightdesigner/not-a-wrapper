@@ -163,20 +163,6 @@ No changes needed for Grok.
 
 All Claude models correctly have `reasoningText: true`. No changes needed.
 
-#### `lib/models/data/ollama.ts`
-
-The `checkReasoningCapability()` function (line 227) returns `true` for Llama, Qwen, DeepSeek, Mistral, Phi families. This is too broad — most Ollama models don't expose reasoning tokens.
-
-**Change needed**: Update `checkReasoningCapability()` to only return `true` for model families that actually produce reasoning (primarily DeepSeek when running R1 variants):
-
-```typescript
-function checkReasoningCapability(family: string): boolean {
-  return ["DeepSeek"].includes(family)
-}
-```
-
-Also set `reasoningText: false` for both static fallback models (`llama3.2:latest` and `qwen2.5-coder:latest`).
-
 ### Task 5: Run verification
 
 After all changes, run:
@@ -199,7 +185,6 @@ Fix any errors before considering the task complete.
 | `lib/models/data/perplexity.ts` | Set `reasoningText: false` for all 5 models |
 | `lib/models/data/deepseek.ts` | Set `reasoningText: false` for deepseek-v3 |
 | `lib/models/data/llama.ts` | Set `reasoningText: false` for 4 models |
-| `lib/models/data/ollama.ts` | Tighten `checkReasoningCapability()`, fix 2 static models |
 
 ## Important Constraints
 

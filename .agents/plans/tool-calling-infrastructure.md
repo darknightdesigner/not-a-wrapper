@@ -50,7 +50,7 @@ Phases must be executed in order (1 → 2 → 3 → ...), except where noted as 
 **Implementing a 3-layer hybrid tool architecture with centralized coordination:**
 
 1. **Layer 1 — Built-in Provider Tools** (zero-config, zero new deps): Provider-specific search via `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google` — packages already installed. Uses the resolved BYOK API key (same key as the model).
-2. **Layer 2 — Third-Party Tools** (one new dep): Universal search fallback via `@tavily/ai-sdk` for providers without native search (xAI, Mistral, OpenRouter, Ollama). API key model: **Option C (Hybrid)** — platform key as default, user BYOK key takes priority.
+2. **Layer 2 — Third-Party Tools** (one new dep): Universal search fallback via `@tavily/ai-sdk` for providers without native search (xAI, Mistral, OpenRouter). API key model: **Option C (Hybrid)** — platform key as default, user BYOK key takes priority.
 3. **Layer 3 — MCP Tools** (existing, unchanged): The existing `loadUserMcpTools()` pipeline continues as-is.
 
 **Coordination model**: Route.ts is the single coordinator. It loads Layer 1, checks whether search is already provided, then loads Layer 2 with `skipSearch` if Layer 1 already has it. Layer 2 does NOT know about Layer 1's provider list — the coupling is broken.
@@ -644,7 +644,7 @@ After Phase 3, update `.env.example` to include:
 # Third-Party Tool API Keys (optional)
 # These enable additional tool capabilities for models without native tools.
 # Users can also provide their own keys via Settings → Tool Keys (overrides these).
-# TAVILY_API_KEY=tvly-...    # Web search for xAI/Mistral/OpenRouter/Ollama models
+# TAVILY_API_KEY=tvly-...    # Web search for xAI/Mistral/OpenRouter models
 # EXA_API_KEY=...            # Alternative search (future)
 # FIRECRAWL_API_KEY=...      # Web scraping/extraction (future)
 ```

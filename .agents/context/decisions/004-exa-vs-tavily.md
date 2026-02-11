@@ -119,7 +119,7 @@ import { searchTool, scrapeTool, mapTool, crawlTool } from "firecrawl-aisdk";
 **Strengths**:
 - **Most comprehensive tool suite** — 9 tools covering scrape, search, crawl, map, extract, and batch operations
 - **Best scraping/extraction** — JS-rendered pages via headless browser, structured JSON extraction with schema support, screenshot capability
-- **Self-hostable** — open-source core (AGPL-3.0) means self-hosters can run their own Firecrawl instance with zero API cost
+- **Self-hostable** — open-source core (AGPL-3.0) allows running your own Firecrawl instance with zero API cost
 - **Massive community** — 81.6K GitHub stars on the main repo; strong ecosystem
 - **SOC 2 Type II certified** — enterprise-grade security compliance
 - Rich `searchTool` input schema with `sources` (web, news, images) and `categories` (pdf, github, research) filtering
@@ -279,7 +279,7 @@ const allTools = { ...builtInTools, ...byokTools, ...mcpTools } as ToolSet
 ### Negative
 
 - **Higher cost per search** — ~$0.01-0.015/search (with tuned config) vs Tavily's $0.008. At 10K searches/month, this is ~$100-150 vs $80. Manageable but real.
-- **Limited free tier** — $10 one-time credit (~670-1000 searches depending on config) vs Tavily's 1,000/month recurring. Self-hosters who exhaust the free credit must pay or use MCP-based search instead.
+- **Limited free tier** — $10 one-time credit (~670-1000 searches depending on config) vs Tavily's 1,000/month recurring. Users who exhaust the free credit must pay or use MCP-based search instead.
 - **Search-only package** — URL extraction (Priority 3) must be solved separately. Options: lightweight custom `fetch()` + HTML-to-markdown tool, or add Tavily extract as a secondary optional tool.
 - **No model runtime control** — LLM can only control the query string; search depth and result count are fixed at configuration time. Less adaptive than Tavily's model-controllable `searchDepth`/`timeRange`.
 

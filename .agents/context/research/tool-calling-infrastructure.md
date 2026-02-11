@@ -741,7 +741,7 @@ Implementation:
 
 **Why this is the highest-priority item**: These tools are available in packages we already ship. Zero infrastructure cost, zero new API keys, zero cold start latency. The provider handles search server-side. This gives ~18 direct-provider models (plus ~14 OpenRouter equivalents) instant web search capability.
 
-**Limitation**: Only works for OpenAI, Anthropic, and Google models. xAI/Grok, Mistral, DeepSeek, OpenRouter (non-proxied), and Ollama models would not get provider search. A fallback strategy is needed (see Priority 2).
+**Limitation**: Only works for OpenAI, Anthropic, and Google models. xAI/Grok, Mistral, DeepSeek, and OpenRouter (non-proxied) models would not get provider search. A fallback strategy is needed (see Priority 2).
 
 **Priority 2: Third-Party Search Tool for Universal Coverage (High)**
 
@@ -750,7 +750,7 @@ For models without provider-specific search, add a third-party search tool:
 - **Alternative**: `@tavily/ai-sdk` → `tavilySearch()` — broader capability set (search + extract + crawl + map), credit-based pricing, reads `TAVILY_API_KEY` from environment
 
 This tool would serve as:
-1. A fallback when provider-specific search isn't available (xAI, Mistral, OpenRouter, Ollama)
+1. A fallback when provider-specific search isn't available (xAI, Mistral, OpenRouter)
 2. A BYOK option for users who provide their own Exa/Tavily API key
 3. The default search for non-provider models (requires a platform-level API key — `EXA_API_KEY` or `TAVILY_API_KEY` in server environment variables)
 
@@ -872,7 +872,7 @@ Files to modify:
 
 **Phase B: Universal Search Fallback (2-3 days)**
 
-Scope: Add search for providers without native search tools (xAI, Mistral, OpenRouter, Ollama — ~25 models).
+Scope: Add search for providers without native search tools (xAI, Mistral, OpenRouter — ~25 models).
 
 New dependencies: `@exalabs/ai-sdk` or `@tavily/ai-sdk` (one new package)
 

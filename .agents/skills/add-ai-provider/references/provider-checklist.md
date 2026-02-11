@@ -41,14 +41,8 @@ export type Provider =
   | "google"
   | "anthropic"
   | "xai"
-  | "ollama"
   | "openrouter"
   | "[new-provider]"  // ← Add
-```
-
-If provider should support BYOK, also add to:
-```typescript
-export type ProviderWithoutOllama = Exclude<Provider, "ollama">
 ```
 
 ### 3. Factory (`lib/openproviders/index.ts`)

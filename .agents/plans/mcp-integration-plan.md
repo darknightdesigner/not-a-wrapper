@@ -486,7 +486,6 @@ Then manual test:
 ### Context to Load
 
 - `app/components/layout/settings/connections/connections-placeholder.tsx` — being replaced
-- `app/components/layout/settings/connections/ollama-section.tsx` — pattern reference
 - `app/components/layout/settings/connections/developer-tools.tsx` — pattern reference
 - `app/components/layout/settings/settings-content.tsx` — **critical**: has BOTH mobile and desktop layouts, both must be updated. Currently gates connections on `!isDev`.
 
@@ -524,7 +523,7 @@ Create `app/components/layout/settings/connections/mcp-tool-approvals.tsx`:
 2. Replace `ConnectionsPlaceholder` with the new MCP server management component
 3. **Visibility rules**:
    - MCP UI: visible to ALL users (not gated on `isDev`), but only when MCP is enabled
-   - `OllamaSection` and `DeveloperTools`: remain dev-only, alongside the MCP section
+   - `DeveloperTools`: remain dev-only, alongside the MCP section
 4. **Feature flag gating**: Check `ENABLE_MCP` status via API response (recommended approach: add `mcpEnabled: boolean` to an existing settings/status endpoint). When MCP is disabled, show a message: "MCP integration is currently disabled."
 
 ### Verify

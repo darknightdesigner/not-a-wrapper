@@ -207,7 +207,7 @@ Currently the app only has a global `FeedbackWidget` (floating button in `app/co
 - **Potential uses**:
   - Rate limit warnings inline in chat
   - Model fallback notifications ("Switched to gpt-4o due to rate limit")
-  - System status messages ("Connected to local Ollama")
+  - System status messages ("Connected to MCP server")
   - Error recovery prompts with CTA ("Retry" button)
 - **Recommendation**: **Adopt soon**. This fills a real UX gap. Currently errors are only shown as toasts, which disappear. Inline system messages would persist in the conversation context.
 
