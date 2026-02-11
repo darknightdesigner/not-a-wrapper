@@ -171,7 +171,7 @@ export function MultiChatInput({
             className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
           />
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
-            <div className="flex gap-2">
+            <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               {renderFileUpload()}
               <MultiModelSelector
                 selectedModelIds={selectedModelIds}
