@@ -93,7 +93,7 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             onEdit={(id, newText) => group.onEdit(response.model, id, newText)}
             onReload={() => group.onReload(response.model)}
             status={response.isLoading ? "streaming" : "ready"}
-            isLast={false}
+            isLast={response.isLoading === true}
             hasScrollAnchor={false}
             className="bg-transparent p-0 px-0"
           >

@@ -26,11 +26,16 @@ function Tooltip({
   /** Per-tooltip delay override (wraps in its own TooltipProvider). */
   delay?: number
 }) {
-  return (
-    <TooltipProvider {...(delay !== undefined ? { delay } : {})}>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
-  )
+  const root = <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+
+  // Only wrap in a per-instance TooltipProvider when an explicit delay override
+  // is needed. Otherwise inherit the app-level provider (layout.tsx) to avoid
+  // redundant context providers and preserve the global delay setting.
+  if (delay !== undefined) {
+    return <TooltipProvider delay={delay}>{root}</TooltipProvider>
+  }
+
+  return root
 }
 
 function TooltipTrigger({
@@ -52,11 +57,11 @@ function TooltipTrigger({
 
 function TooltipContent({
   className,
-  sideOffset = 0,
+  sideOffset = 8,
   side = "top",
   align = "center",
   children,
-  hideArrow = false,
+  hideArrow = true,
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<
@@ -76,14 +81,18 @@ function TooltipContent({
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            "bg-foreground text-background z-50 w-fit origin-(--transform-origin) rounded-md px-3 py-1.5 text-xs text-balance",
+            "bg-foreground text-background z-50 w-fit rounded-md px-3 py-1.5 text-xs text-balance",
             className
           )}
           {...props}
         >
           {children}
           {!hideArrow && (
-            <TooltipPrimitive.Arrow className="bg-foreground fill-foreground z-50 size-2.5 translate-y-[calc(-50%_-_2px)] rotate-45 rounded-[2px]" />
+            <TooltipPrimitive.Arrow className="z-50 [&>svg]:fill-foreground">
+              <svg width="12" height="6" viewBox="0 0 12 6">
+                <path d="M0 6L6 0L12 6H0Z" />
+              </svg>
+            </TooltipPrimitive.Arrow>
           )}
         </TooltipPrimitive.Popup>
       </TooltipPrimitive.Positioner>

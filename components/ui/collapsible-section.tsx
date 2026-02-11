@@ -86,7 +86,7 @@ export function CollapsibleSection({
           "data-[closed]:animate-collapsible-up"
         )}
       >
-        <div className="space-y-0.5 pt-1">{children}</div>
+        <div className="pt-1">{children}</div>
       </Collapsible.Panel>
     </Collapsible.Root>
   )

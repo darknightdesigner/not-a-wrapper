@@ -272,7 +272,6 @@ export function ModelSelector({
             className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
-            forceMount
             side="top"
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
@@ -311,7 +310,7 @@ export function ModelSelector({
                         "flex w-full items-center justify-between px-3 py-2",
                         selectedModelId === model.id && "bg-accent"
                       )}
-                      onSelect={() => {
+                      onClick={() => {
                         if (isLocked) {
                           setSelectedProModel(model.id)
                           setIsProDialogOpen(true)
