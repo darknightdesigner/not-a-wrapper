@@ -140,7 +140,7 @@ import { searchTool, scrapeTool, mapTool, crawlTool } from "firecrawl-aisdk";
 Using multiple packages (e.g., Exa for search, Tavily for extraction, or Firecrawl for scraping) was considered but rejected:
 
 - **Two or three new dependencies** instead of one
-- **Multiple API keys to manage** — more friction for self-hosters and BYOK users
+- **Multiple API keys to manage** — more friction for BYOK users
 - **Multiple billing relationships** for the platform operator
 - **Marginal quality gain** — Tavily's search quality is adequate for a general chat app; the delta doesn't justify the complexity
 - Violates the project's bias toward simplicity
@@ -200,7 +200,7 @@ Tavily has a more generous free tier (1,000 credits/month recurring vs Exa's $10
 - **Search quality gap is meaningful.** Independent benchmarks show a 15-20+ percentage point accuracy gap on SimpleQA. For a product competing with ChatGPT and Claude, "good enough" search quality is not good enough.
 - **Cost is manageable.** Exa's effective cost of ~$0.01-0.015/search is still inexpensive in absolute terms. At 1K searches/month, that's $10-15 — less than a typical API bill for the LLM calls themselves. The cost delta is small relative to the quality gain.
 - **URL extraction can be solved separately.** Priority 3 (URL content extraction) doesn't need to come from the same package as search. A lightweight custom tool using `fetch()` + HTML-to-markdown, or adding Tavily's extract as a separate optional tool for users who want it, keeps the primary search dependency focused on quality.
-- **Self-hosters who want free search can use MCP.** Not A Wrapper already has a production MCP system. Self-hosters who can't afford an Exa key can configure a free search MCP server (Exa, Tavily, and others all offer MCP servers). The built-in Tier 2 tool is for the hosted platform and BYOK users who want the best quality.
+- **Users who want free search can use MCP.** Not A Wrapper already has a production MCP system. Users who can't afford an Exa key can configure a free search MCP server (Exa, Tavily, and others all offer MCP servers). The built-in Tier 2 tool is for the hosted platform and BYOK users who want the best quality.
 
 ## Integration Sketch
 
@@ -288,7 +288,7 @@ const allTools = { ...builtInTools, ...byokTools, ...mcpTools } as ToolSet
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
 | Exa cost is too high for hosted platform at scale | Medium | Medium | Tune `numResults` (5 instead of 10) and `maxCharacters` (1500 instead of 3000) to reduce per-search cost to ~$0.01. Provider-specific search (Tier 1) handles the highest-traffic models for free. |
-| Self-hosters can't afford Exa after free credits | Medium | Low | Self-hosters can configure a free search MCP server as fallback. Document this in README. BYOK is the primary model. |
+| Users can't afford Exa after free credits | Medium | Low | Users can configure a free search MCP server as fallback. Document this in README. BYOK is the primary model. |
 | Exa pricing increases or free tier removed | Low | Medium | Provider-agnostic tool names allow swap to Tavily with one file change |
 | Exa API outage or quality degradation | Low | Medium | Tier 1 provider-specific search is unaffected. MCP servers provide an alternative search path. |
 | No URL extraction tool from same package | Medium | Low | Implement a lightweight custom extract tool using `fetch()` + a markdown conversion library, or add `@tavily/ai-sdk` extract as a secondary optional dependency |
@@ -315,7 +315,7 @@ const allTools = { ...builtInTools, ...byokTools, ...mcpTools } as ToolSet
 **Notes**:
 - Exa's tuned config (`numResults: 5`, `maxCharacters: 1500`) reduces per-search cost from $0.015 to **$0.01** — a 33% reduction that closes the gap with Tavily
 - At 10K searches/month, the cost delta between Exa (tuned) and Tavily (PAYG) is $20/month — a modest premium for meaningfully better search quality
-- Self-hosters get $10 in free Exa credits (~1,000 searches with tuned config) to evaluate. After that, MCP-based search servers remain a free alternative
+- New users get $10 in free Exa credits (~1,000 searches with tuned config) to evaluate. After that, MCP-based search servers remain a free alternative
 - Exa offers custom enterprise pricing with volume discounts for higher usage tiers
 - Tavily remains cheaper at all tiers, but the absolute costs for Exa are moderate relative to LLM API costs (which dominate the overall bill)
 - Firecrawl's subscription model makes it cheapest at very high volume but punitive for light usage
