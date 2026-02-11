@@ -233,10 +233,16 @@ export function extractErrorMessage(error: unknown): string {
  * Try to extract the AI provider name from an error for more helpful messages
  */
 function extractProviderHint(error: unknown): string {
-  const errorStr =
-    error instanceof Error
-      ? error.message + (error.stack || "")
-      : JSON.stringify(error)
+  let errorStr: string
+  if (error instanceof Error) {
+    errorStr = error.message + (error.stack || "")
+  } else {
+    try {
+      errorStr = JSON.stringify(error)
+    } catch {
+      errorStr = String(error)
+    }
+  }
 
   if (errorStr.includes("anthropic") || errorStr.includes("x-api-key")) {
     return " for Anthropic"

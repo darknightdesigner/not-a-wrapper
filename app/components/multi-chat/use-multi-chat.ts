@@ -34,7 +34,7 @@ const AUTH_ERROR_PATTERNS = [
   "api key",
   "authentication",
   "unauthorized",
-  "MISSING_API_KEY",
+  "missing_api_key",
 ] as const
 
 function isAuthError(message: string): boolean {
@@ -119,7 +119,7 @@ export function useMultiChat(
 
     return instances
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [models, ...chatHooks.flatMap((chat) => [chat.messages, chat.status])])
+  }, [models, ...chatHooks.flatMap((chat) => [chat.messages, chat.status, chat.error])])
 
   return activeChatInstances
 }

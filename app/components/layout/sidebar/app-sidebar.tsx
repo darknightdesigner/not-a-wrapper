@@ -77,8 +77,11 @@ export function AppSidebar() {
         className={cn(
           "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          // Fixed easing: snap visible at END of collapse, snap invisible at START of expand (ChatGPT pattern)
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-[steps(1,end)]",
+          // Stepped easing: appear instantly at START of collapse animation (same time expanded content hides)
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,start)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-auto opacity-100" 
@@ -143,8 +146,11 @@ export function AppSidebar() {
           // by 1px and painting over the container's border-r. ChatGPT uses overflow-hidden
           // on their outer container to achieve the same result with an explicit width.
           "w-full overflow-x-clip text-clip whitespace-nowrap",
-          // Smooth linear fade — crossfades during width animation (ChatGPT pattern)
-          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
+          // Stepped easing: disappear instantly at START of collapse animation
+          "motion-safe:transition-opacity motion-safe:duration-150",
+          isCollapsed 
+            ? "motion-safe:ease-[steps(1,start)]" 
+            : "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-none opacity-0" 
