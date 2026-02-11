@@ -6,7 +6,7 @@ Not A Wrapper — Open-source multi-AI chat application with unified model inter
 
 ## Product Vision
 
-Provide a powerful, self-hostable AI chat interface that lets users interact with any AI model through a unified experience, with support for multi-model comparison, BYOK, and local models.
+Provide a powerful AI chat interface that lets users interact with any AI model through a unified experience, with support for multi-model comparison and BYOK.
 
 ---
 
@@ -22,8 +22,6 @@ Provide a powerful, self-hostable AI chat interface that lets users interact wit
 - [x] Convex database integration
 - [x] Multi-model comparison (side-by-side)
 - [x] BYOK (Bring Your Own Key) support
-- [x] Ollama local model integration
-
 #### Phase 2: Enhanced Features
 - [ ] Model performance analytics
 - [ ] Response quality comparison tools

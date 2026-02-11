@@ -122,7 +122,6 @@ Boolean flag on `ModelConfig` indicating if the current user can use this model.
 
 Determined by:
 - Model is in `FREE_MODELS_IDS` list
-- Model is an Ollama model (always accessible)
 - User has appropriate subscription tier
 
 ### BYOK (Bring Your Own Key)

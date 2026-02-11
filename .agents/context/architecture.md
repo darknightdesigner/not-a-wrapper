@@ -5,7 +5,7 @@
 
 ## Overview
 
-Not A Wrapper is an open-source multi-AI chat application that provides a unified interface for multiple models. It supports BYOK, multi-model comparison, and local models via Ollama.
+Not A Wrapper is an open-source multi-AI chat application that provides a unified interface for multiple models. It supports BYOK and multi-model comparison.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -36,10 +36,10 @@ Not A Wrapper is an open-source multi-AI chat application that provides a unifie
 │  │  │ + AI/RAG │  │              │  │                  │ │  │
 │  │  └──────────┘  └──────────────┘  └──────────────────┘ │  │
 │  │                                                        │  │
-│  │  ┌──────────┐  ┌──────────────┐  ┌──────────────────┐ │  │
-│  │  │ Vercel   │  │   Ollama     │  │   AI Providers   │ │  │
-│  │  │   AI SDK │  │   (Local)    │  │ Claude/OpenAI/.. │ │  │
-│  │  └──────────┘  └──────────────┘  └──────────────────┘ │  │
+│  │  ┌──────────┐  ┌──────────────────┐                    │  │
+│  │  │ Vercel   │  │   AI Providers   │                    │  │
+│  │  │   AI SDK │  │ Claude/OpenAI/.. │                    │  │
+│  │  └──────────┘  └──────────────────┘                    │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘

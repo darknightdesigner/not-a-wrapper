@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(APP_DOMAIN),
   title: "Not A Wrapper",
   description:
-    "Not A Wrapper is an open-source, Next.js-based AI chat application that provides a unified interface for multiple models, including OpenAI, Mistral, Claude, and Gemini. BYOK-ready and self-hostable.",
+    "Not A Wrapper is an open-source, Next.js-based AI chat application that provides a unified interface for multiple models, including OpenAI, Mistral, Claude, and Gemini. BYOK-ready.",
 }
 
 export default async function RootLayout({

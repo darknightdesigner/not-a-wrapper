@@ -11,15 +11,11 @@ Forked from [Zola](https://github.com/ibelick/zola) and updated with state-of-th
 - 🔑 **Bring your own API key (BYOK)** - Use your own keys via OpenRouter or direct provider APIs
 - 📎 **File uploads** - Share documents, images, and code for AI analysis
 - 🎨 **Clean, responsive UI** - Light/dark themes with modern design
-- 🏠 **Self-hostable** - Full control over your data
 - ⚙️ **Customizable** - User system prompts, multiple layout options
-- 🖥️ **Local AI with Ollama** - Run models locally with automatic detection
 - 💳 **Usage-based billing ready** - Flowglad integration for AI usage metering
 - 🔌 **MCP support** (work in progress)
 
 ## Quick Start
-
-### Option 1: With OpenAI (Cloud)
 
 ```bash
 git clone https://github.com/your-username/not-a-wrapper.git
@@ -29,41 +25,7 @@ echo "OPENAI_API_KEY=your-key" > .env.local
 bun dev
 ```
 
-### Option 2: With Ollama (Local)
-
-```bash
-# Install and start Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-ollama pull llama3.2  # or any model you prefer
-
-# Clone and run
-git clone https://github.com/your-username/not-a-wrapper.git
-cd not-a-wrapper
-bun install
-bun dev
-```
-
-Not A Wrapper will automatically detect your local Ollama models!
-
-### Setup AI Tool Skills (Optional)
-
-If you're developing with AI coding tools (Cursor, Claude Code, Codex), run the skill sync script:
-
-```bash
-./.agents/skills/sync-agent-skills/scripts/sync-skills.sh
-```
-
-This creates symlinks so all AI tools can access the shared skills in `.agents/skills/`.
-
-### Option 3: Docker with Ollama
-
-```bash
-git clone https://github.com/your-username/not-a-wrapper.git
-cd not-a-wrapper
-docker-compose -f docker-compose.ollama.yml up
-```
-
-To unlock features like auth, file uploads, see [INSTALL.md](./INSTALL.md).
+For full setup (auth, file uploads, BYOK), see [INSTALL.md](./INSTALL.md).
 
 ## Supported AI Providers
 
@@ -75,7 +37,6 @@ To unlock features like auth, file uploads, see [INSTALL.md](./INSTALL.md).
 | **Mistral** | Mistral Large, Pixtral, Mixtral | Vision |
 | **xAI** | Grok-3, Grok-2 Vision | Vision |
 | **Perplexity** | Sonar Pro, Deep Research | Web search |
-| **Ollama** | Any local model | Local, Private |
 | **OpenRouter** | 100+ models | Aggregator |
 
 ## Built With

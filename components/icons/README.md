@@ -120,7 +120,6 @@ See `.agents/archive/icon-mapping-phosphor-hugeicons.md` for the complete Phosph
 - `GrokIcon`
 - `MetaIcon`
 - `MistralIcon`
-- `OllamaIcon`
 - `OpenAIIcon`
 - `OpenRouterIcon`
 - `PerplexityIcon`

@@ -7,7 +7,7 @@ export function AppInfoContent() {
         <br />
         Access 100+ models from OpenAI, Claude, Gemini, Mistral, and more.
         <br />
-        Multi-model comparison, BYOK-ready, and fully self-hostable.
+        Multi-model comparison and BYOK-ready.
         <br />
       </p>
       <p className="text-foreground leading-relaxed">

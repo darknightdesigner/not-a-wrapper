@@ -11,7 +11,7 @@ Not A Wrapper's tool calling research identified a **two-tier search strategy** 
 
 - **Tier 1 (confirmed)**: Provider-specific search tools — `openai.tools.webSearch()`, `anthropic.tools.webSearch_20250305()`, `google.tools.googleSearch()` — for ~18 models with native provider search. These require zero new dependencies (packages already installed).
 
-- **Tier 2 (this decision)**: A third-party search package for models **without** native provider search — xAI/Grok, Mistral, DeepSeek, OpenRouter, and Ollama (~25 models). This is the **one new dependency** we need to add.
+- **Tier 2 (this decision)**: A third-party search package for models **without** native provider search — xAI/Grok, Mistral, DeepSeek, and OpenRouter (~25 models). This is the **one new dependency** we need to add.
 
 Three candidates exist on npm with Vercel AI SDK tool exports: `@exalabs/ai-sdk` (Exa), `@tavily/ai-sdk` (Tavily), and `firecrawl-aisdk` (Firecrawl). This decision selects one.
 
@@ -19,7 +19,7 @@ Three candidates exist on npm with Vercel AI SDK tool exports: `@exalabs/ai-sdk`
 
 1. **Integration quality** — Drop-in compatibility with `streamText({ tools: { ... } })`, per-request API key support (BYOK), environment variable default
 2. **Search quality** — Accuracy and relevance for general-purpose AI chat queries (current events, technical topics, obscure facts)
-3. **Cost** — Effective cost per search query, free tier generosity for self-hosters, cost at platform scale
+3. **Cost** — Effective cost per search query, free tier generosity, cost at platform scale
 4. **Response format** — LLM-optimized output that fits within context windows efficiently
 5. **Reliability & latency** — Response time impact on the agentic loop, rate limits, error handling
 6. **Extra capabilities** — Value of additional tools beyond search (URL extraction, crawling)
@@ -55,7 +55,7 @@ const { apiKey = process.env.EXA_API_KEY, ...searchOptions } = config;
 **Weaknesses**:
 - **Only provides search** — no URL extraction, crawling, or mapping tools
 - **Expensive with default settings** — search ($5/1K) + text content ($1/1K pages) + per-result page charges mean effective cost is $0.015/search at default 10 results (see Cost Analysis below)
-- **One-time $10 free credit** — not recurring, exhausted after ~667 default searches
+- **One-time $10 free credit** — not recurring, exhausted after ~667 default searches (Tavily's 1,000/month recurring free tier is more generous)
 - **Model has no runtime control** — search depth, time range, and result count are fixed at tool creation; the LLM can only control the query string
 - Returns raw API JSON that may include unnecessary metadata (request IDs, cost breakdowns, filter echoes) consuming context window tokens
 
@@ -82,7 +82,7 @@ const client = tavily({ ...options, clientSource: "ai-sdk" } as TavilyClientOpti
 **Strengths**:
 - **Four tools from one dependency** — search + extract + crawl + map. `tavilyExtract()` directly addresses Priority 3 from the research (URL content extraction)
 - **Cheaper per search** — $0.008/search (basic, PAYG) with content included in the response; no separate content extraction charges
-- **Recurring free tier** — 1,000 credits/month (renewable), no credit card required; critical for self-hosters
+- **Recurring free tier** — 1,000 credits/month (renewable), no credit card required
 - **Model has runtime agency** — search depth and time range are in the input schema, letting the LLM choose "advanced" for complex queries and "basic" for simple lookups
 - **Content included in search results** — no hidden charges for text extraction from search results
 - `includeAnswer: true` option generates an AI-synthesized answer alongside results
