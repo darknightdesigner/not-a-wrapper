@@ -198,7 +198,7 @@ export function MultiChatInput({
                 {status === "streaming" || anyLoading ? (
                   <HugeiconsIcon icon={StopCircleIcon} size={16} />
                 ) : (
-                  <HugeiconsIcon icon={ArrowUp02Icon} size={16} />
+                  <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2.5} className="size-5" />
                 )}
               </Button>
             </PromptInputAction>
