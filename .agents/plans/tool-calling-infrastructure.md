@@ -35,19 +35,7 @@ Phases must be executed in order (1 → 2 → 3 → ...), except where noted as 
 2. **Layer 2 — Third-Party Tools** (one new dep): Universal search fallback via `exa-js` (Exa core SDK) with custom `tool()` wrapper for providers without native search (Mistral, OpenRouter, Perplexity). API key model: **Option C (Hybrid)** — platform key as default, user BYOK key takes priority. Uses `exa-js` instead of `@exalabs/ai-sdk` because the latter does not support explicit `apiKey` passthrough needed for BYOK.
 3. **Layer 3 — MCP Tools** (existing, unchanged): The existing `loadUserMcpTools()` pipeline continues as-is.
 
-**Coordination model**: Route.ts is the single coordinator. The `enableSearch` flag from the client is the **master switch** — when true, route.ts injects search tools (Layer 1 native or Layer 2 Exa fallback). This replaces the previous dual mechanism where `enableSearch` was passed to `modelConfig.apiSdk()` as an opaque provider-level flag. All search is now visible, auditable tool calls.
-
-When `enableSearch` is true:
-- If the provider has native search tools → use Layer 1 (best quality, zero extra cost for BYOK)
-- If not → use Layer 2 Exa fallback (universal coverage)
-
-When `enableSearch` is false:
-- No search tools are injected (Layer 1 and Layer 2 skipped)
-- MCP tools (Layer 3) are still loaded independently — they are not search-specific
-
-All three layers merge into a single `ToolSet` before passing to `streamText()`. The Vercel AI SDK v6 `ToolSet` type natively supports this composition — all tool types are `Record<string, ToolDefinition>` under the hood.
-
-**Architecture diagram:**
+**Coordination**: Route.ts is the single coordinator. `enableSearch` (from client) is the **master switch** — when true, injects Layer 1 or Layer 2 search tools. When false, no search tools. MCP (Layer 3) is always independent. All layers merge into one `ToolSet` for `streamText()`.
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
@@ -88,18 +76,30 @@ All three layers merge into a single `ToolSet` before passing to `streamText()`.
 > **Dependencies**: None — run before any code changes
 > **Output**: Verified API identifiers used by all subsequent phases
 
-Before writing any code, the implementing agent MUST verify these unconfirmed API identifiers. Phase 0 is a dedicated pre-implementation phase — all four tasks must complete before Phase 1 begins.
+Before writing any code, the implementing agent MUST verify the remaining unconfirmed API identifier below. Tasks V1 (Anthropic), V2 (gateway), and V3 (Firecrawl) are resolved or moved to Phase 7. **Task V4 is now verified — Phase 0 is complete.**
 
-### Task V4: Verify `exa-js` Package and API Shape
+### Task V4: Verify `exa-js` Package and API Shape ✅ VERIFIED
 
 Since Phase 3 uses `exa-js` (Exa core SDK) with a custom `tool()` wrapper, verify the package works and returns the expected response shape.
 
 **Steps:**
 
-1. Run `npm info exa-js` to confirm the package exists and check its latest version.
-2. Run: `npx tsx -e "import Exa from 'exa-js'; console.log(typeof Exa)"` — should output `function`.
-3. Verify the `searchAndContents` method exists: `npx tsx -e "import Exa from 'exa-js'; const e = new Exa('test-key'); console.log(typeof e.searchAndContents)"` — should output `function`.
-4. After Phase 3 installation with a real key, verify the response shape includes `results` array with `title`, `url`, `text`, and `publishedDate` fields.
+1. ✅ Run `npm info exa-js` to confirm the package exists and check its latest version.
+2. ✅ Run: `npx tsx -e "import Exa from 'exa-js'; console.log(typeof Exa)"` — should output `function`.
+3. ✅ Verify the `searchAndContents` method exists: `npx tsx -e "import Exa from 'exa-js'; const e = new Exa('test-key'); console.log(typeof e.searchAndContents)"` — should output `function`.
+4. ⏳ After Phase 3 installation with a real key, verify the response shape includes `results` array with `title`, `url`, `text`, and `publishedDate` fields.
+
+**Verification Results (February 11, 2026):**
+
+| Check | Result |
+|-------|--------|
+| npm registry | `exa-js@2.3.0` (latest), MIT license, 90 versions published |
+| Project dependency | `^1.6.13` in package.json → resolves to `1.10.2` installed |
+| `typeof Exa` (default export) | `function` ✅ — constructor works as expected |
+| `typeof e.searchAndContents` | `function` ✅ — method exists on instance |
+| Full API surface | `search`, `searchAndContents`, `findSimilar`, `findSimilarAndContents`, `getContents`, `answer`, `streamAnswer`, `extractContentsOptions`, `request`, `rawRequest`, `processChunk`, `parseSSEStream` |
+
+**Version note:** The project pins `^1.6.13` (installed `1.10.2`), while the latest is `2.3.0`. Phase 3 Step 3.1 (`bun add exa-js`) will update to the latest. The `searchAndContents` method exists in both versions, so no API shape risk. The v2.x release added `answer`/`streamAnswer` methods and depends on `openai@^5.0.1` and `zod@^3.22.0` (both compatible with the project's existing deps).
 
 **Fallback**: If `exa-js` has issues, use `@exalabs/ai-sdk` for platform-key-only search (reads `EXA_API_KEY` from env). BYOK support would require a custom wrapper around `@exalabs/ai-sdk` that temporarily sets the env var — less clean but functional.
 
@@ -157,24 +157,8 @@ export interface ToolMetadata {
   estimatedCostPer1k?: number
 }
 
-/**
- * Granular tool capability flags for model configuration.
- * Backward-compatible: `tools?: boolean | ToolCapabilities` where:
- *   - `undefined` / `true`  → all tools enabled (default)
- *   - `false`               → no tools at all (e.g., Perplexity models)
- *   - `ToolCapabilities`    → granular control per capability
- *
- * Phases 1-5 use the boolean check (`tools !== false`).
- * Granular checks are deferred to Phase 7 when code execution is added.
- */
-export interface ToolCapabilities {
-  /** Web search (Layer 1 built-in + Layer 2 third-party). Default: true */
-  search?: boolean
-  /** Code execution (provider sandboxes). Default: true */
-  code?: boolean
-  /** MCP server tools (Layer 3). Default: true */
-  mcp?: boolean
-}
+// NOTE: ToolCapabilities interface (granular per-capability control) is deferred
+// to Phase 7 when code execution is added. Phases 1-5 use `tools !== false`.
 ```
 
 ### Step 1.2: Create `lib/tools/provider.ts`
@@ -495,14 +479,16 @@ Also remove references to `ENABLE_MCP` from:
 
 ### Decision Gate
 
+> **Note for implementing agent**: The unchecked items below are **runtime verification tasks**, not blocking planning questions. They should be answered during the Phase 1 smoke test (Verify steps 3–12). Proceed with implementation — check these off as you verify each one during testing.
+
 - [x] ~~Did Task V1 reveal the correct Anthropic web search export?~~ **RESOLVED**: Export is `webSearch_20250305`. Anthropic case is uncommented.
 - [x] ~~Does xAI have native search tools?~~ **RESOLVED**: Yes, `xai.tools.webSearch({})`. xAI added to Layer 1.
-- [ ] Does `createOpenAI({ apiKey }).tools.webSearch({})` work correctly with a BYOK key?
-- [ ] Does `createGoogleGenerativeAI({ apiKey }).tools.googleSearch({})` work correctly?
-- [ ] Does `createXai({ apiKey }).tools.webSearch({})` work correctly?
-- [ ] Does `createAnthropic({ apiKey }).tools.webSearch_20250305()` work correctly?
-- [ ] Is `ENABLE_MCP` fully removed? Search codebase for any remaining references.
-- [ ] Does removing `enableSearch` from `apiSdk()` break any existing behavior? Verify OpenRouter models still work.
+- [ ] Does `createOpenAI({ apiKey }).tools.webSearch({})` work correctly with a BYOK key? *(Verify: smoke test #8)*
+- [ ] Does `createGoogleGenerativeAI({ apiKey }).tools.googleSearch({})` work correctly? *(Verify: smoke test #4)*
+- [ ] Does `createXai({ apiKey }).tools.webSearch({})` work correctly? *(Verify: smoke test #4)*
+- [ ] Does `createAnthropic({ apiKey }).tools.webSearch_20250305()` work correctly? *(Verify: smoke test #4)*
+- [ ] Is `ENABLE_MCP` fully removed? Search codebase for any remaining references. *(Verify: smoke test #11)*
+- [ ] Does removing `enableSearch` from `apiSdk()` break any existing behavior? Verify OpenRouter models still work. *(Verify: smoke test #3–6)*
 
 ---
 
@@ -539,13 +525,27 @@ const BUILTIN_TOOL_DISPLAY: Record<string, { name: string; icon: "search" | "cod
 
 ### Step 2.2: Use Display Names in Tool Card Header
 
-In the tool card rendering, check if the tool name exists in `BUILTIN_TOOL_DISPLAY` before falling back to the raw name. Use the `Search01Icon` for search tools instead of the generic `Wrench01Icon`.
+In the tool card rendering, check if the tool name exists in `BUILTIN_TOOL_DISPLAY` before falling back to the raw name. Use `Search01Icon` for search tools instead of the generic `Wrench01Icon`.
+
+> **Import note**: `tool-invocation.tsx` does NOT currently import `Search01Icon`. Add it to the existing Hugeicons import block:
+> ```typescript
+> import {
+>   ArrowDown01Icon,
+>   CheckmarkCircle01Icon,
+>   SourceCodeIcon,
+>   Link01Icon,
+>   NutIcon,
+>   Loading01Icon,
+>   Search01Icon,  // ← ADD
+>   Wrench01Icon,
+> } from "@hugeicons-pro/core-stroke-rounded"
+> ```
 
 The exact implementation depends on the current rendering structure. The agent should:
 1. Read the full `tool-invocation.tsx` file
-2. Locate where tool names are displayed (look for `getStaticToolName` or raw `toolName` usage)
+2. Locate where tool names are displayed (look for `getStaticToolName` or raw `toolName` usage — line 219)
 3. Add a helper: `const displayInfo = BUILTIN_TOOL_DISPLAY[toolName] ?? null`
-4. If `displayInfo` exists, use `displayInfo.name` as the display name and swap the icon
+4. If `displayInfo` exists, use `displayInfo.name` as the display name and swap `Wrench01Icon` for `Search01Icon` (line 395)
 
 ### Step 2.3: Handle Provider Source Attribution
 
@@ -682,7 +682,7 @@ export async function getThirdPartyTools(options: ThirdPartyToolOptions): Promis
         description:
           "Search the web for current information using AI-native semantic search. " +
           "Returns relevant web pages with titles, URLs, content snippets, and publication dates.",
-        inputSchema: z.object({
+        parameters: z.object({
           query: z
             .string()
             .min(1)
@@ -1332,6 +1332,12 @@ Update the Phase 3 key resolution in `route.ts` to check for user BYOK tool keys
 
 ---
 
+> **Phase 6 note**: There is no Phase 6. The original Phase 6 was split and promoted into earlier phases:
+> - `ENABLE_MCP` feature gate removal → merged into **Phase 1, Step 1.4f**
+> - BYOK tool key settings → promoted to **Phase 5**
+>
+> The numbering gap is intentional to preserve stable phase IDs referenced elsewhere.
+
 ---
 
 ## Phase 7: Future Tool Integrations (Roadmap)
@@ -1340,6 +1346,21 @@ Update the Phase 3 key resolution in `route.ts` to check for user BYOK tool keys
 > **Dependencies**: Phases 1-3 complete
 
 This phase is not a single implementation step — it's a guide for adding future tools. Each subsection can be prioritized independently.
+
+### 7.0: `ToolCapabilities` Type (Granular Control)
+
+When code execution tools are added, extend `ModelConfig.tools` from `boolean` to `boolean | ToolCapabilities`:
+
+```typescript
+// lib/tools/types.ts — add when Phase 7 begins
+export interface ToolCapabilities {
+  search?: boolean  // Web search (Layer 1 + Layer 2). Default: true
+  code?: boolean    // Code execution (provider sandboxes). Default: true
+  mcp?: boolean     // MCP server tools (Layer 3). Default: true
+}
+```
+
+Phases 1-5 use the boolean check (`tools !== false`). Granular checks use `typeof tools === 'object' ? tools.search !== false : tools !== false`.
 
 ### 7.1: ToolProvider Interface (Extensibility Pattern)
 

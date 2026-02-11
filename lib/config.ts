@@ -199,6 +199,32 @@ export const MCP_MAX_STEP_COUNT = 20
 export const MCP_MAX_TOOLS_PER_REQUEST = 50
 
 // ============================================================================
+// Tool Infrastructure
+// ============================================================================
+
+/** Max steps when no tools are available (currently hardcoded as 10 in route.ts:213) */
+export const DEFAULT_MAX_STEP_COUNT = 10
+
+/**
+ * Max steps for anonymous (unauthenticated) users with tools.
+ * Capped lower than authenticated users (MCP_MAX_STEP_COUNT = 20) to limit
+ * tool call cost exposure. With 5 daily messages × 5 steps, worst case is
+ * 25 tool calls/day/user — manageable at $0.005/Exa search.
+ */
+export const ANONYMOUS_MAX_STEP_COUNT = 5
+
+/**
+ * Timeout for individual third-party tool executions (in milliseconds).
+ * Provider tools (Layer 1) are server-side and have their own timeouts.
+ * Third-party tools (Layer 2) make outbound HTTP requests that could hang.
+ * This timeout is enforced via AbortSignal in custom tool() wrappers.
+ *
+ * Not yet enforced — reserved for Phase 7 when custom tool() wrappers
+ * with AbortSignal support are added for third-party tools.
+ */
+export const TOOL_EXECUTION_TIMEOUT_MS = 15_000
+
+// ============================================================================
 // Sub-Agent Model Configuration
 // ============================================================================
 

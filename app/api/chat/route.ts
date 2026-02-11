@@ -4,6 +4,8 @@ import {
   SYSTEM_PROMPT_DEFAULT,
   MCP_CONNECTION_TIMEOUT_MS,
   MCP_MAX_STEP_COUNT,
+  DEFAULT_MAX_STEP_COUNT,
+  ANONYMOUS_MAX_STEP_COUNT,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -164,19 +166,48 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create base model from config
-    const aiModel = modelConfig.apiSdk(apiKey, { enableSearch })
+    // enableSearch is no longer passed to the model — it controls tool injection below.
+    // All search is now provided via visible, auditable tool calls (Layer 1 or Layer 2).
+    const aiModel = modelConfig.apiSdk(apiKey)
+
+    // -----------------------------------------------------------------------
+    // Search Tool Loading (Layer 1 — Built-in Provider Tools)
+    //
+    // The `enableSearch` flag from the client is the MASTER SWITCH for search
+    // tool injection. When true, route.ts injects search tools:
+    //   - If the provider has native search tools → use them (Layer 1)
+    //   - If not → use Exa fallback (Layer 2, added in Phase 3)
+    //
+    // This replaces the previous dual mechanism where `enableSearch` was
+    // passed to `modelConfig.apiSdk()` as an opaque provider-level flag.
+    // All search is now visible, auditable tool calls.
+    //
+    // NOT gated on isAuthenticated. Anonymous users (5 daily messages)
+    // get search tools when the platform has provider API keys configured.
+    // When apiKey is undefined (anonymous), the provider factory falls back
+    // to the env var — same behavior as model creation above.
+    // -----------------------------------------------------------------------
+    let builtInTools: ToolSet = {} as ToolSet
+    let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    const shouldInjectSearch = enableSearch && modelConfig.tools !== false
+
+    if (shouldInjectSearch) {
+      const { getProviderTools } = await import("@/lib/tools/provider")
+      const providerResult = await getProviderTools(provider, apiKey)
+      builtInTools = providerResult.tools
+      builtInToolMetadata = providerResult.metadata
+    }
 
     // -----------------------------------------------------------------------
     // MCP Tool Loading
-    // Gate on: auth + Convex token + feature flag + model capability
+    // Gate on: auth + Convex token + model capability
     // -----------------------------------------------------------------------
     let mcpTools: ToolSet = {} as ToolSet
 
     if (
       isAuthenticated &&
       convexToken &&
-      process.env.ENABLE_MCP === "true" &&
       modelConfig.tools !== false
     ) {
       const mcpLoadStart = Date.now()
@@ -210,8 +241,31 @@ export async function POST(req: Request) {
       })
     }
 
-    const hasMcpTools = Object.keys(mcpTools).length > 0
-    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : 10
+    // Merge all tool layers: search (Layer 1) + MCP (Layer 3)
+    // Layer 2 (third-party) will be added in Phase 3.
+    // Spread order: search first, MCP second. MCP tools are namespaced
+    // (e.g., "serverslug_toolname") so key collisions are extremely unlikely.
+    // If a collision occurs, MCP wins (intentional — user config overrides defaults).
+    const allTools = { ...builtInTools, ...mcpTools } as ToolSet
+
+    // Dev-mode collision detection: warn when duplicate keys are found
+    if (process.env.NODE_ENV !== "production") {
+      const builtInKeys = new Set(Object.keys(builtInTools))
+      const mcpKeys = Object.keys(mcpTools)
+      for (const key of mcpKeys) {
+        if (builtInKeys.has(key)) {
+          console.warn(`[tools] Key collision: "${key}" exists in both built-in and MCP tools. MCP wins.`)
+        }
+      }
+    }
+
+    const hasAnyTools = Object.keys(allTools).length > 0
+
+    // Anonymous users get a lower step count to limit tool call cost exposure.
+    // Authenticated users get the full MCP_MAX_STEP_COUNT (20).
+    const maxSteps = hasAnyTools
+      ? (isAuthenticated ? MCP_MAX_STEP_COUNT : ANONYMOUS_MAX_STEP_COUNT)
+      : DEFAULT_MAX_STEP_COUNT
 
     // Check if PostHog is configured for LLM analytics
     const phClient = getPostHogClient()
@@ -290,7 +344,7 @@ export async function POST(req: Request) {
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
-      tools: mcpTools,
+      tools: allTools,
       stopWhen: stepCountIs(maxSteps),
       ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
 
