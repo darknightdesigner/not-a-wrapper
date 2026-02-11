@@ -1,3 +1,4 @@
+import { Loader } from "@/components/ui/loader"
 import {
   Message,
   MessageAction,
@@ -78,6 +79,23 @@ export function MessageAssistant({
         return output?.content?.[0]?.results ?? []
       }) ?? []
 
+  // Show a loading indicator when streaming has started but no visible content
+  // exists yet. This covers the gap between the SDK transitioning to "streaming"
+  // (which hides the conversation-level loader) and the first text token arriving.
+  const hasVisibleReasoning = Boolean(reasoningParts && reasoningParts.text)
+  const hasVisibleTools = Boolean(
+    toolInvocationParts &&
+      toolInvocationParts.length > 0 &&
+      preferences.showToolInvocations
+  )
+  const hasVisibleImages = searchImageResults.length > 0
+  const showStreamingLoader =
+    isLastStreaming &&
+    contentNullOrEmpty &&
+    !hasVisibleReasoning &&
+    !hasVisibleTools &&
+    !hasVisibleImages
+
   const isQuoteEnabled = !preferences.multiModelEnabled
   const messageRef = useRef<HTMLDivElement>(null)
   const { selectionInfo, clearSelection } = useAssistantMessageSelection(
@@ -123,6 +141,8 @@ export function MessageAssistant({
         {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
         )}
+
+        {showStreamingLoader && <Loader variant="chat" />}
 
         {contentNullOrEmpty ? null : (
           <MessageContent

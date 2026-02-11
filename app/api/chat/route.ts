@@ -224,8 +224,36 @@ export async function POST(req: Request) {
       })
     }
 
+    // Strip reasoning parts from message history before converting — but only
+    // for non-Anthropic providers.  The OpenAI responses API rejects orphaned
+    // reasoning items ("Item 'rs_...' of type 'reasoning' was provided without
+    // its required following item").  Anthropic has the opposite requirement:
+    // messages that were originally produced with extended thinking MUST be sent
+    // back with their reasoning items ("Item 'msg_...' of type 'message' was
+    // provided without its required 'reasoning' item").
+    const shouldStripReasoning = provider !== "anthropic"
+
+    const sanitizedMessages = shouldStripReasoning
+      ? messages.map((msg) => {
+          if (msg.role !== "assistant" || !msg.parts) return msg
+          const hasReasoning = msg.parts.some(
+            (part: { type: string }) => part.type === "reasoning"
+          )
+          if (!hasReasoning) return msg
+          const filteredParts = msg.parts.filter(
+            (part: { type: string }) => part.type !== "reasoning"
+          )
+          return {
+            ...msg,
+            parts: filteredParts.length > 0
+              ? filteredParts
+              : [{ type: "text" as const, text: "" }],
+          }
+        })
+      : messages
+
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
-    const modelMessages = await convertToModelMessages(messages)
+    const modelMessages = await convertToModelMessages(sanitizedMessages)
 
     const result = streamText({
       model: aiModel,

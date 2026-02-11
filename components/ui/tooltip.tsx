@@ -26,11 +26,16 @@ function Tooltip({
   /** Per-tooltip delay override (wraps in its own TooltipProvider). */
   delay?: number
 }) {
-  return (
-    <TooltipProvider {...(delay !== undefined ? { delay } : {})}>
-      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
-    </TooltipProvider>
-  )
+  const root = <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+
+  // Only wrap in a per-instance TooltipProvider when an explicit delay override
+  // is needed. Otherwise inherit the app-level provider (layout.tsx) to avoid
+  // redundant context providers and preserve the global delay setting.
+  if (delay !== undefined) {
+    return <TooltipProvider delay={delay}>{root}</TooltipProvider>
+  }
+
+  return root
 }
 
 function TooltipTrigger({
