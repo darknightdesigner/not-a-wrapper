@@ -1,7 +1,8 @@
 import type { ChatApiParams } from "@/app/types/api.types"
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "@/lib/config"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
-import { hasUserKey, type ProviderWithoutOllama } from "@/lib/user-keys"
+import type { SupportedModel } from "@/lib/openproviders/types"
+import { hasUserKey } from "@/lib/user-keys"
 import { fetchQuery, fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
 
@@ -88,18 +89,16 @@ export async function validateAndTrackUsage({
     }
   } else {
     // For authenticated users, check API key requirements
-    const provider = getProviderForModel(model)
+    const provider = getProviderForModel(model as SupportedModel)
 
-    if (provider !== "ollama") {
-      // Check if user has their own API key for this provider
-      const hasKey = await hasUserKey(provider as ProviderWithoutOllama, token)
+    // Check if user has their own API key for this provider
+    const hasKey = await hasUserKey(provider, token)
 
-      // If no API key and model is not in free list, deny access
-      if (!hasKey && !FREE_MODELS_IDS.includes(model)) {
-        throw new Error(
-          `This model requires an API key for ${provider}. Please add your API key in settings or use a free model.`
-        )
-      }
+    // If no API key and model is not in free list, deny access
+    if (!hasKey && !FREE_MODELS_IDS.includes(model)) {
+      throw new Error(
+        `This model requires an API key for ${provider}. Please add your API key in settings or use a free model.`
+      )
     }
   }
 

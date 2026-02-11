@@ -146,12 +146,6 @@ export type OpenRouterModel =
   | "openrouter:perplexity/sonar-pro"
   | "openrouter:perplexity/sonar-deep-research"
 
-// Static Ollama models for type safety
-export type StaticOllamaModel = "llama3.2:latest" | "qwen2.5-coder:latest"
-
-// Dynamic Ollama model type - allows any string for auto-detected models
-export type OllamaModel = StaticOllamaModel | (string & {})
-
 export type Provider =
   | "openai"
   | "mistral"
@@ -159,7 +153,6 @@ export type Provider =
   | "google"
   | "anthropic"
   | "xai"
-  | "ollama"
   | "openrouter"
 
 export type SupportedModel =
@@ -169,5 +162,4 @@ export type SupportedModel =
   | PerplexityModel
   | AnthropicModel
   | XaiModel
-  | OllamaModel
   | OpenRouterModel

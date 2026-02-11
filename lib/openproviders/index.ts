@@ -10,33 +10,11 @@ import type {
   AnthropicModel,
   GeminiModel,
   MistralModel,
-  OllamaModel,
   OpenAIModel,
   PerplexityModel,
   SupportedModel,
   XaiModel,
 } from "./types"
-
-// Get Ollama base URL from environment or use default
-const getOllamaBaseURL = () => {
-  if (typeof window !== "undefined") {
-    // Client-side: use localhost
-    return "http://localhost:11434/v1"
-  }
-
-  // Server-side: check environment variables
-  const baseURL = process.env.OLLAMA_BASE_URL?.replace(/\/+$/, "")
-  return baseURL ? `${baseURL}/v1` : "http://localhost:11434/v1"
-}
-
-// Create Ollama provider instance with configurable baseURL
-const createOllamaProvider = () => {
-  return createOpenAI({
-    baseURL: getOllamaBaseURL(),
-    apiKey: "ollama", // Ollama doesn't require a real API key
-    name: "ollama",
-  })
-}
 
 /**
  * Create a language model instance for any supported provider.
@@ -102,11 +80,6 @@ export function openproviders<T extends SupportedModel>(
       return xaiProvider(modelId as XaiModel)
     }
     return xai(modelId as XaiModel)
-  }
-
-  if (provider === "ollama") {
-    const ollamaProvider = createOllamaProvider()
-    return ollamaProvider(modelId as OllamaModel)
   }
 
   throw new Error(`Unsupported model: ${modelId}`)

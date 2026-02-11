@@ -33,7 +33,7 @@ export const FREE_MODELS_IDS = [
   "gpt-5-mini",
 ]
 
-export const MODEL_DEFAULT = "gpt-5-mini"
+export const MODEL_DEFAULT = "gpt-5.2"
 
 export const APP_NAME = "Not A Wrapper"
 export const APP_DOMAIN = "https://not-a-wrapper.com"

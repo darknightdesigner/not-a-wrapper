@@ -7,13 +7,15 @@ import {
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
+import type { SupportedModel } from "@/lib/openproviders/types"
 import {
   captureGeneration,
   flushPostHog,
   getPostHogClient,
 } from "@/lib/posthog"
-import type { ProviderWithoutOllama } from "@/lib/user-keys"
+import type { Provider } from "@/lib/user-keys"
 import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
@@ -124,14 +126,14 @@ export async function POST(req: Request) {
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
-    const provider = getProviderForModel(model)
+    const provider = getProviderForModel(model as SupportedModel)
 
     let apiKey: string | undefined
     if (isAuthenticated && convexToken) {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
       apiKey =
         (await getEffectiveApiKey(
-          provider as ProviderWithoutOllama,
+          provider as Provider,
           convexToken
         )) || undefined
     }
@@ -139,7 +141,7 @@ export async function POST(req: Request) {
     // Pre-flight check: verify an API key is available before calling the provider.
     // When apiKey is undefined, the AI SDK falls back to environment variables.
     // If neither source has a valid key, the provider will reject with a 401.
-    if (!apiKey && provider !== "ollama") {
+    if (!apiKey) {
       const { env: providerEnv } = await import("@/lib/openproviders/env")
       const envKeyMap: Record<string, string | undefined> = {
         openai: providerEnv.OPENAI_API_KEY,
@@ -255,12 +257,42 @@ export async function POST(req: Request) {
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
     const modelMessages = await convertToModelMessages(sanitizedMessages)
 
+    // Build provider-specific options to enable reasoning/thinking when
+    // the selected model advertises support (reasoningText: true).
+    const providerOptions: ProviderOptions = {}
+
+    if (modelConfig.reasoningText) {
+      if (provider === "anthropic") {
+        let budgetTokens = 10000 // default
+        if (model.includes("opus")) budgetTokens = 16000
+        else if (model.includes("haiku")) budgetTokens = 5000
+        else if (model.includes("sonnet")) budgetTokens = 12000
+
+        providerOptions.anthropic = {
+          thinking: { type: "enabled", budgetTokens },
+        }
+      } else if (provider === "google") {
+        providerOptions.google = {
+          thinkingConfig: { includeThoughts: true },
+        }
+      } else if (provider === "openai") {
+        providerOptions.openai = {
+          reasoningEffort: "medium",
+        }
+      } else if (provider === "xai") {
+        providerOptions.xai = {
+          reasoningEffort: "medium",
+        }
+      }
+    }
+
     const result = streamText({
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
       tools: mcpTools,
       stopWhen: stepCountIs(maxSteps),
+      ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)

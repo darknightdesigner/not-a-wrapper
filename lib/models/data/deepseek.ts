@@ -49,7 +49,7 @@ const deepseekModels: ModelConfig[] = [
     vision: false,
     tools: true,
     audio: false,
-    reasoningText: true,
+    reasoningText: false,
     openSource: true,
     speed: "Fast",
     intelligence: "Medium",

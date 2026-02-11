@@ -5,14 +5,13 @@ import { env } from "./openproviders/env"
 import { Provider } from "./openproviders/types"
 
 export type { Provider } from "./openproviders/types"
-export type ProviderWithoutOllama = Exclude<Provider, "ollama">
 
 /**
  * Check if user has an API key for a provider via Convex
  * Returns true if a key exists, false otherwise
  */
 export async function hasUserKey(
-  provider: ProviderWithoutOllama,
+  provider: Provider,
   token?: string
 ): Promise<boolean> {
   if (!token) return false
@@ -35,7 +34,7 @@ export async function hasUserKey(
  * Returns the decrypted key if found, null otherwise
  */
 export async function getUserKeyFromConvex(
-  provider: ProviderWithoutOllama,
+  provider: Provider,
   token?: string
 ): Promise<string | null> {
   if (!token) return null
@@ -66,7 +65,7 @@ export async function getUserKeyFromConvex(
  * @param token - Optional Convex auth token for fetching user keys
  */
 export async function getEffectiveApiKey(
-  provider: ProviderWithoutOllama,
+  provider: Provider,
   token?: string
 ): Promise<string | null> {
   // Try user key first if token is provided
@@ -78,7 +77,7 @@ export async function getEffectiveApiKey(
   }
 
   // Fall back to environment keys
-  const envKeyMap: Record<ProviderWithoutOllama, string | undefined> = {
+  const envKeyMap: Record<Provider, string | undefined> = {
     openai: env.OPENAI_API_KEY,
     mistral: env.MISTRAL_API_KEY,
     perplexity: env.PERPLEXITY_API_KEY,
