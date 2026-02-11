@@ -56,7 +56,7 @@ function TooltipContent({
   side = "top",
   align = "center",
   children,
-  hideArrow = false,
+  hideArrow = true,
   ...props
 }: TooltipPrimitive.Popup.Props &
   Pick<
