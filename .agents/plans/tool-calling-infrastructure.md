@@ -1,30 +1,12 @@
 # Tool Calling Infrastructure — Implementation Plan
 
-> **Status**: Ready for Implementation (Reviewed)
+> **Status**: Ready for Implementation
 > **Priority**: P0 — Critical
 > **Timeline**: 3–4 weeks (7 phases)
 > **Date**: February 11, 2026
-> **Reviewed**: February 11, 2026
 > **Research**: `.agents/context/research/tool-calling-infrastructure.md`
 > **Decision**: `.agents/context/decisions/004-exa-vs-tavily.md`
-
-> ### Review Changes (February 11, 2026)
->
-> The following changes were made based on critical review. Items marked **[Blocking]** or **[Critical]** must be addressed before implementation begins.
->
-> 1. **[Blocking] API key passthrough (W1)**: `getProviderTools()` now accepts the resolved BYOK API key and creates provider instances with it, instead of using the default singleton that reads from `process.env`. Without this fix, BYOK users' tool calls would silently bill to the platform key (or fail with 401 if no env key exists).
-> 2. **[Critical] Decoupled layer resolution (W2)**: Removed `PROVIDERS_WITH_BUILTIN_SEARCH` from `third-party.ts`. Route.ts now coordinates layers by checking whether Layer 1 already provided search, eliminating fragile coupling where Layer 2 had to duplicate Layer 1's provider list.
-> 3. **[High] Phase 3 resolved as Option C (Decision Gate)**: Platform key + BYOK override from the start. Was "start with Option A, add BYOK later." The BYOK-primary product strategy makes Option C the correct default.
-> 4. **[High] Simplified maxSteps (W6)**: Removed dead `BUILTIN_TOOLS_MAX_STEP_COUNT` constant and collapsed the identical-branch triple ternary.
-> 5. **[High] Tool execution timeout (W3)**: Added `TOOL_EXECUTION_TIMEOUT_MS` constant. Plan notes AbortSignal propagation for future tool wrappers.
-> 6. **[High] Cost visibility (W5)**: Added `estimatedCostPer1k` to `ToolMetadata` for BYOK cost transparency in UI.
-> 7. **[Medium] Audit table renamed (W10)**: `mcpToolCallLog` → `toolCallLog` in Phase 4. Convex schema change is straightforward and avoids permanent naming confusion.
-> 8. **[Medium] BYOK Tool Key UI promoted (Phase 5)**: Moved from Phase 6 roadmap to Phase 5 concrete implementation. Core to the BYOK-primary product strategy.
-> 9. **[Medium] `await import()` consistency (W9)**: Replaced `require()` with `await import()` in all new code. Matches existing patterns in `route.ts:132,144`.
-> 10. **[Medium] V4 verification task added (W11)**: Tavily + AI SDK v6 compatibility check before Phase 3.
-> 11. **[Medium] ToolProvider interface (W7)**: Added to Phase 7 roadmap for extensibility beyond 3 providers.
-> 12. **[Low] Self-hoster env-var controls cancelled (W8)**: Redirected effort to user-facing toggles (BYOK-primary strategy).
-> 13. **[Info] Research patterns noted (W12)**: `prepareStep`, `needsApproval`, token-efficient tools, `MAX_TOOL_RESULT_SIZE` enforcement added to Phase 7 roadmap.
+> **AI SDK**: v6.0.78 (`ai`), v3.0.26 (`@ai-sdk/openai`), v3.0.41 (`@ai-sdk/anthropic`), v3.0.24 (`@ai-sdk/google`)
 
 ---
 
@@ -47,95 +29,79 @@ Phases must be executed in order (1 → 2 → 3 → ...), except where noted as 
 
 ## Decision Summary
 
-**Implementing a 3-layer hybrid tool architecture with centralized coordination:**
+**Implementing a 3-layer hybrid tool architecture with centralized coordination and `enableSearch` as the universal search routing control:**
 
-1. **Layer 1 — Built-in Provider Tools** (zero-config, zero new deps): Provider-specific search via `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google` — packages already installed. Uses the resolved BYOK API key (same key as the model).
-2. **Layer 2 — Third-Party Tools** (one new dep): Universal search fallback via `@tavily/ai-sdk` for providers without native search (xAI, Mistral, OpenRouter). API key model: **Option C (Hybrid)** — platform key as default, user BYOK key takes priority.
+1. **Layer 1 — Built-in Provider Tools** (zero-config, zero new deps): Provider-specific search via `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `@ai-sdk/xai` — packages already installed. Uses the resolved BYOK API key (same key as the model). **Verified exports**: `openai.tools.webSearch()`, `anthropic.tools.webSearch_20250305()`, `google.tools.googleSearch()`, `xai.tools.webSearch()`.
+2. **Layer 2 — Third-Party Tools** (one new dep): Universal search fallback via `exa-js` (Exa core SDK) with custom `tool()` wrapper for providers without native search (Mistral, OpenRouter, Perplexity). API key model: **Option C (Hybrid)** — platform key as default, user BYOK key takes priority. Uses `exa-js` instead of `@exalabs/ai-sdk` because the latter does not support explicit `apiKey` passthrough needed for BYOK.
 3. **Layer 3 — MCP Tools** (existing, unchanged): The existing `loadUserMcpTools()` pipeline continues as-is.
 
-**Coordination model**: Route.ts is the single coordinator. It loads Layer 1, checks whether search is already provided, then loads Layer 2 with `skipSearch` if Layer 1 already has it. Layer 2 does NOT know about Layer 1's provider list — the coupling is broken.
+**Coordination model**: Route.ts is the single coordinator. The `enableSearch` flag from the client is the **master switch** — when true, route.ts injects search tools (Layer 1 native or Layer 2 Exa fallback). This replaces the previous dual mechanism where `enableSearch` was passed to `modelConfig.apiSdk()` as an opaque provider-level flag. All search is now visible, auditable tool calls.
+
+When `enableSearch` is true:
+- If the provider has native search tools → use Layer 1 (best quality, zero extra cost for BYOK)
+- If not → use Layer 2 Exa fallback (universal coverage)
+
+When `enableSearch` is false:
+- No search tools are injected (Layer 1 and Layer 2 skipped)
+- MCP tools (Layer 3) are still loaded independently — they are not search-specific
 
 All three layers merge into a single `ToolSet` before passing to `streamText()`. The Vercel AI SDK v6 `ToolSet` type natively supports this composition — all tool types are `Record<string, ToolDefinition>` under the hood.
 
 **Architecture diagram:**
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                   app/api/chat/route.ts                           │
-│                   streamText({ tools: allTools })                 │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │ COORDINATOR: route.ts merges all layers                    │  │
-│  │                                                            │  │
-│  │  ┌──────────────┐                                          │  │
-│  │  │  Layer 1:     │──→ has search? ──→ skipSearch flag       │  │
-│  │  │  Built-in     │                         │                │  │
-│  │  │  Provider     │                         ▼                │  │
-│  │  │  Tools        │    ┌──────────────┐  ┌──────────────┐   │  │
-│  │  │               │    │  Layer 2:     │  │  Layer 3:    │   │  │
-│  │  │ lib/tools/    │    │  Third-party  │  │  MCP Tools   │   │  │
-│  │  │ provider.ts   │    │  Tools        │  │  (existing)  │   │  │
-│  │  │               │    │              │  │              │   │  │
-│  │  │ apiKey ──────►│    │ lib/tools/   │  │ lib/mcp/     │   │  │
-│  │  │ (BYOK)        │    │ third-       │  │ load-tools   │   │  │
-│  │  │               │    │ party.ts     │  │ .ts          │   │  │
-│  │  └──────────────┘    └──────────────┘  └──────────────┘   │  │
-│  └────────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                   app/api/chat/route.ts                            │
+│                   streamText({ tools: allTools })                  │
+│                                                                    │
+│  enableSearch (from client) ─────────────────────────┐             │
+│                                                      ▼             │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │ COORDINATOR: route.ts merges all layers                     │   │
+│  │                                                             │   │
+│  │  if (enableSearch && tools !== false):                       │   │
+│  │  ┌──────────────────────┐                                   │   │
+│  │  │ Provider has native  │── YES ──→ Layer 1: Provider Tool  │   │
+│  │  │ search tools?        │           (OpenAI / Anthropic /   │   │
+│  │  │                      │            Google / xAI)          │   │
+│  │  │                      │                                   │   │
+│  │  │                      │── NO ───→ Layer 2: Exa Fallback   │   │
+│  │  │                      │           (Mistral / OpenRouter / │   │
+│  │  │                      │            Perplexity / etc.)     │   │
+│  │  └──────────────────────┘                                   │   │
+│  │                                                             │   │
+│  │  always (if auth + tools !== false):                         │   │
+│  │  ┌──────────────────────┐                                   │   │
+│  │  │ Layer 3: MCP Tools   │  (existing, independent)          │   │
+│  │  └──────────────────────┘                                   │   │
+│  │                                                             │   │
+│  │  Merge: { ...searchTools, ...mcpTools }                     │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Pre-Implementation: Verification Tasks
+## Phase 0: Verification Tasks
 
-Before writing any code, the implementing agent MUST verify these unconfirmed API identifiers.
+> **Effort**: XS (< half day)
+> **Dependencies**: None — run before any code changes
+> **Output**: Verified API identifiers used by all subsequent phases
 
-### Task V1: Verify Anthropic Web Search Export
+Before writing any code, the implementing agent MUST verify these unconfirmed API identifiers. Phase 0 is a dedicated pre-implementation phase — all four tasks must complete before Phase 1 begins.
 
-The research document uses `anthropic.tools.webSearch_20250305()` but this identifier is **UNVERIFIED**. The date suffix `_20250305` predates Anthropic's web search announcement (May 7, 2025).
+### Task V4: Verify `exa-js` Package and API Shape
 
-**Steps:**
-
-1. Run `npx tsx -e "import { anthropic } from '@ai-sdk/anthropic'; console.log(Object.keys(anthropic.tools))"` to list available tool exports.
-2. If that fails, check the package source: `ls node_modules/@ai-sdk/anthropic/dist/` and grep for `webSearch` or `web_search`.
-3. Alternatively, search `npm info @ai-sdk/anthropic` or check https://ai-sdk.dev/providers/ai-sdk-providers/anthropic.
-4. Record the exact export name. Update this plan's Phase 1 code accordingly.
-
-**Fallback**: If `@ai-sdk/anthropic` does not export a web search tool at all, skip Anthropic in Phase 1 Layer 1 and rely on Layer 2 (Tavily) for Anthropic models.
-
-### Task V2: Verify `gateway` Import Path
-
-The research found two import paths: `import { gateway } from "ai"` and `import { gateway } from "@ai-sdk/gateway"`.
+Since Phase 3 uses `exa-js` (Exa core SDK) with a custom `tool()` wrapper, verify the package works and returns the expected response shape.
 
 **Steps:**
 
-1. Run `npx tsx -e "import { gateway } from 'ai'; console.log(typeof gateway, Object.keys(gateway.tools || {}))"`.
-2. If that fails, try `import { gateway } from "@ai-sdk/gateway"`.
-3. Record which import works. Update Phase 7 roadmap accordingly if gateway is used.
+1. Run `npm info exa-js` to confirm the package exists and check its latest version.
+2. Run: `npx tsx -e "import Exa from 'exa-js'; console.log(typeof Exa)"` — should output `function`.
+3. Verify the `searchAndContents` method exists: `npx tsx -e "import Exa from 'exa-js'; const e = new Exa('test-key'); console.log(typeof e.searchAndContents)"` — should output `function`.
+4. After Phase 3 installation with a real key, verify the response shape includes `results` array with `title`, `url`, `text`, and `publishedDate` fields.
 
-**Note**: The `gateway` import is used for optional fallback search (`gateway.tools.perplexitySearch()`). If neither import works, skip the gateway fallback — Layer 2 (Tavily) serves the same purpose.
-
-### Task V3: Verify Firecrawl AI SDK Package Name (Optional — Phase 7+)
-
-The research uses `firecrawl-aisdk` but this could not be verified on npm. The actual package may be under `@mendable/firecrawl-js`.
-
-**Steps:**
-
-1. Run `npm info firecrawl-aisdk` to check if it exists.
-2. If not found, check `npm info @mendable/firecrawl-js` and look for AI SDK tool exports in the docs.
-3. Record the correct package name for future Phase 7+ integration.
-
-### Task V4: Verify Tavily + AI SDK v6 Compatibility
-
-The research notes `@tavily/ai-sdk` is "documented as compatible with AI SDK v5 (works with v6 as well)" but this is **UNVERIFIED**. Since Tavily is Phase 3's sole new dependency, verify before committing to it.
-
-**Steps:**
-
-1. Run `npm info @tavily/ai-sdk` to confirm the package exists and check its latest version.
-2. After Phase 3 installation, run: `npx tsx -e "import { tavilySearch } from '@tavily/ai-sdk'; console.log(typeof tavilySearch)"` — should output `function`.
-3. Verify the returned tool object has the expected shape for AI SDK v6 `ToolSet` compatibility.
-
-**Fallback**: If `@tavily/ai-sdk` is incompatible with AI SDK v6, use `@tavily/core` with a custom `tool()` wrapper (the research document Section 7.1 shows this pattern with Exa).
+**Fallback**: If `exa-js` has issues, use `@exalabs/ai-sdk` for platform-key-only search (reads `EXA_API_KEY` from env). BYOK support would require a custom wrapper around `@exalabs/ai-sdk` that temporarily sets the env var — less clean but functional.
 
 ---
 
@@ -166,7 +132,7 @@ Create the shared types for the tool system.
 /**
  * Source identifier for tool audit logging and UI display.
  * - "builtin": Provider-specific tools (OpenAI web search, Google grounding, etc.)
- * - "third-party": Third-party tools via API keys (Exa, Tavily, Firecrawl, etc.)
+ * - "third-party": Third-party tools via API keys (Exa, Firecrawl, etc.)
  * - "mcp": User-configured MCP server tools (existing system)
  */
 export type ToolSource = "builtin" | "third-party" | "mcp"
@@ -175,20 +141,39 @@ export type ToolSource = "builtin" | "third-party" | "mcp"
  * Metadata for a tool, used for UI display, audit logging, and cost tracking.
  */
 export interface ToolMetadata {
-  /** Human-readable display name (e.g., "Web Search", "Tavily Search") */
+  /** Human-readable display name (e.g., "Web Search", "Exa Search") */
   displayName: string
   /** Tool source layer */
   source: ToolSource
-  /** Provider or service name (e.g., "OpenAI", "Tavily", "my-mcp-server") */
+  /** Provider or service name (e.g., "OpenAI", "Exa", "my-mcp-server") */
   serviceName: string
   /** Optional icon identifier for the UI */
   icon?: "search" | "code" | "image" | "extract" | "wrench"
   /**
    * Estimated cost per 1,000 invocations in USD.
-   * Used for BYOK cost transparency in the UI.
+   * Used for BYOK cost transparency in the UI — shown in tool invocation cards.
    * Omit if the tool has no marginal cost or cost is unknown.
    */
   estimatedCostPer1k?: number
+}
+
+/**
+ * Granular tool capability flags for model configuration.
+ * Backward-compatible: `tools?: boolean | ToolCapabilities` where:
+ *   - `undefined` / `true`  → all tools enabled (default)
+ *   - `false`               → no tools at all (e.g., Perplexity models)
+ *   - `ToolCapabilities`    → granular control per capability
+ *
+ * Phases 1-5 use the boolean check (`tools !== false`).
+ * Granular checks are deferred to Phase 7 when code execution is added.
+ */
+export interface ToolCapabilities {
+  /** Web search (Layer 1 built-in + Layer 2 third-party). Default: true */
+  search?: boolean
+  /** Code execution (provider sandboxes). Default: true */
+  code?: boolean
+  /** MCP server tools (Layer 3). Default: true */
+  mcp?: boolean
 }
 ```
 
@@ -196,7 +181,7 @@ export interface ToolMetadata {
 
 Create the provider-specific tool resolver. This module returns zero-config tools that use the resolved BYOK API key — the same key used for the model itself.
 
-**IMPORTANT**: Before writing this file, complete verification Task V1 (Anthropic export name). Use the verified export name in the `anthropic` case.
+> **Task V1 RESOLVED**: Anthropic export is `webSearch_20250305`. xAI export is `webSearch`. Both verified via live package inspection on February 11, 2026.
 
 ```typescript
 // lib/tools/provider.ts
@@ -207,8 +192,14 @@ import type { ToolMetadata } from "./types"
 /**
  * Provider IDs that have native built-in search tools.
  * These tools use the same API key as the model itself — zero additional config.
+ *
+ * Verified exports (AI SDK v6.0.78, February 2026):
+ *   - openai:    openai.tools.webSearch({})
+ *   - anthropic: anthropic.tools.webSearch_20250305({})
+ *   - google:    google.tools.googleSearch({})
+ *   - xai:       xai.tools.webSearch({})
  */
-const PROVIDERS_WITH_SEARCH = ["openai", "anthropic", "google"] as const
+const PROVIDERS_WITH_SEARCH = ["openai", "anthropic", "google", "xai"] as const
 type SearchProvider = (typeof PROVIDERS_WITH_SEARCH)[number]
 
 /**
@@ -221,6 +212,11 @@ type SearchProvider = (typeof PROVIDERS_WITH_SEARCH)[number]
  * When `apiKey` is undefined, the provider factory falls back to the
  * corresponding environment variable (e.g., `OPENAI_API_KEY`). This is
  * the same behavior as `modelConfig.apiSdk(apiKey, ...)` in route.ts.
+ *
+ * Provider instances (createOpenAI, createAnthropic, createGoogleGenerativeAI,
+ * createXai) are stateless HTTP client factories — they do not hold connections
+ * or resources. No after() cleanup is needed; instances are GC'd when the
+ * request completes.
  *
  * @param providerId - The provider string from getProviderForModel()
  * @param apiKey - The resolved API key (BYOK or undefined for env fallback)
@@ -255,20 +251,17 @@ export async function getProviderTools(
       break
     }
     case "anthropic": {
-      // NOTE: The exact export name must be verified in Task V1.
-      // The research document uses webSearch_20250305() but this is unverified.
-      // Replace the identifier below with the verified export name.
+      // Verified: webSearch_20250305 is the correct export (Task V1, Feb 2026)
       const { createAnthropic } = await import("@ai-sdk/anthropic")
       const anthropicProvider = createAnthropic(apiKey ? { apiKey } : {})
-      // TODO: Replace with verified identifier from Task V1
-      // tools.web_search = anthropicProvider.tools.webSearch_VERIFIED_DATE()
-      // metadata.set("web_search", {
-      //   displayName: "Web Search",
-      //   source: "builtin",
-      //   serviceName: "Anthropic",
-      //   icon: "search",
-      //   estimatedCostPer1k: 10, // Usage-based, varies
-      // })
+      tools.web_search = anthropicProvider.tools.webSearch_20250305()
+      metadata.set("web_search", {
+        displayName: "Web Search",
+        source: "builtin",
+        serviceName: "Anthropic",
+        icon: "search",
+        estimatedCostPer1k: 10, // Usage-based, varies
+      })
       break
     }
     case "google": {
@@ -281,6 +274,20 @@ export async function getProviderTools(
         serviceName: "Google",
         icon: "search",
         estimatedCostPer1k: 35, // Grounding billing started Jan 5, 2026
+      })
+      break
+    }
+    case "xai": {
+      // Verified: xAI exports webSearch tool (discovered Feb 2026)
+      const { createXai } = await import("@ai-sdk/xai")
+      const xaiProvider = createXai(apiKey ? { apiKey } : {})
+      tools.web_search = xaiProvider.tools.webSearch({})
+      metadata.set("web_search", {
+        displayName: "Web Search",
+        source: "builtin",
+        serviceName: "xAI",
+        icon: "search",
+        estimatedCostPer1k: 0, // Included in Grok API pricing
       })
       break
     }
@@ -309,6 +316,14 @@ Add tool-related constants to the existing config file.
 export const DEFAULT_MAX_STEP_COUNT = 10
 
 /**
+ * Max steps for anonymous (unauthenticated) users with tools.
+ * Capped lower than authenticated users (MCP_MAX_STEP_COUNT = 20) to limit
+ * tool call cost exposure. With 5 daily messages × 5 steps, worst case is
+ * 25 tool calls/day/user — manageable at $0.005/Exa search.
+ */
+export const ANONYMOUS_MAX_STEP_COUNT = 5
+
+/**
  * Timeout for individual third-party tool executions (in milliseconds).
  * Provider tools (Layer 1) are server-side and have their own timeouts.
  * Third-party tools (Layer 2) make outbound HTTP requests that could hang.
@@ -332,22 +347,54 @@ import {
   MCP_CONNECTION_TIMEOUT_MS,
   MCP_MAX_STEP_COUNT,
   DEFAULT_MAX_STEP_COUNT,
+  ANONYMOUS_MAX_STEP_COUNT,
 } from "@/lib/config"
 ```
 
-**1.4b — Add built-in tool loading block** (insert AFTER line 167 `const aiModel = ...`, BEFORE line 169 MCP block):
+**1.4b — Stop passing `enableSearch` to `apiSdk()`** (line 168):
+
+The `enableSearch` flag is no longer passed to the model factory. It is now the server-side routing control for search tool injection (see 1.4c below). All search is provided via visible, auditable tool calls — not opaque provider-level plugins.
+
+Current code:
+```typescript
+    const aiModel = modelConfig.apiSdk(apiKey, { enableSearch })
+```
+
+Replace with:
+```typescript
+    // enableSearch is no longer passed to the model — it controls tool injection below.
+    // All search is now provided via visible, auditable tool calls (Layer 1 or Layer 2).
+    const aiModel = modelConfig.apiSdk(apiKey)
+```
+
+> **Migration note**: This change removes the opaque `enableSearch` pass-through to `apiSdk()`. Any provider-specific search behavior that was triggered by this flag (e.g., OpenRouter's `enableSearch` plugin) is replaced by tool-based search. Verify that `apiSdk()` gracefully ignores the missing `opts` parameter — the `ModelConfig.apiSdk` signature is `(apiKey?: string, opts?: { enableSearch?: boolean })`, so omitting `opts` is safe.
+
+**1.4c — Add search tool loading block (Layer 1)** (insert AFTER `const aiModel = ...`, BEFORE the MCP block):
 
 ```typescript
     // -----------------------------------------------------------------------
-    // Built-in Tool Loading (Layer 1)
-    // Zero-config, provider-specific tools using the same API key as the model.
-    // The resolved apiKey (BYOK or undefined for env fallback) is passed through
-    // to ensure consistent billing — tool calls use the same key as model calls.
+    // Search Tool Loading (Layer 1 — Built-in Provider Tools)
+    //
+    // The `enableSearch` flag from the client is the MASTER SWITCH for search
+    // tool injection. When true, route.ts injects search tools:
+    //   - If the provider has native search tools → use them (Layer 1)
+    //   - If not → use Exa fallback (Layer 2, added in Phase 3)
+    //
+    // This replaces the previous dual mechanism where `enableSearch` was
+    // passed to `modelConfig.apiSdk()` as an opaque provider-level flag.
+    // All search is now visible, auditable tool calls.
+    //
+    // NOT gated on isAuthenticated. Anonymous users (5 daily messages)
+    // get search tools when the platform has provider API keys configured.
+    // When apiKey is undefined (anonymous), the provider factory falls back
+    // to the env var — same behavior as model creation above.
     // -----------------------------------------------------------------------
     let builtInTools: ToolSet = {} as ToolSet
     let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-    if (modelConfig.tools !== false) {
+    const shouldInjectSearch = enableSearch && modelConfig.tools !== false
+
+    if (shouldInjectSearch) {
       const { getProviderTools } = await import("@/lib/tools/provider")
       const providerResult = await getProviderTools(provider, apiKey)
       builtInTools = providerResult.tools
@@ -355,7 +402,7 @@ import {
     }
 ```
 
-**1.4c — Merge tools and update step count** (replace lines 212-213):
+**1.4d — Merge tools and update step count** (replace lines 212-213):
 
 Current code:
 ```typescript
@@ -365,17 +412,34 @@ Current code:
 
 Replace with:
 ```typescript
-    // Merge all tool layers: built-in (Layer 1) + MCP (Layer 3)
+    // Merge all tool layers: search (Layer 1) + MCP (Layer 3)
     // Layer 2 (third-party) will be added in Phase 3.
-    // Spread order: built-in first, MCP second. MCP tools are namespaced
+    // Spread order: search first, MCP second. MCP tools are namespaced
     // (e.g., "serverslug_toolname") so key collisions are extremely unlikely.
     // If a collision occurs, MCP wins (intentional — user config overrides defaults).
     const allTools = { ...builtInTools, ...mcpTools } as ToolSet
-    const hasMcpTools = Object.keys(mcpTools).length > 0
-    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : DEFAULT_MAX_STEP_COUNT
+
+    // Dev-mode collision detection: warn when duplicate keys are found
+    if (process.env.NODE_ENV !== "production") {
+      const builtInKeys = new Set(Object.keys(builtInTools))
+      const mcpKeys = Object.keys(mcpTools)
+      for (const key of mcpKeys) {
+        if (builtInKeys.has(key)) {
+          console.warn(`[tools] Key collision: "${key}" exists in both built-in and MCP tools. MCP wins.`)
+        }
+      }
+    }
+
+    const hasAnyTools = Object.keys(allTools).length > 0
+
+    // Anonymous users get a lower step count to limit tool call cost exposure.
+    // Authenticated users get the full MCP_MAX_STEP_COUNT (20).
+    const maxSteps = hasAnyTools
+      ? (isAuthenticated ? MCP_MAX_STEP_COUNT : ANONYMOUS_MAX_STEP_COUNT)
+      : DEFAULT_MAX_STEP_COUNT
 ```
 
-**1.4d — Update streamText call** (line 292):
+**1.4e — Update streamText call** (line 292):
 
 Current code:
 ```typescript
@@ -387,20 +451,58 @@ Replace with:
       tools: allTools,
 ```
 
+**1.4f — Remove `ENABLE_MCP` feature gate** (merged from Phase 6):
+
+This step removes the `ENABLE_MCP` env var requirement. Built-in tools are independent of MCP, and there are no existing users relying on the gate. The existing security layers (auth check for MCP, URL validation, DNS rebinding guard, circuit breaker, per-tool approval) remain in place.
+
+Current code (line 176-180):
+```typescript
+    if (
+      isAuthenticated &&
+      convexToken &&
+      process.env.ENABLE_MCP === "true" &&
+      modelConfig.tools !== false
+    ) {
+```
+
+Replace with:
+```typescript
+    if (
+      isAuthenticated &&
+      convexToken &&
+      modelConfig.tools !== false
+    ) {
+```
+
+Also remove references to `ENABLE_MCP` from:
+- `.env.example` (if present)
+- Any README or setup docs that mention the flag
+
 ### Verify Phase 1
 
 1. **Lint**: `bun run lint` — no new errors
 2. **Typecheck**: `bun run typecheck` — no new errors
-3. **Smoke test**: `bun run dev`, select an OpenAI model (e.g., gpt-5-mini), send a message asking "What happened in the news today?" — the model should invoke `web_search` and return results with citations. Select a Google model and repeat. Verify the model calls the search tool.
-4. **Non-search test**: Send a regular message ("What is 2+2?") — the model should NOT invoke search, confirming `toolChoice: "auto"` behavior.
-5. **No-tools model**: Select a Perplexity model (which has `tools: false` in ModelConfig) — verify no tools are injected.
-6. **BYOK key test**: If a user BYOK key is configured for OpenAI, verify the tool uses that key (check that the search call appears in the user's OpenAI usage dashboard, not the platform's).
+3. **Smoke test (enableSearch ON)**: `bun run dev`, select an OpenAI model (e.g., gpt-5-mini), toggle search ON, send "What happened in the news today?" — the model should invoke `web_search` and return results with citations.
+4. **Multi-provider search**: Repeat with Google, Anthropic, and xAI models with search ON. Verify each provider's native search tool fires.
+5. **Search OFF test**: With search toggle OFF, send the same query — the model should NOT invoke search, confirming `enableSearch` controls injection.
+6. **Non-search message**: With search ON, send "What is 2+2?" — the model should NOT invoke search, confirming `toolChoice: "auto"` behavior.
+7. **No-tools model**: Select a Perplexity model (which has `tools: false` in ModelConfig) — verify no tools are injected even with search ON.
+8. **BYOK key test**: If a user BYOK key is configured for OpenAI, verify the tool uses that key (check that the search call appears in the user's OpenAI usage dashboard, not the platform's).
+9. **Anonymous user test**: Log out. Select a model with search ON — verify built-in search tools work using the platform API key (env var fallback).
+10. **Anonymous step limit**: Verify anonymous users are capped at `ANONYMOUS_MAX_STEP_COUNT` (5) steps, not the full 20.
+11. **ENABLE_MCP removed**: Remove `ENABLE_MCP=true` from `.env.local` (or never set it). Verify MCP tools still load for authenticated users with configured MCP servers.
+12. **Collision warning**: In dev mode, verify `console.warn` fires if an MCP tool has the same key as a built-in tool (add a test MCP server with a `web_search` tool temporarily).
 
 ### Decision Gate
 
-- [ ] Did Task V1 reveal the correct Anthropic web search export? If yes, uncomment the `anthropic` case in `lib/tools/provider.ts`. If no export exists, leave it commented out — Anthropic models will use Layer 2 fallback in Phase 3.
+- [x] ~~Did Task V1 reveal the correct Anthropic web search export?~~ **RESOLVED**: Export is `webSearch_20250305`. Anthropic case is uncommented.
+- [x] ~~Does xAI have native search tools?~~ **RESOLVED**: Yes, `xai.tools.webSearch({})`. xAI added to Layer 1.
 - [ ] Does `createOpenAI({ apiKey }).tools.webSearch({})` work correctly with a BYOK key?
 - [ ] Does `createGoogleGenerativeAI({ apiKey }).tools.googleSearch({})` work correctly?
+- [ ] Does `createXai({ apiKey }).tools.webSearch({})` work correctly?
+- [ ] Does `createAnthropic({ apiKey }).tools.webSearch_20250305()` work correctly?
+- [ ] Is `ENABLE_MCP` fully removed? Search codebase for any remaining references.
+- [ ] Does removing `enableSearch` from `apiSdk()` break any existing behavior? Verify OpenRouter models still work.
 
 ---
 
@@ -445,20 +547,31 @@ The exact implementation depends on the current rendering structure. The agent s
 3. Add a helper: `const displayInfo = BUILTIN_TOOL_DISPLAY[toolName] ?? null`
 4. If `displayInfo` exists, use `displayInfo.name` as the display name and swap the icon
 
+### Step 2.3: Handle Provider Source Attribution
+
+AI SDK v6 normalizes provider-defined tool results into a unified `sources` array on the response. The `sendSources: true` option in `toUIMessageStreamResponse()` already sends these to the client. The agent should:
+
+1. Check if the chat message renderer already handles `source` parts in the message parts array
+2. If not, add rendering for source parts — display as clickable URL chips below the assistant message text
+3. Provider tools (OpenAI, Anthropic, Google) embed sources as inline citations in the text; Exa returns structured `toolResults` — the renderer should handle both:
+   - **Provider sources**: Rendered as citation markers in the text + a "Sources" footer with URLs
+   - **Exa tool results**: Rendered as a collapsible "Web Search" card with title/URL/snippet per result
+
 ### Verify Phase 2
 
-1. **Visual check**: In dev mode, send a search query to an OpenAI/Google model. Verify the tool invocation card shows "Web Search" with a search icon instead of a wrench icon and raw tool name.
-2. **MCP tools unchanged**: If MCP is configured, verify MCP tool cards still render with the existing wrench icon and namespaced names.
+1. **Visual check**: In dev mode, send a search query to an OpenAI/Google model with search ON. Verify the tool invocation card shows "Web Search" with a search icon instead of a wrench icon and raw tool name.
+2. **Source attribution**: Verify search results show source URLs/citations below the response.
+3. **MCP tools unchanged**: If MCP is configured, verify MCP tool cards still render with the existing wrench icon and namespaced names.
 
 ---
 
-## Phase 3: Third-Party Tool Framework (Tavily)
+## Phase 3: Third-Party Tool Framework (Exa)
 
 > **Effort**: M (2-3 days)
 > **Files created**: 1 (`lib/tools/third-party.ts`)
 > **Files modified**: 2 (`app/api/chat/route.ts`, `package.json`)
 > **Dependencies**: Phase 1 complete, one new npm package
-> **Permission required**: `bun add @tavily/ai-sdk` (new dependency — ask user first per AGENTS.md)
+> **Permission required**: `bun add exa-js` (new dependency — ask user first per AGENTS.md)
 
 ### Context to Load
 
@@ -469,34 +582,39 @@ The exact implementation depends on the current rendering structure. The agent s
 @lib/openproviders/env.ts           # Environment variable pattern
 @convex/schema.ts                   # userKeys table (lines 84-91)
 @lib/user-keys.ts                   # getEffectiveApiKey pattern
-@.agents/context/decisions/004-exa-vs-tavily.md  # Decision: Tavily chosen for Phase 3
 ```
 
 ### Decision Gate (Resolved)
 
 **API key model: Option C — Hybrid.** This is resolved based on the BYOK-primary product strategy:
 
-- **Platform key** (`TAVILY_API_KEY` env var) provides a baseline: all authenticated users get search on non-provider models. The platform controls costs via rate limits.
+- **Platform key** (`EXA_API_KEY` env var) provides a baseline: all users (including anonymous) get search on non-provider models. The platform controls costs via rate limits.
 - **User BYOK key** takes priority when provided (via Phase 5's settings UI). User bears their own cost with higher limits.
 - **Key resolution order**: User BYOK key → Platform env var → no tool (graceful skip).
 
 Phase 3 implements the infrastructure with platform key support. Phase 5 adds the user BYOK key resolution.
 
-### Step 3.1: Install Tavily AI SDK Package
+**Why `exa-js` (core SDK) over `@exalabs/ai-sdk` (convenience package)**: The `@exalabs/ai-sdk` package reads `EXA_API_KEY` exclusively from `process.env` — it does not accept an explicit `apiKey` parameter. This breaks BYOK, where per-user keys must be injected at runtime. The `exa-js` core SDK accepts keys in its constructor (`new Exa(apiKey)`), enabling clean BYOK support via a custom `tool()` wrapper. One code path serves both platform-key and BYOK users.
+
+### Step 3.1: Install Exa Core SDK
 
 ```bash
-bun add @tavily/ai-sdk
+bun add exa-js
 ```
 
-Verify installation (Task V4): `npx tsx -e "import { tavilySearch } from '@tavily/ai-sdk'; console.log(typeof tavilySearch)"` should output `function`.
+Verify installation (Task V4): `npx tsx -e "import Exa from 'exa-js'; console.log(typeof Exa)"` should output `function`.
 
 ### Step 3.2: Create `lib/tools/third-party.ts`
 
-This module provides tools for providers without native capabilities. It does NOT know which providers have built-in search — that coordination happens in `route.ts` via the `skipSearch` parameter.
+This module provides tools for providers without native capabilities. It uses the `exa-js` core SDK with a custom `tool()` wrapper that accepts an explicit API key — critical for BYOK support.
+
+The module does NOT know which providers have built-in search — that coordination happens in `route.ts` via the `skipSearch` parameter.
 
 ```typescript
 // lib/tools/third-party.ts
 
+import { tool } from "ai"
+import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
 
@@ -504,27 +622,38 @@ import type { ToolMetadata } from "./types"
  * Configuration for third-party tool loading.
  * The coordinator (route.ts) determines which capabilities to skip
  * based on what Layer 1 (built-in provider tools) already provides.
+ * Route.ts only calls getThirdPartyTools when Layer 1 didn't provide search.
  */
 export interface ThirdPartyToolOptions {
   /**
    * Skip loading search tools.
    * Set to true when Layer 1 already provides a search tool for this provider.
-   * This eliminates the coupling where Layer 2 needed to know Layer 1's provider list.
+   * In practice, route.ts only calls getThirdPartyTools when Layer 1 didn't
+   * provide search, so this will typically be false when called.
+   * Kept for future extensibility (e.g., skip search but load other tools).
    */
   skipSearch?: boolean
 
   /**
-   * Resolved Tavily API key.
+   * Resolved Exa API key.
    * Key resolution order (handled by caller in route.ts):
    *   1. User BYOK key from Convex userKeys (Phase 5)
-   *   2. Platform env var: process.env.TAVILY_API_KEY
-   *   3. undefined (no key → skip Tavily tools)
+   *   2. Platform env var: process.env.EXA_API_KEY
+   *   3. undefined (no key → skip Exa tools)
+   *
+   * The exa-js SDK requires an explicit key in its constructor —
+   * it does not read from process.env. This is intentional: it ensures
+   * BYOK keys are passed directly without env var manipulation.
    */
-  tavilyKey?: string
+  exaKey?: string
 }
 
 /**
  * Returns third-party tools based on available API keys and capability flags.
+ *
+ * Uses the exa-js core SDK with a custom tool() wrapper instead of
+ * @exalabs/ai-sdk, because the latter reads API keys from env vars only
+ * and does not support explicit key passthrough needed for BYOK.
  *
  * This module is intentionally decoupled from Layer 1 (provider tools).
  * It does not know or check which providers have built-in search.
@@ -537,31 +666,60 @@ export async function getThirdPartyTools(options: ThirdPartyToolOptions): Promis
   tools: ToolSet
   metadata: Map<string, ToolMetadata>
 }> {
-  const { skipSearch = false, tavilyKey } = options
+  const { skipSearch = false, exaKey } = options
   const tools: Record<string, unknown> = {}
   const metadata = new Map<string, ToolMetadata>()
 
-  // Tavily Search — skip if Layer 1 already provides search
-  if (!skipSearch && tavilyKey) {
+  // Exa Search — skip if Layer 1 already provides search
+  if (!skipSearch && exaKey) {
     try {
-      const { tavilySearch } = await import("@tavily/ai-sdk")
-      tools.web_search = tavilySearch({
-        maxResults: 5,
-        searchDepth: "basic",
-        // The tavilySearch function reads TAVILY_API_KEY from process.env.
-        // For user BYOK keys (Phase 5), we may need to pass the key explicitly.
-        // TODO (Phase 5): Check if @tavily/ai-sdk supports passing apiKey as a parameter.
-        // If not, use @tavily/core with a custom tool() wrapper.
+      // exa-js is a stateless HTTP client wrapper — no cleanup or after() needed.
+      // Each call creates a fresh fetch request. No connection pool or persistent state.
+      const Exa = (await import("exa-js")).default
+      const exa = new Exa(exaKey)
+
+      tools.web_search = tool({
+        description:
+          "Search the web for current information using AI-native semantic search. " +
+          "Returns relevant web pages with titles, URLs, content snippets, and publication dates.",
+        inputSchema: z.object({
+          query: z
+            .string()
+            .min(1)
+            .max(200)
+            .describe("The search query — be specific for better results"),
+        }),
+        execute: async ({ query }) => {
+          const { results } = await exa.searchAndContents(query, {
+            type: "auto",
+            numResults: 5,
+            text: { maxCharacters: 2000 },
+            livecrawl: "fallback",
+          })
+          return results.map(
+            (r: {
+              title?: string
+              url: string
+              text?: string
+              publishedDate?: string
+            }) => ({
+              title: r.title,
+              url: r.url,
+              content: r.text?.slice(0, 2000),
+              publishedDate: r.publishedDate,
+            })
+          )
+        },
       })
       metadata.set("web_search", {
         displayName: "Web Search",
         source: "third-party",
-        serviceName: "Tavily",
+        serviceName: "Exa",
         icon: "search",
-        estimatedCostPer1k: 8, // $0.008/credit, basic search = 1 credit
+        estimatedCostPer1k: 5, // $5/1K search requests (1-25 results per request)
       })
     } catch (err) {
-      console.error("[tools/third-party] Failed to load Tavily search:", err)
+      console.error("[tools/third-party] Failed to load Exa search:", err)
     }
   }
 
@@ -577,64 +735,83 @@ export async function getThirdPartyTools(options: ThirdPartyToolOptions): Promis
     // -----------------------------------------------------------------------
     // Third-Party Tool Loading (Layer 2)
     // Universal search fallback for providers without native search tools.
-    // Route.ts coordinates: if Layer 1 already has search, Layer 2 skips it.
-    // This eliminates coupling — third-party.ts does not know about providers.
+    // Only loaded when enableSearch is true AND Layer 1 didn't provide search.
+    //
+    // The coordination model is simple:
+    //   - enableSearch === true: route.ts injects search tools
+    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2
+    //   - Layer 1 did NOT provide search: load Layer 2 Exa fallback
+    //
+    // NOT gated on isAuthenticated — anonymous users get search when
+    // the platform has an EXA_API_KEY configured (same as Layer 1).
     // -----------------------------------------------------------------------
     let thirdPartyTools: ToolSet = {} as ToolSet
     let thirdPartyToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-    if (modelConfig.tools !== false) {
-      const { getThirdPartyTools } = await import("@/lib/tools/third-party")
+    if (shouldInjectSearch) {
+      const builtInHasSearch = Object.keys(builtInTools).length > 0
 
-      // Centralized search coordination: check if Layer 1 already provides search
-      const builtInHasSearch = "web_search" in builtInTools
+      // Only load Layer 2 when Layer 1 didn't provide search.
+      // This is the sole coordination point — third-party.ts does not
+      // know about providers. It just receives a skipSearch flag.
+      if (!builtInHasSearch) {
+        const { getThirdPartyTools } = await import("@/lib/tools/third-party")
 
-      // Key resolution: user BYOK key (Phase 5) → platform env var → undefined
-      // Phase 3: platform key only. Phase 5 will add user BYOK resolution here.
-      const resolvedTavilyKey = process.env.TAVILY_API_KEY
+        // Key resolution: user BYOK key (Phase 5) → platform env var → undefined
+        // Phase 3: platform key only. Phase 5 will add user BYOK resolution here.
+        const resolvedExaKey = process.env.EXA_API_KEY
 
-      const thirdPartyResult = await getThirdPartyTools({
-        skipSearch: builtInHasSearch,
-        tavilyKey: resolvedTavilyKey,
-      })
-      thirdPartyTools = thirdPartyResult.tools
-      thirdPartyToolMetadata = thirdPartyResult.metadata
+        const thirdPartyResult = await getThirdPartyTools({
+          skipSearch: false, // We already know we need search (builtInHasSearch is false)
+          exaKey: resolvedExaKey,
+        })
+        thirdPartyTools = thirdPartyResult.tools
+        thirdPartyToolMetadata = thirdPartyResult.metadata
+      }
     }
 ```
 
 **3.3b — Update tool merging** (update the merge block from Phase 1):
 
 ```typescript
-    // Merge all tool layers: built-in (Layer 1) + third-party (Layer 2) + MCP (Layer 3)
+    // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
+    // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
+    // MCP tools are always independent and additive.
     // Spread order matters for conflict resolution:
-    //   1. Built-in tools (lowest priority — provider defaults)
-    //   2. Third-party tools (middle — only for providers without built-in search)
-    //   3. MCP tools (highest priority — user-configured, namespaced)
-    const allTools = { ...builtInTools, ...thirdPartyTools, ...mcpTools } as ToolSet
-    const hasMcpTools = Object.keys(mcpTools).length > 0
-    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : DEFAULT_MAX_STEP_COUNT
+    //   1. Built-in/third-party search tools (lowest priority)
+    //   2. MCP tools (highest priority — user-configured, namespaced)
+    const searchTools = { ...builtInTools, ...thirdPartyTools }
+    const allTools = { ...searchTools, ...mcpTools } as ToolSet
+
+    // Dev-mode collision detection: warn when duplicate keys are found
+    if (process.env.NODE_ENV !== "production") {
+      const searchKeys = new Set(Object.keys(searchTools))
+      for (const key of Object.keys(mcpTools)) {
+        if (searchKeys.has(key)) {
+          console.warn(`[tools] Key collision: "${key}" exists in both search and MCP tools. MCP wins.`)
+        }
+      }
+    }
+
+    const hasAnyTools = Object.keys(allTools).length > 0
+    const maxSteps = hasAnyTools
+      ? (isAuthenticated ? MCP_MAX_STEP_COUNT : ANONYMOUS_MAX_STEP_COUNT)
+      : DEFAULT_MAX_STEP_COUNT
 ```
 
 ### Step 3.4: Update Tool Display Map (Phase 2 additions)
 
-In `app/components/chat/tool-invocation.tsx`, add Tavily to the built-in tool display map:
-
-```typescript
-const BUILTIN_TOOL_DISPLAY: Record<string, { name: string; icon: "search" | "code" | "image" | "extract" }> = {
-  web_search: { name: "Web Search", icon: "search" },
-  google_search: { name: "Web Search", icon: "search" },
-  tavily_search: { name: "Web Search", icon: "search" },
-  // Future:
-  // tavily_extract: { name: "Content Extract", icon: "extract" },
-}
-```
+In `app/components/chat/tool-invocation.tsx`, the `BUILTIN_TOOL_DISPLAY` map from Phase 2 already covers `web_search` (the key used by both Layer 1 and Layer 2). No additional entry is needed since Exa's custom wrapper uses the same `web_search` key. The display name "Web Search" is sufficient regardless of whether the tool is backed by OpenAI, Google, or Exa — users care about the capability, not the implementation.
 
 ### Verify Phase 3
 
-1. **With TAVILY_API_KEY**: Set `TAVILY_API_KEY=tvly-...` in `.env.local`. Select a Mistral or xAI model. Ask "What happened in the news today?" — the model should invoke `web_search` via Tavily.
-2. **Without TAVILY_API_KEY**: Remove the key. Verify non-OpenAI/Google/Anthropic models get no search tools (graceful degradation).
-3. **No duplicate tools**: Select an OpenAI model WITH `TAVILY_API_KEY` set — verify only ONE `web_search` tool is injected (the OpenAI built-in, not Tavily). Confirm via the tool invocation card showing "Web Search" with OpenAI's provider rendering, not Tavily's.
-4. **Lint + typecheck**: `bun run lint && bun run typecheck`
+1. **With EXA_API_KEY**: Set `EXA_API_KEY=...` in `.env.local`. Select a Mistral or OpenRouter model with search ON. Ask "What happened in the news today?" — the model should invoke `web_search` via Exa and return results with titles, URLs, and content.
+2. **Without EXA_API_KEY**: Remove the key. Verify Mistral/OpenRouter models get no search tools when search is ON (graceful degradation — no Exa key, no Layer 1 for these providers).
+3. **No duplicate tools**: Select an OpenAI model WITH `EXA_API_KEY` set and search ON — verify only ONE `web_search` tool is injected (the OpenAI built-in, not Exa). Layer 1 provides search, so Layer 2 is skipped entirely.
+4. **xAI uses native search**: Select an xAI model with search ON — verify the xAI native `web_search` tool fires (Layer 1), NOT Exa (Layer 2). xAI is now a Layer 1 provider.
+5. **Anonymous user**: Log out, select a Mistral model with search ON, ask a search query — verify search works via platform `EXA_API_KEY` (Layer 2 fallback for non-Layer-1 providers).
+6. **Search OFF**: With `EXA_API_KEY` set, select a Mistral model with search OFF — verify NO search tools are injected. The `enableSearch` master switch controls everything.
+7. **Lint + typecheck**: `bun run lint && bun run typecheck`
 
 ### Environment Variable Documentation
 
@@ -644,9 +821,8 @@ After Phase 3, update `.env.example` to include:
 # Third-Party Tool API Keys (optional)
 # These enable additional tool capabilities for models without native tools.
 # Users can also provide their own keys via Settings → Tool Keys (overrides these).
-# TAVILY_API_KEY=tvly-...    # Web search for xAI/Mistral/OpenRouter models
-# EXA_API_KEY=...            # Alternative search (future)
-# FIRECRAWL_API_KEY=...      # Web scraping/extraction (future)
+# EXA_API_KEY=...              # Web search for xAI/Mistral/OpenRouter models
+# FIRECRAWL_API_KEY=...        # Web scraping/extraction (future)
 ```
 
 ---
@@ -689,15 +865,14 @@ Replace lines 158-173:
     durationMs: v.optional(v.number()),
     error: v.optional(v.string()),
     createdAt: v.number(),
-    // Tool source discriminator — identifies which layer produced the tool call
-    source: v.optional(
-      v.union(
-        v.literal("builtin"),
-        v.literal("third-party"),
-        v.literal("mcp")
-      )
+    // Tool source discriminator — identifies which layer produced the tool call.
+    // REQUIRED (not optional) — clean break, no existing data to migrate.
+    source: v.union(
+      v.literal("builtin"),
+      v.literal("third-party"),
+      v.literal("mcp")
     ),
-    // Service name for display and filtering (e.g., "OpenAI", "Tavily", "my-mcp-server")
+    // Service name for display and filtering (e.g., "OpenAI", "Exa", "my-mcp-server")
     serviceName: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
@@ -758,12 +933,11 @@ export const log = mutation({
     success: v.boolean(),
     durationMs: v.optional(v.number()),
     error: v.optional(v.string()),
-    source: v.optional(
-      v.union(
-        v.literal("builtin"),
-        v.literal("third-party"),
-        v.literal("mcp")
-      )
+    // REQUIRED — clean break, no backward compat needed
+    source: v.union(
+      v.literal("builtin"),
+      v.literal("third-party"),
+      v.literal("mcp")
     ),
     serviceName: v.optional(v.string()),
   },
@@ -797,7 +971,7 @@ export const log = mutation({
       success: args.success,
       durationMs: args.durationMs,
       error: args.error ? truncatePreview(args.error) : undefined,
-      source: args.source ?? "mcp", // Default to "mcp" for backward compat with existing callers
+      source: args.source,
       serviceName: args.serviceName,
       createdAt: Date.now(),
     })
@@ -928,7 +1102,63 @@ In the `onFinish` callback, add a new block AFTER the existing MCP audit logging
         }
 ```
 
-### Step 4.4: Update Existing MCP Log Calls
+### Step 4.4: Add Unified `tool_call` PostHog Event
+
+Replace the MCP-only `mcp_tool_call` PostHog event with a unified `tool_call` event that covers all tool sources. In the `onFinish` callback, replace the existing MCP PostHog capture block (lines 349-381) with:
+
+```typescript
+            // PostHog: unified tool call events — one event per tool invocation (all sources)
+            // Replaces the previous MCP-only mcp_tool_call event.
+            if (steps) {
+              // Combine all metadata maps for source identification
+              const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+
+              for (const step of steps) {
+                if (step.toolCalls) {
+                  for (const toolCall of step.toolCalls) {
+                    const mcpServerInfo = mcpToolServerMap.get(toolCall.toolName)
+                    const nonMcpMeta = allToolMetadata.get(toolCall.toolName)
+
+                    // Determine source and service name
+                    const source = mcpServerInfo ? "mcp" : (nonMcpMeta?.source ?? "unknown")
+                    const serviceName = mcpServerInfo
+                      ? mcpServerInfo.serverName
+                      : (nonMcpMeta?.serviceName ?? "unknown")
+                    const displayName = mcpServerInfo
+                      ? mcpServerInfo.displayName
+                      : (nonMcpMeta?.displayName ?? toolCall.toolName)
+
+                    const toolResult = step.toolResults?.find(
+                      (r: { toolCallId: string }) => r.toolCallId === toolCall.toolCallId
+                    )
+                    const success = toolResult
+                      ? !(toolResult as { isError?: boolean }).isError
+                      : false
+
+                    phClient.capture({
+                      distinctId: userId,
+                      event: "tool_call",
+                      properties: {
+                        toolName: displayName,
+                        rawToolName: toolCall.toolName,
+                        source,
+                        serviceName,
+                        success,
+                        chatId,
+                        // MCP-specific (optional)
+                        ...(mcpServerInfo && {
+                          serverId: mcpServerInfo.serverId,
+                          serverName: mcpServerInfo.serverName,
+                        }),
+                      },
+                    })
+                  }
+                }
+              }
+            }
+```
+
+### Step 4.5: Update Existing MCP Log Calls
 
 Update the existing MCP audit log call (around line 411) to use the new import and add `source: "mcp"`:
 
@@ -954,15 +1184,17 @@ Update the existing MCP audit log call (around line 411) to use the new import a
                 })
 ```
 
-### Step 4.5: Delete Old File
+### Step 4.6: Delete Old File
 
 Delete `convex/mcpToolCallLog.ts` after verifying the new `convex/toolCallLog.ts` works correctly.
 
+**Clean break note**: Since there are no existing users, this is a clean break — no data migration needed. The new `toolCallLog` table starts empty. The old `mcpToolCallLog` table is dropped when removed from the schema. No backfill script required.
+
 ### Verify Phase 4
 
-1. **Convex push**: `npx convex dev` should apply schema changes without errors
-2. **Backward compatibility**: Existing MCP tool call logs continue to work (now with `source: "mcp"`)
-3. **New logs**: Send a search query with an OpenAI model. Check the Convex dashboard — the `toolCallLog` table should contain a new entry with `source: "builtin"`, `serviceName: "OpenAI"`, and `serverId: undefined`.
+1. **Convex push**: `npx convex dev` should apply schema changes without errors. The old `mcpToolCallLog` table will be dropped and the new `toolCallLog` table created.
+2. **New logs**: Send a search query with an OpenAI model. Check the Convex dashboard — the `toolCallLog` table should contain a new entry with `source: "builtin"`, `serviceName: "OpenAI"`, and `serverId: undefined`.
+3. **MCP logs**: Send a message using an MCP tool. Verify the log entry has `source: "mcp"`, the correct `serverId`, and `serviceName`.
 4. **No stale references**: Search codebase for any remaining `mcpToolCallLog` references and update them.
 5. **Lint + typecheck**: `bun run lint && bun run typecheck`
 
@@ -972,9 +1204,9 @@ Delete `convex/mcpToolCallLog.ts` after verifying the new `convex/toolCallLog.ts
 
 > **Effort**: M (3-4 days)
 > **Files created**: 2-3 (settings panel components)
-> **Files modified**: 3 (`convex/schema.ts`, `convex/userKeys.ts`, `app/api/chat/route.ts`)
-> **Dependencies**: Phase 3 complete (Tavily integrated)
-> **Permission required**: Modifies `convex/schema.ts` — ask user first per AGENTS.md
+> **Files modified**: 3 (`convex/userKeys.ts`, `lib/user-keys.ts`, `app/api/chat/route.ts`)
+> **Dependencies**: Phase 3 complete (Exa integrated)
+> **Permission required**: None — `convex/schema.ts` is NOT modified (the `provider` field is already `v.string()`)
 
 This phase is promoted from the original Phase 6 roadmap. With BYOK as the primary product strategy, users need a polished way to manage their tool API keys.
 
@@ -986,39 +1218,73 @@ This phase is promoted from the original Phase 6 roadmap. With BYOK as the prima
 @lib/encryption.ts                     # AES-256-GCM encryption for keys
 @lib/user-keys.ts                      # getEffectiveApiKey pattern
 @app/components/layout/settings/       # Existing settings panels
-@lib/tools/third-party.ts             # Phase 3 — accepts tavilyKey parameter
+@lib/tools/third-party.ts             # Phase 3 — accepts exaKey parameter
 ```
 
-### Step 5.1: Extend `userKeys` for Tool Providers
+### Step 5.1: Widen `getUserKeyFromConvex` and Add `getEffectiveToolKey`
 
-The existing `userKeys` table stores provider API keys (OpenAI, Anthropic, etc.) with `userId + provider` as the lookup. Extend this to accept tool provider keys.
+The existing `userKeys` table stores provider API keys (OpenAI, Anthropic, etc.) with `userId + provider` as the lookup. The `provider` field is already `v.string()`, so tool provider IDs can be stored without schema changes.
 
-Add the following tool provider IDs to the list of valid `provider` values:
-- `"tavily"` — Tavily web search
-- `"exa"` — Exa AI search (future)
-- `"firecrawl"` — Firecrawl scraping (future)
-
-No schema change needed — the `provider` field is already `v.string()`. The change is in the application logic: `convex/userKeys.ts` mutations should accept these new provider IDs, and `lib/user-keys.ts` should be extended with a helper to retrieve tool-specific keys.
+**First**, widen `getUserKeyFromConvex` to accept `string` instead of `Provider`:
 
 ```typescript
-// lib/user-keys.ts — add helper for tool keys
+// lib/user-keys.ts — CHANGE the function signature
+
+// BEFORE:
+export async function getUserKeyFromConvex(
+  provider: Provider,
+  token?: string
+): Promise<string | null> {
+
+// AFTER:
+export async function getUserKeyFromConvex(
+  provider: string, // Widened from Provider to string — supports both AI providers and tool providers
+  token?: string
+): Promise<string | null> {
+```
+
+> **Rationale**: The Convex schema already uses `v.string()` for the `provider` field — only the TypeScript type was restrictive. Tool providers ("exa", "firecrawl") need the same encrypt/decrypt flow as AI providers. A single function is more maintainable than duplicating the logic. The `getEffectiveApiKey` function retains its `Provider` type constraint since it also handles the env var map (which is AI-provider-specific).
+
+**Then**, add the tool-specific types and resolution function:
+
+```typescript
+// lib/user-keys.ts — add below existing exports
 
 /** Tool provider IDs that can be stored in userKeys */
-export const TOOL_PROVIDERS = ["tavily", "exa", "firecrawl"] as const
+export const TOOL_PROVIDERS = ["exa", "firecrawl"] as const
 export type ToolProvider = (typeof TOOL_PROVIDERS)[number]
 
+/** Maps tool provider IDs to their environment variable names */
+const TOOL_ENV_MAP: Record<ToolProvider, string> = {
+  exa: "EXA_API_KEY",
+  firecrawl: "FIRECRAWL_API_KEY",
+}
+
 /**
- * Get the user's BYOK key for a tool provider.
- * Returns undefined if no key is stored.
+ * Get the effective API key for a tool provider.
+ * Uses the widened getUserKeyFromConvex (accepts string) for BYOK lookup,
+ * then falls back to platform env vars.
+ *
+ * Resolution order:
+ *   1. User BYOK key from Convex userKeys (encrypted, decrypted here)
+ *   2. Platform env var (e.g., EXA_API_KEY)
+ *   3. undefined (no key available → tool will be skipped)
+ *
+ * @param provider - The tool provider to get key for
+ * @param convexToken - Optional Convex auth token for fetching user keys
  */
 export async function getEffectiveToolKey(
   provider: ToolProvider,
-  convexToken: string
+  convexToken?: string
 ): Promise<string | undefined> {
-  // Reuse the same getEffectiveApiKey logic — the userKeys table
-  // stores tool keys identically to provider keys.
-  const { getEffectiveApiKey } = await import("@/lib/user-keys")
-  return (await getEffectiveApiKey(provider as string, convexToken)) || undefined
+  // 1. Try user BYOK key first (getUserKeyFromConvex accepts string)
+  if (convexToken) {
+    const userKey = await getUserKeyFromConvex(provider, convexToken)
+    if (userKey) return userKey
+  }
+
+  // 2. Fall back to platform env var
+  return process.env[TOOL_ENV_MAP[provider]] || undefined
 }
 ```
 
@@ -1029,9 +1295,10 @@ Create a settings panel at `app/components/layout/settings/tools/` that follows 
 1. Read the existing API key settings panel (likely in `app/components/layout/settings/`) for UI patterns
 2. Create a "Tool Keys" section with:
    - Status indicators showing which tools are active (platform key vs. user key vs. unavailable)
-   - Input fields for Tavily, Exa, and Firecrawl API keys
+   - Input fields for Exa and Firecrawl API keys
    - Clear labeling of which tools use platform-provided keys vs. user keys
-   - Cost estimate display using `estimatedCostPer1k` from `ToolMetadata`
+   - Cost estimate display: "~$0.005 per search" for Exa ($5/1K), sourced from `estimatedCostPer1k` in `ToolMetadata`
+   - Link to Exa Dashboard for key creation: https://dashboard.exa.ai/api-keys
 3. Reuse the existing encrypted key storage flow (`convex/userKeys.ts` + `lib/encryption.ts`)
 
 ### Step 5.3: Wire User Tool Keys into Route.ts
@@ -1040,84 +1307,30 @@ Update the Phase 3 key resolution in `route.ts` to check for user BYOK tool keys
 
 ```typescript
     // Key resolution: user BYOK key → platform env var → undefined
-    let resolvedTavilyKey: string | undefined
-    if (isAuthenticated && convexToken) {
+    // The exa-js SDK accepts keys in its constructor, so BYOK keys
+    // are passed directly — no env var manipulation needed.
+    let resolvedExaKey: string | undefined
+    if (convexToken) {
       const { getEffectiveToolKey } = await import("@/lib/user-keys")
-      resolvedTavilyKey = await getEffectiveToolKey("tavily", convexToken)
+      resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
     }
-    if (!resolvedTavilyKey) {
-      resolvedTavilyKey = process.env.TAVILY_API_KEY
+    if (!resolvedExaKey) {
+      resolvedExaKey = process.env.EXA_API_KEY
     }
 ```
 
-**Note**: The `@tavily/ai-sdk` package reads `TAVILY_API_KEY` from `process.env` by default. If the user provides a BYOK key that differs from the env var, we may need to use `@tavily/core` with a custom `tool()` wrapper that accepts the key as a parameter. Verify this during implementation. If `tavilySearch()` supports a `key` or `apiKey` option, use that directly.
+**Note**: Unlike `@exalabs/ai-sdk` (which reads from env only), our custom `tool()` wrapper using `exa-js` accepts the key directly via `new Exa(exaKey)`. This means BYOK works without any env var manipulation or workarounds — the resolved key (user BYOK or platform env) flows cleanly into the SDK constructor.
 
 ### Verify Phase 5
 
-1. **Settings UI**: Navigate to Settings → Tool Keys. Verify the panel displays correctly.
-2. **Save key**: Enter a Tavily key and save. Verify it's stored encrypted in the `userKeys` table with `provider: "tavily"`.
-3. **BYOK override**: With both a platform `TAVILY_API_KEY` and a user BYOK key, verify the user's key takes priority (check Tavily's usage dashboard).
+1. **Settings UI**: Navigate to Settings → Tool Keys. Verify the panel displays correctly with cost estimates.
+2. **Save key**: Enter an Exa key and save. Verify it's stored encrypted in the `userKeys` table with `provider: "exa"`.
+3. **BYOK override**: With both a platform `EXA_API_KEY` and a user BYOK key, verify the user's key takes priority (check Exa's usage dashboard).
 4. **Remove key**: Delete the user key. Verify it falls back to the platform key.
-5. **No platform key**: Remove `TAVILY_API_KEY` from env. Verify users with BYOK keys still get search, and users without keys get no search.
+5. **No platform key**: Remove `EXA_API_KEY` from env. Verify users with BYOK keys still get search, and users without keys get no search.
+6. **Anonymous user**: Anonymous users should still get search via platform key (no BYOK lookup for unauthenticated users).
 
 ---
-
-## Phase 6: Remove `ENABLE_MCP` Feature Gate
-
-> **Effort**: S (< 1 day)
-> **Files modified**: 1 (`app/api/chat/route.ts`)
-> **Dependencies**: Phases 1-4 complete and stable
-> **Note**: This phase can optionally be executed earlier (after Phase 1) since built-in tools provide value without MCP, making the feature gate less critical. Discuss timing with the project owner.
-
-### Context to Load
-
-```
-@app/api/chat/route.ts  # MCP gate at line 178: process.env.ENABLE_MCP === "true"
-```
-
-### Decision Gate
-
-- [ ] Are built-in tools stable in production? (Phase 1 verified)
-- [ ] Is the MCP pipeline stable with the new tool merging? (Phase 1 verified)
-- [ ] Is the deployer comfortable removing the gate? (Discuss with user)
-
-### Step 6.1: Remove the ENABLE_MCP Check
-
-**Current code** (lines 175-179):
-
-```typescript
-    if (
-      isAuthenticated &&
-      convexToken &&
-      process.env.ENABLE_MCP === "true" &&
-      modelConfig.tools !== false
-    ) {
-```
-
-**Replace with:**
-
-```typescript
-    if (
-      isAuthenticated &&
-      convexToken &&
-      modelConfig.tools !== false
-    ) {
-```
-
-This removes the `ENABLE_MCP` env var requirement. MCP tools are now loaded for all authenticated users whose model supports tools. The existing security layers (URL validation, DNS rebinding guard, circuit breaker, per-tool approval) remain in place.
-
-### Step 6.2: Update Documentation
-
-Remove references to `ENABLE_MCP` from:
-- `.env.example` (if present)
-- Any README or setup docs that mention the flag
-- `app/api/CLAUDE.md` (if it mentions the flag)
-
-### Verify Phase 6
-
-1. **Without ENABLE_MCP**: Remove `ENABLE_MCP=true` from `.env.local`. Verify MCP tools still load for authenticated users with configured MCP servers.
-2. **Built-in tools still work**: Verify provider search tools work regardless of MCP state.
-3. **Anonymous users**: Verify anonymous users still get NO MCP tools (the `isAuthenticated && convexToken` check remains).
 
 ---
 
@@ -1130,7 +1343,7 @@ This phase is not a single implementation step — it's a guide for adding futur
 
 ### 7.1: ToolProvider Interface (Extensibility Pattern)
 
-When the third tool provider is added (after Tavily), refactor `lib/tools/third-party.ts` from a growing if-block into a registry pattern. This makes adding a new provider a "create one file" operation.
+When the third tool provider is added (after Exa), refactor `lib/tools/third-party.ts` from a growing if-block into a registry pattern. This makes adding a new provider a "create one file" operation.
 
 **Interface:**
 
@@ -1143,7 +1356,7 @@ When the third tool provider is added (after Tavily), refactor `lib/tools/third-
  * The registry in lib/tools/third-party.ts iterates over registered providers.
  */
 export interface ToolProvider {
-  /** Unique identifier (e.g., "tavily", "exa", "firecrawl") */
+  /** Unique identifier (e.g., "exa", "firecrawl") */
   id: string
   /** Human-readable name for UI */
   displayName: string
@@ -1171,23 +1384,23 @@ lib/tools/
 ├── provider.ts           # Layer 1: Built-in provider tools
 ├── third-party.ts        # Layer 2: Registry that loads from providers/
 ├── providers/            # One file per third-party tool provider
-│   ├── tavily.ts         # implements ToolProvider
-│   ├── exa.ts            # implements ToolProvider
+│   ├── exa.ts            # implements ToolProvider (Phase 3 — already exists)
 │   └── firecrawl.ts      # implements ToolProvider
 └── index.ts              # Barrel export
 ```
 
 ### 7.2: Adding a New Third-Party Tool Provider
 
-To add a new tool provider (e.g., Exa, Firecrawl, BrowserBase):
+To add a new tool provider (e.g., Firecrawl, BrowserBase):
 
-1. Install the AI SDK package: `bun add @exalabs/ai-sdk`
-2. Create `lib/tools/providers/exa.ts` implementing `ToolProvider`
+1. Install the SDK package: `bun add <package>`
+2. Create `lib/tools/providers/<name>.ts` implementing `ToolProvider`
 3. Register it in `lib/tools/third-party.ts`
 4. Add display name to `tool-invocation.tsx`'s `BUILTIN_TOOL_DISPLAY` map
 5. Add env var to `.env.example`
 6. Add the provider ID to `TOOL_PROVIDERS` in `lib/user-keys.ts`
-7. Test
+7. Prefer core SDKs that accept explicit API keys (like `exa-js`) over convenience wrappers that read from env vars only (like `@exalabs/ai-sdk`) — this is critical for BYOK support
+8. Test
 
 ### 7.3: `MAX_TOOL_RESULT_SIZE` Enforcement
 
@@ -1212,11 +1425,11 @@ The research document identifies two AI SDK v6 patterns that the current plan do
    }
    ```
 
-2. **`needsApproval` for cost-sensitive tools**: For tools with per-request costs (e.g., Tavily advanced search = 2 credits), the AI SDK supports per-tool approval:
+2. **`needsApproval` for cost-sensitive tools**: For tools with per-request costs (e.g., Exa deep search at higher credit cost), the AI SDK supports per-tool approval:
    ```typescript
-   tools.web_search = tavilySearch({
-     searchDepth: "advanced",
-     needsApproval: true, // or async (input) => input.searchDepth === "advanced"
+   tools.web_search = tool({
+     // ... tool definition ...
+     needsApproval: true, // or async (input) => input.searchType === "deep"
    })
    ```
    This sends an approval request to the client instead of executing immediately.
@@ -1250,56 +1463,28 @@ Verify the exact header format with the `@ai-sdk/anthropic` package before imple
 
 ### 7.7: URL/Content Extraction
 
-1. Use `@tavily/ai-sdk` → `tavilyExtract()` (already installed after Phase 3)
-2. Add to `lib/tools/third-party.ts` as `content_extract` tool
-3. Alternatively: `firecrawl-aisdk` → `scrapeTool` for JS-rendered page support
+1. Exa's `searchAndContents()` already returns page content (up to `maxCharacters` per result), covering basic extraction needs. For dedicated extraction:
+2. Use `exa-js` → `exa.getContents(urls, { text: { maxCharacters: 5000 } })` for content extraction from specific URLs. Add as `content_extract` tool in `lib/tools/third-party.ts`.
+3. Alternatively: `firecrawl-aisdk` → `scrapeTool` for JS-rendered page support (requires separate `FIRECRAWL_API_KEY`)
+
+### 7.8: Verify `gateway` Import Path
+
+The research found two import paths: `import { gateway } from "ai"` and `import { gateway } from "@ai-sdk/gateway"`. The `gateway` import is used for optional fallback search (`gateway.tools.perplexitySearch()`). Verify which import works before using. If neither works, skip — Layer 2 (Exa) serves the same purpose.
+
+### 7.9: Verify Firecrawl AI SDK Package Name
+
+The research uses `firecrawl-aisdk` but this could not be verified on npm. Check `npm info firecrawl-aisdk` and `npm info @mendable/firecrawl-js` for the correct package name before integrating.
 
 ---
 
 ## File Change Summary
 
-### New Files
-
-| File | Phase | Purpose |
-|------|-------|---------|
-| `lib/tools/types.ts` | 1 | Shared types (`ToolSource`, `ToolMetadata`) |
-| `lib/tools/provider.ts` | 1 | Provider-specific built-in tools (accepts BYOK apiKey) |
-| `lib/tools/third-party.ts` | 3 | Third-party tool integrations (decoupled, accepts config) |
-| `convex/toolCallLog.ts` | 4 | Renamed from `convex/mcpToolCallLog.ts` — all tool sources |
-| `app/components/layout/settings/tools/` | 5 | BYOK tool key settings panel |
-
-### Modified Files
-
-| File | Phase | Changes |
-|------|-------|---------|
-| `lib/config.ts` | 1 | Add `DEFAULT_MAX_STEP_COUNT`, `TOOL_EXECUTION_TIMEOUT_MS` |
-| `app/api/chat/route.ts` | 1, 3, 4, 5, 6 | Import tools, pass BYOK apiKey, merge 3 layers with centralized coordination, update audit logging to `toolCallLog`, add BYOK tool key resolution, remove `ENABLE_MCP` |
-| `app/components/chat/tool-invocation.tsx` | 2 | Add built-in tool display names and icons |
-| `convex/schema.ts` | 4 | Rename `mcpToolCallLog` → `toolCallLog`, make `serverId` optional, add `source` and `serviceName` fields, add `by_source` index |
-| `lib/user-keys.ts` | 5 | Add `TOOL_PROVIDERS`, `getEffectiveToolKey()` helper |
-| `.env.example` | 3 | Document `TAVILY_API_KEY` and future tool API keys |
-
-### Deleted Files
-
-| File | Phase | Reason |
-|------|-------|--------|
-| `convex/mcpToolCallLog.ts` | 4 | Renamed to `convex/toolCallLog.ts` |
-
-### Dependencies
-
-| Package | Phase | Purpose |
-|---------|-------|---------|
-| `@tavily/ai-sdk` | 3 | Universal web search for non-provider models |
-
-### No Changes Required
-
-| File | Reason |
-|------|--------|
-| `lib/mcp/load-tools.ts` | Existing MCP pipeline completely untouched |
-| `lib/mcp/circuit-breaker.ts` | No changes |
-| `lib/mcp/url-validation.ts` | No changes |
-| `lib/models/types.ts` | `tools?: boolean` field already sufficient |
-| `lib/openproviders/provider-map.ts` | `getProviderForModel()` already returns the provider ID we need |
+**New**: `lib/tools/types.ts` (P1), `lib/tools/provider.ts` (P1), `lib/tools/third-party.ts` (P3), `convex/toolCallLog.ts` (P4), `app/components/layout/settings/tools/` (P5)
+**Modified**: `lib/config.ts` (P1), `app/api/chat/route.ts` (P1,3,4,5), `app/components/chat/tool-invocation.tsx` (P2), `convex/schema.ts` (P4), `lib/user-keys.ts` (P5), `.env.example` (P3)
+**Deleted**: `convex/mcpToolCallLog.ts` (P4) — replaced by `convex/toolCallLog.ts`
+**New dep**: `exa-js` (P3) — Exa core SDK for BYOK-compatible web search
+**Unchanged**: `lib/mcp/*` (entire MCP pipeline untouched)
+**Verify only**: `lib/openproviders/index.ts` (confirm `apiSdk()` handles missing `opts`), `lib/models/data/` (confirm `webSearch` is UI-only)
 
 ---
 
@@ -1307,16 +1492,17 @@ Verify the exact header format with the `@ai-sdk/anthropic` package before imple
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|-----------|--------|------------|
-| Anthropic web search export name incorrect | Medium | Low | Task V1 verification; fallback to Tavily |
-| `createOpenAI({ apiKey }).tools` doesn't expose tools | Low | High | Verify in Phase 1 decision gate; fallback to default singleton with env key |
-| Provider search adds unexpected BYOK cost | Medium | Medium | `estimatedCostPer1k` in ToolMetadata; cost indicators in Phase 5 UI |
-| Tool name collision (built-in vs third-party) | Very Low | Medium | Centralized coordination in route.ts; Layer 2 `skipSearch` flag |
-| Tavily rate limits hit on platform key | Medium | Medium | Credit-based pricing with generous free tier; rate limit per-user in future |
-| `@tavily/ai-sdk` incompatible with AI SDK v6 | Low | High | Task V4 verification; fallback to `@tavily/core` + custom `tool()` wrapper |
+| `createOpenAI({ apiKey }).tools` doesn't expose tools | Low | High | Verified `typeof` returns `function`; full integration test in Phase 1 decision gate |
+| Provider search adds unexpected BYOK cost | Medium | Medium | `estimatedCostPer1k` in ToolMetadata; cost indicators in tool cards and Phase 5 UI |
+| Tool name collision (search vs MCP) | Very Low | Medium | Dev-mode `console.warn` collision detection; MCP tools are namespaced; `shouldInjectSearch` prevents Layer 1/Layer 2 overlap |
+| Exa rate limits hit on platform key | Medium | Medium | Usage-based pricing ($5/1K); `ANONYMOUS_MAX_STEP_COUNT = 5` caps exposure; per-user rate limiting in future |
+| `exa-js` API shape changes | Low | Medium | Task V4 verification; custom wrapper isolates API surface |
 | Third-party tool hangs (no timeout) | Low | Medium | `TOOL_EXECUTION_TIMEOUT_MS` defined; enforcement deferred to Phase 7.3 |
 | Tool returns oversized result (> 100KB) | Low | Medium | `MAX_TOOL_RESULT_SIZE` defined; enforcement deferred to Phase 7.3 |
 | Breaking change in `streamText` tool handling | Very Low | High | Pin AI SDK version; test after upgrades |
-| Convex table rename breaks existing data | Very Low | Low | Convex handles schema renames; verify migration in Phase 4 |
+| Anonymous users abuse platform search key | Medium | Medium | Daily message limit (5) x `ANONYMOUS_MAX_STEP_COUNT` (5) = max 25 tool calls/day/user |
+| Removing `enableSearch` from `apiSdk()` breaks OpenRouter | Low | Medium | `apiSdk` signature has `opts?` optional parameter; verify OpenRouter models work without it in Phase 1 decision gate |
+| xAI `webSearch` tool has different cost model | Low | Low | Set `estimatedCostPer1k: 0` (included in API pricing); monitor via PostHog |
 
 ---
 
@@ -1324,16 +1510,17 @@ Verify the exact header format with the `@ai-sdk/anthropic` package before imple
 
 After all phases are complete:
 
-1. **Zero-config search**: A new user can ask "What's in the news today?" and get web search results without configuring anything (assuming provider API keys are set up).
-2. **Universal coverage**: Every model with `tools !== false` gets web search — either via provider-specific tools or Tavily fallback.
-3. **BYOK consistency**: Tool calls bill to the user's BYOK key when one is provided — same key as model calls.
-4. **BYOK tool keys**: Users can provide their own Tavily/Exa/Firecrawl keys via Settings, with platform keys as fallback.
-5. **MCP unchanged**: Existing MCP server configurations continue to work exactly as before.
-6. **Decoupled layers**: Layer 2 (third-party) does not know about Layer 1 (provider) capabilities. Route.ts coordinates.
-7. **Extensible**: Adding a new tool provider requires minimal changes — create a provider file and register it.
-8. **Auditable**: All tool calls (built-in, third-party, MCP) are logged to `toolCallLog` with source discrimination.
-9. **No feature gate**: Tools work for all authenticated users without requiring `ENABLE_MCP=true`.
+1. **`enableSearch` as universal control**: Users can toggle search ON for ANY model. When ON, the model gets web search tools — either native (Layer 1) or Exa fallback (Layer 2). When OFF, no search tools are injected.
+2. **4 native providers**: OpenAI, Anthropic, Google, and xAI models use their own provider-defined search tools (Layer 1) — best quality, zero extra cost for BYOK users.
+3. **Universal fallback**: Mistral, OpenRouter, and other non-Layer-1 models get Exa search (Layer 2) when a platform or BYOK key is available.
+4. **BYOK consistency**: Built-in tool calls (Layer 1) bill to the user's BYOK key when one is provided — same key as model calls.
+5. **BYOK tool keys**: Users can provide their own Exa/Firecrawl keys via Settings → Tool Keys, with platform keys as fallback.
+6. **MCP unchanged**: Existing MCP server configurations continue to work exactly as before, independent of search.
+7. **Single coordination point**: Route.ts is the sole coordinator. `enableSearch` is the master switch. Layer 2 does not know about Layer 1 providers.
+8. **Extensible**: Adding a new tool provider requires minimal changes — create a provider file, register it, prefer core SDKs with explicit key support for BYOK.
+9. **Auditable**: All tool calls (built-in, third-party, MCP) are logged to `toolCallLog` with required `source` discrimination. Unified `tool_call` PostHog event for observability.
+10. **No feature gate**: Tools work for all users (authenticated AND anonymous) without requiring `ENABLE_MCP=true`.
+11. **Anonymous cost protection**: Anonymous users capped at `ANONYMOUS_MAX_STEP_COUNT` (5) steps per message, limiting tool call cost exposure.
+12. **Cost transparency**: Tool invocation cards display estimated per-search costs, with BYOK users seeing which key is billed.
+13. **All search is visible**: No opaque provider-level search. All search goes through auditable, renderable tool calls.
 
----
-
-*Plan created February 11, 2026. Reviewed February 11, 2026. Based on research at `.agents/context/research/tool-calling-infrastructure.md` and codebase analysis.*
