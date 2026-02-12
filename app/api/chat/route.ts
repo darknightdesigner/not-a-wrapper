@@ -200,6 +200,44 @@ export async function POST(req: Request) {
     }
 
     // -----------------------------------------------------------------------
+    // Third-Party Tool Loading (Layer 2)
+    // Universal search fallback for providers without native search tools.
+    // Only loaded when enableSearch is true AND Layer 1 didn't provide search.
+    //
+    // The coordination model is simple:
+    //   - enableSearch === true: route.ts injects search tools
+    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2
+    //   - Layer 1 did NOT provide search: load Layer 2 Exa fallback
+    //
+    // NOT gated on isAuthenticated — anonymous users get search when
+    // the platform has an EXA_API_KEY configured (same as Layer 1).
+    // -----------------------------------------------------------------------
+    let thirdPartyTools: ToolSet = {} as ToolSet
+    let thirdPartyToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    if (shouldInjectSearch) {
+      const builtInHasSearch = Object.keys(builtInTools).length > 0
+
+      // Only load Layer 2 when Layer 1 didn't provide search.
+      // This is the sole coordination point — third-party.ts does not
+      // know about providers. It just receives a skipSearch flag.
+      if (!builtInHasSearch) {
+        const { getThirdPartyTools } = await import("@/lib/tools/third-party")
+
+        // Key resolution: user BYOK key (Phase 5) → platform env var → undefined
+        // Phase 3: platform key only. Phase 5 will add user BYOK resolution here.
+        const resolvedExaKey = process.env.EXA_API_KEY
+
+        const thirdPartyResult = await getThirdPartyTools({
+          skipSearch: false, // We already know we need search (builtInHasSearch is false)
+          exaKey: resolvedExaKey,
+        })
+        thirdPartyTools = thirdPartyResult.tools
+        thirdPartyToolMetadata = thirdPartyResult.metadata
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // MCP Tool Loading
     // Gate on: auth + Convex token + model capability
     // -----------------------------------------------------------------------
@@ -241,20 +279,21 @@ export async function POST(req: Request) {
       })
     }
 
-    // Merge all tool layers: search (Layer 1) + MCP (Layer 3)
-    // Layer 2 (third-party) will be added in Phase 3.
-    // Spread order: search first, MCP second. MCP tools are namespaced
-    // (e.g., "serverslug_toolname") so key collisions are extremely unlikely.
-    // If a collision occurs, MCP wins (intentional — user config overrides defaults).
-    const allTools = { ...builtInTools, ...mcpTools } as ToolSet
+    // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
+    // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
+    // MCP tools are always independent and additive.
+    // Spread order matters for conflict resolution:
+    //   1. Built-in/third-party search tools (lowest priority)
+    //   2. MCP tools (highest priority — user-configured, namespaced)
+    const searchTools = { ...builtInTools, ...thirdPartyTools }
+    const allTools = { ...searchTools, ...mcpTools } as ToolSet
 
     // Dev-mode collision detection: warn when duplicate keys are found
     if (process.env.NODE_ENV !== "production") {
-      const builtInKeys = new Set(Object.keys(builtInTools))
-      const mcpKeys = Object.keys(mcpTools)
-      for (const key of mcpKeys) {
-        if (builtInKeys.has(key)) {
-          console.warn(`[tools] Key collision: "${key}" exists in both built-in and MCP tools. MCP wins.`)
+      const searchKeys = new Set(Object.keys(searchTools))
+      for (const key of Object.keys(mcpTools)) {
+        if (searchKeys.has(key)) {
+          console.warn(`[tools] Key collision: "${key}" exists in both search and MCP tools. MCP wins.`)
         }
       }
     }
@@ -400,35 +439,51 @@ export async function POST(req: Request) {
               },
             })
 
-            // PostHog: MCP tool call events — one event per tool invocation
-            // Iterates through all steps to find tool calls that map to MCP tools.
-            // durationMs per tool call requires wrapping tool.execute (future enhancement).
-            if (steps && mcpToolServerMap.size > 0) {
+            // PostHog: unified tool call events — one event per tool invocation (all sources)
+            // Replaces the previous MCP-only mcp_tool_call event.
+            if (steps) {
+              // Combine all metadata maps for source identification
+              const allToolMetadata = new Map([...builtInToolMetadata])
+
               for (const step of steps) {
                 if (step.toolCalls) {
                   for (const toolCall of step.toolCalls) {
-                    const serverInfo = mcpToolServerMap.get(toolCall.toolName)
-                    if (serverInfo) {
-                      const toolResult = step.toolResults?.find(
-                        (r: { toolCallId: string }) =>
-                          r.toolCallId === toolCall.toolCallId
-                      )
-                      const success = toolResult
-                        ? !(toolResult as { isError?: boolean }).isError
-                        : false
-                      phClient.capture({
-                        distinctId: userId,
-                        event: "mcp_tool_call",
-                        properties: {
-                          toolName: serverInfo.displayName,
-                          serverName: serverInfo.serverName,
-                          serverId: serverInfo.serverId,
-                          namespacedToolName: toolCall.toolName,
-                          success,
-                          chatId,
-                        },
-                      })
-                    }
+                    const mcpServerInfo = mcpToolServerMap.get(toolCall.toolName)
+                    const nonMcpMeta = allToolMetadata.get(toolCall.toolName)
+
+                    // Determine source and service name
+                    const source = mcpServerInfo ? "mcp" : (nonMcpMeta?.source ?? "unknown")
+                    const serviceName = mcpServerInfo
+                      ? mcpServerInfo.serverName
+                      : (nonMcpMeta?.serviceName ?? "unknown")
+                    const displayName = mcpServerInfo
+                      ? mcpServerInfo.displayName
+                      : (nonMcpMeta?.displayName ?? toolCall.toolName)
+
+                    const toolResult = step.toolResults?.find(
+                      (r: { toolCallId: string }) => r.toolCallId === toolCall.toolCallId
+                    )
+                    const success = toolResult
+                      ? !(toolResult as { isError?: boolean }).isError
+                      : false
+
+                    phClient.capture({
+                      distinctId: userId,
+                      event: "tool_call",
+                      properties: {
+                        toolName: displayName,
+                        rawToolName: toolCall.toolName,
+                        source,
+                        serviceName,
+                        success,
+                        chatId,
+                        // MCP-specific (optional)
+                        ...(mcpServerInfo && {
+                          serverId: mcpServerInfo.serverId,
+                          serverName: mcpServerInfo.serverName,
+                        }),
+                      },
+                    })
                   }
                 }
               }
@@ -442,7 +497,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // Audit log: persist MCP tool calls to mcpToolCallLog (fire-and-forget).
+        // Audit log: persist MCP tool calls to toolCallLog (fire-and-forget).
         // These writes are best-effort — failures are swallowed to avoid breaking
         // the streaming response. Follows the same pattern as updateConnectionStatus
         // in lib/mcp/load-tools.ts.
@@ -464,7 +519,7 @@ export async function POST(req: Request) {
                   : false
 
                 void fetchMutation(
-                  api.mcpToolCallLog.log,
+                  api.toolCallLog.log,
                   {
                     chatId: chatId as Id<"chats">,
                     serverId: serverInfo.serverId as Id<"mcpServers">,
@@ -475,11 +530,62 @@ export async function POST(req: Request) {
                       ? JSON.stringify(toolResult.output).slice(0, 500)
                       : undefined,
                     success,
+                    source: "mcp",
+                    serviceName: serverInfo.serverName,
                   },
                   { token: convexToken }
                 ).catch(() => {
                   // Intentionally swallowed — audit logging is best-effort
                 })
+              }
+            }
+          }
+        }
+
+        // Audit log: persist built-in + third-party tool calls (fire-and-forget).
+        // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
+        if (convexToken && steps) {
+          // Combine built-in (and future third-party) metadata maps
+          const nonMcpMetadata = new Map([...builtInToolMetadata])
+
+          if (nonMcpMetadata.size > 0) {
+            for (const step of steps) {
+              if (step.toolCalls) {
+                for (const toolCall of step.toolCalls) {
+                  // Skip MCP tools (already logged above)
+                  if (mcpToolServerMap.get(toolCall.toolName)) continue
+
+                  const meta = nonMcpMetadata.get(toolCall.toolName)
+                  if (!meta) continue // Unknown tool — skip
+
+                  const toolResult = step.toolResults?.find(
+                    (r: { toolCallId: string }) =>
+                      r.toolCallId === toolCall.toolCallId
+                  )
+                  const success = toolResult
+                    ? !(toolResult as { isError?: boolean }).isError
+                    : false
+
+                  void fetchMutation(
+                    api.toolCallLog.log,
+                    {
+                      chatId: chatId as Id<"chats">,
+                      // No serverId for non-MCP tools
+                      toolName: meta.displayName,
+                      toolCallId: toolCall.toolCallId,
+                      inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
+                      outputPreview: toolResult
+                        ? JSON.stringify(toolResult.output).slice(0, 500)
+                        : undefined,
+                      success,
+                      source: meta.source,
+                      serviceName: meta.serviceName,
+                    },
+                    { token: convexToken }
+                  ).catch(() => {
+                    // Intentionally swallowed — audit logging is best-effort
+                  })
+                }
               }
             }
           }
