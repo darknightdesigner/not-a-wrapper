@@ -4,16 +4,20 @@ import {
   SYSTEM_PROMPT_DEFAULT,
   MCP_CONNECTION_TIMEOUT_MS,
   MCP_MAX_STEP_COUNT,
+  DEFAULT_MAX_STEP_COUNT,
+  ANONYMOUS_MAX_STEP_COUNT,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
+import type { SupportedModel } from "@/lib/openproviders/types"
 import {
   captureGeneration,
   flushPostHog,
   getPostHogClient,
 } from "@/lib/posthog"
-import type { ProviderWithoutOllama } from "@/lib/user-keys"
+import type { Provider } from "@/lib/user-keys"
 import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
@@ -124,14 +128,14 @@ export async function POST(req: Request) {
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
-    const provider = getProviderForModel(model)
+    const provider = getProviderForModel(model as SupportedModel)
 
     let apiKey: string | undefined
     if (isAuthenticated && convexToken) {
       const { getEffectiveApiKey } = await import("@/lib/user-keys")
       apiKey =
         (await getEffectiveApiKey(
-          provider as ProviderWithoutOllama,
+          provider as Provider,
           convexToken
         )) || undefined
     }
@@ -139,7 +143,7 @@ export async function POST(req: Request) {
     // Pre-flight check: verify an API key is available before calling the provider.
     // When apiKey is undefined, the AI SDK falls back to environment variables.
     // If neither source has a valid key, the provider will reject with a 401.
-    if (!apiKey && provider !== "ollama") {
+    if (!apiKey) {
       const { env: providerEnv } = await import("@/lib/openproviders/env")
       const envKeyMap: Record<string, string | undefined> = {
         openai: providerEnv.OPENAI_API_KEY,
@@ -162,19 +166,94 @@ export async function POST(req: Request) {
       }
     }
 
-    // Create base model from config
-    const aiModel = modelConfig.apiSdk(apiKey, { enableSearch })
+    // enableSearch is no longer passed to the model — it controls tool injection below.
+    // All search is now provided via visible, auditable tool calls (Layer 1 or Layer 2).
+    const aiModel = modelConfig.apiSdk(apiKey)
+
+    // -----------------------------------------------------------------------
+    // Search Tool Loading (Layer 1 — Built-in Provider Tools)
+    //
+    // The `enableSearch` flag from the client is the MASTER SWITCH for search
+    // tool injection. When true, route.ts injects search tools:
+    //   - If the provider has native search tools → use them (Layer 1)
+    //   - If not → use Exa fallback (Layer 2, added in Phase 3)
+    //
+    // This replaces the previous dual mechanism where `enableSearch` was
+    // passed to `modelConfig.apiSdk()` as an opaque provider-level flag.
+    // All search is now visible, auditable tool calls.
+    //
+    // NOT gated on isAuthenticated. Anonymous users (5 daily messages)
+    // get search tools when the platform has provider API keys configured.
+    // When apiKey is undefined (anonymous), the provider factory falls back
+    // to the env var — same behavior as model creation above.
+    // -----------------------------------------------------------------------
+    let builtInTools: ToolSet = {} as ToolSet
+    let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    const shouldInjectSearch = enableSearch && modelConfig.tools !== false
+
+    if (shouldInjectSearch) {
+      const { getProviderTools } = await import("@/lib/tools/provider")
+      const providerResult = await getProviderTools(provider, apiKey)
+      builtInTools = providerResult.tools
+      builtInToolMetadata = providerResult.metadata
+    }
+
+    // -----------------------------------------------------------------------
+    // Third-Party Tool Loading (Layer 2)
+    // Universal search fallback for providers without native search tools.
+    // Only loaded when enableSearch is true AND Layer 1 didn't provide search.
+    //
+    // The coordination model is simple:
+    //   - enableSearch === true: route.ts injects search tools
+    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2
+    //   - Layer 1 did NOT provide search: load Layer 2 Exa fallback
+    //
+    // NOT gated on isAuthenticated — anonymous users get search when
+    // the platform has an EXA_API_KEY configured (same as Layer 1).
+    // -----------------------------------------------------------------------
+    let thirdPartyTools: ToolSet = {} as ToolSet
+    let thirdPartyToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    if (shouldInjectSearch) {
+      const builtInHasSearch = Object.keys(builtInTools).length > 0
+
+      // Only load Layer 2 when Layer 1 didn't provide search.
+      // This is the sole coordination point — third-party.ts does not
+      // know about providers. It just receives a skipSearch flag.
+      if (!builtInHasSearch) {
+        const { getThirdPartyTools } = await import("@/lib/tools/third-party")
+
+        // Key resolution: user BYOK key → platform env var → undefined
+        // The exa-js SDK accepts keys in its constructor, so BYOK keys
+        // are passed directly — no env var manipulation needed.
+        let resolvedExaKey: string | undefined
+        if (convexToken) {
+          const { getEffectiveToolKey } = await import("@/lib/user-keys")
+          resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
+        }
+        if (!resolvedExaKey) {
+          resolvedExaKey = process.env.EXA_API_KEY
+        }
+
+        const thirdPartyResult = await getThirdPartyTools({
+          skipSearch: false, // We already know we need search (builtInHasSearch is false)
+          exaKey: resolvedExaKey,
+        })
+        thirdPartyTools = thirdPartyResult.tools
+        thirdPartyToolMetadata = thirdPartyResult.metadata
+      }
+    }
 
     // -----------------------------------------------------------------------
     // MCP Tool Loading
-    // Gate on: auth + Convex token + feature flag + model capability
+    // Gate on: auth + Convex token + model capability
     // -----------------------------------------------------------------------
     let mcpTools: ToolSet = {} as ToolSet
 
     if (
       isAuthenticated &&
       convexToken &&
-      process.env.ENABLE_MCP === "true" &&
       modelConfig.tools !== false
     ) {
       const mcpLoadStart = Date.now()
@@ -208,8 +287,32 @@ export async function POST(req: Request) {
       })
     }
 
-    const hasMcpTools = Object.keys(mcpTools).length > 0
-    const maxSteps = hasMcpTools ? MCP_MAX_STEP_COUNT : 10
+    // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
+    // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
+    // MCP tools are always independent and additive.
+    // Spread order matters for conflict resolution:
+    //   1. Built-in/third-party search tools (lowest priority)
+    //   2. MCP tools (highest priority — user-configured, namespaced)
+    const searchTools = { ...builtInTools, ...thirdPartyTools }
+    const allTools = { ...searchTools, ...mcpTools } as ToolSet
+
+    // Dev-mode collision detection: warn when duplicate keys are found
+    if (process.env.NODE_ENV !== "production") {
+      const searchKeys = new Set(Object.keys(searchTools))
+      for (const key of Object.keys(mcpTools)) {
+        if (searchKeys.has(key)) {
+          console.warn(`[tools] Key collision: "${key}" exists in both search and MCP tools. MCP wins.`)
+        }
+      }
+    }
+
+    const hasAnyTools = Object.keys(allTools).length > 0
+
+    // Anonymous users get a lower step count to limit tool call cost exposure.
+    // Authenticated users get the full MCP_MAX_STEP_COUNT (20).
+    const maxSteps = hasAnyTools
+      ? (isAuthenticated ? MCP_MAX_STEP_COUNT : ANONYMOUS_MAX_STEP_COUNT)
+      : DEFAULT_MAX_STEP_COUNT
 
     // Check if PostHog is configured for LLM analytics
     const phClient = getPostHogClient()
@@ -255,12 +358,42 @@ export async function POST(req: Request) {
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
     const modelMessages = await convertToModelMessages(sanitizedMessages)
 
+    // Build provider-specific options to enable reasoning/thinking when
+    // the selected model advertises support (reasoningText: true).
+    const providerOptions: ProviderOptions = {}
+
+    if (modelConfig.reasoningText) {
+      if (provider === "anthropic") {
+        let budgetTokens = 10000 // default
+        if (model.includes("opus")) budgetTokens = 16000
+        else if (model.includes("haiku")) budgetTokens = 5000
+        else if (model.includes("sonnet")) budgetTokens = 12000
+
+        providerOptions.anthropic = {
+          thinking: { type: "enabled", budgetTokens },
+        }
+      } else if (provider === "google") {
+        providerOptions.google = {
+          thinkingConfig: { includeThoughts: true },
+        }
+      } else if (provider === "openai") {
+        providerOptions.openai = {
+          reasoningEffort: "medium",
+        }
+      } else if (provider === "xai") {
+        providerOptions.xai = {
+          reasoningEffort: "medium",
+        }
+      }
+    }
+
     const result = streamText({
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
-      tools: mcpTools,
+      tools: allTools,
       stopWhen: stepCountIs(maxSteps),
+      ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
@@ -314,35 +447,51 @@ export async function POST(req: Request) {
               },
             })
 
-            // PostHog: MCP tool call events — one event per tool invocation
-            // Iterates through all steps to find tool calls that map to MCP tools.
-            // durationMs per tool call requires wrapping tool.execute (future enhancement).
-            if (steps && mcpToolServerMap.size > 0) {
+            // PostHog: unified tool call events — one event per tool invocation (all sources)
+            // Replaces the previous MCP-only mcp_tool_call event.
+            if (steps) {
+              // Combine all metadata maps for source identification
+              const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+
               for (const step of steps) {
                 if (step.toolCalls) {
                   for (const toolCall of step.toolCalls) {
-                    const serverInfo = mcpToolServerMap.get(toolCall.toolName)
-                    if (serverInfo) {
-                      const toolResult = step.toolResults?.find(
-                        (r: { toolCallId: string }) =>
-                          r.toolCallId === toolCall.toolCallId
-                      )
-                      const success = toolResult
-                        ? !(toolResult as { isError?: boolean }).isError
-                        : false
-                      phClient.capture({
-                        distinctId: userId,
-                        event: "mcp_tool_call",
-                        properties: {
-                          toolName: serverInfo.displayName,
-                          serverName: serverInfo.serverName,
-                          serverId: serverInfo.serverId,
-                          namespacedToolName: toolCall.toolName,
-                          success,
-                          chatId,
-                        },
-                      })
-                    }
+                    const mcpServerInfo = mcpToolServerMap.get(toolCall.toolName)
+                    const nonMcpMeta = allToolMetadata.get(toolCall.toolName)
+
+                    // Determine source and service name
+                    const source = mcpServerInfo ? "mcp" : (nonMcpMeta?.source ?? "unknown")
+                    const serviceName = mcpServerInfo
+                      ? mcpServerInfo.serverName
+                      : (nonMcpMeta?.serviceName ?? "unknown")
+                    const displayName = mcpServerInfo
+                      ? mcpServerInfo.displayName
+                      : (nonMcpMeta?.displayName ?? toolCall.toolName)
+
+                    const toolResult = step.toolResults?.find(
+                      (r: { toolCallId: string }) => r.toolCallId === toolCall.toolCallId
+                    )
+                    const success = toolResult
+                      ? !(toolResult as { isError?: boolean }).isError
+                      : false
+
+                    phClient.capture({
+                      distinctId: userId,
+                      event: "tool_call",
+                      properties: {
+                        toolName: displayName,
+                        rawToolName: toolCall.toolName,
+                        source,
+                        serviceName,
+                        success,
+                        chatId,
+                        // MCP-specific (optional)
+                        ...(mcpServerInfo && {
+                          serverId: mcpServerInfo.serverId,
+                          serverName: mcpServerInfo.serverName,
+                        }),
+                      },
+                    })
                   }
                 }
               }
@@ -356,7 +505,7 @@ export async function POST(req: Request) {
           }
         }
 
-        // Audit log: persist MCP tool calls to mcpToolCallLog (fire-and-forget).
+        // Audit log: persist MCP tool calls to toolCallLog (fire-and-forget).
         // These writes are best-effort — failures are swallowed to avoid breaking
         // the streaming response. Follows the same pattern as updateConnectionStatus
         // in lib/mcp/load-tools.ts.
@@ -378,7 +527,7 @@ export async function POST(req: Request) {
                   : false
 
                 void fetchMutation(
-                  api.mcpToolCallLog.log,
+                  api.toolCallLog.log,
                   {
                     chatId: chatId as Id<"chats">,
                     serverId: serverInfo.serverId as Id<"mcpServers">,
@@ -389,11 +538,62 @@ export async function POST(req: Request) {
                       ? JSON.stringify(toolResult.output).slice(0, 500)
                       : undefined,
                     success,
+                    source: "mcp",
+                    serviceName: serverInfo.serverName,
                   },
                   { token: convexToken }
                 ).catch(() => {
                   // Intentionally swallowed — audit logging is best-effort
                 })
+              }
+            }
+          }
+        }
+
+        // Audit log: persist built-in + third-party tool calls (fire-and-forget).
+        // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
+        if (convexToken && steps) {
+          // Combine built-in and third-party metadata maps
+          const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+
+          if (nonMcpMetadata.size > 0) {
+            for (const step of steps) {
+              if (step.toolCalls) {
+                for (const toolCall of step.toolCalls) {
+                  // Skip MCP tools (already logged above)
+                  if (mcpToolServerMap.get(toolCall.toolName)) continue
+
+                  const meta = nonMcpMetadata.get(toolCall.toolName)
+                  if (!meta) continue // Unknown tool — skip
+
+                  const toolResult = step.toolResults?.find(
+                    (r: { toolCallId: string }) =>
+                      r.toolCallId === toolCall.toolCallId
+                  )
+                  const success = toolResult
+                    ? !(toolResult as { isError?: boolean }).isError
+                    : false
+
+                  void fetchMutation(
+                    api.toolCallLog.log,
+                    {
+                      chatId: chatId as Id<"chats">,
+                      // No serverId for non-MCP tools
+                      toolName: meta.displayName,
+                      toolCallId: toolCall.toolCallId,
+                      inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
+                      outputPreview: toolResult
+                        ? JSON.stringify(toolResult.output).slice(0, 500)
+                        : undefined,
+                      success,
+                      source: meta.source,
+                      serviceName: meta.serviceName,
+                    },
+                    { token: convexToken }
+                  ).catch(() => {
+                    // Intentionally swallowed — audit logging is best-effort
+                  })
+                }
               }
             }
           }

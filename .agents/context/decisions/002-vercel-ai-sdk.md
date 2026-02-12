@@ -7,14 +7,13 @@
 
 ## Context
 
-The project supports 100+ AI models across 8+ providers:
+The project supports 100+ AI models across 7+ providers:
 - OpenAI (GPT-4, GPT-4.1)
 - Anthropic (Claude 3.5, Claude 4)
 - Google (Gemini)
 - Mistral
 - Perplexity
 - xAI (Grok)
-- Ollama (local)
 - OpenRouter (aggregator)
 
 Needed a unified interface that:

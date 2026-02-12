@@ -4,7 +4,6 @@ import { deepseekModels } from "./data/deepseek"
 import { geminiModels } from "./data/gemini"
 import { grokModels } from "./data/grok"
 import { mistralModels } from "./data/mistral"
-import { getOllamaModels, ollamaModels } from "./data/ollama"
 import { openaiModels } from "./data/openai"
 import { openrouterModels } from "./data/openrouter"
 import { perplexityModels } from "./data/perplexity"
@@ -19,51 +18,19 @@ const STATIC_MODELS: ModelConfig[] = [
   ...grokModels,
   ...perplexityModels,
   ...geminiModels,
-  ...ollamaModels, // Static fallback Ollama models
   ...openrouterModels,
 ]
 
-// Dynamic models cache
-let dynamicModelsCache: ModelConfig[] | null = null
-let lastFetchTime = 0
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
-
-// // Function to get all models including dynamically detected ones
+// Function to get all models
 export async function getAllModels(): Promise<ModelConfig[]> {
-  const now = Date.now()
-
-  // Use cache if it's still valid
-  if (dynamicModelsCache && now - lastFetchTime < CACHE_DURATION) {
-    return dynamicModelsCache
-  }
-
-  try {
-    // Get dynamically detected Ollama models (includes enabled check internally)
-    const detectedOllamaModels = await getOllamaModels()
-
-    // Combine static models (excluding static Ollama models) with detected ones
-    const staticModelsWithoutOllama = STATIC_MODELS.filter(
-      (model) => model.providerId !== "ollama"
-    )
-
-    dynamicModelsCache = [...staticModelsWithoutOllama, ...detectedOllamaModels]
-
-    lastFetchTime = now
-    return dynamicModelsCache
-  } catch (error) {
-    console.warn("Failed to load dynamic models, using static models:", error)
-    return STATIC_MODELS
-  }
+  return STATIC_MODELS
 }
 
 export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
   const models = await getAllModels()
 
   const freeModels = models
-    .filter(
-      (model) =>
-        FREE_MODELS_IDS.includes(model.id) || model.providerId === "ollama"
-    )
+    .filter((model) => FREE_MODELS_IDS.includes(model.id))
     .map((model) => ({
       ...model,
       accessible: true,
@@ -108,22 +75,9 @@ export async function getModelsForUserProviders(
 }
 
 // Synchronous function to get model info for simple lookups
-// This uses cached data if available, otherwise falls back to static models
 export function getModelInfo(modelId: string): ModelConfig | undefined {
-  // First check the cache if it exists
-  if (dynamicModelsCache) {
-    return dynamicModelsCache.find((model) => model.id === modelId)
-  }
-
-  // Fall back to static models for immediate lookup
   return STATIC_MODELS.find((model) => model.id === modelId)
 }
 
 // For backward compatibility - static models only
 export const MODELS: ModelConfig[] = STATIC_MODELS
-
-// Function to refresh the models cache
-export function refreshModelsCache(): void {
-  dynamicModelsCache = null
-  lastFetchTime = 0
-}

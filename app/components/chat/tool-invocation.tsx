@@ -11,6 +11,7 @@ import {
   Link01Icon,
   NutIcon,
   Loading01Icon,
+  Search01Icon,
   Wrench01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
@@ -27,6 +28,28 @@ const TRANSITION = {
   duration: 0.2,
   bounce: 0,
 } as const
+
+/** Maps built-in tool names to human-readable display names and icons */
+const BUILTIN_TOOL_DISPLAY: Record<
+  string,
+  { name: string; icon: "search" | "code" | "image" | "extract" }
+> = {
+  web_search: { name: "Web Search", icon: "search" },
+  google_search: { name: "Web Search", icon: "search" },
+  // Future built-in tools:
+  // code_execution: { name: "Code Execution", icon: "code" },
+  // image_generation: { name: "Image Generation", icon: "image" },
+}
+
+/** Resolve icon component from BUILTIN_TOOL_DISPLAY icon identifier */
+function getToolIcon(iconId: "search" | "code" | "image" | "extract") {
+  switch (iconId) {
+    case "search":
+      return Search01Icon
+    default:
+      return Wrench01Icon
+  }
+}
 
 export function ToolInvocation({
   toolInvocations,
@@ -217,6 +240,9 @@ function SingleToolCard({
   // Displaying a cleaner name requires passing toolServerMap from the chat route via stream
   // metadata, which is planned for v1.1. Until then, the namespaced name is shown as-is.
   const toolName = getStaticToolName(toolData)
+  const displayInfo = BUILTIN_TOOL_DISPLAY[toolName] ?? null
+  const displayName = displayInfo?.name ?? toolName
+  const ToolIcon = displayInfo ? getToolIcon(displayInfo.icon) : Wrench01Icon
   const args = toolData.input as Record<string, unknown> | undefined
   const isLoading = state === "input-available" || state === "input-streaming"
   const isCompleted = state === "output-available"
@@ -392,8 +418,8 @@ function SingleToolCard({
         className="hover:bg-accent flex w-full flex-row items-center rounded-t-md px-3 py-2 transition-colors"
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
-          <HugeiconsIcon icon={Wrench01Icon} size={16} className="text-muted-foreground" />
-          <span className="font-mono text-sm">{toolName}</span>
+          <HugeiconsIcon icon={ToolIcon} size={16} className="text-muted-foreground" />
+          <span className={cn("text-sm", displayInfo ? "" : "font-mono")}>{displayName}</span>
           <AnimatePresence mode="popLayout" initial={false}>
             {isLoading ? (
               <motion.div

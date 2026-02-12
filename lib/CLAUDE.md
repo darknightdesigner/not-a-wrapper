@@ -92,7 +92,7 @@ export function getProvider(provider: ProviderType, apiKey?: string) {
 // All constants in one place
 export const NON_AUTH_DAILY_MESSAGE_LIMIT = 5
 export const AUTH_DAILY_MESSAGE_LIMIT = 1000
-export const MODEL_DEFAULT = "gpt-4.1-nano"
+export const MODEL_DEFAULT = "gpt-5.2"
 export const APP_NAME = "Not A Wrapper"
 export const SYSTEM_PROMPT_DEFAULT = `...`
 ```

@@ -43,8 +43,6 @@ export type Provider =
   | "anthropic"
   | "[new-provider]"  // Add here
   // ...
-
-export type ProviderWithoutOllama = Exclude<Provider, "ollama">
 ```
 
 ### 3. Add Factory Case

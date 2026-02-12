@@ -1159,9 +1159,7 @@ Database Schema:
 
 CI/CD & Deployment:
 ├── .github/workflows/
-├── vercel.json
-├── Dockerfile
-└── docker-compose*.yml
+└── vercel.json
 
 Configuration:
 ├── next.config.*

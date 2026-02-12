@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
-import { ProviderWithoutOllama } from "@/lib/user-keys"
+import { Provider } from "@/lib/user-keys"
 import { NextRequest, NextResponse } from "next/server"
 
 /**
@@ -15,17 +15,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Skip Ollama since it doesn't use API keys
-    if (provider === "ollama") {
-      return NextResponse.json({
-        hasUserKey: false,
-        provider,
-      })
-    }
-
     // With Convex, key checking should be done client-side
     // Check if environment has a key for this provider
-    const envKeyMap: Record<ProviderWithoutOllama, string | undefined> = {
+    const envKeyMap: Record<Provider, string | undefined> = {
       openai: process.env.OPENAI_API_KEY,
       mistral: process.env.MISTRAL_API_KEY,
       perplexity: process.env.PERPLEXITY_API_KEY,
@@ -35,7 +27,7 @@ export async function POST(request: NextRequest) {
       openrouter: process.env.OPENROUTER_API_KEY,
     }
 
-    const hasEnvKey = !!envKeyMap[provider as ProviderWithoutOllama]
+    const hasEnvKey = !!envKeyMap[provider as Provider]
 
     return NextResponse.json({
       hasUserKey: false, // User keys should be checked via Convex

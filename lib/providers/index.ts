@@ -6,7 +6,6 @@ import Google from "@/components/icons/google"
 import Grok from "@/components/icons/grok"
 import Meta from "@/components/icons/meta"
 import Mistral from "@/components/icons/mistral"
-import Ollama from "@/components/icons/ollama"
 import OpenAI from "@/components/icons/openai"
 import OpenRouter from "@/components/icons/openrouter"
 import Preplexity from "@/components/icons/perplexity"
@@ -69,11 +68,6 @@ export const PROVIDERS: Provider[] = [
     id: "anthropic",
     name: "Anthropic",
     icon: Anthropic,
-  },
-  {
-    id: "ollama",
-    name: "Ollama",
-    icon: Ollama,
   },
   {
     id: "meta",

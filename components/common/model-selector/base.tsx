@@ -137,14 +137,11 @@ export function ModelSelector({
 
   const trigger = (
     <Button
-      variant="outline"
-      className={cn("dark:bg-secondary justify-between", className)}
+      variant="ghost"
+      className={cn("justify-between", className)}
       disabled={isLoadingModels}
     >
-      <div className="flex items-center gap-2">
-        {currentProvider?.icon && <currentProvider.icon className="size-5" />}
-        <span>{currentModel?.name || "Select model"}</span>
-      </div>
+      <span>{currentModel?.name || "Select model"}</span>
       <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-50" />
     </Button>
   )

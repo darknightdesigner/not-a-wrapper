@@ -1,7 +1,6 @@
 import {
   getAllModels,
   getModelsWithAccessFlags,
-  refreshModelsCache,
 } from "@/lib/models"
 import { NextResponse } from "next/server"
 
@@ -13,7 +12,7 @@ import { NextResponse } from "next/server"
 export async function GET() {
   try {
     // Return models with base access flags
-    // Free models (from FREE_MODELS_IDS) and Ollama models are marked accessible
+    // Free models (from FREE_MODELS_IDS) are marked accessible
     // Paid/provider-specific models are locked until client verifies user has API keys
     const models = await getModelsWithAccessFlags()
 
@@ -36,11 +35,10 @@ export async function GET() {
 
 export async function POST() {
   try {
-    refreshModelsCache()
     const models = await getAllModels()
 
     return NextResponse.json({
-      message: "Models cache refreshed",
+      message: "Models refreshed",
       models,
       timestamp: new Date().toISOString(),
       count: models.length,

@@ -155,10 +155,10 @@ export default defineSchema({
     .index("by_user_server", ["userId", "serverId"])
     .index("by_user_server_tool", ["userId", "serverId", "toolName"]),
 
-  mcpToolCallLog: defineTable({
+  toolCallLog: defineTable({
     userId: v.id("users"),
     chatId: v.optional(v.id("chats")),
-    serverId: v.id("mcpServers"),
+    serverId: v.optional(v.id("mcpServers")), // Optional — only present for MCP tools
     toolName: v.string(),
     toolCallId: v.string(),
     inputPreview: v.optional(v.string()),
@@ -167,8 +167,18 @@ export default defineSchema({
     durationMs: v.optional(v.number()),
     error: v.optional(v.string()),
     createdAt: v.number(),
+    // Tool source discriminator — identifies which layer produced the tool call.
+    // REQUIRED (not optional) — clean break, no existing data to migrate.
+    source: v.union(
+      v.literal("builtin"),
+      v.literal("third-party"),
+      v.literal("mcp")
+    ),
+    // Service name for display and filtering (e.g., "OpenAI", "Exa", "my-mcp-server")
+    serviceName: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_chat", ["chatId"])
-    .index("by_server", ["serverId"]),
+    .index("by_server", ["serverId"])
+    .index("by_source", ["source"]),
 })

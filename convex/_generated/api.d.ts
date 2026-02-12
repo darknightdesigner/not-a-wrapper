@@ -16,6 +16,7 @@ import type * as mcpToolApprovals from "../mcpToolApprovals.js";
 import type * as mcpToolCallLog from "../mcpToolCallLog.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
+import type * as toolCallLog from "../toolCallLog.js";
 import type * as usage from "../usage.js";
 import type * as userKeys from "../userKeys.js";
 import type * as userPreferences from "../userPreferences.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   mcpToolCallLog: typeof mcpToolCallLog;
   messages: typeof messages;
   projects: typeof projects;
+  toolCallLog: typeof toolCallLog;
   usage: typeof usage;
   userKeys: typeof userKeys;
   userPreferences: typeof userPreferences;

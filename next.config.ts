@@ -1,7 +1,6 @@
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   experimental: {
     optimizePackageImports: [
       "@hugeicons/react",
@@ -36,6 +35,13 @@ const nextConfig: NextConfig = {
         hostname: "img.clerk.com",
         port: "",
         pathname: "/**",
+      },
+      // Google favicon service (used by web search source citations)
+      {
+        protocol: "https",
+        hostname: "www.google.com",
+        port: "",
+        pathname: "/s2/favicons/**",
       },
     ],
   },

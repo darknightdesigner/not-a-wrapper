@@ -11,7 +11,7 @@
 - **Claude** has differentiated through Artifacts (interactive app creation), connectors/MCP integrations (Google Workspace, Slack), memory across conversations (Pro), deep extended thinking, Projects with RAG, and Research mode. Its Max plan ($100-$200/mo) targets power users with 5-20x usage limits.
 - **Not A Wrapper** has strong fundamentals — 10 providers, 73+ models, BYOK encryption, multi-model comparison, web search, projects, and sharing. However, it still has major feature gaps including no image generation, no code execution, no artifacts/canvas, no conversation export, no memory, no branching, no native integrations, no notifications, no granular personalization, no data controls beyond Clerk defaults, and no schedules/orders.
 - The four highest-impact gaps to close remain: **(1) MCP integration into chat flow** (unlocks the "universal AI interface" positioning), **(2) Message reactions** (low-effort UX polish; drag-and-drop exists but needs minor accept/UX polish), **(3) Conversation export** (leapfrogs competitors who both have weak native export), and **(4) Artifacts/interactive outputs** (transformational). Additionally, ChatGPT's expanding platform features — notifications, granular personalization, schedules, orders, data controls, and passkey/MFA security — widen the "platform maturity" gap and should be tracked for future prioritization.
-- Not A Wrapper's unique positioning (multi-provider, BYOK, open-source, local models) is a genuine competitive moat. The roadmap should lean into this by becoming the **universal AI interface** rather than cloning any single provider's walled garden.
+- Not A Wrapper's unique positioning (multi-provider, BYOK, open-source) is a genuine competitive moat. The roadmap should lean into this by becoming the **universal AI interface** rather than cloning any single provider's walled garden.
 
 ---
 
@@ -412,7 +412,6 @@ ChatGPT surfaces connected apps and integrations when the user types `@` in the 
 | Multi-model comparison | No | No | Yes (up to 10; search disabled) | **Opportunity** |
 | BYOK encryption | No | No | Yes (AES-256-GCM) | **Opportunity** |
 | 10 providers / 73+ models | No (1 provider) | No (1 provider) | Yes | **Opportunity** |
-| Local model support (Ollama) | No | No | Yes | **Opportunity** |
 | Open source | No | No | Yes | **Opportunity** |
 | Model picker with metadata | Basic | Basic | Rich (speed, cost, context) | **None** |
 | Message reactions / feedback | Yes | Yes | No (feedback table only) | **Major** |
@@ -665,8 +664,7 @@ Not A Wrapper has **six distinct competitive advantages** that neither ChatGPT n
 | **Multi-Model Comparison** | No other platform lets users compare 10 models side-by-side on the same prompt. This is uniquely valuable for developers evaluating models, researchers benchmarking, and power users optimizing. | Add comparison analytics (token count, latency, cost per response). Allow saving comparison results. Create a "Model Arena" feature for blind comparisons with voting. |
 | **BYOK (Bring Your Own Key)** | Enterprise users and privacy-conscious individuals can use their own API keys with zero data passing through third-party servers. AES-256-GCM encryption is enterprise-grade. | Highlight cost savings (vs. $20-200/mo subscriptions). Show estimated cost per conversation. Add BYOK for more providers (Cohere, Together AI). Enterprise: team-level key pools. |
 | **100+ Models / 10 Providers** | ChatGPT locks users to OpenAI models. Claude locks users to Anthropic models. Not A Wrapper is the universal interface — try any model without separate accounts. | Build a model recommendation engine ("best model for coding", "best for creative writing"). Show model capability comparisons. Add new providers quickly via the established skill system. |
-| **Open Source** | Full transparency, community contributions, self-hosting, no vendor lock-in. No other major AI chat app offers this combination of features as open source. | Invest in documentation, contribution guides, and community. Accept PRs for new providers and features. Offer a managed hosted version alongside self-host. Create a plugin/extension system for community-built features. |
-| **Local Model Support (Ollama)** | Privacy-sensitive users and air-gapped environments can run models entirely locally with zero external API calls. | Improve Ollama setup UX (currently dev-only). Add one-click model pull. Show local model performance benchmarks. Support other local runtimes (llama.cpp, LM Studio). |
+| **Open Source** | Full transparency, community contributions, no vendor lock-in. No other major AI chat app offers this combination of features as open source. | Invest in documentation, contribution guides, and community. Accept PRs for new providers and features. Offer a managed hosted version. Create a plugin/extension system for community-built features. |
 | **Command Palette (Cmd+K)** | Neither ChatGPT nor Claude has a command palette. Power users love keyboard-driven interfaces. | Expand to include actions (new chat, toggle search, switch model, change theme) beyond just chat search. Make it the central command hub. |
 
 ### 4d. Strategic Recommendations
@@ -737,7 +735,7 @@ Several planned features (image generation, code execution, MCP tools, deep rese
 
 **9. Monetization Strategy in a $8/mo World**
 
-ChatGPT now offers six tiers from Free to Enterprise, including a Go plan at **$8/mo** (with ads). Claude has Free, Pro ($20/mo), and Max ($100-200/mo). Not A Wrapper's pricing strategy needs to account for this landscape. The open-source self-hosted model is a strength, but the managed hosted version needs a clear value proposition at a competitive price point.
+ChatGPT now offers six tiers from Free to Enterprise, including a Go plan at **$8/mo** (with ads). Claude has Free, Pro ($20/mo), and Max ($100-200/mo). Not A Wrapper's pricing strategy needs to account for this landscape. The open-source model is a strength, but the managed hosted version needs a clear value proposition at a competitive price point.
 
 **Action**: Define pricing tiers for the managed hosted version. Consider: Free (limited models, rate-limited) → Pro ($X/mo, all models, higher limits, export, MCP) → Team ($Y/user/mo, shared BYOK pools, admin controls). The BYOK model is a natural differentiator — users who bring their own keys pay less because they're covering API costs directly.
 

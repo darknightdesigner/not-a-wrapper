@@ -72,7 +72,43 @@ Search app/ and components/ for: onSelect=
 
 **Key detail**: `closeOnClick` is a first-class Base UI prop on `Menu.Item` (defaults to `true`). It passes through the `DropdownMenuItem` wrapper via `{...props}` since it's part of `MenuPrimitive.Item.Props`. No wrapper changes needed.
 
-### 3. Dialogs/Drawers Inside Dropdown Menus (Flash & Disappear)
+### 3. Dialog/Modal Animation (Base UI + Tailwind v4)
+
+**What to look for**: A `Dialog` that flashes on dismiss, has jittery scale animations, or uses a JS animation library (Motion) where pure CSS transitions would suffice.
+
+**Root cause history**: Three approaches were tried before landing on the correct one:
+1. `tailwindcss-animate` keyframes — flash on dismiss because `getAnimations()` didn't reliably detect them, so Base UI unmounted early.
+2. CSS transitions with Tailwind's `scale-95` — jittery because Tailwind v4 emits `scale` as an individual CSS property (not inside `transform`), so `transition-[opacity,transform]` didn't cover it.
+3. Motion `render` prop — worked but added a JS animation dependency and required stripping conflicting event handlers for TypeScript compatibility.
+
+**Fix pattern**: Use **CSS transitions** with Base UI's `data-[starting-style]` / `data-[ending-style]` attributes. The key is using the legacy `transform: scale()` function (via Tailwind arbitrary property `[transform:scale(0.95)]`) so that `transition: transform` covers it, while `translate` (used for centering) stays on the individual `translate` property and isn't transitioned.
+
+```tsx
+// ❌ CSS animations (flash — getAnimations() may not detect tw-animate)
+className="data-[open]:animate-in data-[closed]:animate-out ..."
+
+// ❌ Tailwind scale-95 + transition-[opacity,transform] (jittery — scale is individual property)
+className="transition-[opacity,transform] data-[starting-style]:scale-95 ..."
+
+// ❌ Motion render prop (works but unnecessary JS dependency)
+<DialogPrimitive.Popup render={(props, state) => <motion.div ... />} />
+
+// ✅ CSS transitions with transform: scale() (smooth, cancelable mid-animation)
+<DialogPrimitive.Popup
+  className={cn(
+    "... translate-x-[-50%] translate-y-[-50%] ...",
+    "data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)]",
+    "data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
+  )}
+  style={{ transition: "opacity 200ms ease-out, transform 200ms ease-out" }}
+/>
+```
+
+**Why inline `style` for transition**: Tailwind's `transition-[opacity,transform]` arbitrary utility may not reliably compose with `duration-*` and `ease-*` for custom property lists. An inline `style` is explicit and avoids ambiguity.
+
+**Reference**: `components/ui/dialog.tsx` (Feb 2026). See also: [Base UI Animation Handbook](https://base-ui.com/react/handbook/animation#css-transitions), [mui/base-ui#1608](https://github.com/mui/base-ui/issues/1608).
+
+### 4. Dialogs/Drawers Inside Dropdown Menus (Flash & Disappear)
 
 **What to look for**: A `Dialog`, `Drawer`, or `Popover` whose root is rendered inside `DropdownMenuContent`. When the menu item is clicked, Base UI closes the menu, unmounting the content tree — including the dialog that just opened.
 
@@ -119,7 +155,7 @@ Search app/ for components that:
 
 **Key principle**: The `Dialog`/`Drawer` root manages open state. If it unmounts, the dialog closes — even though `DialogContent` uses a portal. Always render dialog roots at a level that won't unmount unexpectedly.
 
-### 4. `nativeButton` Mismatch Errors
+### 5. `nativeButton` Mismatch Errors
 
 **What to look for**: Console error: "Base UI: A component that acts as a button was not rendered as a native `<button>`..."
 
@@ -145,9 +181,9 @@ Then check: Is the child a native <button> or a component that renders <button>?
 </DropdownMenuTrigger>
 ```
 
-**Note**: Prefer fixing issue #3 first — if you lift the dialog out of the dropdown, you won't need `asChild` on DialogTrigger with a DropdownMenuItem at all.
+**Note**: Prefer fixing issue #4 (dialogs inside dropdowns) first — if you lift the dialog out of the dropdown, you won't need `asChild` on DialogTrigger with a DropdownMenuItem at all.
 
-### 5. `asChild` on Non-Trigger Components
+### 6. `asChild` on Non-Trigger Components
 
 **What to look for**: `asChild` used on components that don't support it in Base UI (e.g., content wrappers, non-interactive elements).
 

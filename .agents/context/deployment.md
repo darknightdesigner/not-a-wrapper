@@ -1,8 +1,7 @@
 # Deployment & Infrastructure
 
-> **Last Updated:** January 2026  
-> **Primary Platform:** Vercel  
-> **Alternative:** Docker (self-hosted)
+> **Last Updated:** February 2026  
+> **Primary Platform:** Vercel
 
 ## Deployment Architecture
 
@@ -23,11 +22,11 @@
 │  ┌─────────────────────────┼─────────────────────────────┐  │
 │  │                  EXTERNAL SERVICES                     │  │
 │  │                                                        │  │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  ┌────────────┐ │  │
-│  │  │  Convex  │  │  Clerk   │  │  AI Providers│  │   Ollama   │ │  │
-│  │  │   (DB)   │  │  (Auth)  │  │  (Anthropic, │  │   (Local   │ │  │
-│  │  │          │  │          │  │   OpenAI...) │  │   Models)  │ │  │
-│  │  └──────────┘  └──────────┘  └──────────────┘  └────────────┘ │  │
+│  │  ┌──────────┐  ┌──────────┐  ┌──────────────┐               │  │
+│  │  │  Convex  │  │  Clerk   │  │  AI Providers│               │  │
+│  │  │   (DB)   │  │  (Auth)  │  │  (Anthropic, │               │  │
+│  │  │          │  │          │  │   OpenAI...) │               │  │
+│  │  └──────────┘  └──────────┘  └──────────────┘               │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
@@ -214,92 +213,6 @@ jobs:
 | `develop` | Staging | ✅ Yes |
 | `feature/*` | Preview | ✅ Yes (PR) |
 
-## Docker Deployment (Alternative)
-
-### Dockerfile
-
-```dockerfile
-# Multi-stage build
-# Use Bun for dependency installation and building
-FROM oven/bun:1 AS base
-
-# Dependencies stage
-FROM base AS deps
-WORKDIR /app
-COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
-
-# Build stage
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN bun run build
-
-# Production stage
-# Use Node.js for runtime (Next.js standalone output is optimized for Node)
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-# Copy built application
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-USER nextjs
-
-EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-CMD ["node", "server.js"]
-```
-
-### Docker Compose
-
-```yaml
-# docker-compose.yml
-version: "3.8"
-
-services:
-  app:
-    build: .
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - CONVEX_DEPLOYMENT=${CONVEX_DEPLOYMENT}
-      - NEXT_PUBLIC_CONVEX_URL=${NEXT_PUBLIC_CONVEX_URL}
-      - NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
-      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
-      - CLERK_JWT_ISSUER_DOMAIN=${CLERK_JWT_ISSUER_DOMAIN}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - CSRF_SECRET=${CSRF_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-    restart: unless-stopped
-```
-
-### Running with Docker
-
-```bash
-# Build image
-docker build -t not-a-wrapper .
-
-# Run container
-docker run -p 3000:3000 --env-file .env.local not-a-wrapper
-
-# Or with docker-compose
-docker-compose up -d
-```
-
 ## Monitoring & Observability
 
 ### Current Setup
@@ -371,8 +284,6 @@ const config = {
     domains: ["avatars.githubusercontent.com", "img.clerk.com"],
   },
   
-  // Enable standalone output for Docker
-  output: "standalone",
 }
 ```
 
