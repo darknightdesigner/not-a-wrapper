@@ -66,7 +66,11 @@ export function ChatInput({
   quotedText,
 }: ChatInputProps) {
   const selectModelConfig = getModelInfo(selectedModel)
-  const hasSearchSupport = Boolean(selectModelConfig?.webSearch)
+  // Web search is disabled only when the model explicitly can't accept tool calls
+  // (tools: false) or has opted out of search (webSearch: false).
+  // All other models get search via Layer 1 (provider-native) or Layer 2 (Exa fallback).
+  const isSearchDisabled =
+    selectModelConfig?.tools === false || selectModelConfig?.webSearch === false
   const isFileUploadAvailable = Boolean(selectModelConfig?.vision)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -148,26 +152,31 @@ export function ChatInput({
     [isUserAuthenticated, onFileUpload]
   )
 
+  const valueRef = useRef(value)
+  useEffect(() => {
+    valueRef.current = value
+  }, [value])
+
   useEffect(() => {
     if (quotedText) {
+      const current = valueRef.current
       const quoted = quotedText.text
         .split("\n")
         .map((line) => `> ${line}`)
         .join("\n")
-      onValueChange(value ? `${value}\n\n${quoted}\n\n` : `${quoted}\n\n`)
+      onValueChange(current ? `${current}\n\n${quoted}\n\n` : `${quoted}\n\n`)
 
       requestAnimationFrame(() => {
         textareaRef.current?.focus()
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quotedText, onValueChange])
 
-  useMemo(() => {
-    if (!hasSearchSupport && enableSearch) {
+  useEffect(() => {
+    if (isSearchDisabled && enableSearch) {
       setEnableSearch?.(false)
     }
-  }, [hasSearchSupport, enableSearch, setEnableSearch])
+  }, [isSearchDisabled, enableSearch, setEnableSearch])
 
   return (
     <div className="relative flex w-full flex-col gap-4">
@@ -210,7 +219,7 @@ export function ChatInput({
                   isFileUploadAvailable={isFileUploadAvailable}
                   enableSearch={enableSearch}
                   onToggleSearch={setEnableSearch}
-                  hasSearchSupport={hasSearchSupport}
+                  isSearchDisabled={isSearchDisabled}
                 />
                 <ModelSelector
                   selectedModelId={selectedModel}

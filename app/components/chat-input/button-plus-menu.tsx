@@ -33,7 +33,7 @@ type ButtonPlusMenuProps = {
   isFileUploadAvailable: boolean
   enableSearch: boolean
   onToggleSearch: (enabled: boolean) => void
-  hasSearchSupport: boolean
+  isSearchDisabled: boolean
 }
 
 export function ButtonPlusMenu({
@@ -42,7 +42,7 @@ export function ButtonPlusMenu({
   isFileUploadAvailable,
   enableSearch,
   onToggleSearch,
-  hasSearchSupport,
+  isSearchDisabled,
 }: ButtonPlusMenuProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -111,28 +111,55 @@ export function ButtonPlusMenu({
           </TooltipContent>
         </Tooltip>
         <DropdownMenuContent side="top" align="start">
-          <DropdownMenuItem
-            disabled={!isFileUploadAvailable}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <HugeiconsIcon icon={AttachmentIcon} size={16} />
-            Add files or photos
-          </DropdownMenuItem>
-          {hasSearchSupport && (
-            <DropdownMenuItem
-              onClick={() => onToggleSearch(!enableSearch)}
-            >
-              <HugeiconsIcon icon={Globe02Icon} size={16} />
-              Web search
-              {enableSearch && (
-                <HugeiconsIcon
-                  icon={Tick02Icon}
-                  size={14}
-                  className="ml-auto"
-                />
-              )}
-            </DropdownMenuItem>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuItem
+                disabled={!isFileUploadAvailable}
+                className={!isFileUploadAvailable ? "cursor-not-allowed opacity-50" : ""}
+                onClick={() => {
+                  if (!isFileUploadAvailable) return
+                  fileInputRef.current?.click()
+                }}
+              >
+                <HugeiconsIcon icon={AttachmentIcon} size={16} />
+                Add files or photos
+              </DropdownMenuItem>
+            </TooltipTrigger>
+            {!isFileUploadAvailable && (
+              <TooltipContent side="right" sideOffset={4}>
+                This model doesn&apos;t support file uploads
+              </TooltipContent>
+            )}
+          </Tooltip>
+          {/* Web search — always visible, stays open on click (toggle behavior). */}
+          {/* Disabled with tooltip when model can't use tools (e.g., Perplexity). */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuItem
+                closeOnClick={false}
+                className={isSearchDisabled ? "cursor-not-allowed opacity-50" : ""}
+                onClick={() => {
+                  if (isSearchDisabled) return
+                  onToggleSearch(!enableSearch)
+                }}
+              >
+                <HugeiconsIcon icon={Globe02Icon} size={16} />
+                Web search
+                {!isSearchDisabled && enableSearch && (
+                  <HugeiconsIcon
+                    icon={Tick02Icon}
+                    size={14}
+                    className="ml-auto"
+                  />
+                )}
+              </DropdownMenuItem>
+            </TooltipTrigger>
+            {isSearchDisabled && (
+              <TooltipContent side="right" sideOffset={4}>
+                This model doesn&apos;t support web search
+              </TooltipContent>
+            )}
+          </Tooltip>
         </DropdownMenuContent>
       </DropdownMenu>
     </>
