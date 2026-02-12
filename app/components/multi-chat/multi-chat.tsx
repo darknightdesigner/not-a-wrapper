@@ -51,10 +51,17 @@ type SubmissionRecord = {
   pendingModels: Set<string>
 }
 
-// v5 helper: Extract text content from UIMessage parts array
+// Extract text content from all text parts in order.
 function getMessageText(message: MessageType): string {
-  const textPart = message.parts?.find((p) => p.type === "text")
-  return (textPart as { text?: string })?.text || ""
+  if (!message.parts || message.parts.length === 0) return ""
+
+  let text = ""
+  for (const part of message.parts) {
+    if (part.type === "text" && "text" in part) {
+      text += part.text
+    }
+  }
+  return text
 }
 
 export function MultiChat() {

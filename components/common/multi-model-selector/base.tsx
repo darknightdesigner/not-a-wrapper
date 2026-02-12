@@ -420,7 +420,7 @@ export function MultiModelSelector({
             Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
           </TooltipContent>
           <DropdownMenuContent
-            className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
+            className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
             side="top"

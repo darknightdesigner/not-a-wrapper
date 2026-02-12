@@ -91,8 +91,7 @@ function SidebarProvider({
     if (cookieValue !== undefined && cookieValue !== _open) {
       _setOpen(cookieValue)
     }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time cookie sync on mount; getSidebarStateFromCookie reads document.cookie (unavailable during SSR)
   }, [])
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {

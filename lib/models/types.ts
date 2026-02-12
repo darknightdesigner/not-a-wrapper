@@ -1,4 +1,5 @@
 import { LanguageModelV3 } from '@ai-sdk/provider'
+import type { ToolCapabilities } from "@/lib/tools/types"
 
 type ModelConfig = {
   id: string // "gpt-5-mini" // same from AI SDKs
@@ -12,16 +13,25 @@ type ModelConfig = {
   tags?: string[] // ["fast", "cheap", "vision", "OSS"]
 
   contextWindow?: number // in tokens
+  maxOutput?: number // max output tokens (used for thinking budget allocation)
   inputCost?: number // USD per 1M input tokens
   outputCost?: number // USD per 1M output tokens
   priceUnit?: string // "per 1M tokens", "per image", etc.
 
   vision?: boolean
-  tools?: boolean
+  tools?: boolean | ToolCapabilities
   audio?: boolean
   reasoningText?: boolean
   webSearch?: boolean
   openSource?: boolean
+
+  /**
+   * Thinking mode for this model.
+   *   - "adaptive" — model dynamically allocates thinking budget (Opus 4.6+)
+   *   - "enabled"  — fixed budget via budgetTokens (default for older models)
+   *   - undefined  — inherit from reasoningText flag (backward compat)
+   */
+  thinkingMode?: "adaptive" | "enabled"
 
   speed?: "Fast" | "Medium" | "Slow"
   intelligence?: "Low" | "Medium" | "High"
@@ -34,10 +44,7 @@ type ModelConfig = {
   icon?: string // e.g. "gpt-4", "claude", "mistral", or custom string
 
   // apiSdk?: () => LanguageModelV3 // "openai("gpt-5-mini")"
-  apiSdk?: (
-    apiKey?: string,
-    opts?: { enableSearch?: boolean }
-  ) => LanguageModelV3
+  apiSdk?: (apiKey?: string) => LanguageModelV3
 
   accessible?: boolean // true if the model is accessible to the user
 }

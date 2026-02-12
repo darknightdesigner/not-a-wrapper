@@ -26,7 +26,80 @@ export interface ToolMetadata {
    * Omit if the tool has no marginal cost or cost is unknown.
    */
   estimatedCostPer1k?: number
+  /**
+   * Maximum result size in bytes for this specific tool.
+   * Overrides the global MAX_TOOL_RESULT_SIZE when set.
+   * Use for tools that legitimately need larger results (e.g., code execution: 500KB).
+   */
+  maxResultSize?: number
+  /**
+   * Whether this tool is read-only (no side effects).
+   * Used by prepareStep to restrict tools after initial steps.
+   * Default: true for search tools, false for write tools.
+   */
+  readOnly?: boolean
 }
 
-// NOTE: ToolCapabilities interface (granular per-capability control) is deferred
-// to Phase 7 when code execution is added. Phases 1-5 use `tools !== false`.
+/**
+ * Standardized tool result envelope for Layer 2 (third-party) tools.
+ * Layer 1 (provider) tools return opaque results — do NOT wrap them.
+ * Layer 3 (MCP) tools return their own format — do NOT wrap them.
+ *
+ * IMPORTANT: Only used for the SUCCESS path. On error, tools should
+ * throw so the AI SDK sets isError: true — this preserves correct
+ * success detection in onFinish, PostHog events, and audit logs.
+ *
+ * This envelope enables:
+ * - Structured success data with metadata
+ * - Tool result caching (hash the envelope for dedup)
+ * - Observability via meta field (duration, result count)
+ */
+export interface ToolResultEnvelope<T = unknown> {
+  ok: boolean
+  data: T | null
+  error: string | null
+  meta: {
+    tool: string
+    source: string
+    durationMs: number
+    [key: string]: unknown
+  }
+}
+
+/**
+ * Granular per-capability control for model tool access.
+ * Replaces the binary `tools?: boolean` in ModelConfig.
+ *
+ * All fields default to `true` when omitted — preserves backward
+ * compatibility with existing `tools: undefined` (all tools enabled).
+ *
+ * When `tools: false` on a ModelConfig, ALL capabilities are disabled.
+ * When `tools: ToolCapabilities`, individual capabilities can be toggled.
+ */
+export interface ToolCapabilities {
+  /** Web search (Layer 1 provider tools + Layer 2 Exa). Default: true */
+  search?: boolean
+  /** Code execution (provider sandboxes, future). Default: true */
+  code?: boolean
+  /** MCP server tools (Layer 3). Default: true */
+  mcp?: boolean
+}
+
+/**
+ * Resolve a ModelConfig.tools value into individual capability flags.
+ * Handles the boolean → ToolCapabilities migration.
+ *
+ * @param tools - The raw tools value from ModelConfig
+ * @returns Resolved capabilities (all default to true)
+ */
+export function resolveToolCapabilities(
+  tools: boolean | ToolCapabilities | undefined
+): Required<ToolCapabilities> {
+  if (tools === false) return { search: false, code: false, mcp: false }
+  if (tools === true || tools === undefined) return { search: true, code: true, mcp: true }
+  return {
+    search: tools.search !== false,
+    code: tools.code !== false,
+    mcp: tools.mcp !== false,
+  }
+}

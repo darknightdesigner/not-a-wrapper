@@ -15,6 +15,7 @@ import {
   RefreshIcon,
   Tick02Icon,
   Copy01Icon,
+  Alert02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useCallback, useRef } from "react"
 import { getSources } from "./get-sources"
@@ -37,6 +38,7 @@ type MessageAssistantProps = {
   className?: string
   messageId: string
   onQuote?: (text: string, messageId: string) => void
+  finishReason?: string
 }
 
 export function MessageAssistant({
@@ -51,6 +53,7 @@ export function MessageAssistant({
   className,
   messageId,
   onQuote,
+  finishReason,
 }: MessageAssistantProps) {
   const { preferences } = useUserPreferences()
   const sources = getSources(parts || [])
@@ -157,6 +160,24 @@ export function MessageAssistant({
         )}
 
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
+
+        {finishReason === "length" && status !== "streaming" && (
+          <div className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
+            <HugeiconsIcon icon={Alert02Icon} size={14} className="text-amber-500 dark:text-amber-400" />
+            <span>
+              Response may be incomplete due to output length limits.
+              {onReload && (
+                <button
+                  type="button"
+                  onClick={onReload}
+                  className="text-primary ml-1 underline underline-offset-2 hover:no-underline"
+                >
+                  Regenerate
+                </button>
+              )}
+            </span>
+          </div>
+        )}
 
         {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
           <MessageActions

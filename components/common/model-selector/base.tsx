@@ -159,21 +159,7 @@ export function ModelSelector({
         <Tooltip>
           <TooltipTrigger asChild>
             <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
-                  className
-                )}
-                type="button"
-              >
-                {currentProvider?.icon && (
-                  <currentProvider.icon className="size-5" />
-                )}
-                {currentModel?.name}
-                <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
-              </Button>
+              {trigger}
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Select a model</TooltipContent>
@@ -266,7 +252,7 @@ export function ModelSelector({
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Switch model ⌘⇧P</TooltipContent>
           <DropdownMenuContent
-            className="flex h-[320px] w-[300px] flex-col space-y-0.5 overflow-visible p-0"
+            className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
             side="top"

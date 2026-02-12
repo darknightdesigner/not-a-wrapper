@@ -214,6 +214,14 @@ export const DEFAULT_MAX_STEP_COUNT = 10
 export const ANONYMOUS_MAX_STEP_COUNT = 5
 
 /**
+ * Step number after which prepareStep restricts tools to read-only.
+ * The model has full tool access for the first N steps; after this
+ * threshold, only tools explicitly marked as readOnly: true remain.
+ * MCP tools are conservatively included (can't classify read/write yet).
+ */
+export const PREPARE_STEP_THRESHOLD = 3
+
+/**
  * Timeout for individual third-party tool executions (in milliseconds).
  * Provider tools (Layer 1) are server-side and have their own timeouts.
  * Third-party tools (Layer 2) make outbound HTTP requests that could hang.

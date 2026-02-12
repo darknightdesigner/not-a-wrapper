@@ -9,10 +9,19 @@ import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
 
-// v6 helper: Extract text content from UIMessage parts array
+// v6 helper: Extract text content from all text parts in order.
+// Tool-enabled responses can interleave multiple assistant text parts across
+// steps; using only the first part makes responses appear truncated.
 function getMessageText(message: MessageType): string {
-  const textPart = message.parts?.find((p) => p.type === "text")
-  return (textPart as { text?: string })?.text || ""
+  if (!message.parts || message.parts.length === 0) return ""
+
+  let text = ""
+  for (const part of message.parts) {
+    if (part.type === "text" && "text" in part) {
+      text += part.text
+    }
+  }
+  return text
 }
 
 // Extract file attachments from parts array
@@ -36,6 +45,7 @@ type ConversationProps = {
   onReload: () => void
   onQuote?: (text: string, messageId: string) => void
   isUserAuthenticated?: boolean
+  lastFinishReason?: string
 }
 
 export function Conversation({
@@ -46,6 +56,7 @@ export function Conversation({
   onReload,
   onQuote,
   isUserAuthenticated,
+  lastFinishReason,
 }: ConversationProps) {
   // Use state to capture initial message count once on mount
   const [initialCount] = useState(() => messages.length)
@@ -90,6 +101,7 @@ export function Conversation({
                   (message as ExtendedMessageAISDK).message_group_id ?? null
                 }
                 isUserAuthenticated={isUserAuthenticated}
+                finishReason={isLast ? lastFinishReason : undefined}
               >
                 {getMessageText(message)}
               </Message>

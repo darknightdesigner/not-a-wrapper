@@ -6,6 +6,8 @@ import {
   MCP_MAX_STEP_COUNT,
   DEFAULT_MAX_STEP_COUNT,
   ANONYMOUS_MAX_STEP_COUNT,
+  ANTHROPIC_BETA_HEADERS,
+  PREPARE_STEP_THRESHOLD,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -31,6 +33,8 @@ import {
   loadUserMcpTools,
   type LoadToolsResult,
 } from "@/lib/mcp/load-tools"
+import { resolveToolCapabilities } from "@/lib/tools/types"
+import { wrapToolsWithTruncation } from "@/lib/tools/utils"
 
 export const maxDuration = 60
 
@@ -190,7 +194,8 @@ export async function POST(req: Request) {
     let builtInTools: ToolSet = {} as ToolSet
     let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-    const shouldInjectSearch = enableSearch && modelConfig.tools !== false
+    const capabilities = resolveToolCapabilities(modelConfig.tools)
+    const shouldInjectSearch = enableSearch && capabilities.search
 
     if (shouldInjectSearch) {
       const { getProviderTools } = await import("@/lib/tools/provider")
@@ -254,7 +259,7 @@ export async function POST(req: Request) {
     if (
       isAuthenticated &&
       convexToken &&
-      modelConfig.tools !== false
+      capabilities.mcp
     ) {
       const mcpLoadStart = Date.now()
       const mcpResult = await loadUserMcpTools(convexToken, {
@@ -285,6 +290,15 @@ export async function POST(req: Request) {
       after(async () => {
         await Promise.allSettled(mcpClients.map((c) => c.close()))
       })
+    }
+
+    // Wrap MCP tools with result truncation before merging.
+    // MCP tools connect to arbitrary user-configured servers that can return
+    // unbounded results. Unlike Layer 1 (provider-managed limits) and Layer 2
+    // (Exa's own maxCharacters + explicit truncation), Layer 3 has no built-in
+    // size safety net.
+    if (Object.keys(mcpTools).length > 0) {
+      mcpTools = wrapToolsWithTruncation(mcpTools) as ToolSet
     }
 
     // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
@@ -360,17 +374,62 @@ export async function POST(req: Request) {
 
     // Build provider-specific options to enable reasoning/thinking when
     // the selected model advertises support (reasoningText: true).
+    //
+    // Anthropic thinking configuration is context-aware:
+    //   - Models with thinkingMode: "adaptive" (Opus 4.6+) use Anthropic's
+    //     adaptive allocation — the recommended mode per Anthropic's docs.
+    //     "enabled" with budget_tokens is deprecated on Opus 4.6.
+    //   - Older models use "enabled" with a fixed budgetTokens.
+    //
+    // IMPORTANT: Server-side web search results (encrypted_content) are
+    // counted as INPUT tokens, not output tokens. They do NOT consume from
+    // the max_tokens budget. (Source: Anthropic web search tool docs)
+    //
+    // SDK LIMITATION (ai@6.0.78 / @ai-sdk/anthropic@3.0.41):
+    // When adaptive thinking is used with server-side tools (web search),
+    // the Anthropic API may return stop_reason: "pause_turn" — indicating
+    // the model needs a follow-up request to continue generating text. The
+    // AI SDK maps "pause_turn" to the same unified finishReason as "end_turn"
+    // ("stop") and the step continuation logic does not re-send the
+    // conversation. This results in responses with reasoning + tool results
+    // but zero text content.
+    //
+    // WORKAROUND: When search tools are active, fall back to "enabled"
+    // thinking with a conservative budget. This produces a complete response
+    // in a single API call (no pause_turn). For non-search requests,
+    // adaptive thinking works correctly and is preferred.
     const providerOptions: ProviderOptions = {}
 
     if (modelConfig.reasoningText) {
       if (provider === "anthropic") {
-        let budgetTokens = 10000 // default
-        if (model.includes("opus")) budgetTokens = 16000
-        else if (model.includes("haiku")) budgetTokens = 5000
-        else if (model.includes("sonnet")) budgetTokens = 12000
+        if (modelConfig.thinkingMode === "adaptive") {
+          if (shouldInjectSearch) {
+            // Adaptive + server-side web search triggers pause_turn in the
+            // Anthropic API, which the AI SDK does not handle (see above).
+            // Fall back to "enabled" with a budget that leaves ample room
+            // for text output. Search results are input tokens, so they
+            // don't consume from max_tokens — no reduction needed.
+            providerOptions.anthropic = {
+              thinking: { type: "enabled", budgetTokens: 10000 },
+            }
+          } else {
+            // Opus 4.6+ without search — use adaptive thinking as recommended.
+            // The model dynamically allocates between thinking and text, with
+            // interleaved thinking automatically enabled for tool use.
+            providerOptions.anthropic = {
+              thinking: { type: "adaptive" },
+            }
+          }
+        } else {
+          // Older models — fixed budget.
+          let budgetTokens = 10000 // default
+          if (model.includes("opus")) budgetTokens = 16000
+          else if (model.includes("haiku")) budgetTokens = 5000
+          else if (model.includes("sonnet")) budgetTokens = 12000
 
-        providerOptions.anthropic = {
-          thinking: { type: "enabled", budgetTokens },
+          providerOptions.anthropic = {
+            thinking: { type: "enabled", budgetTokens },
+          }
         }
       } else if (provider === "google") {
         providerOptions.google = {
@@ -387,13 +446,92 @@ export async function POST(req: Request) {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // Anthropic Token-Efficient Tool Use
+    //
+    // When Anthropic models have tools injected, enable the token-efficient
+    // beta header to reduce tool definition token consumption. This header
+    // is request-scoped via streamText({ headers }) — only affects Anthropic
+    // requests that actually include tools.
+    //
+    // The header is safe to apply: @ai-sdk/anthropic@3.0.41 comma-merges
+    // user and inferred betas (getBetasFromHeaders + Array.from(betas).join(",")).
+    // -----------------------------------------------------------------------
+    const requestHeaders: Record<string, string> = {}
+
+    if (provider === "anthropic" && hasAnyTools) {
+      requestHeaders["anthropic-beta"] = ANTHROPIC_BETA_HEADERS.tokenEfficient
+    }
+
+    // Collect all tool metadata for prepareStep tool restriction.
+    // Merge built-in + third-party metadata (MCP metadata not available here —
+    // MCP tools are conservatively included in the safe list).
+    const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+
+    const streamStartMs = Date.now()
+
     const result = streamText({
       model: aiModel,
       system: effectiveSystemPrompt,
       messages: modelMessages,
       tools: allTools,
       stopWhen: stepCountIs(maxSteps),
+
+      // Restrict tools after PREPARE_STEP_THRESHOLD to prevent runaway
+      // tool chains. Only tools explicitly marked readOnly: true remain
+      // available. MCP tools are conservatively included (can't classify
+      // read/write yet). Unclassified non-MCP tools are restricted
+      // (fail closed — new tools must opt in via readOnly: true).
+      prepareStep: hasAnyTools
+        ? async ({ stepNumber }) => {
+            if (stepNumber <= PREPARE_STEP_THRESHOLD) return {}
+
+            // Build safe tool list: only tools explicitly marked readOnly.
+            // New tools that omit readOnly default to RESTRICTED (fail closed).
+            const safeTools: string[] = []
+            for (const [name, meta] of allToolMetadata) {
+              if (meta.readOnly === true) safeTools.push(name)
+            }
+            // Include all MCP tools (can't classify read/write yet)
+            for (const name of Object.keys(mcpTools)) {
+              if (!safeTools.includes(name)) safeTools.push(name)
+            }
+
+            // Fail closed: if no safe tools found, no tools available.
+            // This is intentional — prevents unrestricted tool access
+            // if readOnly metadata is misconfigured.
+            return { activeTools: safeTools }
+          }
+        : undefined,
+
+      // Per-step structured tracing.
+      // Captures tool name, duration, token usage, and success per step.
+      // This data feeds into the existing toolCallLog for trajectory analysis
+      // and future trace-based evaluation.
+      onStepFinish: ({ toolCalls, toolResults, usage, finishReason }) => {
+        if (process.env.NODE_ENV !== "production" && toolCalls.length > 0) {
+          for (const call of toolCalls) {
+            const result = toolResults.find(
+              (r) => r.toolCallId === call.toolCallId
+            )
+            const success = result
+              ? !(result as { isError?: boolean }).isError
+              : false
+            const meta = allToolMetadata.get(call.toolName)
+
+            console.log(
+              `[tools/step] ${meta?.displayName ?? call.toolName} ` +
+              `(${meta?.source ?? "unknown"}) — ` +
+              `success: ${success}, ` +
+              `tokens: ${usage?.inputTokens ?? "?"}in/${usage?.outputTokens ?? "?"}out, ` +
+              `finishReason: ${finishReason}`
+            )
+          }
+        }
+      },
+
       ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
+      ...(Object.keys(requestHeaders).length > 0 && { headers: requestHeaders }),
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
@@ -425,7 +563,41 @@ export async function POST(req: Request) {
         }
       },
 
-      onFinish: ({ text, usage, steps }) => {
+      onFinish: ({ text, usage, steps, finishReason }) => {
+        // ---------------------------------------------------------------
+        // Finish reason observability
+        // Log when the response was truncated (finishReason: "length")
+        // so we can detect max_tokens exhaustion in dev and production.
+        // ---------------------------------------------------------------
+        if (finishReason === "length") {
+          console.warn(
+            `[chat] Response truncated (finishReason: "length") — model: ${model}, ` +
+            `outputTokens: ${usage?.outputTokens ?? "?"}, ` +
+            `inputTokens: ${usage?.inputTokens ?? "?"}`
+          )
+        }
+        if (process.env.NODE_ENV !== "production") {
+          // Log both unified and raw finish reasons. The raw reason reveals
+          // provider-specific signals (e.g. Anthropic's "pause_turn" vs
+          // "end_turn") that the unified reason collapses into "stop".
+          const rawReason = steps?.[steps.length - 1]?.rawFinishReason
+          console.log(
+            `[chat] finishReason: ${finishReason}` +
+            `${rawReason && rawReason !== finishReason ? ` (raw: ${rawReason})` : ""}, ` +
+            `model: ${model}, ` +
+            `tokens: ${usage?.inputTokens ?? "?"}in/${usage?.outputTokens ?? "?"}out, ` +
+            `text: ${text?.length ?? 0} chars`
+          )
+        }
+
+        if (process.env.NODE_ENV !== "production" && provider === "anthropic" && hasAnyTools) {
+          console.log(
+            `[chat] Anthropic tool usage — inputTokens: ${usage?.inputTokens ?? "?"}, ` +
+            `toolCount: ${Object.keys(allTools).length}, ` +
+            `tokenEfficient: true`
+          )
+        }
+
         // Manually capture LLM generation for PostHog analytics
         // This ensures accurate output capture (withTracing has issues with streaming)
         if (phClient) {
@@ -444,6 +616,7 @@ export async function POST(req: Request) {
               properties: {
                 isAuthenticated,
                 messageGroupId: message_group_id,
+                finishReason,
               },
             })
 
@@ -586,6 +759,11 @@ export async function POST(req: Request) {
                         ? JSON.stringify(toolResult.output).slice(0, 500)
                         : undefined,
                       success,
+                      // NOTE: This is the full response duration (stream start → onFinish),
+                      // not per-tool-call duration. Per-tool timing requires wrapping each
+                      // tool's execute function, which is deferred to a future phase.
+                      // Still useful for identifying slow conversations.
+                      durationMs: Date.now() - streamStartMs,
                       source: meta.source,
                       serviceName: meta.serviceName,
                     },

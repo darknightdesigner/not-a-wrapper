@@ -52,7 +52,7 @@ export function useMultiChat(
 
   // Create a fixed number of useChat hooks to avoid conditional hook calls
   const chatHooks = Array.from({ length: MAX_MODELS }, (_, index) =>
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+    // eslint-disable-next-line react-hooks/rules-of-hooks -- MAX_MODELS is a compile-time constant; hook count is always fixed at 10
     useChat({
       onFinish: ({ message, isAbort, isDisconnect, isError }) => {
         if (isAbort || isDisconnect || isError) return
@@ -118,7 +118,7 @@ export function useMultiChat(
     })
 
     return instances
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dynamic dep spread via flatMap; ESLint cannot statically analyze computed dependency arrays
   }, [models, ...chatHooks.flatMap((chat) => [chat.messages, chat.status, chat.error])])
 
   return activeChatInstances

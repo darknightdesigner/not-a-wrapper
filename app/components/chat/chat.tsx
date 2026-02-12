@@ -113,6 +113,7 @@ export function Chat() {
     isSubmitting,
     enableSearch,
     setEnableSearch,
+    lastFinishReason,
     submit,
     handleSuggestion,
     handleReload,
@@ -147,6 +148,7 @@ export function Chat() {
       onReload: handleReload,
       onQuote: handleQuotedSelected,
       isUserAuthenticated: isAuthenticated,
+      lastFinishReason,
     }),
     [
       messages,
@@ -156,6 +158,7 @@ export function Chat() {
       handleReload,
       handleQuotedSelected,
       isAuthenticated,
+      lastFinishReason,
     ]
   )
 
