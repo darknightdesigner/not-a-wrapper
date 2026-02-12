@@ -1,4 +1,5 @@
 import { LanguageModelV3 } from '@ai-sdk/provider'
+import type { ToolCapabilities } from "@/lib/tools/types"
 
 type ModelConfig = {
   id: string // "gpt-5-mini" // same from AI SDKs
@@ -18,7 +19,7 @@ type ModelConfig = {
   priceUnit?: string // "per 1M tokens", "per image", etc.
 
   vision?: boolean
-  tools?: boolean
+  tools?: boolean | ToolCapabilities
   audio?: boolean
   reasoningText?: boolean
   webSearch?: boolean
@@ -43,10 +44,7 @@ type ModelConfig = {
   icon?: string // e.g. "gpt-4", "claude", "mistral", or custom string
 
   // apiSdk?: () => LanguageModelV3 // "openai("gpt-5-mini")"
-  apiSdk?: (
-    apiKey?: string,
-    opts?: { enableSearch?: boolean }
-  ) => LanguageModelV3
+  apiSdk?: (apiKey?: string) => LanguageModelV3
 
   accessible?: boolean // true if the model is accessible to the user
 }

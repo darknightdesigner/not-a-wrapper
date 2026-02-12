@@ -4,6 +4,7 @@ import { tool } from "ai"
 import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
+import { truncateToolResult } from "./utils"
 
 /**
  * Configuration for third-party tool loading.
@@ -79,18 +80,43 @@ export async function getThirdPartyTools(
             .describe("The search query — be specific for better results"),
         }),
         execute: async ({ query }) => {
-          const { results } = await exa.searchAndContents(query, {
-            type: "auto",
-            numResults: 5,
-            text: { maxCharacters: 2000 },
-            livecrawl: "fallback",
-          })
-          return results.map((r) => ({
-            title: r.title ?? undefined,
-            url: r.url,
-            content: r.text?.slice(0, 2000),
-            publishedDate: r.publishedDate ?? undefined,
-          }))
+          const startMs = Date.now()
+          try {
+            const { results } = await exa.searchAndContents(query, {
+              type: "auto",
+              numResults: 5,
+              text: { maxCharacters: 2000 },
+              livecrawl: "fallback",
+            })
+            const mapped = results.map((r) => ({
+              title: r.title ?? undefined,
+              url: r.url,
+              content: r.text?.slice(0, 2000),
+              publishedDate: r.publishedDate ?? undefined,
+            }))
+            return {
+              ok: true,
+              data: truncateToolResult(mapped),
+              error: null,
+              meta: {
+                tool: "web_search",
+                source: "exa",
+                durationMs: Date.now() - startMs,
+                resultCount: results.length,
+              },
+            }
+          } catch (err) {
+            // Log for observability, then re-throw so the AI SDK sets isError: true
+            // on the tool result. This preserves correct success detection in
+            // onFinish (PostHog events, audit logs). The SDK passes the error
+            // message to the model as a tool result — the model can still
+            // explain "search failed" without the app crashing.
+            console.error(
+              `[tools/exa] Search failed after ${Date.now() - startMs}ms:`,
+              err instanceof Error ? err.message : String(err)
+            )
+            throw err
+          }
         },
       })
       metadata.set("web_search", {
@@ -99,6 +125,7 @@ export async function getThirdPartyTools(
         serviceName: "Exa",
         icon: "search",
         estimatedCostPer1k: 5, // $5/1K search requests (1-25 results per request)
+        readOnly: true,
       })
     } catch (err) {
       console.error("[tools/third-party] Failed to load Exa search:", err)

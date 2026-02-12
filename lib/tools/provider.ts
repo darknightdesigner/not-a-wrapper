@@ -61,6 +61,7 @@ export async function getProviderTools(
         serviceName: "OpenAI",
         icon: "search",
         estimatedCostPer1k: 30, // ~$25-50/1K depending on searchContextSize
+        readOnly: true,
       })
       break
     }
@@ -75,6 +76,7 @@ export async function getProviderTools(
         serviceName: "Anthropic",
         icon: "search",
         estimatedCostPer1k: 10, // Usage-based, varies
+        readOnly: true,
       })
       break
     }
@@ -88,6 +90,7 @@ export async function getProviderTools(
         serviceName: "Google",
         icon: "search",
         estimatedCostPer1k: 35, // Grounding billing started Jan 5, 2026
+        readOnly: true,
       })
       break
     }
@@ -102,6 +105,7 @@ export async function getProviderTools(
         serviceName: "xAI",
         icon: "search",
         estimatedCostPer1k: 0, // Included in Grok API pricing
+        readOnly: true,
       })
       break
     }
