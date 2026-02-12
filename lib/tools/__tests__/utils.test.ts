@@ -114,6 +114,41 @@ describe("truncateToolResult", () => {
       expect(result.data.length).toBeGreaterThan(0)
     })
 
+    it("falls back to empty array when a single element exceeds budget", () => {
+      // Single oversized element — loop body never executes
+      const items = [{ data: "x".repeat(2000) }]
+      const result = truncateToolResult(items, 100) as {
+        _truncated: boolean
+        _originalCount: number
+        _returnedCount: number
+        data: unknown[]
+      }
+
+      expect(result._truncated).toBe(true)
+      expect(result._originalCount).toBe(1)
+      expect(result._returnedCount).toBe(0)
+      expect(result.data).toEqual([])
+    })
+
+    it("falls back to empty array when halving leaves one oversized element", () => {
+      // Multiple items where even a single item exceeds budget
+      const items = Array.from({ length: 8 }, (_, i) => ({
+        id: i,
+        content: "x".repeat(500),
+      }))
+      const result = truncateToolResult(items, 100) as {
+        _truncated: boolean
+        _originalCount: number
+        _returnedCount: number
+        data: unknown[]
+      }
+
+      expect(result._truncated).toBe(true)
+      expect(result._originalCount).toBe(8)
+      expect(result._returnedCount).toBe(0)
+      expect(result.data).toEqual([])
+    })
+
     it("preserves array item structure", () => {
       const items = Array.from({ length: 50 }, (_, i) => ({
         title: `Item ${i}`,

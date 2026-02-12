@@ -61,7 +61,7 @@ function Button({
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       render={adapted.render}
-      nativeButton={adapted.render ? renderedAsNativeButton : nativeButton}
+      nativeButton={adapted.render ? (nativeButton ?? renderedAsNativeButton) : nativeButton}
       {...props}
     >
       {adapted.children}

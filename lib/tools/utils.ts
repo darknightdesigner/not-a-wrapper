@@ -51,6 +51,16 @@ export function truncateToolResult(
       const size = new TextEncoder().encode(safeStringify(items)).length
       if (size <= maxBytes * 0.95) break // leave room for metadata
     }
+
+    // Final size check: if the last remaining element is still oversized,
+    // fall back to an empty array so the wrapper stays within budget.
+    if (items.length > 0) {
+      const finalSize = new TextEncoder().encode(safeStringify(items)).length
+      if (finalSize > maxBytes * 0.95) {
+        items = []
+      }
+    }
+
     return {
       _truncated: true,
       _originalCount: result.length,

@@ -2,7 +2,7 @@
 
 > **Date**: February 12, 2026
 > **Scope**: Deep codebase analysis of [Open WebUI](https://github.com/open-webui/open-webui) (124k stars) compared against Not A Wrapper
-> **Documents synthesized**: 10 research docs (5 Phase 1 deep-dives, 4 Phase 2 comparisons, 1 Phase 3 synthesis)
+> **Documents synthesized**: 11 research docs (1 research plan, 5 Phase 1 deep-dives, 4 Phase 2 comparisons, 1 Phase 3 synthesis)
 > **Evidence base**: 80 coded claims, 94% high-confidence, sourced from Open WebUI v0.7.2
 
 ---

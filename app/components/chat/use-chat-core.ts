@@ -170,6 +170,9 @@ export function useChatCore({
       stopRef.current()
     }
 
+    // Clear stale finish reason so truncation indicators don't carry over
+    setLastFinishReason(undefined)
+
     // When navigating to home, clear messages and reset tracking state
     if (chatId === null) {
       setMessages([])

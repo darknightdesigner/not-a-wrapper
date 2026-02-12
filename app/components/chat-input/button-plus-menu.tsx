@@ -114,7 +114,7 @@ export function ButtonPlusMenu({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuItem
-                disabled={!isFileUploadAvailable}
+                aria-disabled={!isFileUploadAvailable || undefined}
                 className={!isFileUploadAvailable ? "cursor-not-allowed opacity-50" : ""}
                 onClick={() => {
                   if (!isFileUploadAvailable) return
