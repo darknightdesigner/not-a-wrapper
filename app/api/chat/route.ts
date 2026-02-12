@@ -451,7 +451,7 @@ export async function POST(req: Request) {
             // Replaces the previous MCP-only mcp_tool_call event.
             if (steps) {
               // Combine all metadata maps for source identification
-              const allToolMetadata = new Map([...builtInToolMetadata])
+              const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
               for (const step of steps) {
                 if (step.toolCalls) {
@@ -553,8 +553,8 @@ export async function POST(req: Request) {
         // Audit log: persist built-in + third-party tool calls (fire-and-forget).
         // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
         if (convexToken && steps) {
-          // Combine built-in (and future third-party) metadata maps
-          const nonMcpMetadata = new Map([...builtInToolMetadata])
+          // Combine built-in and third-party metadata maps
+          const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
           if (nonMcpMetadata.size > 0) {
             for (const step of steps) {

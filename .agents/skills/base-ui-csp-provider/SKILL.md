@@ -129,18 +129,30 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 }
 ```
 
-Configure your middleware to generate and attach the nonce:
+Configure your proxy (or middleware) to generate and attach the nonce:
+
+> **Next.js 16+**: The `middleware.ts` file convention has been renamed to `proxy.ts` and the exported function to `proxy`. Run `npx @next/codemod@canary middleware-to-proxy .` to migrate. The pattern below works with either convention.
 
 ```ts
-// middleware.ts
+// proxy.ts  (Next.js 16+)  —  or middleware.ts (Next.js 15 and earlier)
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID();
-  const response = NextResponse.next();
 
-  response.headers.set('x-nonce', nonce);
+  // Forward the nonce on the *request* headers so that
+  // `headers()` in Server Components can read it.
+  // NextResponse.next({ request: { headers } }) sends headers upstream,
+  // NOT to the client.  See: https://nextjs.org/docs/app/api-reference/functions/next-response#next
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  const response = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
+
+  // The CSP header goes on the *response* (sent to the browser).
   response.headers.set(
     'Content-Security-Policy',
     [

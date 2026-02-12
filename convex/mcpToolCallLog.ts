@@ -61,7 +61,7 @@ export const log = mutation({
       }
     }
 
-    return await ctx.db.insert("mcpToolCallLog", {
+    return await ctx.db.insert("toolCallLog", {
       userId: user._id,
       chatId: args.chatId,
       serverId: args.serverId,
@@ -73,6 +73,7 @@ export const log = mutation({
       durationMs: args.durationMs,
       error: args.error ? truncatePreview(args.error) : undefined,
       createdAt: Date.now(),
+      source: "mcp" as const,
     })
   },
 })
@@ -103,7 +104,7 @@ export const listByChat = query({
     if (!chat || chat.userId !== user._id) return []
 
     return await ctx.db
-      .query("mcpToolCallLog")
+      .query("toolCallLog")
       .withIndex("by_chat", (q) => q.eq("chatId", chatId))
       .order("desc")
       .collect()
@@ -132,7 +133,7 @@ export const listByUser = query({
     }
 
     return await ctx.db
-      .query("mcpToolCallLog")
+      .query("toolCallLog")
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .order("desc")
       .paginate(args.paginationOpts)
