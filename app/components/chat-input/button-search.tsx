@@ -44,8 +44,8 @@ export function ButtonSearch({
       variant="ghost"
       className={cn(
         "rounded-full transition-all duration-150 has-[>svg]:px-1.75 md:has-[>svg]:px-3",
-        isSelected &&
-          "bg-[#E5F3FE] text-[#0091FF] hover:bg-[#E5F3FE] hover:text-[#0091FF]"
+        // TODO: Create a dedicated color variable for the search-selected state instead of reusing chart-1
+        isSelected && "text-chart-1"
       )}
       onClick={handleClick}
     >
