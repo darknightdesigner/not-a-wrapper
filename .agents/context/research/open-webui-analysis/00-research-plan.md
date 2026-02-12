@@ -9,6 +9,44 @@
 
 ## 1. Executive Context
 
+## 0. Research Quality Contract (Required)
+
+Every document in this research track must follow a shared evidence contract so Phase 3 can compare claims directly.
+
+### Required Evidence Record Per Major Claim
+
+Each major finding must include:
+
+| Field | Description |
+|-------|-------------|
+| `claim_id` | Unique ID (`A1-C01`, `A2B-C12`, etc.) |
+| `claim` | The assertion being made |
+| `evidence_type` | Code / issue-discussion / release-note / benchmark / docs |
+| `source_refs` | File paths or URLs used as evidence |
+| `confidence` | High / Medium / Low |
+| `impact_area` | Architecture / AI / data / UX / DX / security / cost |
+| `reversibility` | Easy / Moderate / Hard to change later |
+| `stack_fit_for_naw` | Strong / Partial / Weak |
+| `notes` | Caveats and assumptions |
+
+### Required Uncertainty Capture
+
+Each document must include:
+- Top 5 unresolved questions
+- What evidence would change the top conclusions ("falsification criteria")
+- Which claims are based on inference rather than direct evidence
+
+### Comparable vs. Non-Comparable Guardrail
+
+Agents must explicitly tag findings as one of:
+- **Directly Comparable**: same problem space and constraints
+- **Conditionally Comparable**: useful pattern, different infra assumptions
+- **Not Comparable**: tied to self-hosted/Python/long-running runtime assumptions NaW does not share
+
+This avoids false parity conclusions between Open WebUI's self-hosted monolith and NaW's serverless TypeScript stack.
+
+---
+
 ### Open WebUI at a Glance
 
 | Layer | Technology |
@@ -45,7 +83,7 @@
 
 ### Research Framing
 
-**This research mines for implementation patterns and architectural lessons — it does NOT rewrite the product roadmap.** The roadmap is established by `competitive-feature-analysis.md` (ChatGPT/Claude comparison, Feb 2026), which identified prioritized gaps based on direct competitor analysis.
+**This research mines for implementation patterns and architectural lessons.** The current roadmap is anchored by `competitive-feature-analysis.md` (ChatGPT/Claude comparison, Feb 2026), but this Open WebUI analysis is allowed to challenge or reorder existing assumptions when evidence is strong.
 
 **This research focuses on:**
 - **Implementation intelligence**: How did Open WebUI solve problems we'll also face? What patterns, abstractions, and architectures can we learn from?
@@ -54,6 +92,8 @@
 - **Community & growth signals**: How did a 124k-star project build its contributor ecosystem? What drove adoption?
 
 **Every analysis must assess both strengths AND weaknesses.** Feature inventories provide context, but the primary outputs are patterns, trade-offs, and lessons — not feature shopping lists. For every feature Open WebUI has, agents must assess whether NaW should **adopt** it (build it), **adapt** it (modify for our stack), or **deliberately skip** it (with documented rationale).
+
+**Bias control rule**: Do not defend existing NaW plans by default. Prefer disconfirming evidence over confirming evidence when both are available.
 
 ---
 
@@ -109,6 +149,8 @@
 | 08 | `08-comparison-ux-extensibility.md` | Agent 8 | 2 (parallel) | 04 | 01, 02, 02b, 03 + competitive analysis |
 | 09 | `09-prioritized-recommendations.md` | Synthesis | 3 (sequential) | 05-08 | competitive analysis + existing plans |
 
+> Note: This folder currently includes `00` + docs `01-09` + `02b` template (11 markdown files total). Execution outputs are the ten research documents `01`, `02`, `02b`, `03`, `04`, `05`, `06`, `07`, `08`, `09`.
+
 ---
 
 ## 3. Phase 1: Open WebUI Deep Dive
@@ -118,6 +160,7 @@
 **Mission**: Map Open WebUI's system architecture, code organization, patterns, and quality practices. Assess both strengths and weaknesses of their architectural decisions.
 
 **Scope Boundary**: Owns system architecture, code organization, patterns, middleware, auth flow, configuration, and testing. Database *schema design quality* is in scope, but database *engine internals, caching, and scaling* belong to Agent 3. Frontend *feature UX* belongs to Agent 4.
+**Do not duplicate**: deep RAG/vector backend internals (Agent 2B + 3), community popularity claims (Agent 4).
 
 **Key Questions to Answer**:
 1. How is the backend structured? (FastAPI app composition, router organization, middleware chain)
@@ -166,6 +209,7 @@ vite.config.ts                      # Build config
 **Mission**: Analyze how Open WebUI handles AI provider abstraction, model management, the chat completion pipeline (request → middleware → provider → response → storage), and the evaluation/arena system.
 
 **Scope Boundary**: Owns provider routing, middleware composition, streaming mechanics, model lifecycle, and evaluation/arena. Tool calling, MCP, RAG, code execution, image gen, audio, memories, and web search belong to Agent 2B. User-facing feature UX belongs to Agent 4.
+**Do not duplicate**: implementation internals for tools/MCP/RAG execution paths (Agent 2B).
 
 **Key Questions to Answer**:
 1. How do they abstract multiple AI providers? (Ollama proxy + OpenAI-compatible)
@@ -205,6 +249,7 @@ backend/open_webui/routers/tasks.py      # Title gen, tag gen, follow-ups
 **Mission**: Deeply analyze all capability subsystems that plug into the chat pipeline: tool calling, MCP, RAG, code execution, image generation, audio, memories, and web search. Assess both the implementation quality and the maintenance burden of supporting this breadth.
 
 **Scope Boundary**: Owns backend implementation of all tool/feature subsystems. The chat pipeline itself (providers, streaming, middleware) belongs to Agent 2A. User-facing feature UX belongs to Agent 4.
+**Timebox rule**: Prioritize depth in tool calling + MCP + RAG + memories first. Cover code execution/image/audio/search after core subsystems meet evidence-quality requirements.
 
 **Key Questions to Answer**:
 1. How does their tool/function calling system work? (native Python tools, BYOF)
@@ -255,6 +300,7 @@ backend/open_webui/models/memories.py    # Memory data model
 **Mission**: Analyze the database layer, caching strategy, real-time infrastructure, deployment model, and horizontal scaling approach. Assess operational burden for self-hosted users.
 
 **Scope Boundary**: Owns database engine internals, caching, real-time communication, file storage, deployment infrastructure, horizontal scaling, and observability. Database *schema design quality and code organization* belong to Agent 1. *Vector DB abstraction for RAG* is shared with Agent 2B — cover infrastructure/scaling here, Agent 2B covers pipeline logic.
+**Evidence rule**: Any throughput or concurrency statements require benchmark artifacts or maintainer-reported data; otherwise mark as unknown.
 
 **Key Questions to Answer**:
 1. How is the database structured? (SQLAlchemy models, migrations via Alembic, schema design)
@@ -299,6 +345,7 @@ backend/open_webui/utils/audit.py        # Audit logging middleware
 **Mission**: Catalog the complete feature set, analyze UX patterns, evaluate the plugin/extension system, assess developer experience, and investigate community dynamics and growth trajectory.
 
 **Scope Boundary**: Owns the **user-facing surface** — feature inventory, UX patterns, UI components, design system, i18n, RBAC, admin panel, plugin system, DX, and community/growth analysis. Backend implementation of AI features belongs to Agents 2A and 2B.
+**Quality-over-breadth rule**: If scope is too wide, prioritize: (1) UX coherence + discoverability, (2) extensibility model, (3) admin/RBAC relevance to NaW, (4) community signals. Capture lower-priority features as inventory notes, not deep analysis.
 
 **Key Questions to Answer**:
 1. What is the complete feature inventory? (every user-facing capability)
@@ -349,7 +396,9 @@ backend/open_webui/routers/pipelines.py  # Pipeline framework
 
 ## 4. Phase 2: Comparison & Mapping
 
-> **Critical Rule for All Phase 2 Agents**: Read ALL Phase 1 outputs before writing your comparison document. Your primary dependency defines your focus area, but reading the other tracks prevents siloed analysis. Also read `competitive-feature-analysis.md` for prior ChatGPT/Claude gap analysis — this document establishes the product roadmap priorities. This research should ADD the Open WebUI perspective, not replace prior competitive analysis.
+> **Critical Rule for All Phase 2 Agents**: Read ALL Phase 1 outputs before writing your comparison document. Your primary dependency defines your focus area, but reading the other tracks prevents siloed analysis. Also read `competitive-feature-analysis.md` for prior ChatGPT/Claude gap analysis — use it as baseline context, not a hard constraint. This research may refine or reprioritize roadmap assumptions when evidence warrants.
+
+> **Normalization Rule for All Phase 2 Agents**: Every recommendation must include confidence, evidence count, stack fit, and implementation dependency notes so synthesis can rank proposals consistently.
 
 ### Agent 5 — Architecture Comparison (`05-comparison-architecture.md`)
 
@@ -486,6 +535,19 @@ backend/open_webui/routers/pipelines.py  # Pipeline framework
 
 **Conflict Resolution**: When Phase 2 agents disagree, resolve by: (1) checking alignment with "universal AI interface" positioning, (2) assessing evidence strength, (3) documenting both positions and resolution rationale in the "Unresolved Conflicts" section if no clear winner.
 
+**Minimum recommendation payload** (required for each proposed change):
+- Recommendation title
+- Adopt / Adapt / Skip
+- Evidence summary (`claim_id` references)
+- Confidence (High/Medium/Low)
+- User impact (1-5)
+- Feasibility (1-5)
+- Time to value (days/weeks/months)
+- Operational cost impact (Low/Medium/High)
+- Security/compliance impact (Low/Medium/High)
+- Dependencies / blockers
+- Risk if wrong
+
 ---
 
 ## 6. Execution Guidelines
@@ -504,6 +566,9 @@ backend/open_webui/routers/pipelines.py  # Pipeline framework
 10. **Flag "gems"**: Particularly clever or well-designed patterns worth adopting
 11. **Flag "warnings"**: Anti-patterns, tech debt, or poor decisions to avoid
 12. **For every feature, assess**: Adopt (copy), Adapt (modify for NaW), or Skip (don't copy, with rationale)
+13. **Tag comparability**: Directly comparable / conditionally comparable / not comparable
+14. **Use confidence labels**: High/Medium/Low for each major conclusion
+15. **Separate facts from interpretation**: include an evidence table for all major claims
 
 ### For Phase 2 Agents (Additional)
 
@@ -511,6 +576,18 @@ backend/open_webui/routers/pipelines.py  # Pipeline framework
 14. **Read `competitive-feature-analysis.md`**: Understand established priorities before proposing new ones
 15. **Cross-reference existing plans**: Check `.agents/plans/` for existing implementation decisions
 16. **Flag conflicts**: If your recommendation contradicts another track or existing plan, note it explicitly
+17. **Add stack-fit checks**: Explicitly validate serverless + Convex compatibility for each recommendation
+18. **Avoid false parity**: Mark self-hosted-only Open WebUI capabilities as non-comparable unless a realistic NaW path exists
+
+### Phase 1.5: Evidence Normalization Gate (New, Required)
+
+Before Phase 2 begins, verify each Phase 1 document includes:
+- Completed evidence table for all major claims
+- Confidence labels for top conclusions
+- Uncertainty and falsification section
+- At least 3 concrete "adopt/adapt/skip" previews tied to evidence IDs
+
+If any Phase 1 doc fails this gate, fix it before launching Phase 2.
 
 ### Output Format for Each Document
 
@@ -553,15 +630,17 @@ Run agents 1, 2A, 2B, 3, 4 sequentially, then 5-8, then 9. ~5-7 hours total.
 
 ### Option B: Parallel (Multi-Agent)
 - **Batch 1**: Launch Agents 1, 2A, 2B, 3, 4 simultaneously → ~1-1.5 hours
-- **Batch 2**: Launch Agents 5, 6, 7, 8 simultaneously (using Phase 1 outputs) → ~1 hour
+- **Batch 1.5**: Run evidence normalization gate for docs 01-04 → ~20-30 minutes
+- **Batch 2**: Launch Agents 5, 6, 7, 8 simultaneously (using normalized Phase 1 outputs) → ~1 hour
 - **Batch 3**: Launch Agent 9 (using Phase 2 outputs) → ~30 minutes
-- **Total**: ~2.5-3 hours
+- **Total**: ~3-3.5 hours
 
 ### Option C: Hybrid (Recommended)
 - **Batch 1**: Launch Agents 1 + 2A + 2B (architecture + AI — the three highest-priority dimensions)
 - **Batch 2**: Launch Agents 3 + 4 (data + UX — can start slightly later)
-- **Batch 3**: Launch Agents 5 + 6 as soon as Batch 1 completes
-- **Batch 4**: Launch Agents 7 + 8 as soon as Batch 2 completes
+- **Gate**: Run evidence normalization check on completed Phase 1 docs
+- **Batch 3**: Launch Agents 5 + 6 as soon as Gate passes for docs 01/02/02b
+- **Batch 4**: Launch Agents 7 + 8 as soon as Gate passes for docs 03/04
 - **Batch 5**: Launch Agent 9 as soon as 5-8 complete
 
 ### Token Budget Warning
@@ -577,10 +656,12 @@ This research is complete when:
 - [ ] Every key Open WebUI subsystem is mapped and understood
 - [ ] Both strengths AND weaknesses are documented for every subsystem
 - [ ] Every feature is assessed as Adopt / Adapt / Skip with rationale
+- [ ] Every major claim has evidence, confidence, and comparability tags
 - [ ] Recommendations are prioritized by impact × feasibility
 - [ ] Recommendations preserve NaW's unique advantages
 - [ ] Recommendations are consistent with (or explicitly modify) existing NaW plans
 - [ ] Deliberately excluded features are documented with rationale
+- [ ] Phase 1.5 normalization gate is passed before Phase 2 starts
 - [ ] The output is actionable — each recommendation includes enough detail to begin implementation
 
 ---

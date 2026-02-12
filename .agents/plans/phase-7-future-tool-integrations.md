@@ -1,7 +1,7 @@
 # Phase 7: Future Tool Integrations — Expanded Implementation Plan
 
-> **Status**: Open Questions Resolved — Ready for Implementation
-> **Reviewed**: February 12, 2026 — All 38 open questions resolved via codebase analysis, AI SDK v6 docs, provider API research, and npm package verification
+> **Status**: Research Updated — Implementation Gates Identified
+> **Reviewed**: February 12, 2026 — Decisions refreshed via codebase analysis, SDK source verification, npm package inspection, and provider docs
 > **Priority**: P1 — High (builds on P0 foundation)
 > **Parent Plan**: `.agents/plans/tool-calling-infrastructure.md` (Phase 7)
 > **Prerequisites**: Phases 1–5 complete (tool abstraction, UI, Exa, audit logging, BYOK)
@@ -28,6 +28,17 @@ Each sub-phase includes:
 | **Tier 2 — High Impact, Medium Effort** | 7.5, 7.4, 7.7 | New capabilities users will see |
 | **Tier 3 — Infrastructure** | 7.1, 7.2 | Extensibility — implement when third provider is added |
 | **Tier 4 — Exploratory** | 7.8, 7.9 | Verify-and-decide — may not be needed |
+
+### Execution Gates (Must Confirm Before Tier 2 Work)
+
+1. **Anthropic token-efficient behavior is measured in this repo** (7.6)  
+   Do not assume old beta headers are required. Run before/after token measurements for Anthropic + tools in this app.
+2. **Firecrawl package choice is finalized with BYOK as a hard requirement** (7.9)  
+   `firecrawl-aisdk` exists on npm, but published build reads only `process.env.FIRECRAWL_API_KEY`. Use `@mendable/firecrawl-js` unless wrapper adds explicit key injection.
+3. **Read-only tool classification exists before `prepareStep` restrictions** (7.4)  
+   Name-based heuristics (e.g., `mcp_read_*`) are not sufficient in the current MCP naming model.
+4. **Truncation contract preserves result shape** (7.3)  
+   Truncation cannot arbitrarily convert arrays/objects into a generic wrapper that breaks downstream tool consumers.
 
 ---
 
@@ -355,7 +366,7 @@ When implementing, load the following context:
 
 ### Step 7.3.1: Create Truncation Utility
 
-Create a shared truncation helper in `lib/tools/types.ts` (or a new `lib/tools/utils.ts`):
+Create a shared truncation helper in `lib/tools/types.ts` (or a new `lib/tools/utils.ts`) that is byte-aware and shape-preserving:
 
 ```typescript
 import { MAX_TOOL_RESULT_SIZE } from "@/lib/config"
@@ -369,20 +380,20 @@ import { MAX_TOOL_RESULT_SIZE } from "@/lib/config"
  * catches edge cases (unexpected API responses, large MCP results).
  */
 export function truncateToolResult(result: unknown): unknown {
-  const serialized = JSON.stringify(result)
-  if (serialized.length <= MAX_TOOL_RESULT_SIZE) return result
+  const serialized = safeJsonStringify(result)
+  const sizeBytes = new TextEncoder().encode(serialized).length
+  if (sizeBytes <= MAX_TOOL_RESULT_SIZE) return result
 
   // For strings, simple truncation with marker
   if (typeof result === "string") {
-    return result.slice(0, MAX_TOOL_RESULT_SIZE) + "\n[truncated — result exceeded size limit]"
+    return result.slice(0, MAX_TOOL_RESULT_SIZE) +
+      "\n[truncated — result exceeded size limit]"
   }
 
-  // For objects/arrays, truncate the serialized form and note it
-  return {
-    _truncated: true,
-    _originalSize: serialized.length,
-    data: serialized.slice(0, MAX_TOOL_RESULT_SIZE),
-  }
+  // Preserve top-level shape so existing renderers/parsers keep working.
+  // Objects: add metadata fields without replacing object semantics.
+  // Arrays: truncate item count, then append metadata in the tool response contract.
+  return applyShapePreservingTruncation(result, MAX_TOOL_RESULT_SIZE)
 }
 ```
 
@@ -481,14 +492,22 @@ Add a `prepareStep` callback that restricts tools after a configurable number of
 prepareStep: async ({ stepNumber }) => {
   // After MAX_UNRESTRICTED_STEPS, only allow read-only tools
   if (stepNumber > 3) {
-    const readOnlyTools = Object.keys(allTools).filter(
-      (name) => name === "web_search" || name.startsWith("mcp_read_")
-    )
+    const readOnlyTools = Object.entries(allToolMetadata)
+      .filter(([, meta]) => meta.readOnly === true)
+      .map(([name]) => name)
+
+    // Safety fallback: if metadata is unavailable, keep only known-safe defaults
+    if (readOnlyTools.length === 0) {
+      return { activeTools: ["web_search"] }
+    }
+
     return { activeTools: readOnlyTools }
   }
   return {}
 },
 ```
+
+Add `readOnly?: boolean` and `capability?: "search" | "code" | "extract" | "mcp"` to `ToolMetadata`, then populate for all layers (including MCP) before turning on this policy.
 
 ### Step 7.4.2: Add Client-Side Approval UI
 
@@ -517,7 +536,7 @@ Handle the approval protocol in the chat hook. When the model requests approval,
 
 - [x] **Q7.4-C: Should approval be per-tool-type or per-invocation?** **Decision: Per-invocation for dangerous tools + per-session "always allow" for cost-sensitive tools.** Per-invocation for code execution and state-modifying MCP tools (each invocation could be different). Per-session "always allow for this chat" for premium search / content extraction (reduces friction in iterative workflows). Standard web search never needs approval. *(Modifies recommendation: "always allow" is per-session, not per-type.)*
 
-- [x] **Q7.4-D: Which tools should require approval by default?** **Decision: Configure in `ToolMetadata`.** Add `requiresApproval?: boolean | ((input: unknown) => boolean)` to `ToolMetadata`. Defaults: search tools = `false`, content extraction = `false`, provider code execution = `false` (sandboxed by provider), third-party code execution (E2B) = `true`, state-modifying MCP tools = `true`. The function form enables conditional approval (e.g., approve only if code snippet exceeds N chars).
+- [x] **Q7.4-D: Which tools should require approval by default?** **Decision: Configure in `ToolMetadata`.** Add `requiresApproval?: boolean | ((input: unknown) => boolean)` to `ToolMetadata`. Defaults: search tools = `false`, content extraction = `false`, provider code execution = `true` on first invocation per chat then user may "Always allow in this chat", third-party code execution (E2B) = `true`, state-modifying MCP tools = `true`. The function form enables conditional approval (e.g., approve only if code snippet exceeds N chars).
 
 - [x] **Q7.4-E: How does `prepareStep` interact with `ANONYMOUS_MAX_STEP_COUNT`?** **Decision: Step count limit is sufficient for anonymous users.** `stopWhen: stepCountIs(ANONYMOUS_MAX_STEP_COUNT)` already caps total steps. `prepareStep` restrictions are orthogonal — they restrict *which* tools per step, not *how many* steps total. Adding `prepareStep` restrictions for anonymous users would be belt-and-suspenders overkill.
 
@@ -610,7 +629,7 @@ Create a dedicated rendering component for code execution results in `tool-invoc
   | **OpenAI** | Code Interpreter | Available (Responses API) | `code_interpreter` type — may not surface via `@ai-sdk/openai` tools export |
   **Recommendation**: Start with Google (most mature, simplest). Add Anthropic when beta stabilizes. Defer OpenAI until `@ai-sdk/openai` cleanly exposes Code Interpreter as a tool.
 
-- [x] **Q7.5-B: Should code execution require user approval (7.4b)?** **Decision: No approval for provider sandboxes.** Provider sandboxes (Google, Anthropic, OpenAI) are specifically designed for safe, isolated execution. Users expect code execution to just work (like ChatGPT's Code Interpreter). Require approval only for third-party sandboxes (E2B) where user code runs on external infrastructure.
+- [x] **Q7.5-B: Should code execution require user approval (7.4b)?** **Decision: Yes — first invocation per chat requires approval, then allow opt-in bypass for that chat.** Provider sandboxes are isolated, but code execution is still high-impact for cost and user trust. Use a low-friction policy: first execution request in a chat requires approval; users can choose "Always allow for this chat" for subsequent invocations. Keep strict per-invocation approval for non-provider sandboxes (E2B) and state-modifying MCP tools.
 
 - [x] **Q7.5-C: How should code execution output be rendered?** **Decision: Syntax-highlighted code blocks (option b).** Familiar to developers, reuses existing markdown rendering. Separate stdout/stderr sections with clear labels. Collapsible by default (same pattern as tool invocation cards). Upgrade to notebook-style (option c) later if demand warrants.
 
@@ -625,12 +644,12 @@ Create a dedicated rendering component for code execution results in `tool-invoc
 
 ---
 
-## Sub-Phase 7.6: Token-Efficient Tool Use (Anthropic)
+## Sub-Phase 7.6: Anthropic Token-Efficient Validation
 
 > **Effort**: XS (< half day)
 > **Files modified**: `app/api/chat/route.ts`
 > **Dependencies**: Phase 1 complete
-> **Priority**: Tier 1 — quick win, immediate cost reduction
+> **Priority**: Tier 1 — quick validation, may be a no-op
 
 ### Context to Load
 
@@ -641,45 +660,44 @@ Create a dedicated rendering component for code execution results in `tool-invoc
 
 ### Current State
 
-`ANTHROPIC_BETA_HEADERS.tokenEfficient` is defined as `"token-efficient-tools-2025-02-19"` in `lib/config.ts:174`. This beta header reduces token consumption when tools are injected into Anthropic API calls. It is **not currently applied**.
+`ANTHROPIC_BETA_HEADERS.tokenEfficient` is defined in `lib/config.ts` but may be legacy. Anthropic has moved tool-efficiency capabilities forward (including newer advanced tool-use betas), and behavior may already be active depending on model/version. This phase is now measurement-first, not header-first.
 
-### Step 7.6.1: Apply Token-Efficient Header
+### Step 7.6.1: Measure Current Anthropic Tool Token Usage
 
-In `route.ts`, add the header when Anthropic models have tools:
+Run an A/B benchmark in this codebase using identical prompts with tools enabled:
+- Baseline: current behavior (no new per-request beta header changes)
+- Variant: add a request-scoped `headers["anthropic-beta"]` override
+- Compare `usage.inputTokens` and total latency in `onFinish`
 
 ```typescript
-// After tool merging, before streamText():
-if (provider === "anthropic" && Object.keys(allTools).length > 0) {
-  providerOptions.anthropic = {
-    ...providerOptions.anthropic,
-    headers: {
-      ...(providerOptions.anthropic as Record<string, unknown>)?.headers,
-      "anthropic-beta": ANTHROPIC_BETA_HEADERS.tokenEfficient,
-    },
+if (provider === "anthropic" && Object.keys(allTools).length > 0 && enableAnthropicToolBeta) {
+  headers = {
+    ...headers,
+    "anthropic-beta": "token-efficient-tools-2025-02-19",
   }
 }
 ```
 
-### Step 7.6.2: Verify Header Format
+### Step 7.6.2: Keep Header Injection Request-Scoped
 
-Check how `@ai-sdk/anthropic` handles the `headers` provider option. The beta header may need to be passed differently depending on the SDK version.
+If a beta header is needed, pass it via `streamText({ headers })` so it only applies to Anthropic requests that actually include tools.
 
 ### Verify 7.6
 
-1. **Anthropic + tools**: Send a search query to an Anthropic model. Verify the request includes the `anthropic-beta` header (check server logs or network tab).
-2. **Token reduction**: Compare token usage before/after enabling the header for identical prompts with tools.
-3. **No regression**: Verify Anthropic models without tools still work (no header applied when `allTools` is empty).
-4. **Other providers unaffected**: Verify OpenAI, Google, xAI models are not affected.
+1. **Measurement complete**: At least 20 comparable Anthropic tool runs per variant (same model family/prompt class)
+2. **Decision threshold**: Keep custom header only if median input-token savings is materially positive (for example, >= 5%) with no reliability regression
+3. **No regression**: Anthropic requests continue to work with and without tools
+4. **Isolation**: Other providers are unaffected
 
 ### Open Questions
 
-- [x] **Q7.6-A: Is `token-efficient-tools-2025-02-19` still the current beta header?** **Decision: Likely auto-applied — graduated to production.** Anthropic graduated token-efficient tool use to production for Claude 3.7+ in March 2025. For Claude 4.x models (which this app uses), it's likely auto-applied. **Action**: Test with and without the header on Claude Sonnet 4.5. If no token difference, this sub-phase is a no-op. If tokens are higher without it, apply the header. *(Modifies original recommendation — may not need the header at all.)*
+- [x] **Q7.6-A: Is `token-efficient-tools-2025-02-19` still the current beta header?** **Decision: Treat as untrusted legacy until measured.** Anthropic docs now emphasize newer tool-search/advanced tool-use betas; the old token-efficient header may be redundant for current Claude 4.x behavior. Keep this phase as a benchmark gate, not a guaranteed implementation.
 
-- [x] **Q7.6-B: How does the `anthropic-beta` header interact with other beta headers?** **Decision: Comma-separated, but known SDK merging bug.** Per Anthropic docs, multiple betas are comma-separated: `"feature1,feature2"`. However, `@ai-sdk/anthropic` has a known bug (GitHub issue #10018) where custom `anthropic-beta` headers get overwritten by the SDK's auto-inferred headers (e.g., `fine-grained-tool-streaming`). **Action**: Check if `@ai-sdk/anthropic@^3.0.41` has this fix. If not, this blocks reliable header application.
+- [x] **Q7.6-B: How does the `anthropic-beta` header interact with other beta headers?** **Decision: Comma-merge confirmed in current dependency.** Verified in installed `@ai-sdk/anthropic@3.0.41` source: user and inferred betas are unioned and emitted as comma-separated `anthropic-beta` (`getBetasFromHeaders` + `Array.from(betas).join(",")`). This previously reported overwrite bug is not present in the current pinned version.
 
-- [x] **Q7.6-C: How does `@ai-sdk/anthropic` accept provider-specific headers?** **Decision: Use `streamText({ headers })`, NOT `providerOptions`.** Two mechanisms exist: (1) `createAnthropic({ headers })` at provider creation, (2) `streamText({ headers })` at request time. Option 2 is better because `route.ts` knows whether tools are present (header only matters with tools). The `headers` parameter on `streamText()` passes through to the provider HTTP request. Do NOT use `providerOptions` for HTTP headers. *(Modifies original recommendation — the plan's approach was incorrect.)*
+- [x] **Q7.6-C: How does `@ai-sdk/anthropic` accept provider-specific headers?** **Decision: Use `streamText({ headers })` for request-scoped betas.** This is the cleanest way to attach headers only when needed (Anthropic + tools), without changing global provider construction.
 
-- [x] **Q7.6-D: What's the actual token savings?** **Decision: Measure to confirm; likely auto-applied.** Anthropic reports "up to 70% reduction" (best case, many tools) and "14% average." For one search tool, savings are on the lower end. If auto-applied for Claude 4.x (per Q7.6-A), this is already in effect. Measure current tool token consumption to confirm.
+- [x] **Q7.6-D: What's the actual token savings?** **Decision: Unknown in this app until benchmarked.** Public claims vary by tool count and prompt shape; production decision must be based on this repo's traffic profile and model mix.
 
 ---
 
@@ -801,7 +819,7 @@ npx tsx -e "import { gateway } from 'ai'; const g = gateway(); console.log(Objec
 
 ---
 
-## Sub-Phase 7.9: Verify Firecrawl AI SDK Package Name
+## Sub-Phase 7.9: Verify Firecrawl Package + BYOK Compatibility
 
 > **Effort**: XS (< 1 hour)
 > **Dependencies**: None
@@ -809,7 +827,7 @@ npx tsx -e "import { gateway } from 'ai'; const g = gateway(); console.log(Objec
 
 ### Task
 
-The research document uses `firecrawl-aisdk` but this could not be verified on npm. Determine the correct package for AI SDK integration.
+Determine which Firecrawl package should be used given the project's BYOK requirement.
 
 ### Step 7.9.1: Check Packages
 
@@ -829,9 +847,9 @@ npx tsx -e "import { ... } from '<package>'; // check constructor accepts apiKey
 
 ### Open Questions
 
-- [x] **Q7.9-A: Does the Firecrawl AI SDK wrapper support explicit API key passthrough?** **Decision: Resolved — there IS no AI SDK wrapper.** `firecrawl-aisdk` does not exist on npm. The only official package is `@mendable/firecrawl-js` (v4.12.1, 444K weekly downloads). It accepts `apiKey` in its constructor: `new FirecrawlApp({ apiKey })`. This supports BYOK perfectly — same pattern as `exa-js`.
+- [x] **Q7.9-A: Does the Firecrawl AI SDK wrapper support explicit API key passthrough?** **Decision: Wrapper exists, but current build is not BYOK-compatible.** `firecrawl-aisdk` exists on npm (`0.8.1`), but published code initializes via `process.env.FIRECRAWL_API_KEY` and throws if missing. No explicit per-request key injection path was found in the published package.
 
-- [x] **Q7.9-B: Is `@mendable/firecrawl-js` (core SDK) better than the AI SDK wrapper?** **Decision: Resolved — core SDK is the only option.** There is no AI SDK wrapper to compare. `@mendable/firecrawl-js` with a custom `tool()` wrapper matches the established Exa pattern exactly. Use `new FirecrawlApp({ apiKey })` for BYOK support.
+- [x] **Q7.9-B: Is `@mendable/firecrawl-js` (core SDK) better than the AI SDK wrapper?** **Decision: Yes for this project, due to BYOK constraints.** `@mendable/firecrawl-js` supports explicit constructor keys and cleanly matches the existing Exa wrapper pattern. Use it unless `firecrawl-aisdk` adds explicit API key injection and stable maintenance signals.
 
 ---
 
@@ -886,7 +904,7 @@ These questions span multiple sub-phases and should be resolved before starting 
 
 ## Open Questions Index
 
-All 38 open questions have been resolved. Decisions below are final unless revisited during implementation.
+Most questions are now resolved with evidence. Decisions below are working defaults; execution gates in 7.6/7.9 still require benchmark confirmation before rollout.
 
 | ID | Sub-Phase | Summary | Decision | Modified? |
 |----|-----------|---------|----------|-----------|
@@ -912,14 +930,14 @@ All 38 open questions have been resolved. Decisions below are final unless revis
 | Q7.4-E | 7.4 | prepareStep + anonymous step limits | Step count sufficient | No |
 | Q7.4-F | 7.4 | prepareStep SDK compatibility | Confirmed — fully supported | No |
 | Q7.5-A | 7.5 | Which providers support code execution | Google (ready), Anthropic (beta), OpenAI (deferred) | No |
-| Q7.5-B | 7.5 | Code execution approval | No approval for sandboxes | No |
+| Q7.5-B | 7.5 | Code execution approval | First invocation approval + per-chat allow | **Yes** |
 | Q7.5-C | 7.5 | Code output rendering style | Syntax-highlighted blocks | No |
 | Q7.5-D | 7.5 | Code execution cost model | Google $0, Anthropic TBD, OpenAI $30/1K | No |
 | Q7.5-E | 7.5 | Code results vs MAX_TOOL_RESULT_SIZE | Separate 500KB limit | No |
-| Q7.6-A | 7.6 | Current beta header name | **Likely auto-applied — test first** | **Yes** |
-| Q7.6-B | 7.6 | Multiple beta headers | Comma-separated; SDK merging bug exists | No |
+| Q7.6-A | 7.6 | Current beta header name | Treat as legacy until benchmarked | **Yes** |
+| Q7.6-B | 7.6 | Multiple beta headers | Comma-separated; merge confirmed in installed SDK | **Yes** |
 | Q7.6-C | 7.6 | How @ai-sdk/anthropic accepts headers | **Use `streamText({ headers })` not providerOptions** | **Yes** |
-| Q7.6-D | 7.6 | Actual token savings | Up to 70%, avg 14%; may be auto-applied | No |
+| Q7.6-D | 7.6 | Actual token savings | Unknown in this app until benchmarked | **Yes** |
 | Q7.7-A | 7.7 | Exa vs Firecrawl for extraction | Start with Exa | No |
 | Q7.7-B | 7.7 | Shared API key for search + extract | Same key | No |
 | Q7.7-C | 7.7 | Content extraction cost model | $1/1K pages (cheaper than search) | No |
@@ -927,8 +945,8 @@ All 38 open questions have been resolved. Decisions below are final unless revis
 | Q7.7-E | 7.7 | Auto-extract URLs in user messages | No — model decides | No |
 | Q7.8-A | 7.8 | Is gateway useful? | **Will not implement** | No |
 | Q7.8-B | 7.8 | Gateway pricing/access | Requires Vercel platform — disqualified | No |
-| Q7.9-A | 7.9 | Firecrawl BYOK support | `@mendable/firecrawl-js` — supports `apiKey` | No |
-| Q7.9-B | 7.9 | Core SDK vs AI SDK wrapper | Core SDK only option (no wrapper exists) | No |
+| Q7.9-A | 7.9 | Firecrawl wrapper BYOK support | `firecrawl-aisdk` exists but env-var-only in published build | **Yes** |
+| Q7.9-B | 7.9 | Core SDK vs AI SDK wrapper | Prefer `@mendable/firecrawl-js` for explicit BYOK keys | **Yes** |
 | Q-CC-A | Cross | Tool error display in UI | Both places (card + model) | No |
 | Q-CC-B | Cross | Automatic retry policy | No retry | No |
 | Q-CC-C | Cross | Per-tool rate limiting | Not initially | No |
@@ -938,7 +956,7 @@ All 38 open questions have been resolved. Decisions below are final unless revis
 | Q-CC-G | Cross | Automated tests for tools | Yes — prioritized list | No |
 | Q-CC-H | Cross | Clean up apiSdk type signature | Yes — in Phase 7.0 | No |
 
-**Modified decisions** (5 total): Q7.1-C, Q7.2-B, Q7.4-C, Q7.6-A, Q7.6-C diverge from original recommendations based on research findings.
+**Modified decisions** (10 total): Q7.1-C, Q7.2-B, Q7.4-C, Q7.5-B, Q7.6-A, Q7.6-B, Q7.6-C, Q7.9-A, Q7.9-B, plus execution-gate framing at plan level.
 
 ---
 
