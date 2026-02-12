@@ -23,6 +23,7 @@ import { McpServers } from "./connections/mcp-servers"
 import { AccountManagement } from "./general/account-management"
 import { UserProfile } from "./general/user-profile"
 import { ModelsSettings } from "./models/models-settings"
+import { ToolKeys } from "./tools/tool-keys"
 
 type SettingsContentProps = {
   isDrawer?: boolean
@@ -116,8 +117,9 @@ export function SettingsContent({
               <InteractionPreferences />
             </TabsContent>
 
-            <TabsContent value="apikeys" className="px-6">
+            <TabsContent value="apikeys" className="space-y-6 px-6">
               <ByokSection />
+              <ToolKeys />
             </TabsContent>
 
             <TabsContent value="models" className="px-6">
@@ -199,6 +201,7 @@ export function SettingsContent({
 
               <TabsContent value="apikeys" className="mt-0 space-y-6">
                 <ByokSection />
+                <ToolKeys />
               </TabsContent>
 
               <TabsContent value="models" className="mt-0 space-y-6">

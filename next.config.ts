@@ -36,6 +36,13 @@ const nextConfig: NextConfig = {
         port: "",
         pathname: "/**",
       },
+      // Google favicon service (used by web search source citations)
+      {
+        protocol: "https",
+        hostname: "www.google.com",
+        port: "",
+        pathname: "/s2/favicons/**",
+      },
     ],
   },
 }

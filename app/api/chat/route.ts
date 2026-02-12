@@ -224,9 +224,17 @@ export async function POST(req: Request) {
       if (!builtInHasSearch) {
         const { getThirdPartyTools } = await import("@/lib/tools/third-party")
 
-        // Key resolution: user BYOK key (Phase 5) → platform env var → undefined
-        // Phase 3: platform key only. Phase 5 will add user BYOK resolution here.
-        const resolvedExaKey = process.env.EXA_API_KEY
+        // Key resolution: user BYOK key → platform env var → undefined
+        // The exa-js SDK accepts keys in its constructor, so BYOK keys
+        // are passed directly — no env var manipulation needed.
+        let resolvedExaKey: string | undefined
+        if (convexToken) {
+          const { getEffectiveToolKey } = await import("@/lib/user-keys")
+          resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
+        }
+        if (!resolvedExaKey) {
+          resolvedExaKey = process.env.EXA_API_KEY
+        }
 
         const thirdPartyResult = await getThirdPartyTools({
           skipSearch: false, // We already know we need search (builtInHasSearch is false)
