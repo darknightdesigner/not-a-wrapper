@@ -62,6 +62,10 @@ export function useChatCore({
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const [enableSearch, setEnableSearch] = useState(false)
 
+  // Track the finish reason of the last assistant message.
+  // Used to show a truncation indicator when finishReason is "length".
+  const [lastFinishReason, setLastFinishReason] = useState<string | undefined>()
+
   // State for tracking first message sent (prevents redirect after sending)
   const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false)
   const prevChatIdRef = useRef<string | null>(chatId)
@@ -117,7 +121,10 @@ export function useChatCore({
     transport,
     messages: initialMessages,
 
-    onFinish: async ({ message, isAbort, isDisconnect, isError }) => {
+    onFinish: async ({ message, isAbort, isDisconnect, isError, finishReason }) => {
+      // Track finish reason for truncation detection
+      setLastFinishReason(finishReason)
+
       // Skip processing for aborted, disconnected, or errored responses
       if (isAbort || isDisconnect || isError) return
 
@@ -629,6 +636,7 @@ export function useChatCore({
     setHasDialogAuth,
     enableSearch,
     setEnableSearch,
+    lastFinishReason,
 
     // Actions
     submit,

@@ -44,13 +44,16 @@ function Button({
   variant = "default",
   size = "default",
   asChild = false,
+  nativeButton,
   children,
   ...props
-}: React.ComponentProps<"button"> &
+}: Omit<React.ComponentProps<typeof ButtonPrimitive>, "render"> &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean
   }) {
   const adapted = adaptAsChild(asChild, children)
+  const renderedAsNativeButton = adapted.render?.type === "button"
+
   return (
     <ButtonPrimitive
       data-slot="button"
@@ -58,6 +61,7 @@ function Button({
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
       render={adapted.render}
+      nativeButton={adapted.render ? renderedAsNativeButton : nativeButton}
       {...props}
     >
       {adapted.children}

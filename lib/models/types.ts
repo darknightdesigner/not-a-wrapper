@@ -12,6 +12,7 @@ type ModelConfig = {
   tags?: string[] // ["fast", "cheap", "vision", "OSS"]
 
   contextWindow?: number // in tokens
+  maxOutput?: number // max output tokens (used for thinking budget allocation)
   inputCost?: number // USD per 1M input tokens
   outputCost?: number // USD per 1M output tokens
   priceUnit?: string // "per 1M tokens", "per image", etc.
@@ -22,6 +23,14 @@ type ModelConfig = {
   reasoningText?: boolean
   webSearch?: boolean
   openSource?: boolean
+
+  /**
+   * Thinking mode for this model.
+   *   - "adaptive" — model dynamically allocates thinking budget (Opus 4.6+)
+   *   - "enabled"  — fixed budget via budgetTokens (default for older models)
+   *   - undefined  — inherit from reasoningText flag (backward compat)
+   */
+  thinkingMode?: "adaptive" | "enabled"
 
   speed?: "Fast" | "Medium" | "Slow"
   intelligence?: "Low" | "Medium" | "High"
