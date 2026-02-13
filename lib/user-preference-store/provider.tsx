@@ -28,6 +28,7 @@ interface UserPreferencesContextType {
   setShowToolInvocations: (enabled: boolean) => void
   setShowConversationPreviews: (enabled: boolean) => void
   setMultiModelEnabled: (enabled: boolean) => void
+  setWebSearchEnabled: (enabled: boolean) => void
   toggleModelVisibility: (modelId: string) => void
   isModelHidden: (modelId: string) => boolean
   isLoading: boolean
@@ -43,7 +44,8 @@ function getLocalStoragePreferences(): UserPreferences {
   const stored = localStorage.getItem(PREFERENCES_STORAGE_KEY)
   if (stored) {
     try {
-      return JSON.parse(stored)
+      const parsed = JSON.parse(stored) as Partial<UserPreferences>
+      return { ...defaultPreferences, ...parsed }
     } catch {
       // fallback to legacy layout storage if JSON parsing fails
     }
@@ -95,6 +97,7 @@ export function UserPreferencesProvider({
         showToolInvocations: convexPreferences.showToolInvocations ?? defaultPreferences.showToolInvocations,
         showConversationPreviews: convexPreferences.showConversationPreviews ?? defaultPreferences.showConversationPreviews,
         multiModelEnabled: convexPreferences.multiModelEnabled ?? defaultPreferences.multiModelEnabled,
+        webSearchEnabled: convexPreferences.webSearchEnabled ?? defaultPreferences.webSearchEnabled,
         hiddenModels: convexPreferences.hiddenModels ?? defaultPreferences.hiddenModels,
       }
     }
@@ -197,6 +200,13 @@ export function UserPreferencesProvider({
     [updatePreferences]
   )
 
+  const setWebSearchEnabled = useCallback(
+    (enabled: boolean) => {
+      updatePreferences({ webSearchEnabled: enabled })
+    },
+    [updatePreferences]
+  )
+
   const toggleModelVisibility = useCallback(
     (modelId: string) => {
       const currentHidden = preferences.hiddenModels || []
@@ -226,6 +236,7 @@ export function UserPreferencesProvider({
         setShowToolInvocations,
         setShowConversationPreviews,
         setMultiModelEnabled,
+        setWebSearchEnabled,
         toggleModelVisibility,
         isModelHidden,
         isLoading,

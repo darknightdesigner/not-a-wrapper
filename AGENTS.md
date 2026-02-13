@@ -110,6 +110,7 @@ convex/               # Convex DB schema & functions
 | Pattern | File |
 |---------|------|
 | API Route | `app/api/chat/route.ts` |
+| Provider History Adapter Registry | `app/api/chat/adapters/index.ts` |
 | Custom Hook | `app/components/chat/use-chat-core.ts` |
 | Context Provider | `lib/chat-store/chats/provider.tsx` |
 | Component | `app/components/chat/chat.tsx` |

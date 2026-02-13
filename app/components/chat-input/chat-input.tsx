@@ -172,12 +172,6 @@ export function ChatInput({
     }
   }, [quotedText, onValueChange])
 
-  useEffect(() => {
-    if (isSearchDisabled && enableSearch) {
-      setEnableSearch?.(false)
-    }
-  }, [isSearchDisabled, enableSearch, setEnableSearch])
-
   return (
     <div className="relative flex w-full flex-col gap-4">
       {hasSuggestions && (

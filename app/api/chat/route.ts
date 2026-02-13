@@ -8,6 +8,7 @@ import {
   ANONYMOUS_MAX_STEP_COUNT,
   ANTHROPIC_BETA_HEADERS,
   PREPARE_STEP_THRESHOLD,
+  HISTORY_REPLAY_COMPILER_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -18,7 +19,14 @@ import {
   getPostHogClient,
 } from "@/lib/posthog"
 import type { Provider } from "@/lib/user-keys"
-import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import {
+  UIMessage as MessageAISDK,
+  streamText,
+  ToolSet,
+  stepCountIs,
+  convertToModelMessages,
+  type ModelMessage,
+} from "ai"
 import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
@@ -28,13 +36,25 @@ import {
   incrementServerSideUsage,
   validateAndTrackUsage,
 } from "./api"
-import { createErrorResponse, extractErrorMessage } from "./utils"
+import {
+  createErrorResponse,
+  extractErrorMessage,
+  hasProviderLinkedResponseIds,
+  toPlainTextModelMessages,
+} from "./utils"
+import { adaptHistoryForProvider } from "./adapters"
+import type { AdaptationContext, AdaptationWarning } from "./adapters/types"
 import {
   loadUserMcpTools,
   type LoadToolsResult,
 } from "@/lib/mcp/load-tools"
 import { resolveToolCapabilities } from "@/lib/tools/types"
-import { wrapToolsWithTruncation } from "@/lib/tools/utils"
+import { shouldInjectSearchTools } from "./search-tools"
+import {
+  ToolTraceCollector,
+  wrapMcpTools,
+  isToolResultEnvelope,
+} from "@/lib/tools/mcp-wrapper"
 
 export const maxDuration = 60
 
@@ -46,6 +66,59 @@ type ChatRequest = {
   enableSearch: boolean
   message_group_id?: string
   userId?: string // Client-provided userId (for anonymous users)
+}
+
+function isReplayShapeError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return [
+    // OpenAI
+    "was provided without its required",
+    "no tool output found for function call",
+    // Anthropic
+    "thinking block must be followed by",
+    "tool_use block must be followed by tool_result",
+    // Google
+    "number of function response parts is equal to",
+    "missing a thought_signature",
+  ].some((pattern) => normalized.includes(pattern))
+}
+
+function summarizeHistoryPartTypes(messages: MessageAISDK[]): {
+  roleCounts: Record<string, number>
+  partTypeCounts: Record<string, number>
+} {
+  const roleCounts: Record<string, number> = {}
+  const partTypeCounts: Record<string, number> = {}
+
+  for (const message of messages) {
+    roleCounts[message.role] = (roleCounts[message.role] ?? 0) + 1
+    for (const part of message.parts ?? []) {
+      partTypeCounts[part.type] = (partTypeCounts[part.type] ?? 0) + 1
+    }
+  }
+
+  return { roleCounts, partTypeCounts }
+}
+
+function countWarningsByCode(warnings: AdaptationWarning[]): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const warning of warnings) {
+    counts[warning.code] = (counts[warning.code] ?? 0) + 1
+  }
+  return counts
+}
+
+function summarizeReplayWarningDetails(
+  warnings: AdaptationWarning[],
+  code: "replay_normalization_warning" | "replay_compile_warning",
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const warning of warnings) {
+    if (warning.code !== code) continue
+    const subcode = warning.detail.split(":")[0]?.trim() || "unknown"
+    counts[subcode] = (counts[subcode] ?? 0) + 1
+  }
+  return counts
 }
 
 export async function POST(req: Request) {
@@ -195,7 +268,7 @@ export async function POST(req: Request) {
     let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
     const capabilities = resolveToolCapabilities(modelConfig.tools)
-    const shouldInjectSearch = enableSearch && capabilities.search
+    const shouldInjectSearch = shouldInjectSearchTools(enableSearch, modelConfig.tools)
 
     if (shouldInjectSearch) {
       const { getProviderTools } = await import("@/lib/tools/provider")
@@ -292,13 +365,17 @@ export async function POST(req: Request) {
       })
     }
 
-    // Wrap MCP tools with result truncation before merging.
-    // MCP tools connect to arbitrary user-configured servers that can return
-    // unbounded results. Unlike Layer 1 (provider-managed limits) and Layer 2
-    // (Exa's own maxCharacters + explicit truncation), Layer 3 has no built-in
-    // size safety net.
+    // Wrap MCP tools with timeout, timing, truncation, and envelope.
+    // Single wrapper handles all Layer 3 concerns — follows the Exa gold
+    // standard pattern (lib/tools/third-party.ts:82-119).
+    // Replaces the previous wrapToolsWithTruncation(mcpTools) call.
+    const traceCollector = new ToolTraceCollector()
+
     if (Object.keys(mcpTools).length > 0) {
-      mcpTools = wrapToolsWithTruncation(mcpTools) as ToolSet
+      mcpTools = wrapMcpTools(mcpTools, {
+        toolServerMap: mcpToolServerMap,
+        traceCollector,
+      }) as ToolSet
     }
 
     // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
@@ -341,36 +418,148 @@ export async function POST(req: Request) {
       })
     }
 
-    // Strip reasoning parts from message history before converting — but only
-    // for non-Anthropic providers.  The OpenAI responses API rejects orphaned
-    // reasoning items ("Item 'rs_...' of type 'reasoning' was provided without
-    // its required following item").  Anthropic has the opposite requirement:
-    // messages that were originally produced with extended thinking MUST be sent
-    // back with their reasoning items ("Item 'msg_...' of type 'message' was
-    // provided without its required 'reasoning' item").
-    const shouldStripReasoning = provider !== "anthropic"
+    const adaptationContext: AdaptationContext = {
+      targetModelId: model,
+      hasTools: hasAnyTools,
+      sourceProviderHint: provider,
+    }
 
-    const sanitizedMessages = shouldStripReasoning
-      ? messages.map((msg) => {
-          if (msg.role !== "assistant" || !msg.parts) return msg
-          const hasReasoning = msg.parts.some(
-            (part: { type: string }) => part.type === "reasoning"
-          )
-          if (!hasReasoning) return msg
-          const filteredParts = msg.parts.filter(
-            (part: { type: string }) => part.type !== "reasoning"
-          )
-          return {
-            ...msg,
-            parts: filteredParts.length > 0
-              ? filteredParts
-              : [{ type: "text" as const, text: "" }],
-          }
+    const adaptStartTime = Date.now()
+    const adapterResult = await adaptHistoryForProvider(
+      messages,
+      provider,
+      adaptationContext,
+      {
+        useReplayCompiler: HISTORY_REPLAY_COMPILER_V1,
+      },
+    )
+    const adaptationTimeMs = Date.now() - adaptStartTime
+    const warningCount = adapterResult.warnings.length
+    const warningCountsByCode = countWarningsByCode(adapterResult.warnings)
+    const replayNormalizeWarningCount =
+      warningCountsByCode.replay_normalization_warning ?? 0
+    const replayCompileWarningCount =
+      warningCountsByCode.replay_compile_warning ?? 0
+    const replayCompileFallbackCount =
+      warningCountsByCode.replay_compile_fallback ?? 0
+    const replayCompileFallbackActivated = replayCompileFallbackCount > 0
+    const partsDroppedTotal = Object.values(adapterResult.stats.partsDropped).reduce(
+      (sum, count) => sum + count,
+      0
+    )
+
+    if (HISTORY_REPLAY_COMPILER_V1) {
+      console.log(
+        JSON.stringify({
+          _tag: "replay_normalize_stage",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: true,
+          warningCount: replayNormalizeWarningCount,
+          warningCodes: summarizeReplayWarningDetails(
+            adapterResult.warnings,
+            "replay_normalization_warning"
+          ),
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+          totalPartsOriginal: adapterResult.stats.totalPartsOriginal,
+          totalPartsAdapted: adapterResult.stats.totalPartsAdapted,
         })
-      : messages
+      )
+
+      console.log(
+        JSON.stringify({
+          _tag: "replay_compile_stage",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: true,
+          warningCount: replayCompileWarningCount,
+          warningCodes: summarizeReplayWarningDetails(
+            adapterResult.warnings,
+            "replay_compile_warning"
+          ),
+          fallbackActivated: replayCompileFallbackActivated,
+          fallbackCount: replayCompileFallbackCount,
+          adaptationTimeMs,
+        })
+      )
+    }
+
+    if (replayCompileFallbackActivated) {
+      console.warn(
+        JSON.stringify({
+          _tag: "replay_compile_fallback_activated",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: HISTORY_REPLAY_COMPILER_V1,
+          fallbackCount: replayCompileFallbackCount,
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+        })
+      )
+    }
+
+    console.log(
+      JSON.stringify({
+        _tag: "history_adapt",
+        chatId,
+        provider,
+        model,
+        replayCompilerEnabled: HISTORY_REPLAY_COMPILER_V1,
+        ...adapterResult.stats,
+        warningCount,
+        warningCodes: warningCountsByCode,
+        adaptationTimeMs,
+      })
+    )
+
+    if (phClient) {
+      phClient.capture({
+        distinctId: userId || "anonymous",
+        event: "history_adaptation",
+        properties: {
+          chatId,
+          provider,
+          model,
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+          partsDroppedTotal,
+          providerIdsStripped: adapterResult.stats.providerIdsStripped,
+          warningCount,
+          adaptationTimeMs,
+        },
+      })
+    }
 
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
-    const modelMessages = await convertToModelMessages(sanitizedMessages)
+    let modelMessages: ModelMessage[] = await convertToModelMessages(
+      adapterResult.messages,
+      {
+        ignoreIncompleteToolCalls: true,
+      }
+    )
+
+    // OpenAI responses replay hardening:
+    // If conversion output still contains provider-linked response IDs
+    // (msg_/rs_/ws_), fall back to a plain-text transcript to avoid
+    // pairing invariant failures on follow-up turns.
+    if (provider === "openai" && hasProviderLinkedResponseIds(modelMessages)) {
+      console.warn(
+        JSON.stringify({
+          _tag: "replay_plaintext_fallback_activated",
+          chatId,
+          provider,
+          model,
+          reason: "provider_linked_response_ids_detected_post_conversion",
+          messageCount: modelMessages.length,
+          compilerEnabled: HISTORY_REPLAY_COMPILER_V1,
+        })
+      )
+      modelMessages = toPlainTextModelMessages(adapterResult.messages)
+    }
 
     // Build provider-specific options to enable reasoning/thinking when
     // the selected model advertises support (reasoningText: true).
@@ -469,6 +658,7 @@ export async function POST(req: Request) {
     const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
     const streamStartMs = Date.now()
+    let stepCounter = 0
 
     const result = streamText({
       model: aiModel,
@@ -509,24 +699,37 @@ export async function POST(req: Request) {
       // This data feeds into the existing toolCallLog for trajectory analysis
       // and future trace-based evaluation.
       onStepFinish: ({ toolCalls, toolResults, usage, finishReason }) => {
-        if (process.env.NODE_ENV !== "production" && toolCalls.length > 0) {
-          for (const call of toolCalls) {
-            const result = toolResults.find(
-              (r) => r.toolCallId === call.toolCallId
-            )
-            const success = result
-              ? !(result as { isError?: boolean }).isError
-              : false
-            const meta = allToolMetadata.get(call.toolName)
+        stepCounter++
+        if (toolCalls.length === 0) return
 
-            console.log(
-              `[tools/step] ${meta?.displayName ?? call.toolName} ` +
-              `(${meta?.source ?? "unknown"}) — ` +
-              `success: ${success}, ` +
-              `tokens: ${usage?.inputTokens ?? "?"}in/${usage?.outputTokens ?? "?"}out, ` +
-              `finishReason: ${finishReason}`
-            )
-          }
+        for (const call of toolCalls) {
+          const result = toolResults.find(
+            (r) => r.toolCallId === call.toolCallId
+          )
+          const success = result
+            ? !(result as { isError?: boolean }).isError
+            : false
+          const meta = allToolMetadata.get(call.toolName)
+
+          // Structured JSON log — parseable by Vercel log drain and grep.
+          // Uses _tag for machine filtering without affecting human readability.
+          console.log(
+            JSON.stringify({
+              _tag: "tool_trace",
+              chatId,
+              step: stepCounter,
+              tool: meta?.displayName ?? call.toolName,
+              source: meta?.source ?? "unknown",
+              success,
+              durationMs: traceCollector.get(call.toolCallId)?.durationMs ?? null,
+              tokens: {
+                in: usage?.inputTokens ?? null,
+                out: usage?.outputTokens ?? null,
+              },
+              finishReason,
+              model,
+            })
+          )
         }
       },
 
@@ -535,13 +738,26 @@ export async function POST(req: Request) {
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
+        const errorMessage = extractErrorMessage(err)
+
+        if (isReplayShapeError(errorMessage)) {
+          console.error(
+            JSON.stringify({
+              _tag: "replay_shape_error",
+              chatId,
+              provider,
+              model,
+              errorMessage,
+              messageCount: messages.length,
+              historyPartTypes: summarizeHistoryPartTypes(messages),
+            })
+          )
+        }
 
         // Capture failed generations to PostHog for complete analytics
         if (phClient) {
           try {
             const latencyMs = Date.now() - startTime
-            const errorMessage =
-              err instanceof Error ? err.message : String(err)
             captureGeneration({
               distinctId: userId,
               traceId: chatId,
@@ -658,6 +874,8 @@ export async function POST(req: Request) {
                         serviceName,
                         success,
                         chatId,
+                        // Phase C: Observability enrichment
+                        durationMs: traceCollector.get(toolCall.toolCallId)?.durationMs ?? undefined,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -683,7 +901,11 @@ export async function POST(req: Request) {
         // the streaming response. Follows the same pattern as updateConnectionStatus
         // in lib/mcp/load-tools.ts.
         if (convexToken && steps && mcpToolServerMap.size > 0) {
+          let finishStepNumber = 0
+
           for (const step of steps) {
+            finishStepNumber++
+
             if (step.toolCalls) {
               for (const toolCall of step.toolCalls) {
                 const serverInfo = mcpToolServerMap.get(toolCall.toolName)
@@ -699,6 +921,14 @@ export async function POST(req: Request) {
                   ? !(toolResult as { isError?: boolean }).isError
                   : false
 
+                // Extract data from envelope for preview — avoids wasting
+                // 500 chars on envelope metadata ({"ok":true,"data":...}).
+                const output = toolResult?.output
+                const previewData = isToolResultEnvelope(output)
+                  ? output.data
+                  : output
+                const trace = traceCollector.get(toolCall.toolCallId)
+
                 void fetchMutation(
                   api.toolCallLog.log,
                   {
@@ -707,12 +937,19 @@ export async function POST(req: Request) {
                     toolName: serverInfo.displayName,
                     toolCallId: toolCall.toolCallId,
                     inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
-                    outputPreview: toolResult
-                      ? JSON.stringify(toolResult.output).slice(0, 500)
+                    outputPreview: previewData
+                      ? JSON.stringify(previewData).slice(0, 500)
                       : undefined,
                     success,
+                    durationMs: trace?.durationMs,
+                    error: trace?.error,
                     source: "mcp",
                     serviceName: serverInfo.serverName,
+                    // Phase C: Observability enrichment
+                    stepNumber: finishStepNumber,
+                    inputTokens: step.usage?.inputTokens,
+                    outputTokens: step.usage?.outputTokens,
+                    resultSizeBytes: trace?.resultSizeBytes,
                   },
                   { token: convexToken }
                 ).catch(() => {
@@ -730,7 +967,11 @@ export async function POST(req: Request) {
           const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
           if (nonMcpMetadata.size > 0) {
+            let finishStepNumber = 0
+
             for (const step of steps) {
+              finishStepNumber++
+
               if (step.toolCalls) {
                 for (const toolCall of step.toolCalls) {
                   // Skip MCP tools (already logged above)
@@ -747,6 +988,12 @@ export async function POST(req: Request) {
                     ? !(toolResult as { isError?: boolean }).isError
                     : false
 
+                  // For non-MCP tools, check if result is enveloped (Exa uses envelopes)
+                  const output = toolResult?.output
+                  const previewData = isToolResultEnvelope(output)
+                    ? output.data
+                    : output
+
                   void fetchMutation(
                     api.toolCallLog.log,
                     {
@@ -755,17 +1002,22 @@ export async function POST(req: Request) {
                       toolName: meta.displayName,
                       toolCallId: toolCall.toolCallId,
                       inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
-                      outputPreview: toolResult
-                        ? JSON.stringify(toolResult.output).slice(0, 500)
+                      outputPreview: previewData
+                        ? JSON.stringify(previewData).slice(0, 500)
                         : undefined,
                       success,
-                      // NOTE: This is the full response duration (stream start → onFinish),
-                      // not per-tool-call duration. Per-tool timing requires wrapping each
-                      // tool's execute function, which is deferred to a future phase.
-                      // Still useful for identifying slow conversations.
-                      durationMs: Date.now() - streamStartMs,
+                      // FIX: Use actual per-tool duration instead of total stream duration.
+                      // For Exa, the envelope's meta.durationMs has the real timing.
+                      // For builtin tools, we don't have per-tool timing (no trace collector).
+                      durationMs: isToolResultEnvelope(output)
+                        ? output.meta.durationMs
+                        : undefined,
                       source: meta.source,
                       serviceName: meta.serviceName,
+                      // Phase C: Observability enrichment
+                      stepNumber: finishStepNumber,
+                      inputTokens: step.usage?.inputTokens,
+                      outputTokens: step.usage?.outputTokens,
                     },
                     { token: convexToken }
                   ).catch(() => {

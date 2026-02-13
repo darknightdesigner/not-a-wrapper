@@ -14,6 +14,11 @@ import { MESSAGE_MAX_LENGTH, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { Attachment } from "@/lib/file-handling"
 import { API_ROUTE_CHAT } from "@/lib/routes"
 import { useUser } from "@/lib/user-store/provider"
+import {
+  persistWebSearchToggle,
+  resolveWebSearchEnabled,
+} from "@/lib/user-preference-store/web-search"
+import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage } from "@ai-sdk/react"
 import { useChat } from "@ai-sdk/react"
@@ -26,7 +31,7 @@ import { Chat01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { usePathname } from "next/navigation"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 
 type Project = {
   id: string
@@ -41,7 +46,10 @@ type ProjectViewProps = {
 
 export function ProjectView({ projectId }: ProjectViewProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [enableSearch, setEnableSearch] = useState(false)
+  const { preferences, setWebSearchEnabled } = useUserPreferences()
+  const [enableSearch, setEnableSearchState] = useState(() =>
+    resolveWebSearchEnabled(preferences.webSearchEnabled)
+  )
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const { user } = useUser()
   const { createNewChat, bumpChat } = useChats()
@@ -79,6 +87,17 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const chats = allChats.filter((chat) => chat.project_id === projectId)
 
   const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
+
+  const setEnableSearch = useCallback(
+    (enabled: boolean) => {
+      persistWebSearchToggle(enabled, setEnableSearchState, setWebSearchEnabled)
+    },
+    [setWebSearchEnabled]
+  )
+
+  useEffect(() => {
+    setEnableSearchState(resolveWebSearchEnabled(preferences.webSearchEnabled))
+  }, [preferences.webSearchEnabled])
 
   // Handle errors directly in onError callback
   const handleError = useCallback((error: Error) => {

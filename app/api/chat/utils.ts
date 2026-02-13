@@ -1,4 +1,5 @@
 import { UIMessage as MessageAISDK } from "ai"
+import type { ModelMessage } from "ai"
 
 /**
  * Check if a part is tool-related (v5 uses parts with type starting with 'tool-')
@@ -65,6 +66,105 @@ export function messageHasToolContent(message: MessageAISDK): boolean {
     (message as { role: string }).role === "tool" ||
     message.parts.some(part => isToolPart(part))
   )
+}
+
+/**
+ * Provider-specific message sanitization before convertToModelMessages().
+ *
+ * Anthropic requires reasoning/tool artifacts to be replayed for continuity.
+ * For other providers, replaying those internal parts can cause responses API
+ * validation errors when required paired items are missing.
+ *
+ * @deprecated Phase 7 cleanup: `app/api/chat/route.ts` now always uses
+ * `adaptHistoryForProvider()`. Keep this only as a test/reference shim until
+ * adapter parity tests are fully retired.
+ */
+export function sanitizeMessagesForProvider(
+  messages: MessageAISDK[],
+  provider: string
+): MessageAISDK[] {
+  if (provider === "anthropic") return messages
+
+  return messages
+    .filter((message) => (message as { role: string }).role !== "tool")
+    .map((message, index) => {
+      const role = (message as { role: string }).role
+      const base = {
+        id: `${role}-${index}`,
+        role: message.role,
+      }
+
+      if (role !== "assistant" || !message.parts) {
+        return {
+          ...base,
+          parts: message.parts,
+        } as MessageAISDK
+      }
+
+      const filteredParts = message.parts.filter((part) => {
+        if (part.type === "reasoning") return false
+        if (part.type === "step-start") return false
+        if (part.type === "source-url") return false
+        return !isToolPart(part)
+      })
+
+      return {
+        ...base,
+        // Always rebuild assistant parts to avoid replaying provider-specific
+        // response item linkage from prior turns (e.g. OpenAI msg_/rs_ pairs).
+        parts: filteredParts.length
+          ? filteredParts
+          : [{ type: "text" as const, text: "" }],
+      } as MessageAISDK
+    })
+}
+
+/**
+ * Detect provider-linked response item identifiers in converted model messages.
+ * These IDs (msg_/rs_/ws_) can trigger replay pairing errors in Responses APIs
+ * when the required companion items are not present.
+ */
+export function hasProviderLinkedResponseIds(
+  modelMessages: ModelMessage[]
+): boolean {
+  try {
+    const serialized = JSON.stringify(modelMessages)
+    return /\b(?:msg|rs|ws)_[a-zA-Z0-9]+\b/.test(serialized)
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Build a conservative plain-text transcript from UI messages.
+ * Used as a safety fallback when provider-linked replay artifacts are detected.
+ */
+export function toPlainTextModelMessages(
+  messages: MessageAISDK[]
+): ModelMessage[] {
+  const modelMessages: ModelMessage[] = []
+
+  for (const message of messages) {
+    if (
+      message.role !== "system" &&
+      message.role !== "user" &&
+      message.role !== "assistant"
+    ) {
+      continue
+    }
+
+    const text = (message.parts || [])
+      .filter((part) => part.type === "text")
+      .map((part) => ("text" in part ? (part.text ?? "") : ""))
+      .join("\n\n")
+
+    modelMessages.push({
+      role: message.role,
+      content: text,
+    })
+  }
+
+  return modelMessages
 }
 
 /**

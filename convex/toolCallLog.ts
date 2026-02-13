@@ -52,6 +52,11 @@ export const log = mutation({
       v.literal("mcp")
     ),
     serviceName: v.optional(v.string()),
+    // Phase C: Observability enrichment
+    stepNumber: v.optional(v.number()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    resultSizeBytes: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
@@ -85,6 +90,11 @@ export const log = mutation({
       error: args.error ? truncatePreview(args.error) : undefined,
       source: args.source,
       serviceName: args.serviceName,
+      // Phase C: Observability enrichment
+      stepNumber: args.stepNumber,
+      inputTokens: args.inputTokens,
+      outputTokens: args.outputTokens,
+      resultSizeBytes: args.resultSizeBytes,
       createdAt: Date.now(),
     })
   },

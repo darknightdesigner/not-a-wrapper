@@ -11,7 +11,7 @@ import { useChatSession } from "@/lib/chat-store/session/provider"
 import { Chat } from "@/lib/chat-store/types"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  MoreVerticalIcon,
+  MoreHorizontalIcon,
   PencilEdit01Icon,
   Delete01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
@@ -55,10 +55,10 @@ export function SidebarItemMenu({
             className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <HugeiconsIcon icon={MoreVerticalIcon} size={18} className="text-primary" />
+            <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
+        <DropdownMenuContent side="bottom" align="start" className="w-40">
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {

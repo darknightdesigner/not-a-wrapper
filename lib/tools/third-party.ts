@@ -5,6 +5,7 @@ import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
 import { truncateToolResult } from "./utils"
+import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
 
 /**
  * Configuration for third-party tool loading.
@@ -82,12 +83,25 @@ export async function getThirdPartyTools(
         execute: async ({ query }) => {
           const startMs = Date.now()
           try {
-            const { results } = await exa.searchAndContents(query, {
-              type: "auto",
-              numResults: 5,
-              text: { maxCharacters: 2000 },
-              livecrawl: "fallback",
-            })
+            const { results } = await Promise.race([
+              exa.searchAndContents(query, {
+                type: "auto",
+                numResults: 5,
+                text: { maxCharacters: 2000 },
+                livecrawl: "fallback",
+              }),
+              new Promise<never>((_, reject) =>
+                setTimeout(
+                  () =>
+                    reject(
+                      new Error(
+                        `Exa search timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
+                      )
+                    ),
+                  TOOL_EXECUTION_TIMEOUT_MS
+                )
+              ),
+            ])
             const mapped = results.map((r) => ({
               title: r.title ?? undefined,
               url: r.url,
