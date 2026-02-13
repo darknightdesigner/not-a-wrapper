@@ -11,6 +11,12 @@ import {
   type ProviderHistoryAdapter,
 } from "./types"
 
+type WebSearchResult = {
+  url: string
+  title?: string
+  snippet?: string
+}
+
 function isToolInvocationPart(part: Record<string, unknown>): boolean {
   const state = typeof part.state === "string" ? part.state : ""
   return state.startsWith("input-") || "input" in part
@@ -19,6 +25,74 @@ function isToolInvocationPart(part: Record<string, unknown>): boolean {
 function isToolResultPart(part: Record<string, unknown>): boolean {
   const state = typeof part.state === "string" ? part.state : ""
   return state.startsWith("output-") || "output" in part
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object"
+}
+
+function toWebSearchResult(item: unknown): WebSearchResult | null {
+  if (!isRecord(item)) return null
+  if (typeof item.url !== "string" || item.url.length === 0) return null
+
+  let snippet: string | undefined
+  if (typeof item.snippet === "string") snippet = item.snippet
+  else if (typeof item.content === "string") snippet = item.content
+  else if (typeof item.text === "string") snippet = item.text
+
+  return {
+    url: item.url,
+    title: typeof item.title === "string" ? item.title : undefined,
+    snippet,
+  }
+}
+
+/**
+ * Anthropic web_search tool expects output as an array of search results.
+ * OpenAI replay history can contain object-shaped output like { action, sources }.
+ * Coerce known object shapes to an array to avoid cross-provider validation failures.
+ */
+function normalizeWebSearchOutputForAnthropic(
+  part: Record<string, unknown>
+): { part: Record<string, unknown>; transformed: boolean } {
+  if (part.type !== "tool-web_search") {
+    return { part, transformed: false }
+  }
+
+  const output = part.output
+  if (Array.isArray(output)) {
+    return { part, transformed: false }
+  }
+
+  if (isRecord(output) && Array.isArray(output.sources)) {
+    const normalizedResults = output.sources
+      .map(toWebSearchResult)
+      .filter((result): result is WebSearchResult => result !== null)
+
+    return {
+      part: {
+        ...part,
+        output: normalizedResults,
+      },
+      transformed: true,
+    }
+  }
+
+  if (isRecord(output) && Array.isArray(output.results)) {
+    const normalizedResults = output.results
+      .map(toWebSearchResult)
+      .filter((result): result is WebSearchResult => result !== null)
+
+    return {
+      part: {
+        ...part,
+        output: normalizedResults,
+      },
+      transformed: true,
+    }
+  }
+
+  return { part, transformed: false }
 }
 
 function warnForOrphanedToolPairs(
@@ -114,6 +188,12 @@ export const anthropicAdapter: ProviderHistoryAdapter = {
               detail: `Stripped callProviderMetadata from "${sourceProvider}" for Anthropic replay`,
             })
           }
+        }
+
+        const normalizedToolPart = normalizeWebSearchOutputForAnthropic(nextPart)
+        if (normalizedToolPart.transformed) {
+          nextPart = normalizedToolPart.part
+          incrementStat(stats.partsTransformed, partType)
         }
 
         nextParts.push(nextPart)

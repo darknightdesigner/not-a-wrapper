@@ -66,4 +66,35 @@ describe("anthropicAdapter", () => {
     expect(result.stats.partsDropped["tool-result"]).toBeUndefined()
     expect(result.warnings.some((w) => w.code === "incomplete_triple_dropped")).toBe(true)
   })
+
+  it("normalizes object-shaped web_search output for Anthropic replay", async () => {
+    const openaiShapeWebSearch = {
+      id: "msg-anthropic-shape-1",
+      role: "assistant",
+      parts: [
+        { type: "reasoning", reasoning: "Searching...", state: "done" },
+        {
+          type: "tool-web_search",
+          state: "output-available",
+          toolCallId: "tc_shape_1",
+          toolName: "web_search",
+          output: {
+            action: { type: "search", query: "top news today" },
+            sources: [
+              { type: "url", url: "https://apnews.com/example", title: "AP News" },
+              { type: "url", url: "https://example.com/other" },
+            ],
+          },
+        },
+      ],
+    } as unknown as UIMessage
+
+    const result = await anthropicAdapter.adaptMessages([openaiShapeWebSearch], context)
+    const toolPart = result.messages[0].parts.find((part) => part.type === "tool-web_search") as
+      | { output?: unknown }
+      | undefined
+
+    expect(Array.isArray(toolPart?.output)).toBe(true)
+    expect(result.stats.partsTransformed["tool-web_search"]).toBe(1)
+  })
 })
