@@ -65,4 +65,22 @@ describe("defaultAdapter", () => {
     expect(result.stats.droppedMessages).toBe(1)
     expect(result.warnings.some((w) => w.code === "incomplete_triple_dropped")).toBe(true)
   })
+
+  it("strips non-text user parts in default fallback path", async () => {
+    const userWithUnsupportedParts = {
+      id: "msg-default-user-1",
+      role: "user",
+      parts: [
+        { type: "text", text: "Hi" },
+        { type: "reasoning", reasoning: "should-not-pass", state: "done" },
+        { type: "tool-web_search", state: "output-available", toolCallId: "tc_default_user_1", output: {} },
+      ],
+    } as unknown as UIMessage
+
+    const result = await defaultAdapter.adaptMessages([userWithUnsupportedParts], context)
+
+    expect(result.messages[0].parts).toEqual([{ type: "text", text: "Hi" }])
+    expect(result.stats.partsDropped.reasoning).toBe(1)
+    expect(result.stats.partsDropped["tool-web_search"]).toBe(1)
+  })
 })

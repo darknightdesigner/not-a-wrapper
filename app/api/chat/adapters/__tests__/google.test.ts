@@ -59,6 +59,35 @@ describe("googleAdapter", () => {
     expect(result.warnings.some((w) => w.code === "role_alternation_repaired")).toBe(true)
   })
 
+  it("preserves non-text user parts when merging consecutive user messages", async () => {
+    const conversation: UIMessage[] = [
+      {
+        id: "u1",
+        role: "user",
+        parts: [
+          { type: "text", text: "Describe this image" },
+          { type: "image", image: new Uint8Array([1, 2, 3]), mimeType: "image/png" },
+        ],
+      } as unknown as UIMessage,
+      {
+        id: "u2",
+        role: "user",
+        parts: [{ type: "text", text: "and compare it to this one" }],
+      } as unknown as UIMessage,
+    ]
+
+    const result = await googleAdapter.adaptMessages(conversation, gemini25Context)
+
+    expect(result.messages).toHaveLength(1)
+    expect(result.messages[0].parts.map((part) => part.type)).toEqual(["text", "image", "text"])
+    expect(result.messages[0].parts[0]).toEqual({ type: "text", text: "Describe this image" })
+    expect(result.messages[0].parts[2]).toEqual({
+      type: "text",
+      text: "and compare it to this one",
+    })
+    expect(result.warnings.some((w) => w.code === "role_alternation_repaired")).toBe(true)
+  })
+
   it("repairs role alternation by merging consecutive assistant messages", async () => {
     const conversation: UIMessage[] = [
       { id: "a1", role: "assistant", parts: [{ type: "text", text: "one" }] } as unknown as UIMessage,
@@ -100,6 +129,24 @@ describe("googleAdapter", () => {
     expect(result.messages[0].parts.map((part) => part.type)).toEqual(["reasoning", "text"])
     expect(result.stats.partsPreserved.reasoning).toBe(1)
     expect(result.warnings).toHaveLength(0)
+  })
+
+  it("drops source artifact parts declared in metadata", async () => {
+    const message = {
+      id: "msg-google-source-artifacts",
+      role: "assistant",
+      parts: [
+        { type: "source-url", url: "https://example.com" },
+        { type: "source-document", source: { id: "doc_1", title: "Doc" } },
+        { type: "text", text: "kept" },
+      ],
+    } as unknown as UIMessage
+
+    const result = await googleAdapter.adaptMessages([message], gemini25Context)
+
+    expect(result.messages[0].parts).toEqual([{ type: "text", text: "kept" }])
+    expect(result.stats.partsDropped["source-url"]).toBe(1)
+    expect(result.stats.partsDropped["source-document"]).toBe(1)
   })
 
   it("strips cross-provider callProviderMetadata from tool parts", async () => {

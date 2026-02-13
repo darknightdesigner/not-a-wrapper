@@ -162,15 +162,22 @@ export function wrapMcpTools(
           // Promise.race: either the tool resolves or the timeout rejects.
           // When timeout wins, ToolTimeoutError is thrown → caught below →
           // re-thrown → SDK sets isError: true on the tool result.
+          let timeoutId: ReturnType<typeof setTimeout> | undefined
+          const timeoutPromise = new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(
+              () => reject(new ToolTimeoutError(name, timeoutMs)),
+              timeoutMs
+            )
+          })
+
           const rawResult = await Promise.race([
             origExec(params, options),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () => reject(new ToolTimeoutError(name, timeoutMs)),
-                timeoutMs
-              )
-            ),
-          ])
+            timeoutPromise,
+          ]).finally(() => {
+            if (timeoutId !== undefined) {
+              clearTimeout(timeoutId)
+            }
+          })
 
           // ── Measure result size (for trace, before truncation) ──
           try {

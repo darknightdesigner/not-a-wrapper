@@ -77,7 +77,7 @@ export type AdapterRegistry = Map<string, ProviderHistoryAdapter>
 const FINAL_TOOL_STATES = new Set(["output-available", "output-error", "output-denied"])
 
 export function isToolPartFinal(part: { state?: string }): boolean {
-  return part.state != null && FINAL_TOOL_STATES.has(part.state)
+  return part.state == null || FINAL_TOOL_STATES.has(part.state)
 }
 
 export function isToolPart(part: { type: string }): boolean {

@@ -61,17 +61,43 @@ function addFallbackAssistantText(
 }
 
 function mergeUserTextParts(prev: UIMessage, current: UIMessage): UIMessage {
-  const getTexts = (message: UIMessage): string[] =>
-    message.parts
-      .filter((part) => part.type === "text")
-      .map((part) => (typeof (part as { text?: unknown }).text === "string" ? (part as { text: string }).text : ""))
-      .filter((value) => value.length > 0)
+  const mergedParts: MessagePart[] = []
+  const appendPart = (rawPart: unknown): void => {
+    const part = toPart(rawPart)
+    if (part.type !== "text") {
+      mergedParts.push(part)
+      return
+    }
 
-  const mergedText = [...getTexts(prev), ...getTexts(current)].join("\n\n")
+    const textValue = typeof (part as { text?: unknown }).text === "string"
+      ? (part as { text: string }).text
+      : ""
+
+    const previousPart = mergedParts[mergedParts.length - 1]
+    if (previousPart?.type !== "text") {
+      mergedParts.push({ ...part, text: textValue })
+      return
+    }
+
+    const previousText = typeof (previousPart as { text?: unknown }).text === "string"
+      ? (previousPart as { text: string }).text
+      : ""
+    const combinedText =
+      previousText.length > 0 && textValue.length > 0
+        ? `${previousText}\n\n${textValue}`
+        : `${previousText}${textValue}`
+    mergedParts[mergedParts.length - 1] = {
+      ...previousPart,
+      text: combinedText,
+    }
+  }
+
+  for (const part of prev.parts) appendPart(part)
+  for (const part of current.parts) appendPart(part)
 
   return {
     ...prev,
-    parts: [{ type: "text", text: mergedText }],
+    parts: mergedParts,
   } as UIMessage
 }
 
@@ -80,6 +106,10 @@ function dropWithStat(
   partType: string,
 ): void {
   incrementStat(statsRecord, partType)
+}
+
+function isDroppedArtifactType(partType: string): boolean {
+  return partType === "step-start" || partType === "source-url" || partType === "source-document"
 }
 
 function pairFilterParts(
@@ -311,7 +341,7 @@ export const googleAdapter: ProviderHistoryAdapter = {
       for (const rawPart of message.parts) {
         const part = toPart(rawPart)
 
-        if (part.type === "step-start") {
+        if (isDroppedArtifactType(part.type)) {
           dropWithStat(stats.partsDropped, part.type)
           continue
         }

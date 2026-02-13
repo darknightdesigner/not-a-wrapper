@@ -262,7 +262,7 @@ const FINAL_TOOL_STATES = new Set(["output-available", "output-error", "output-d
  * appear if abort/disconnect races with the next request.
  */
 export function isToolPartFinal(part: { state?: string }): boolean {
-  return part.state != null && FINAL_TOOL_STATES.has(part.state)
+  return part.state == null || FINAL_TOOL_STATES.has(part.state)
 }
 
 /** Check if a part is tool-related */

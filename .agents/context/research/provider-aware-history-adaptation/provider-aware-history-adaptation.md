@@ -1361,7 +1361,7 @@ const FINAL_TOOL_STATES = new Set(["output-available", "output-error", "output-d
  * Adapters should drop non-final tool parts before provider-specific logic.
  */
 export function isToolPartFinal(part: { state?: string }): boolean {
-  return part.state != null && FINAL_TOOL_STATES.has(part.state)
+  return part.state == null || FINAL_TOOL_STATES.has(part.state)
 }
 
 // --- Entry point ---

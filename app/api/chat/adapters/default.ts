@@ -10,7 +10,7 @@ import {
   type ProviderHistoryAdapter,
 } from "./types"
 
-function shouldDropAssistantPart(partType: string): boolean {
+function shouldDropPart(partType: string): boolean {
   if (partType === "reasoning") return true
   if (partType === "step-start") return true
   if (partType === "source-url") return true
@@ -76,11 +76,9 @@ export const defaultAdapter: ProviderHistoryAdapter = {
           continue
         }
 
-        if (role === "assistant") {
-          if (shouldDropAssistantPart(partType) || !shouldKeepPart(partType)) {
-            incrementStat(stats.partsDropped, partType)
-            continue
-          }
+        if (shouldDropPart(partType) || !shouldKeepPart(partType)) {
+          incrementStat(stats.partsDropped, partType)
+          continue
         }
 
         let nextPart = mutablePart

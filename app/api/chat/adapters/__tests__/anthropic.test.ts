@@ -62,8 +62,8 @@ describe("anthropicAdapter", () => {
 
     const result = await anthropicAdapter.adaptMessages([orphanResultAssistant], context)
 
-    expect(result.messages[0].parts).toEqual([{ type: "text", text: "" }])
-    expect(result.stats.partsDropped["tool-result"]).toBe(1)
-    expect(result.warnings.some((w) => w.code === "non_final_state_dropped")).toBe(true)
+    expect(result.messages[0].parts).toEqual(orphanResultAssistant.parts)
+    expect(result.stats.partsDropped["tool-result"]).toBeUndefined()
+    expect(result.warnings.some((w) => w.code === "incomplete_triple_dropped")).toBe(true)
   })
 })
