@@ -171,7 +171,7 @@ To connect Clerk authentication with Convex:
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/not-a-wrapper.git
+git clone https://github.com/batmn-dev/not-a-wrapper.git
 cd not-a-wrapper
 
 # Install dependencies
@@ -185,7 +185,7 @@ bun dev
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/not-a-wrapper.git
+git clone https://github.com/batmn-dev/not-a-wrapper.git
 cd not-a-wrapper
 
 # Install dependencies
