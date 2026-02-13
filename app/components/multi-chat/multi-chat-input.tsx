@@ -26,6 +26,8 @@ import {
   ArrowUp02Icon,
   StopCircleIcon,
   AttachmentIcon,
+  Globe02Icon,
+  Tick02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import React, { useCallback } from "react"
 
@@ -47,6 +49,9 @@ type MultiChatInputProps = {
   stop: () => void
   status?: "submitted" | "streaming" | "ready" | "error"
   anyLoading?: boolean
+  enableSearch: boolean
+  setEnableSearch: (enabled: boolean) => void
+  searchSupportState: "supported" | "unsupported" | "no-selection"
 }
 
 export function MultiChatInput({
@@ -67,6 +72,9 @@ export function MultiChatInput({
   stop,
   status,
   anyLoading,
+  enableSearch,
+  setEnableSearch,
+  searchSupportState,
 }: MultiChatInputProps) {
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
 
@@ -103,6 +111,53 @@ export function MultiChatInput({
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
+        </Tooltip>
+        <PopoverContent className="p-2">
+          <div className="text-secondary-foreground text-sm">{message}</div>
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  const renderWebSearchToggle = () => {
+    const isSearchDisabled = searchSupportState !== "supported"
+    const message =
+      searchSupportState === "no-selection"
+        ? "Select at least one model to use web search."
+        : "None of the selected models support web search."
+
+    if (!isSearchDisabled) {
+      return (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+          type="button"
+          aria-label="Toggle web search"
+          onClick={() => setEnableSearch(!enableSearch)}
+        >
+          <HugeiconsIcon icon={enableSearch ? Tick02Icon : Globe02Icon} size={16} />
+        </Button>
+      )
+    }
+
+    return (
+      <Popover>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                type="button"
+                aria-label="Web search unavailable"
+              >
+                <HugeiconsIcon icon={Globe02Icon} size={16} />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" hideArrow>Web search</TooltipContent>
         </Tooltip>
         <PopoverContent className="p-2">
           <div className="text-secondary-foreground text-sm">{message}</div>
@@ -173,6 +228,7 @@ export function MultiChatInput({
           <PromptInputActions className="mt-5 w-full justify-between px-3 pb-3">
             <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
               {renderFileUpload()}
+              {renderWebSearchToggle()}
               <MultiModelSelector
                 selectedModelIds={selectedModelIds}
                 setSelectedModelIds={onSelectedModelIdsChange}

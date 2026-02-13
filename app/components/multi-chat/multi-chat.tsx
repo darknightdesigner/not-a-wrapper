@@ -10,6 +10,10 @@ import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provid
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
+import {
+  persistWebSearchToggle,
+  resolveWebSearchEnabled,
+} from "@/lib/user-preference-store/web-search"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
@@ -72,7 +76,10 @@ export function MultiChat() {
 
   const { user } = useUser()
   const { models } = useModel()
-  const { preferences } = useUserPreferences()
+  const { preferences, setWebSearchEnabled } = useUserPreferences()
+  const [enableSearch, setEnableSearchState] = useState(() =>
+    resolveWebSearchEnabled(preferences.webSearchEnabled)
+  )
   const {
     files,
     setFiles,
@@ -142,6 +149,38 @@ export function MultiChat() {
   )
 
   const fileUploadModelId = selectedModels[0]?.id
+
+  const searchSupportState = useMemo<"supported" | "unsupported" | "no-selection">(
+    () => {
+      if (selectedModelIds.length === 0) return "no-selection"
+      if (selectedModels.length !== selectedModelIds.length) return "unsupported"
+      return selectedModels.some(
+        (model) => model?.tools !== false && model?.webSearch !== false
+      )
+        ? "supported"
+        : "unsupported"
+    },
+    [selectedModelIds.length, selectedModels]
+  )
+
+  const modelSupportsSearch = useCallback(
+    (modelId: string) => {
+      const model = models.find((entry) => entry.id === modelId)
+      return model?.tools !== false && model?.webSearch !== false
+    },
+    [models]
+  )
+
+  const setEnableSearch = useCallback(
+    (enabled: boolean) => {
+      persistWebSearchToggle(enabled, setEnableSearchState, setWebSearchEnabled)
+    },
+    [setWebSearchEnabled]
+  )
+
+  useEffect(() => {
+    setEnableSearchState(resolveWebSearchEnabled(preferences.webSearchEnabled))
+  }, [preferences.webSearchEnabled])
 
   useEffect(() => {
     if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
@@ -533,7 +572,7 @@ export function MultiChat() {
               model: chat.model.id,
               isAuthenticated: !!user?.id,
               systemPrompt: systemPrompt,
-              enableSearch: false,
+              enableSearch: enableSearch && modelSupportsSearch(chat.model.id),
               message_group_id,
             },
           }
@@ -577,6 +616,8 @@ export function MultiChat() {
     fileUploadState,
     setFiles,
     cacheAndAddMessage,
+    enableSearch,
+    modelSupportsSearch,
   ])
 
   const handleSuggestion = useCallback(
@@ -623,6 +664,9 @@ export function MultiChat() {
       stop: handleStop,
       status: anyLoading ? ("streaming" as const) : ("ready" as const),
       anyLoading,
+      enableSearch,
+      setEnableSearch,
+      searchSupportState,
     }),
     [
       prompt,
@@ -640,6 +684,9 @@ export function MultiChat() {
       fileUploadModelId,
       handleStop,
       anyLoading,
+      enableSearch,
+      setEnableSearch,
+      searchSupportState,
     ]
   )
 

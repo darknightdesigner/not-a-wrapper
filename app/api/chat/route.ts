@@ -48,6 +48,7 @@ import {
   type LoadToolsResult,
 } from "@/lib/mcp/load-tools"
 import { resolveToolCapabilities } from "@/lib/tools/types"
+import { shouldInjectSearchTools } from "./search-tools"
 import {
   ToolTraceCollector,
   wrapMcpTools,
@@ -245,7 +246,7 @@ export async function POST(req: Request) {
     let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
     const capabilities = resolveToolCapabilities(modelConfig.tools)
-    const shouldInjectSearch = enableSearch && capabilities.search
+    const shouldInjectSearch = shouldInjectSearchTools(enableSearch, modelConfig.tools)
 
     if (shouldInjectSearch) {
       const { getProviderTools } = await import("@/lib/tools/provider")

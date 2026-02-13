@@ -17,6 +17,7 @@ const defaultPreferences = {
   showToolInvocations: true,
   showConversationPreviews: true,
   multiModelEnabled: false,
+  webSearchEnabled: true,
   hiddenModels: [],
 }
 
@@ -36,6 +37,7 @@ export async function GET() {
       show_tool_invocations: defaultPreferences.showToolInvocations,
       show_conversation_previews: defaultPreferences.showConversationPreviews,
       multi_model_enabled: defaultPreferences.multiModelEnabled,
+      web_search_enabled: defaultPreferences.webSearchEnabled,
       hidden_models: defaultPreferences.hiddenModels,
     })
   } catch (error) {

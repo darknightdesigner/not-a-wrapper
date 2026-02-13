@@ -10,6 +10,7 @@ export function InteractionPreferences() {
     setShowToolInvocations,
     setShowConversationPreviews,
     setMultiModelEnabled,
+    setWebSearchEnabled,
   } = useUserPreferences()
 
   return (
@@ -71,6 +72,21 @@ export function InteractionPreferences() {
           <Switch
             checked={preferences.multiModelEnabled}
             onCheckedChange={setMultiModelEnabled}
+          />
+        </div>
+      </div>
+      {/* Web Search Default */}
+      <div>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-medium">Web search default</h3>
+            <p className="text-muted-foreground text-xs">
+              Remember whether web search is enabled in new chats
+            </p>
+          </div>
+          <Switch
+            checked={preferences.webSearchEnabled}
+            onCheckedChange={setWebSearchEnabled}
           />
         </div>
       </div>
