@@ -1,7 +1,7 @@
 # Provider-Aware History Adaptation — Research Plan
 
 > **Date**: February 13, 2026
-> **Status**: 📋 Research Plan (pre-implementation)
+> **Status**: ✅ Research Complete — Interface Validated (ready for implementation)
 > **Scope**: Architecture for robust cross-provider message history replay
 > **Related**: `app/api/chat/utils.ts` (current sanitization), `app/api/chat/route.ts` (chat route), ADR-002 (Vercel AI SDK)
 > **Triggered by**: Production bug — OpenAI Responses API rejected replayed history with orphaned `web_search_call` items missing required `reasoning` pairs
@@ -104,10 +104,10 @@ streamText({ model, messages: ModelMessage[] })
 |----------|-----------------|-------------|-------------------|
 | **OpenAI** (Responses API) | Required if tool calls follow reasoning | Tool calls must pair with results | `web_search_call` requires preceding `reasoning` item; orphaned items rejected |
 | **Anthropic** | Required for continuity (thinking blocks) | Required — tool_use must pair with tool_result | Thinking blocks must be replayed for multi-turn coherence; stripping them degrades quality |
-| **Google Gemini** | Permissive (thoughts are optional in replay) | Tool calls should pair with results; missing results = warning, not error | `functionCall` + `functionResponse` pairing is expected but not strictly enforced |
-| **xAI (Grok)** | Not well-documented; likely permissive | Follows OpenAI-compatible format | Needs empirical testing |
-| **Mistral** | No reasoning support | Tool calls must pair with results | Standard OpenAI-compatible tool format |
-| **Perplexity** | No reasoning support | No tool calling support | Clean text-only replay |
+| **Google Gemini** | **Converted to native `thought: true`** (Gemini 3: mandatory signatures on current-turn FC; 2.5: optional) | **Strict** — `functionCall` must pair with `functionResponse`; count parity enforced; 400 error on mismatch | Strict role alternation (user/model); Gemini 3 requires `thoughtSignature` on FC parts in current turn |
+| **xAI (Grok)** | Not required for replay (output-only in Chat Completions) | OpenAI-compatible `tool_calls` + `tool` role; `tool_call_id` pairing required | `presencePenalty`/`frequencyPenalty`/`stop` rejected on reasoning models |
+| **Mistral** | Not required for replay (Magistral `thinking` chunks are output artifacts) | `tool_calls` + `tool` role with `tool_call_id` + `name`; parallel and successive calling | Magistral models produce `thinking` content chunks but replay is not required |
+| **Perplexity** | No reasoning support (`reasoning_steps` are search pipeline artifacts) | No user-defined tool calling (Sonar API) | Clean text-only replay; tool fields in schema but not user-controllable |
 | **OpenRouter** | Depends on underlying model | Depends on underlying model | Passthrough — inherits target provider's constraints |
 
 **Action**: Empirically validate each provider's behavior with structured test payloads.
@@ -132,15 +132,23 @@ streamText({ model, messages: ModelMessage[] })
 | Part Type | Anthropic | OpenAI | Google | xAI | Mistral | Perplexity |
 |-----------|-----------|--------|--------|-----|---------|------------|
 | `text` | Keep | Keep | Keep | Keep | Keep | Keep |
-| `reasoning` | Keep (required) | Transform* | Drop | Drop | Drop | Drop |
+| `reasoning` | Keep (required) | Transform* | **Keep** (converted to `thought: true`)† | Drop | Drop | Drop |
 | `step-start` | Drop (SDK artifact) | Drop | Drop | Drop | Drop | Drop |
-| `tool-*` (invocation) | Keep (required) | Transform* | Transform** | Drop | Transform** | Drop |
-| `tool-result` | Keep (required) | Transform* | Transform** | Drop | Transform** | Drop |
-| `source-url` | Keep | Keep | Keep | Keep | Keep | Keep |
+| `tool-*` (invocation) | Keep (required) | Transform* | Transform** | Transform*** | Transform*** | Drop |
+| `tool-result` | Keep (required) | Transform* | Transform** | Transform*** | Transform*** | Drop |
+| `source-url` | Keep‡ | Keep‡ | Keep‡ | Keep‡ | Keep‡ | Keep‡ |
+| `source-document` | Keep‡ | Keep‡ | Keep‡ | Keep‡ | Keep‡ | Keep‡ |
 | `file` | Keep | Keep | Keep | Keep | Keep | Keep |
+| `dynamic-tool` | Keep (same as tool-*) | Transform* | Transform** | Transform*** | Transform*** | Drop |
+| `data-*` | Pass through | Pass through | Pass through | Pass through | Pass through | Pass through |
+| `callProviderMetadata` | Keep | Strip IDs§ | Strip IDs§ | Strip IDs§ | Strip IDs§ | Strip IDs§ |
 
-\* OpenAI: Reasoning + tool pairs must be kept together or dropped together. Cannot keep one without the other.
-\** Google/Mistral: Tool calls should be paired with results. If result is missing, either synthesize a placeholder or drop the pair.
+\* OpenAI: Reasoning + tool pairs must be kept together or dropped together. Cannot keep one without the other. Provider-specific IDs (`msg_`/`rs_`/`ws_`/`fc_`) must be stripped.
+\** Google: Tool calls must be paired with results (strict count parity — 400 error). For Gemini 3, function call parts require `thoughtSignature` (use `"skip_thought_signature_validator"` for cross-provider replay).
+\*** xAI/Mistral: Drop reasoning, keep tool pairs if both invocation + result exist, drop orphans. Mistral additionally requires `name` field on tool results.
+† Google: `@ai-sdk/google` converts `reasoning` parts to Gemini's native `{ text, thought: true }` format. This preserves reasoning context and improves response quality. Thought signatures from prior turns are NOT validated — only current-turn FC needs valid signatures.
+‡ `source-url` and `source-document` are silently dropped by `convertToModelMessages()` — adapters don't strictly need to strip them, but should for observability accuracy.
+§ `callProviderMetadata` carries provider-linked IDs (e.g., `msg_`, `rs_`, `ws_`) that create cross-response linkage. Must be stripped when target provider differs from source to prevent pairing validation errors.
 
 ### 2.4 Cross-Turn Tool Artifact Representation
 
@@ -184,12 +192,11 @@ UIMessage[] → ProviderAdapter.adapt(messages) → convertToModelMessages() →
 - Adapters are pure functions (stateless, testable)
 
 ```typescript
+// Original sketch — see Appendix C for validated interface
 interface ProviderHistoryAdapter {
   providerId: string
-  adaptMessages(messages: UIMessage[]): UIMessage[]
-  // Metadata for observability
-  readonly droppedPartTypes: Set<string>
-  readonly transformedPartTypes: Set<string>
+  adaptMessages(messages: UIMessage[], context: AdaptationContext): Promise<AdaptationResult>
+  readonly metadata: { droppedPartTypes: ReadonlySet<string>; transformedPartTypes: ReadonlySet<string>; description: string }
 }
 ```
 
@@ -204,6 +211,200 @@ interface ProviderHistoryAdapter {
 | Debuggability | ★★★★☆ | Adapter logs what was dropped/transformed |
 | Migration effort | ★★★★★ | Drop-in replacement for `sanitizeMessagesForProvider()` |
 | Extensibility | ★★★★★ | Adding provider = adding one adapter file |
+
+### 3.1 Interface Validation Results
+
+> **Validated**: February 13, 2026
+> **Scope**: Validated proposed Appendix C interface and Appendix D file structure against all 7 research documents, codebase conventions, and real message shapes
+
+#### 3.1.1 Part Type Coverage — Gaps Found and Addressed
+
+**AI SDK v6 `UIMessagePart` union (from `ai@6.0.78`):**
+
+```typescript
+type UIMessagePart =
+  | TextUIPart           // { type: "text" }        — ✅ Covered
+  | ReasoningUIPart      // { type: "reasoning" }   — ✅ Covered
+  | ToolUIPart<TOOLS>    // { type: `tool-${NAME}` }— ✅ Covered
+  | DynamicToolUIPart    // { type: "dynamic-tool" }— ⚠️ MISSING from original table
+  | SourceUrlUIPart      // { type: "source-url" }  — ✅ Covered
+  | SourceDocumentUIPart // { type: "source-document" } — ⚠️ MISSING from original table
+  | FileUIPart           // { type: "file" }        — ✅ Covered
+  | DataUIPart           // { type: `data-${NAME}` }— ⚠️ MISSING from original table
+  | StepStartUIPart      // { type: "step-start" }  — ✅ Covered
+```
+
+**Codebase usage audit:**
+
+| Part Type | Used In Codebase | Found In |
+|-----------|-----------------|----------|
+| `text` | Yes (very common) | `utils.ts`, `use-chat-core.ts`, `messages/provider.tsx`, etc. |
+| `reasoning` | Yes | `utils.ts`, `message-assistant.tsx`, `db.ts` |
+| `step-start` | Yes | `utils.ts`, `db.ts` |
+| `tool-*` (e.g., `tool-web_search`, `tool-exa_search`) | Yes | `utils.ts`, `utils.test.ts`, `tool-invocation.tsx` |
+| `source-url` | Yes | `utils.ts`, `get-sources.ts` |
+| `source-document` | **Not used** | Not found in any source file |
+| `file` | Yes | `messages/provider.tsx`, `use-chat-core.ts` |
+| `dynamic-tool` | **Not used** | Not found (could appear with MCP tools in future) |
+| `data-*` | **Not used** | Not found (AI SDK supports custom data parts) |
+
+**Resolution**: Section 2.3 table updated to include `source-document`, `dynamic-tool`, `data-*`, and `callProviderMetadata`. All three missing part types are safe to pass through (they're either silently dropped by `convertToModelMessages()` or treated identically to their base types).
+
+**Critical addition**: `callProviderMetadata` added to the table. This is the mechanism through which provider-linked IDs (`msg_`, `rs_`, `ws_`, `fc_`) flow from stored UIMessage tool parts into ModelMessages, triggering pairing validation errors. The adapter MUST strip this when the target provider differs from the source.
+
+#### 3.1.2 AdaptationResult Stats — Gaps Found
+
+The proposed `AdaptationResult.stats` (Appendix C) was missing fields needed by the structured log format (Section 5.1):
+
+| Field | In AdaptationResult? | In Log Format? | Resolution |
+|-------|---------------------|----------------|------------|
+| `originalMessageCount` | ✅ Yes | ✅ Yes | — |
+| `adaptedMessageCount` | ✅ Yes | ✅ Yes | — |
+| `partsDropped` | ✅ Yes | ✅ Yes | — |
+| `partsTransformed` | ✅ Yes | ✅ Yes | — |
+| `partsPreserved` | ✅ Yes | ✅ Yes | — |
+| `droppedMessages` | ❌ Missing | ✅ Yes | **Added** — count of messages entirely removed |
+| `totalPartsOriginal` | ❌ Missing | ✅ Yes | **Added** — total part count before adaptation |
+| `totalPartsAdapted` | ❌ Missing | ✅ Yes | **Added** — total part count after adaptation |
+| `adaptationTimeMs` | ❌ Missing | ✅ Yes | **Added** — measured by caller, not adapter |
+| `providerIdsStripped` | ❌ Missing | ❌ Missing | **Added** — count of `callProviderMetadata` entries stripped |
+
+**Resolution**: `AdaptationResult` in Appendix C updated with all missing fields.
+
+#### 3.1.3 Adapter Invocation Point — Confirmed Correct, With Refinement
+
+The `ai-sdk-convert-messages.md` research confirms the three-layer architecture:
+
+```
+UIMessage[] → [ADAPTER HERE] → convertToModelMessages() → Provider SDK
+   Layer 1                        Layer 2                  Layer 3
+```
+
+**Confirmed**: Adapters should operate at Layer 1 (before `convertToModelMessages()`). Reasons from research:
+1. Part-level granularity is available (reasoning, tool, source-url etc.)
+2. Step-start block splitting is handled downstream by the SDK
+3. `callProviderMetadata` can be stripped before it propagates to `providerOptions`
+4. UIMessage is a flat parts array — simpler than nested ModelMessage structure
+
+**Refinement needed**: The existing post-conversion safety net (`hasProviderLinkedResponseIds()` + `toPlainTextModelMessages()`) should remain as defense-in-depth. The adapter strips `callProviderMetadata` proactively; the post-conversion check catches any leakage.
+
+**No post-conversion adapter needed**: The provider SDKs (`@ai-sdk/anthropic`, `@ai-sdk/openai`, `@ai-sdk/google`) handle the final format transformation. Adding an adapter between `convertToModelMessages()` and `streamText()` would require working with the complex `ModelMessage` structure (paired assistant+tool messages) — unnecessary complexity.
+
+**Additional context the adapter may need** (see 3.1.5):
+- Target model ID (for Gemini 3 vs 2.5 thought signature handling)
+- Whether tools are being sent (to decide if tool parts should be preserved)
+- Model capabilities (e.g., `modelConfig.reasoningText`, `modelConfig.tools`)
+
+#### 3.1.4 File Structure — Validated Against Conventions
+
+**Test file convention audit:**
+
+| Location | Convention | Examples |
+|----------|-----------|----------|
+| `app/api/chat/utils.test.ts` | `.test.ts` alongside source | Single test file for a single module |
+| `lib/tools/__tests__/*.test.ts` | `__tests__/` subdirectory | Multi-file test suite for a cohesive module |
+| `lib/mcp/__tests__/*.test.ts` | `__tests__/` subdirectory | Multi-file test suite for a cohesive module |
+| `lib/as-child-adapter.test.ts` | `.test.ts` alongside source | Single test file |
+
+**Finding**: Both conventions coexist. `__tests__/` is used for cohesive modules with multiple test files (lib/tools, lib/mcp). `.test.ts` alongside source is used for single-module testing. The adapters module has multiple test files (one per provider + cross-provider), so `__tests__/` is the correct convention.
+
+**Vitest config** (`vitest.config.ts`): No include/exclude patterns — both conventions are auto-discovered.
+
+**File structure change from research**: The xAI/Mistral research recommends a shared `OpenAICompatibleAdapter` rather than separate adapters. Updated in Appendix D.
+
+#### 3.1.5 Interface Gaps Identified
+
+**Gap 1: Synchronous vs Asynchronous**
+
+The proposed `adaptMessages()` is synchronous. This should be **async** because:
+- `convertToModelMessages()` is already async (the caller already awaits)
+- Future adapters might need to look up model capabilities or source provider info
+- The cost of async is zero (caller already in an async context)
+- Enables potential future integration with AI SDK middleware
+
+**Resolution**: Changed to `async` in Appendix C.
+
+**Gap 2: Missing Adaptation Context**
+
+The adapter receives only `messages: UIMessage[]` but needs additional context:
+
+| Context | Why Needed | Example |
+|---------|-----------|---------|
+| `targetModelId` | Gemini 3 vs 2.5 have different thought signature requirements | `"gemini-3-pro"` requires signatures; `"gemini-2.5-flash"` doesn't |
+| `hasTools` | Adapters should only preserve tool parts when tools are actually being sent | If no tools in current request, tool history parts are noise |
+| `sourceProviderHint` | Enables smarter stripping — e.g., Anthropic→Anthropic can preserve signatures | Per-message source is in `callProviderMetadata`; conversation-level hint is useful |
+
+**Resolution**: Added `AdaptationContext` parameter to `adaptMessages()` in Appendix C.
+
+**Gap 3: Source Provider Identification**
+
+The adapter is keyed on the **target** provider (correct — Section 2.5 confirms this). But it may benefit from knowing the source provider per message. This information is available in two places:
+1. `callProviderMetadata` on tool parts (carries provider name as key)
+2. `model` field on `ExtendedUIMessage` (our app-specific extension, stored in Convex)
+
+**Resolution**: Rather than requiring per-message source provider, the adapter should inspect `callProviderMetadata` keys to detect source provider when needed. The `sourceProviderHint` in `AdaptationContext` provides a conversation-level default.
+
+**Gap 4: `providerExecuted` Flag Awareness**
+
+The `cross-turn-tool-artifacts.md` research reveals that `providerExecuted: true` tool parts produce inlined tool results in the assistant ModelMessage (not separate `role: "tool"` messages). This affects the replay shape downstream. The adapter must understand this distinction when deciding what to keep/drop, because:
+- Provider-executed tools (OpenAI `web_search`, Google `code_execution`) carry `callProviderMetadata` with provider IDs
+- SDK-executed tools (MCP, Exa) don't carry provider IDs but need call/result pairing
+
+**Resolution**: Documented in adapter contract (Appendix C). No interface change needed — `providerExecuted` is already on the ToolUIPart and adapters can inspect it.
+
+**Gap 5: Fallback Chain Support**
+
+The xAI/Mistral research suggests shared adapters (both use `OpenAICompatibleAdapter`). Rather than fallback chains, the registry should support **adapter aliasing** — multiple provider IDs mapping to the same adapter instance.
+
+**Resolution**: Registry design updated in Appendix C to use a simple map with shared instances. No fallback chain mechanism needed.
+
+#### 3.1.6 Research Cross-Reference — Corrections to Main Plan
+
+| Section | Original Claim | Correction | Source |
+|---------|---------------|------------|--------|
+| 2.1 (Google) | "Permissive... not strictly enforced" | **Strict** — 400 `INVALID_ARGUMENT` on tool pairing violations | `google-replay-invariants.md` §1 |
+| 2.1 (Mistral) | "No reasoning support" | Magistral models support `thinking` content chunks (since June 2025) | `xai-mistral-perplexity-replay-invariants.md` §2.2 |
+| 2.3 (Google reasoning) | "Drop" | **Keep** — `@ai-sdk/google` converts to native `thought: true` format | `google-replay-invariants.md` §4 |
+| 2.3 (missing parts) | Only 7 part types listed | 3 additional types: `source-document`, `dynamic-tool`, `data-*` | `cross-turn-tool-artifacts.md` §2.1 |
+| — (new) | `callProviderMetadata` not addressed | Must strip when target ≠ source — carries `msg_`/`rs_`/`ws_` IDs | `cross-turn-tool-artifacts.md` §5.4, `openai-replay-invariants.md` §8.4 |
+| — (new) | Gemini 3 thought signatures not addressed | Gemini 3 requires `thoughtSignature` on FC parts; use dummy `"skip_thought_signature_validator"` for cross-provider replay | `google-replay-invariants.md` §2 |
+| — (new) | No shared adapter concept | xAI and Mistral can share an `OpenAICompatibleAdapter` | `xai-mistral-perplexity-replay-invariants.md` §5.1 |
+
+#### 3.1.7 Design Issues Requiring Resolution Before Implementation
+
+**Issue 1 (HIGH): Gemini 3 Thought Signature Injection**
+
+Gemini 3 models require `thoughtSignature` on `functionCall` parts in the current turn. When replaying cross-provider history (e.g., OpenAI tool calls → Gemini 3), these signatures are missing. The adapter must inject the dummy value `"skip_thought_signature_validator"`.
+
+**Question**: Should the adapter inject this at the UIMessage level (into `providerMetadata.google`), or should this be handled downstream by the `@ai-sdk/google` provider?
+
+**Recommendation**: Handle in the adapter. The `@ai-sdk/google` provider converts `providerMetadata` to `providerOptions` and then to `thoughtSignature` on parts. The adapter can set `providerMetadata.google.thoughtSignature = "skip_thought_signature_validator"` on tool parts that lack signatures.
+
+**Issue 2 (MEDIUM): `providerExecuted` Tool Parts Need Special Handling**
+
+Provider-executed tool results are inlined in the assistant ModelMessage (not separate `role: "tool"` messages). When the adapter drops a provider-executed tool part, it only needs to drop that one part. When it drops an SDK-executed tool part, it must also account for the `role: "tool"` ModelMessage that `convertToModelMessages()` would synthesize.
+
+**Current design handles this**: Since the adapter operates on UIMessage parts (before conversion), dropping a tool part automatically prevents the SDK from synthesizing the downstream ModelMessage. No special handling needed at the adapter level — but this should be documented in the adapter contract.
+
+**Issue 3 (MEDIUM): Role Alternation Validation for Google**
+
+The Google research reveals strict role alternation (user/model). If the adapter strips all parts from an assistant message (making it empty), and the message is between two user messages, the result is consecutive user messages — which Gemini rejects with a 400 error.
+
+**Recommendation**: The Google adapter must verify role alternation after filtering. If stripping creates consecutive same-role messages, either merge them or inject an empty assistant placeholder.
+
+**Issue 4 (LOW): `step-start` Parts and Block Awareness**
+
+The `cross-turn-tool-artifacts.md` research shows that `step-start` parts delimit atomic blocks within a single assistant UIMessage. The OpenAI adapter needs block-level awareness to enforce the reasoning→tool→result atomic triple invariant.
+
+**Recommendation**: The adapter should process parts within `step-start` blocks. For each block: identify reasoning + tool parts, check if the group is complete, keep or drop the entire block. This is already described in the OpenAI research (§7 decision tree) but should be explicit in the interface contract.
+
+**Issue 5 (LOW): Test Fixture Realism**
+
+Current `utils.test.ts` fixtures use minimal part shapes (e.g., `{ type: "tool-web_search", toolCallId: "tc1", input: { q: "batman" } }`). Real parts include `state`, `providerExecuted`, `output`, `callProviderMetadata`. Contract tests should use realistic fixtures matching the shapes cataloged in `cross-turn-tool-artifacts.md` §3.
+
+**Recommendation**: Create a comprehensive `fixtures.ts` with realistic message shapes from the cross-turn-tool-artifacts research (Section 3.1–3.8).
+
+---
 
 ### Option B: Dual-Track History Model
 
@@ -406,14 +607,14 @@ Pattern-match known replay-shape error messages:
 **Goal**: Replace the binary sanitization with a proper OpenAI adapter that handles reasoning-tool pairs.
 
 **Steps**:
-1. Create `app/api/chat/adapters/types.ts` — Define `ProviderHistoryAdapter` interface
-2. Create `app/api/chat/adapters/openai.ts` — OpenAI-specific adapter
+1. Create `app/api/chat/adapters/types.ts` — Define `ProviderHistoryAdapter`, `AdaptationResult`, `AdaptationContext`
+2. Create `app/api/chat/adapters/openai.ts` — OpenAI Responses API adapter (reasoning-tool pairing, ID stripping)
 3. Create `app/api/chat/adapters/default.ts` — Default adapter (current strip-all behavior)
-4. Create `app/api/chat/adapters/anthropic.ts` — Anthropic pass-through adapter
-5. Create `app/api/chat/adapters/index.ts` — Registry mapping providerId → adapter
-6. Update `sanitizeMessagesForProvider()` to delegate to adapters
-7. Write contract tests for OpenAI adapter
-8. Write regression test for the Batman production bug
+4. Create `app/api/chat/adapters/anthropic.ts` — Anthropic near-passthrough adapter
+5. Create `app/api/chat/adapters/index.ts` — Registry + `adaptHistoryForProvider()` entry point
+6. Update `route.ts` to call `adaptHistoryForProvider()` behind feature flag (keep `sanitizeMessagesForProvider()` as fallback)
+7. Write contract tests in `adapters/__tests__/openai.test.ts` with realistic fixtures
+8. Write regression test reproducing Batman production bug
 
 **Feature flag**: `HISTORY_ADAPTER_V2=true` (env var, defaults to false)
 **Rollback**: Set flag to false, reverts to current binary sanitization
@@ -424,13 +625,13 @@ Pattern-match known replay-shape error messages:
 **Goal**: Add adapters for Google, xAI, Mistral, Perplexity.
 
 **Steps**:
-1. Create `app/api/chat/adapters/google.ts` — Google Gemini adapter
-2. Create `app/api/chat/adapters/xai.ts` — xAI adapter
-3. Create `app/api/chat/adapters/mistral.ts` — Mistral adapter
-4. Create `app/api/chat/adapters/perplexity.ts` — Perplexity adapter (text-only)
-5. Update registry
-6. Write contract tests for each adapter
-7. Run cross-provider replay test matrix
+1. Create `app/api/chat/adapters/google.ts` — Google Gemini adapter (strict FC pairing, role alternation, Gemini 3 thought signatures)
+2. Create `app/api/chat/adapters/openai-compatible.ts` — Shared adapter for xAI + Mistral (drop reasoning, keep tool pairs)
+3. Create `app/api/chat/adapters/text-only.ts` — Perplexity adapter (strip everything except text)
+4. Register all adapters in `index.ts` (xAI and Mistral map to `OpenAICompatibleAdapter`)
+5. Write contract tests: `google.test.ts`, `openai-compatible.test.ts`, `text-only.test.ts`
+6. Write `cross-provider.test.ts` — Full source×target matrix
+7. Create `fixtures.ts` with realistic message shapes from cross-turn-tool-artifacts research
 
 **Feature flag**: Same `HISTORY_ADAPTER_V2` flag
 **Success criteria**: Full test matrix passing, zero replay errors across all providers
@@ -561,12 +762,31 @@ Based on Anthropic documentation and observed behavior:
 3. Interleaved thinking is automatically enabled when tools are present (on supported models).
 4. Stripping thinking blocks from history is tolerated but not recommended.
 
-## Appendix C: Proposed Adapter Interface
+## Appendix C: Proposed Adapter Interface (Validated)
+
+> Updated after validation against all 7 research documents and codebase audit (Section 3.1)
 
 ```typescript
 // app/api/chat/adapters/types.ts
 
 import type { UIMessage } from "ai"
+
+/**
+ * Context provided to adapters for informed adaptation decisions.
+ * Populated by the caller (route.ts) from request-level information.
+ */
+export interface AdaptationContext {
+  /** Target model ID (e.g., "gemini-3-pro", "gpt-5.2") */
+  targetModelId: string
+  /** Whether tools are being sent in this request */
+  hasTools: boolean
+  /**
+   * Hint for the dominant source provider in this conversation.
+   * Per-message source can be detected from callProviderMetadata.
+   * This is a conversation-level hint for the common case.
+   */
+  sourceProviderHint?: string
+}
 
 /**
  * Contract for provider-specific history adaptation.
@@ -580,20 +800,39 @@ import type { UIMessage } from "ai"
  * - Pure functions (no side effects, no network calls)
  * - Idempotent (applying twice produces the same result)
  * - Documented (invariants are in comments, not just code)
+ * 
+ * Adapters MUST handle these UIMessage part types:
+ * - text, reasoning, step-start, tool-*, dynamic-tool
+ * - source-url, source-document, file, data-*
+ * - Parts with callProviderMetadata (provider-linked IDs)
+ * - Parts with providerExecuted: true vs false
+ * 
+ * Adapters MUST enforce provider invariants at the step-start block
+ * level. Within a single assistant UIMessage, parts are grouped by
+ * step-start delimiters. Each block may contain reasoning + tool
+ * parts that form atomic units (especially for OpenAI).
+ * 
+ * Adapters MUST NOT mutate input messages. Return new arrays/objects.
  */
 export interface ProviderHistoryAdapter {
-  /** Provider ID this adapter handles */
+  /** Provider ID(s) this adapter handles */
   readonly providerId: string
 
   /**
    * Adapt messages for this provider's replay invariants.
    * Returns a new array (never mutates input).
+   * 
+   * Async for future flexibility (model capability lookups, etc.)
+   * Currently all implementations are synchronous but wrapped in Promise.
    */
-  adaptMessages(messages: UIMessage[]): UIMessage[]
+  adaptMessages(
+    messages: UIMessage[],
+    context: AdaptationContext,
+  ): Promise<AdaptationResult>
 
   /**
-   * Metadata for observability — what this adapter drops/transforms.
-   * Used for structured logging.
+   * Static metadata for observability — what this adapter drops/transforms.
+   * Used for structured logging and dashboard configuration.
    */
   readonly metadata: {
     droppedPartTypes: ReadonlySet<string>
@@ -604,43 +843,89 @@ export interface ProviderHistoryAdapter {
 
 /**
  * Result of adaptation, including observability data.
+ * Stats structure matches the structured log format in Section 5.1.
  */
 export interface AdaptationResult {
   messages: UIMessage[]
   stats: {
     originalMessageCount: number
     adaptedMessageCount: number
+    droppedMessages: number
     partsDropped: Record<string, number>
     partsTransformed: Record<string, number>
     partsPreserved: Record<string, number>
+    totalPartsOriginal: number
+    totalPartsAdapted: number
+    providerIdsStripped: number
   }
+}
+
+/**
+ * Adapter registry — maps providerId to adapter.
+ * Multiple provider IDs can map to the same adapter instance
+ * (e.g., xAI and Mistral both use OpenAICompatibleAdapter).
+ */
+export type AdapterRegistry = Map<string, ProviderHistoryAdapter>
+
+/**
+ * Entry point: resolve and run the adapter for a given provider.
+ * Falls back to DefaultAdapter if no provider-specific adapter exists.
+ * 
+ * This replaces sanitizeMessagesForProvider() — same invocation point,
+ * richer per-provider logic, structured observability output.
+ */
+export async function adaptHistoryForProvider(
+  messages: UIMessage[],
+  providerId: string,
+  context: AdaptationContext,
+): Promise<AdaptationResult> {
+  const adapter = registry.get(providerId) ?? defaultAdapter
+  return adapter.adaptMessages(messages, context)
 }
 ```
 
-## Appendix D: File Structure
+## Appendix D: File Structure (Validated)
+
+> Updated after validation against project conventions (Section 3.1.4).
+> Test files use `__tests__/` convention (matches `lib/tools/`, `lib/mcp/` pattern for multi-file test suites).
+> xAI and Mistral share `openai-compatible.ts` adapter (validated in xAI/Mistral research).
 
 ```
 app/api/chat/
 ├── adapters/
-│   ├── types.ts          # ProviderHistoryAdapter interface
-│   ├── index.ts           # Registry: providerId → adapter
-│   ├── openai.ts          # OpenAI Responses API invariants
-│   ├── anthropic.ts       # Anthropic pass-through (keep all)
-│   ├── google.ts          # Google Gemini invariants
-│   ├── xai.ts             # xAI (OpenAI-compatible subset)
-│   ├── mistral.ts         # Mistral invariants
-│   ├── perplexity.ts      # Perplexity (text-only)
-│   └── default.ts         # Fallback (strip tool+reasoning)
+│   ├── types.ts               # ProviderHistoryAdapter, AdaptationResult, AdaptationContext
+│   ├── index.ts               # Registry: providerId → adapter + adaptHistoryForProvider()
+│   ├── openai.ts              # OpenAI Responses API invariants (strict reasoning-tool pairing)
+│   ├── anthropic.ts           # Anthropic near-passthrough (keep all, strip step-start)
+│   ├── google.ts              # Google Gemini invariants (strict FC pairing, role alternation, thought signatures)
+│   ├── openai-compatible.ts   # Shared adapter for xAI + Mistral (drop reasoning, keep tool pairs)
+│   ├── text-only.ts           # Perplexity and future text-only providers
+│   └── default.ts             # Fallback (current strip-all behavior for unknown providers)
 ├── adapters/__tests__/
-│   ├── openai.test.ts     # Contract tests
-│   ├── anthropic.test.ts
-│   ├── google.test.ts
-│   ├── cross-provider.test.ts  # Matrix tests
-│   └── fixtures.ts        # Shared test message fixtures
-├── route.ts               # Updated to use adapter registry
-├── utils.ts               # sanitizeMessagesForProvider delegates to adapters
-└── utils.test.ts          # Updated tests
+│   ├── openai.test.ts         # Contract tests — reasoning-tool pairing, ID stripping
+│   ├── anthropic.test.ts      # Contract tests — passthrough verification
+│   ├── google.test.ts         # Contract tests — FC pairing, role alternation, thought signatures
+│   ├── openai-compatible.test.ts  # Contract tests — xAI/Mistral tool pair handling
+│   ├── text-only.test.ts      # Contract tests — text extraction, part stripping
+│   ├── cross-provider.test.ts # Matrix tests — all source×target combinations
+│   └── fixtures.ts            # Shared realistic message fixtures (from cross-turn-tool-artifacts §3)
+├── route.ts                   # Updated: adaptHistoryForProvider() replaces sanitizeMessagesForProvider()
+├── utils.ts                   # sanitizeMessagesForProvider() kept as deprecated fallback behind feature flag
+└── utils.test.ts              # Existing tests kept; new adapter tests in __tests__/
 ```
+
+**Mapping: providerId → adapter file**
+
+| Provider ID | Adapter File | Adapter Name |
+|------------|-------------|-------------|
+| `anthropic` | `anthropic.ts` | `AnthropicAdapter` |
+| `openai` | `openai.ts` | `OpenAIResponsesAdapter` |
+| `google` | `google.ts` | `GoogleAdapter` |
+| `xai` | `openai-compatible.ts` | `OpenAICompatibleAdapter` |
+| `mistral` | `openai-compatible.ts` | `OpenAICompatibleAdapter` |
+| `perplexity` | `text-only.ts` | `TextOnlyAdapter` |
+| `openrouter` | `default.ts` | `DefaultAdapter` (inherits target model's constraints) |
+| *(unknown)* | `default.ts` | `DefaultAdapter` |
 
 ---
 
