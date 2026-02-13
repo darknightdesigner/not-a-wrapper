@@ -79,6 +79,7 @@ Array of content parts from the AI SDK. Stored in database and used for renderin
 | `tool-invocation` | Tool calls and results |
 | `reasoning` | Model reasoning (o1, o3 models) |
 | `source` | Citations and sources |
+| `file` | File attachments (`filename`, `mediaType`, `url`) |
 | `step-start` | Multi-step reasoning markers |
 
 ```typescript
@@ -99,18 +100,27 @@ String identifier that groups related messages together. Used in multi-model com
 { role: "assistant", model: "claude-3", message_group_id: "abc123" }
 ```
 
-### MessageAISDK
+### Message Types (AI SDK v6)
 
-Type from `@ai-sdk/react` or `ai` package representing a chat message.
+AI SDK v6 defines two primary message types for different layers:
+
+| Type | Package | Purpose | Primary Content |
+|------|---------|---------|-----------------|
+| **`UIMessage`** | `ai`, `@ai-sdk/react` | UI rendering in chat components | `parts` (array of `UIMessagePart`) |
+| **`ModelMessage`** | `ai` | API communication with models | `content` (array of `ModelMessagePart`) |
+
+**`UIMessage`** is the type used in components and hooks (`useChat`, message lists). It uses `parts` as the primary content representation for rendering text, tool invocations, reasoning, sources, and files.
+
+**`ModelMessage`** is the type sent to `streamText`/`generateText`. Use `convertToModelMessages()` to transform `UIMessage[]` → `ModelMessage[]` before calling the API.
 
 ```typescript
-type MessageAISDK = {
-  id: string
-  role: "user" | "assistant" | "system" | "tool"
-  content: string | ContentPart[]
-  parts?: Part[]
-}
+// In route.ts — converting UI messages to model messages
+import { UIMessage as MessageAISDK, convertToModelMessages } from "ai"
+const modelMessages = await convertToModelMessages(sanitizedMessages)
+const result = streamText({ model, messages: modelMessages, ... })
 ```
+
+**NaW alias**: The codebase imports `UIMessage as MessageAISDK` in `route.ts` for backward compatibility. New code should prefer `UIMessage` directly.
 
 Attachments are represented as `file` parts in the `parts` array (e.g., `{ type: "file", filename, mediaType, url }`).
 
@@ -226,6 +236,61 @@ const allTools: ToolSet = {
 streamText({ model, tools: allTools, ... })
 ```
 
+### stopWhen
+
+AI SDK v6 loop-control function that replaced the v5 `maxSteps` parameter. Determines when multi-step tool calling should stop. Used with helper functions like `stepCountIs()`.
+
+> **Official definition** (AI SDK docs): "The `stopWhen` conditions are only evaluated when the last step contains tool results."
+
+```typescript
+// NaW usage (from route.ts)
+import { stepCountIs } from "ai"
+const maxSteps = hasAnyTools ? MCP_MAX_STEP_COUNT : DEFAULT_MAX_STEP_COUNT
+streamText({ model, tools: allTools, stopWhen: stepCountIs(maxSteps), ... })
+```
+
+### needsApproval
+
+AI SDK v6 tool property that requires user approval before execution. When set, `streamText`/`generateText` return `tool-approval-request` parts instead of executing immediately. The host application collects the user's decision and responds with a `tool-approval-response`.
+
+```typescript
+// Static approval
+tool({ description: "Run a command", needsApproval: true, execute: ... })
+
+// Dynamic approval (based on input)
+tool({ needsApproval: async ({ amount }) => amount > 1000, execute: ... })
+```
+
+NaW uses a similar approval concept for MCP tools via `mcpToolApprovals` in Convex, though at the tool-level rather than per-invocation.
+
+### dynamicTool
+
+AI SDK v6 helper for tools whose schemas are not known at compile time. Returns a tool with `unknown` input/output types, requiring runtime validation. Useful for MCP tools loaded from external servers without compile-time type information.
+
+```typescript
+import { dynamicTool } from "ai"
+const customTool = dynamicTool({
+  description: "Execute a custom function",
+  inputSchema: z.object({}),
+  execute: async (input) => { /* input is typed as 'unknown' */ },
+})
+```
+
+### toUIMessageStreamResponse
+
+Method on the `streamText` result that converts the AI SDK stream into a `Response` suitable for `UIMessage`-based chat UIs. This is the primary streaming response method used in NaW.
+
+```typescript
+// NaW usage (from route.ts)
+return result.toUIMessageStreamResponse({
+  sendReasoning: true,
+  sendSources: true,
+  onError: (error) => extractErrorMessage(error),
+})
+```
+
+The AI SDK also provides a lower-level `createUIMessageStream` + `createUIMessageStreamResponse` pattern for custom stream composition, but NaW uses `toUIMessageStreamResponse` for its standard chat flow.
+
 ### MCP (Model Context Protocol)
 
 An **open protocol** (not a tool, not a tool type) that standardizes how LLM applications connect to external data sources and capabilities. Defined by the [MCP specification](https://modelcontextprotocol.io/specification/latest) (version 2025-11-25). Uses JSON-RPC 2.0 for communication.
@@ -237,10 +302,19 @@ MCP defines three roles:
 - **Client**: A connector within the host (`@ai-sdk/mcp`'s `createMCPClient`)
 - **Server**: An external service that provides capabilities (user-configured endpoints)
 
-MCP servers can expose three types of capabilities:
+MCP communication uses **Streamable HTTP** (recommended) or **SSE** (legacy) transports. NaW defaults to HTTP via `lib/mcp/load-mcp-from-url.ts` (configurable per server).
+
+MCP servers can expose three types of capabilities (server features):
 - **Tools**: Functions the AI model can execute (this is the part that becomes AI SDK tools)
 - **Resources**: Application-driven data/context (not tool calls — the app decides when to fetch these)
 - **Prompts**: Templated messages and workflows
+
+MCP clients may also offer features to servers (client features):
+- **Sampling**: Server-initiated agentic behaviors and recursive LLM interactions
+- **Roots**: Server-initiated inquiries into URI or filesystem boundaries
+- **Elicitation**: Server-initiated requests for additional information from users
+
+> NaW currently uses only the server **Tools** capability. Resources, Prompts, and client features are not yet implemented.
 
 **Only MCP Tools become AI SDK tool calls.** Resources and Prompts are separate MCP capabilities that do not go through the tool calling pipeline.
 
