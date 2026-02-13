@@ -14,6 +14,9 @@ export const replayWebSearchResultSchema = z.object({
   url: z.string().min(1),
   title: z.string().optional(),
   snippet: z.string().optional(),
+  pageAge: z.string().nullable().optional(),
+  encryptedContent: z.string().optional(),
+  resultType: z.literal("web_search_result").optional(),
 })
 
 export type ReplayWebSearchResult = z.infer<typeof replayWebSearchResultSchema>
@@ -23,7 +26,7 @@ export const replayWebSearchSchema = z.object({
   results: z.array(replayWebSearchResultSchema),
   providerOrigin: replayProviderOriginSchema.optional(),
   rawShape: z
-    .enum(["object-action-sources", "array-results", "unknown"])
+    .enum(["object-action-sources", "array-results", "array-anthropic-native", "unknown"])
     .optional(),
 })
 

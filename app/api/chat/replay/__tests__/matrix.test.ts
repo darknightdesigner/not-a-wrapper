@@ -7,7 +7,7 @@ function findAssistant(messages: UIMessage[]): UIMessage | undefined {
 }
 
 describe("replay compiler matrix", () => {
-  it("OpenAI -> Anthropic compiles action/sources web_search payloads without fallback", async () => {
+  it("OpenAI -> Anthropic downgrades non-native web_search replay to text context", async () => {
     const history: UIMessage[] = [
       {
         id: "msg-matrix-o2a-user",
@@ -60,8 +60,14 @@ describe("replay compiler matrix", () => {
     expect(result.warnings.some((warning) => warning.code === "replay_compile_fallback")).toBe(false)
     expect(assistant).toBeDefined()
     expect(assistant?.parts.some((part) => part.type === "text")).toBe(true)
-    expect(toolPart).toBeDefined()
-    expect(Array.isArray(toolPart?.output)).toBe(true)
+    expect(toolPart).toBeUndefined()
+    expect(
+      result.warnings.some(
+        (warning) =>
+          warning.code === "replay_compile_warning" &&
+          warning.detail.includes("invariant_block_dropped"),
+      ),
+    ).toBe(true)
   })
 
   it("Anthropic -> OpenAI preserves reasoning-before-tool replay invariants", async () => {

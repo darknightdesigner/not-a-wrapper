@@ -81,6 +81,9 @@ describe("normalizeReplayMessages", () => {
                 url: "https://example.com/b",
                 title: "B",
                 snippet: "Second result",
+                pageAge: "2h",
+                encryptedContent: "enc_payload_2",
+                type: "web_search_result",
               },
             ],
             callProviderMetadata: {
@@ -105,13 +108,16 @@ describe("normalizeReplayMessages", () => {
         replayable: true,
         webSearch: {
           query: "Batman comics",
-          rawShape: "array-results",
+          rawShape: "array-anthropic-native",
           providerOrigin: "anthropic",
           results: [
             {
               url: "https://example.com/b",
               title: "B",
               snippet: "Second result",
+              pageAge: "2h",
+              encryptedContent: "enc_payload_2",
+              resultType: "web_search_result",
             },
           ],
         },

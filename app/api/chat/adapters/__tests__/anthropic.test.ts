@@ -31,7 +31,15 @@ describe("anthropicAdapter", () => {
     const toolPart = result.messages[0].parts.find((part) => part.type === "tool-web_search")
 
     expect(result.messages[0].parts.some((part) => part.type === "reasoning")).toBe(true)
-    expect("callProviderMetadata" in (toolPart as Record<string, unknown>)).toBe(false)
+    expect(toolPart).toBeUndefined()
+    expect(
+      result.messages[0].parts.some(
+        (part) =>
+          part.type === "text" &&
+          typeof (part as { text?: unknown }).text === "string" &&
+          (part as { text: string }).text.includes("Replay"),
+      ),
+    ).toBe(true)
     expect(result.stats.providerIdsStripped).toBe(1)
     expect(result.warnings.some((w) => w.code === "provider_ids_stripped")).toBe(true)
   })
@@ -67,7 +75,7 @@ describe("anthropicAdapter", () => {
     expect(result.warnings.some((w) => w.code === "incomplete_triple_dropped")).toBe(true)
   })
 
-  it("normalizes object-shaped web_search output for Anthropic replay", async () => {
+  it("converts object-shaped web_search output to Anthropic-safe text replay context", async () => {
     const openaiShapeWebSearch = {
       id: "msg-anthropic-shape-1",
       role: "assistant",
@@ -94,7 +102,15 @@ describe("anthropicAdapter", () => {
       | { output?: unknown }
       | undefined
 
-    expect(Array.isArray(toolPart?.output)).toBe(true)
+    expect(toolPart).toBeUndefined()
+    expect(
+      result.messages[0].parts.some(
+        (part) =>
+          part.type === "text" &&
+          typeof (part as { text?: unknown }).text === "string" &&
+          (part as { text: string }).text.includes("Replay context from prior web_search"),
+      ),
+    ).toBe(true)
     expect(result.stats.partsTransformed["tool-web_search"]).toBe(1)
   })
 })

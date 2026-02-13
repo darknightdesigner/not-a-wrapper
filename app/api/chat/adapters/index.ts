@@ -17,7 +17,10 @@ import type {
 const KNOWN_UNDERLYING_PROVIDERS = ["anthropic", "openai", "google", "xai", "mistral"] as const
 
 function extractUnderlyingProvider(modelId: string): (typeof KNOWN_UNDERLYING_PROVIDERS)[number] | null {
-  const [prefix] = modelId.split("/")
+  const modelIdWithoutOpenRouterPrefix = modelId.startsWith("openrouter:")
+    ? modelId.slice("openrouter:".length)
+    : modelId
+  const [prefix] = modelIdWithoutOpenRouterPrefix.split("/")
   if (!prefix) return null
 
   return KNOWN_UNDERLYING_PROVIDERS.includes(prefix as (typeof KNOWN_UNDERLYING_PROVIDERS)[number])

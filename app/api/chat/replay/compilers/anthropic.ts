@@ -13,8 +13,10 @@ type MessagePart = UIMessage["parts"][number]
 
 const anthropicSearchResultSchema = z.object({
   url: z.string().min(1),
-  title: z.string().optional(),
-  snippet: z.string().optional(),
+  title: z.string().nullable(),
+  pageAge: z.string().nullable(),
+  encryptedContent: z.string().min(1),
+  type: z.literal("web_search_result"),
 })
 
 const anthropicToolPartSchema = z.object({
@@ -69,6 +71,14 @@ function synthesizeWebSearchFallback(tool: ReplayToolExchange): string | null {
 function compileWebSearchToolPart(tool: ReplayToolExchange, messageId: string, partIndex: number) {
   if (!tool.webSearch) return null
 
+  const hasNativeAnthropicResults = tool.webSearch.results.every(
+    (result) =>
+      result.resultType === "web_search_result" &&
+      typeof result.encryptedContent === "string" &&
+      result.encryptedContent.length > 0,
+  )
+  if (!hasNativeAnthropicResults) return null
+
   const toolCallId =
     typeof tool.toolCallId === "string" && tool.toolCallId.length > 0
       ? tool.toolCallId
@@ -83,8 +93,10 @@ function compileWebSearchToolPart(tool: ReplayToolExchange, messageId: string, p
     input: { query: tool.webSearch.query },
     output: tool.webSearch.results.map((result) => ({
       url: result.url,
-      title: result.title,
-      snippet: result.snippet,
+      title: result.title ?? null,
+      pageAge: result.pageAge ?? null,
+      encryptedContent: result.encryptedContent,
+      type: result.resultType,
     })),
   }
 

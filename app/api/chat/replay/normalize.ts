@@ -55,13 +55,27 @@ function toWebSearchResult(value: unknown): ReplayWebSearchResult | null {
     url: value.url,
     title: typeof value.title === "string" ? value.title : undefined,
     snippet,
+    pageAge:
+      typeof value.pageAge === "string"
+        ? value.pageAge
+        : typeof value.page_age === "string"
+          ? value.page_age
+        : value.pageAge === null
+          ? null
+          : value.page_age === null
+            ? null
+          : undefined,
+    encryptedContent:
+      typeof value.encryptedContent === "string" ? value.encryptedContent : undefined,
+    resultType:
+      value.type === "web_search_result" ? "web_search_result" : undefined,
   }
 }
 
 function normalizeWebSearchShape(
   output: unknown,
 ): {
-  rawShape: "object-action-sources" | "array-results" | "unknown"
+  rawShape: "object-action-sources" | "array-results" | "array-anthropic-native" | "unknown"
   results: ReplayWebSearchResult[]
 } {
   if (isRecord(output) && Array.isArray(output.sources)) {
@@ -72,8 +86,14 @@ function normalizeWebSearchShape(
   }
 
   if (Array.isArray(output)) {
+    const hasAnthropicNativeFields = output.some(
+      (item) =>
+        isRecord(item) &&
+        typeof item.encryptedContent === "string" &&
+        item.type === "web_search_result",
+    )
     return {
-      rawShape: "array-results",
+      rawShape: hasAnthropicNativeFields ? "array-anthropic-native" : "array-results",
       results: output.map(toWebSearchResult).filter((item) => item !== null),
     }
   }

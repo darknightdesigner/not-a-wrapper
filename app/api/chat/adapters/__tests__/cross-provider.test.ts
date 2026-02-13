@@ -125,19 +125,22 @@ describe("cross-provider replay matrix", () => {
       const replayDropWarning = result.warnings.some(
         (warning) =>
           warning.code === "replay_compile_warning" &&
-          warning.detail.includes("tool_non_replayable"),
+          warning.detail.includes("invariant_block_dropped"),
       )
 
       expect(result.warnings.some((warning) => warning.code === "replay_compile_fallback")).toBe(false)
-      expect(hasCompiledWebSearch || replayDropWarning).toBe(true)
+      expect(hasCompiledWebSearch).toBe(false)
+      expect(replayDropWarning).toBe(true)
       expect(continuityTextKept).toBe(true)
+      expect(
+        assistant?.parts.some(
+          (part) =>
+            part.type === "text" &&
+            typeof (part as { text?: unknown }).text === "string" &&
+            (part as { text: string }).text.includes("Replay context from prior web_search"),
+        ),
+      ).toBe(true)
 
-      if (hasCompiledWebSearch) {
-        const toolPart = assistant?.parts.find((part) => part.type === "tool-web_search") as
-          | { output?: unknown }
-          | undefined
-        expect(Array.isArray(toolPart?.output)).toBe(true)
-      }
     })
 
     it("keeps text-only history unchanged", async () => {
@@ -150,9 +153,10 @@ describe("cross-provider replay matrix", () => {
       expect(hasPartType(result.messages, "reasoning")).toBe(true)
     })
 
-    it("keeps tool calls and strips cross-provider metadata", async () => {
+    it("converts incompatible web_search replay into text and strips cross-provider metadata", async () => {
       const result = await adaptHistoryForProvider([singleProviderExecutedTool], provider, context)
-      expect(hasPartType(result.messages, "tool-web_search")).toBe(true)
+      expect(hasPartType(result.messages, "tool-web_search")).toBe(false)
+      expect(hasPartType(result.messages, "text")).toBe(true)
       assertNoCallProviderMetadata(result.messages)
       expect(result.stats.providerIdsStripped).toBeGreaterThan(0)
     })
@@ -160,17 +164,17 @@ describe("cross-provider replay matrix", () => {
     it("keeps reasoning + tool chains", async () => {
       const result = await adaptHistoryForProvider([multiStepToolChain], provider, context)
       expect(hasPartType(result.messages, "reasoning")).toBe(true)
-      expect(hasPartType(result.messages, "tool-web_search")).toBe(true)
+      expect(hasPartType(result.messages, "tool-web_search")).toBe(false)
       expect(hasPartType(result.messages, "tool-exa_search")).toBe(true)
     })
 
     it("keeps provider-executed and SDK-executed tools", async () => {
       const result = await adaptHistoryForProvider([mixedProviderAndSdkTools], provider, context)
       const parts = result.messages[0]?.parts ?? []
-      expect(parts.some((part) => (part as { providerExecuted?: boolean }).providerExecuted === true)).toBe(true)
       expect(parts.some((part) => (part as { providerExecuted?: boolean }).providerExecuted === false)).toBe(
         true,
       )
+      expect(parts.some((part) => part.type === "text")).toBe(true)
     })
   })
 
@@ -305,14 +309,14 @@ describe("cross-provider replay matrix", () => {
   })
 
   describe("OpenRouter routing", () => {
-    it("routes anthropic/* models to AnthropicAdapter behavior", async () => {
+    it("routes openrouter:anthropic/* models to AnthropicAdapter behavior", async () => {
       const messages = [reasoningPlusText]
       const direct = await adaptHistoryForProvider(messages, "anthropic", {
         targetModelId: "claude-4-opus",
         hasTools: true,
       })
       const throughOpenRouter = await adaptHistoryForProvider(messages, "openrouter", {
-        targetModelId: "anthropic/claude-4-opus",
+        targetModelId: "openrouter:anthropic/claude-4-opus",
         hasTools: true,
       })
 

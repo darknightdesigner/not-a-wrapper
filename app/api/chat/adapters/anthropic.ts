@@ -15,6 +15,9 @@ type WebSearchResult = {
   url: string
   title?: string
   snippet?: string
+  pageAge?: string | null
+  encryptedContent?: string
+  resultType?: "web_search_result"
 }
 
 function isToolInvocationPart(part: Record<string, unknown>): boolean {
@@ -44,7 +47,67 @@ function toWebSearchResult(item: unknown): WebSearchResult | null {
     url: item.url,
     title: typeof item.title === "string" ? item.title : undefined,
     snippet,
+    pageAge:
+      typeof item.pageAge === "string"
+        ? item.pageAge
+        : typeof item.page_age === "string"
+          ? item.page_age
+          : item.pageAge === null || item.page_age === null
+            ? null
+            : undefined,
+    encryptedContent:
+      typeof item.encryptedContent === "string" ? item.encryptedContent : undefined,
+    resultType: item.type === "web_search_result" ? "web_search_result" : undefined,
   }
+}
+
+function extractWebSearchResults(output: unknown): WebSearchResult[] {
+  if (Array.isArray(output)) {
+    return output
+      .map(toWebSearchResult)
+      .filter((result): result is WebSearchResult => result !== null)
+  }
+
+  if (isRecord(output) && Array.isArray(output.sources)) {
+    return output.sources
+      .map(toWebSearchResult)
+      .filter((result): result is WebSearchResult => result !== null)
+  }
+
+  if (isRecord(output) && Array.isArray(output.results)) {
+    return output.results
+      .map(toWebSearchResult)
+      .filter((result): result is WebSearchResult => result !== null)
+  }
+
+  return []
+}
+
+function isAnthropicNativeWebSearchResult(result: WebSearchResult): boolean {
+  return (
+    result.resultType === "web_search_result" &&
+    typeof result.encryptedContent === "string" &&
+    result.encryptedContent.length > 0
+  )
+}
+
+function buildWebSearchReplayFallbackText(part: Record<string, unknown>): string {
+  const query =
+    isRecord(part.input) && typeof part.input.query === "string" ? part.input.query.trim() : ""
+  const queryLabel = query.length > 0 ? ` for "${query}"` : ""
+  const results = extractWebSearchResults(part.output)
+
+  if (results.length === 0) {
+    return `Replay note: web_search${queryLabel} was omitted for Anthropic-safe replay.`
+  }
+
+  const lines = results.slice(0, 3).map((result) => {
+    const title = result.title?.trim().length ? result.title.trim() : "Result"
+    const snippet = result.snippet?.trim().length ? ` - ${result.snippet.trim()}` : ""
+    return `- ${title} (${result.url})${snippet}`
+  })
+
+  return `Replay context from prior web_search${queryLabel}:\n${lines.join("\n")}`
 }
 
 /**
@@ -59,40 +122,33 @@ function normalizeWebSearchOutputForAnthropic(
     return { part, transformed: false }
   }
 
-  const output = part.output
-  if (Array.isArray(output)) {
-    return { part, transformed: false }
-  }
+  const normalizedResults = extractWebSearchResults(part.output)
+  const hasNativeAnthropicPayload =
+    normalizedResults.length > 0 && normalizedResults.every(isAnthropicNativeWebSearchResult)
 
-  if (isRecord(output) && Array.isArray(output.sources)) {
-    const normalizedResults = output.sources
-      .map(toWebSearchResult)
-      .filter((result): result is WebSearchResult => result !== null)
-
+  if (!hasNativeAnthropicPayload) {
     return {
       part: {
-        ...part,
-        output: normalizedResults,
+        type: "text",
+        text: buildWebSearchReplayFallbackText(part),
       },
       transformed: true,
     }
   }
 
-  if (isRecord(output) && Array.isArray(output.results)) {
-    const normalizedResults = output.results
-      .map(toWebSearchResult)
-      .filter((result): result is WebSearchResult => result !== null)
-
-    return {
-      part: {
-        ...part,
-        output: normalizedResults,
-      },
-      transformed: true,
-    }
+  return {
+    part: {
+      ...part,
+      output: normalizedResults.map((result) => ({
+        url: result.url,
+        title: result.title ?? null,
+        pageAge: result.pageAge ?? null,
+        encryptedContent: result.encryptedContent,
+        type: "web_search_result" as const,
+      })),
+    },
+    transformed: true,
   }
-
-  return { part, transformed: false }
 }
 
 function warnForOrphanedToolPairs(
