@@ -370,7 +370,9 @@ export async function POST(req: Request) {
     }
 
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
-    let modelMessages = await convertToModelMessages(sanitizedMessages)
+    let modelMessages = await convertToModelMessages(sanitizedMessages, {
+      ignoreIncompleteToolCalls: true,
+    })
 
     // OpenAI responses replay hardening:
     // If conversion output still contains provider-linked response IDs
