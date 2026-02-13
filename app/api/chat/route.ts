@@ -28,7 +28,13 @@ import {
   incrementServerSideUsage,
   validateAndTrackUsage,
 } from "./api"
-import { createErrorResponse, extractErrorMessage } from "./utils"
+import {
+  createErrorResponse,
+  extractErrorMessage,
+  hasProviderLinkedResponseIds,
+  sanitizeMessagesForProvider,
+  toPlainTextModelMessages,
+} from "./utils"
 import {
   loadUserMcpTools,
   type LoadToolsResult,
@@ -349,36 +355,33 @@ export async function POST(req: Request) {
       })
     }
 
-    // Strip reasoning parts from message history before converting — but only
-    // for non-Anthropic providers.  The OpenAI responses API rejects orphaned
-    // reasoning items ("Item 'rs_...' of type 'reasoning' was provided without
-    // its required following item").  Anthropic has the opposite requirement:
-    // messages that were originally produced with extended thinking MUST be sent
-    // back with their reasoning items ("Item 'msg_...' of type 'message' was
-    // provided without its required 'reasoning' item").
-    const shouldStripReasoning = provider !== "anthropic"
-
-    const sanitizedMessages = shouldStripReasoning
-      ? messages.map((msg) => {
-          if (msg.role !== "assistant" || !msg.parts) return msg
-          const hasReasoning = msg.parts.some(
-            (part: { type: string }) => part.type === "reasoning"
-          )
-          if (!hasReasoning) return msg
-          const filteredParts = msg.parts.filter(
-            (part: { type: string }) => part.type !== "reasoning"
-          )
-          return {
-            ...msg,
-            parts: filteredParts.length > 0
-              ? filteredParts
-              : [{ type: "text" as const, text: "" }],
-          }
-        })
-      : messages
+    // Provider-specific history sanitization before conversion.
+    // See sanitizeMessagesForProvider() for rationale and edge cases.
+    const sanitizedMessages = sanitizeMessagesForProvider(messages, provider)
+    if (process.env.NODE_ENV !== "production" && provider !== "anthropic") {
+      const originalMsgIdCount = messages.filter((m) => m.id.startsWith("msg_")).length
+      const sanitizedMsgIdCount = sanitizedMessages.filter((m) => m.id.startsWith("msg_")).length
+      if (originalMsgIdCount > 0 || sanitizedMsgIdCount > 0) {
+        console.log(
+          `[chat] sanitized history for ${provider}: msg_* ids ${originalMsgIdCount} -> ${sanitizedMsgIdCount}, ` +
+          `messages ${messages.length} -> ${sanitizedMessages.length}`
+        )
+      }
+    }
 
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
-    const modelMessages = await convertToModelMessages(sanitizedMessages)
+    let modelMessages = await convertToModelMessages(sanitizedMessages)
+
+    // OpenAI responses replay hardening:
+    // If conversion output still contains provider-linked response IDs
+    // (msg_/rs_/ws_), fall back to a plain-text transcript to avoid
+    // pairing invariant failures on follow-up turns.
+    if (provider === "openai" && hasProviderLinkedResponseIds(modelMessages)) {
+      console.warn(
+        "[chat] OpenAI replay fallback activated: provider-linked response IDs detected after conversion."
+      )
+      modelMessages = toPlainTextModelMessages(sanitizedMessages)
+    }
 
     // Build provider-specific options to enable reasoning/thinking when
     // the selected model advertises support (reasoningText: true).
