@@ -34,7 +34,11 @@ import {
   type LoadToolsResult,
 } from "@/lib/mcp/load-tools"
 import { resolveToolCapabilities } from "@/lib/tools/types"
-import { wrapToolsWithTruncation } from "@/lib/tools/utils"
+import {
+  ToolTraceCollector,
+  wrapMcpTools,
+  isToolResultEnvelope,
+} from "@/lib/tools/mcp-wrapper"
 
 export const maxDuration = 60
 
@@ -292,13 +296,17 @@ export async function POST(req: Request) {
       })
     }
 
-    // Wrap MCP tools with result truncation before merging.
-    // MCP tools connect to arbitrary user-configured servers that can return
-    // unbounded results. Unlike Layer 1 (provider-managed limits) and Layer 2
-    // (Exa's own maxCharacters + explicit truncation), Layer 3 has no built-in
-    // size safety net.
+    // Wrap MCP tools with timeout, timing, truncation, and envelope.
+    // Single wrapper handles all Layer 3 concerns — follows the Exa gold
+    // standard pattern (lib/tools/third-party.ts:82-119).
+    // Replaces the previous wrapToolsWithTruncation(mcpTools) call.
+    const traceCollector = new ToolTraceCollector()
+
     if (Object.keys(mcpTools).length > 0) {
-      mcpTools = wrapToolsWithTruncation(mcpTools) as ToolSet
+      mcpTools = wrapMcpTools(mcpTools, {
+        toolServerMap: mcpToolServerMap,
+        traceCollector,
+      }) as ToolSet
     }
 
     // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
@@ -469,6 +477,7 @@ export async function POST(req: Request) {
     const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
     const streamStartMs = Date.now()
+    let stepCounter = 0
 
     const result = streamText({
       model: aiModel,
@@ -509,24 +518,37 @@ export async function POST(req: Request) {
       // This data feeds into the existing toolCallLog for trajectory analysis
       // and future trace-based evaluation.
       onStepFinish: ({ toolCalls, toolResults, usage, finishReason }) => {
-        if (process.env.NODE_ENV !== "production" && toolCalls.length > 0) {
-          for (const call of toolCalls) {
-            const result = toolResults.find(
-              (r) => r.toolCallId === call.toolCallId
-            )
-            const success = result
-              ? !(result as { isError?: boolean }).isError
-              : false
-            const meta = allToolMetadata.get(call.toolName)
+        stepCounter++
+        if (toolCalls.length === 0) return
 
-            console.log(
-              `[tools/step] ${meta?.displayName ?? call.toolName} ` +
-              `(${meta?.source ?? "unknown"}) — ` +
-              `success: ${success}, ` +
-              `tokens: ${usage?.inputTokens ?? "?"}in/${usage?.outputTokens ?? "?"}out, ` +
-              `finishReason: ${finishReason}`
-            )
-          }
+        for (const call of toolCalls) {
+          const result = toolResults.find(
+            (r) => r.toolCallId === call.toolCallId
+          )
+          const success = result
+            ? !(result as { isError?: boolean }).isError
+            : false
+          const meta = allToolMetadata.get(call.toolName)
+
+          // Structured JSON log — parseable by Vercel log drain and grep.
+          // Uses _tag for machine filtering without affecting human readability.
+          console.log(
+            JSON.stringify({
+              _tag: "tool_trace",
+              chatId,
+              step: stepCounter,
+              tool: meta?.displayName ?? call.toolName,
+              source: meta?.source ?? "unknown",
+              success,
+              durationMs: traceCollector.get(call.toolCallId)?.durationMs ?? null,
+              tokens: {
+                in: usage?.inputTokens ?? null,
+                out: usage?.outputTokens ?? null,
+              },
+              finishReason,
+              model,
+            })
+          )
         }
       },
 
@@ -658,6 +680,8 @@ export async function POST(req: Request) {
                         serviceName,
                         success,
                         chatId,
+                        // Phase C: Observability enrichment
+                        durationMs: traceCollector.get(toolCall.toolCallId)?.durationMs ?? undefined,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -683,7 +707,11 @@ export async function POST(req: Request) {
         // the streaming response. Follows the same pattern as updateConnectionStatus
         // in lib/mcp/load-tools.ts.
         if (convexToken && steps && mcpToolServerMap.size > 0) {
+          let finishStepNumber = 0
+
           for (const step of steps) {
+            finishStepNumber++
+
             if (step.toolCalls) {
               for (const toolCall of step.toolCalls) {
                 const serverInfo = mcpToolServerMap.get(toolCall.toolName)
@@ -699,6 +727,14 @@ export async function POST(req: Request) {
                   ? !(toolResult as { isError?: boolean }).isError
                   : false
 
+                // Extract data from envelope for preview — avoids wasting
+                // 500 chars on envelope metadata ({"ok":true,"data":...}).
+                const output = toolResult?.output
+                const previewData = isToolResultEnvelope(output)
+                  ? output.data
+                  : output
+                const trace = traceCollector.get(toolCall.toolCallId)
+
                 void fetchMutation(
                   api.toolCallLog.log,
                   {
@@ -707,12 +743,19 @@ export async function POST(req: Request) {
                     toolName: serverInfo.displayName,
                     toolCallId: toolCall.toolCallId,
                     inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
-                    outputPreview: toolResult
-                      ? JSON.stringify(toolResult.output).slice(0, 500)
+                    outputPreview: previewData
+                      ? JSON.stringify(previewData).slice(0, 500)
                       : undefined,
                     success,
+                    durationMs: trace?.durationMs,
+                    error: trace?.error,
                     source: "mcp",
                     serviceName: serverInfo.serverName,
+                    // Phase C: Observability enrichment
+                    stepNumber: finishStepNumber,
+                    inputTokens: step.usage?.inputTokens,
+                    outputTokens: step.usage?.outputTokens,
+                    resultSizeBytes: trace?.resultSizeBytes,
                   },
                   { token: convexToken }
                 ).catch(() => {
@@ -730,7 +773,11 @@ export async function POST(req: Request) {
           const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
 
           if (nonMcpMetadata.size > 0) {
+            let finishStepNumber = 0
+
             for (const step of steps) {
+              finishStepNumber++
+
               if (step.toolCalls) {
                 for (const toolCall of step.toolCalls) {
                   // Skip MCP tools (already logged above)
@@ -747,6 +794,12 @@ export async function POST(req: Request) {
                     ? !(toolResult as { isError?: boolean }).isError
                     : false
 
+                  // For non-MCP tools, check if result is enveloped (Exa uses envelopes)
+                  const output = toolResult?.output
+                  const previewData = isToolResultEnvelope(output)
+                    ? output.data
+                    : output
+
                   void fetchMutation(
                     api.toolCallLog.log,
                     {
@@ -755,17 +808,22 @@ export async function POST(req: Request) {
                       toolName: meta.displayName,
                       toolCallId: toolCall.toolCallId,
                       inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
-                      outputPreview: toolResult
-                        ? JSON.stringify(toolResult.output).slice(0, 500)
+                      outputPreview: previewData
+                        ? JSON.stringify(previewData).slice(0, 500)
                         : undefined,
                       success,
-                      // NOTE: This is the full response duration (stream start → onFinish),
-                      // not per-tool-call duration. Per-tool timing requires wrapping each
-                      // tool's execute function, which is deferred to a future phase.
-                      // Still useful for identifying slow conversations.
-                      durationMs: Date.now() - streamStartMs,
+                      // FIX: Use actual per-tool duration instead of total stream duration.
+                      // For Exa, the envelope's meta.durationMs has the real timing.
+                      // For builtin tools, we don't have per-tool timing (no trace collector).
+                      durationMs: isToolResultEnvelope(output)
+                        ? output.meta.durationMs
+                        : undefined,
                       source: meta.source,
                       serviceName: meta.serviceName,
+                      // Phase C: Observability enrichment
+                      stepNumber: finishStepNumber,
+                      inputTokens: step.usage?.inputTokens,
+                      outputTokens: step.usage?.outputTokens,
                     },
                     { token: convexToken }
                   ).catch(() => {

@@ -176,6 +176,21 @@ export default defineSchema({
     ),
     // Service name for display and filtering (e.g., "OpenAI", "Exa", "my-mcp-server")
     serviceName: v.optional(v.string()),
+
+    // --- Phase C: Observability enrichment (all optional, backward compatible) ---
+
+    // Step number within the streaming response (1-indexed).
+    // Enables ordering tool calls chronologically within a single generation.
+    stepNumber: v.optional(v.number()),
+
+    // Token usage for the step that produced this tool call.
+    // Captured from onStepFinish usage — NOT per-tool, but per-step.
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+
+    // Original result size in bytes before truncation.
+    // Helps identify tools that consistently return large results.
+    resultSizeBytes: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_chat", ["chatId"])

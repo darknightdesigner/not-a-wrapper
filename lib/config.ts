@@ -198,6 +198,15 @@ export const MCP_CIRCUIT_BREAKER_THRESHOLD = 3
 export const MCP_MAX_STEP_COUNT = 20
 export const MCP_MAX_TOOLS_PER_REQUEST = 50
 
+/** Timeout for MCP tool executions (in milliseconds).
+ * MCP tools connect to arbitrary user-configured servers that can hang.
+ * Enforced via Promise.race in wrapMcpTools(). On timeout, the AI SDK
+ * receives a thrown ToolTimeoutError and gracefully returns a tool-error
+ * to the model, which can acknowledge the failure and continue.
+ * 30s is conservative — aligns with MCP RFC #1492 direction (60s proposed).
+ */
+export const MCP_TOOL_EXECUTION_TIMEOUT_MS = 30_000
+
 // ============================================================================
 // Tool Infrastructure
 // ============================================================================

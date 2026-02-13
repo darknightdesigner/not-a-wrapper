@@ -181,6 +181,114 @@ const chats = useMemo(
 
 Identifier for anonymous users in format `"guest_<uuid>"`. Required for tracking anonymous usage.
 
+## Tool Calling & MCP
+
+These are **distinct concepts** that interact in a specific way. The AI SDK documentation separates them into two pages: [Tool Calling](https://sdk.vercel.ai/docs/ai-sdk-core/tools-and-tool-calling) and [Model Context Protocol (MCP)](https://sdk.vercel.ai/docs/ai-sdk-core/mcp-tools). MCP is one *source* of tools — once MCP tools are loaded, they become standard AI SDK tools.
+
+### Tool (AI SDK)
+
+An object that a language model can invoke to perform a specific task. Defined with `description`, `inputSchema`, an optional `execute` function, and optional `strict` mode. Passed to `generateText`/`streamText` as a `ToolSet` (an object with tool names as keys and tools as values).
+
+> **Official definition** (AI SDK docs): "Tools are objects that can be called by the model to perform a specific task."
+
+```typescript
+// Defining a tool
+import { tool } from "ai"
+const myTool = tool({
+  description: "Get the weather",
+  inputSchema: z.object({ location: z.string() }),
+  execute: async ({ location }) => ({ temperature: 72 }),
+})
+
+// Passing tools to streamText
+streamText({ model, tools: { myTool }, prompt })
+```
+
+### Tool Call
+
+The act of a model choosing to invoke a tool. The model generates a tool call (with a `toolCallId`, `toolName`, and `input`); the SDK validates the input against `inputSchema`, runs `execute()`, and returns the **tool result** to the model.
+
+> **Official definition** (AI SDK docs): "When a model uses a tool, it is called a 'tool call' and the output of the tool is called a 'tool result'."
+
+In NaW, tool calls from all sources are logged to `toolCallLog` in Convex and tracked via PostHog `tool_call` events. The `toolCallId` is the SDK-generated unique identifier for each invocation.
+
+### ToolSet
+
+The AI SDK type for the `tools` parameter of `generateText`/`streamText`. An object with tool names as keys and tool definitions as values. In NaW, the final `ToolSet` passed to `streamText` is a merge of all three tool layers.
+
+```typescript
+// NaW's merged ToolSet (simplified from route.ts)
+const allTools: ToolSet = {
+  ...builtInTools,     // Layer 1
+  ...thirdPartyTools,  // Layer 2
+  ...mcpTools,         // Layer 3
+}
+streamText({ model, tools: allTools, ... })
+```
+
+### MCP (Model Context Protocol)
+
+An **open protocol** (not a tool, not a tool type) that standardizes how LLM applications connect to external data sources and capabilities. Defined by the [MCP specification](https://modelcontextprotocol.io/specification/latest) (version 2025-11-25). Uses JSON-RPC 2.0 for communication.
+
+> **Official definition** (MCP spec): "An open protocol that enables seamless integration between LLM applications and external data sources and tools."
+
+MCP defines three roles:
+- **Host**: The LLM application that initiates connections (NaW's Next.js server)
+- **Client**: A connector within the host (`@ai-sdk/mcp`'s `createMCPClient`)
+- **Server**: An external service that provides capabilities (user-configured endpoints)
+
+MCP servers can expose three types of capabilities:
+- **Tools**: Functions the AI model can execute (this is the part that becomes AI SDK tools)
+- **Resources**: Application-driven data/context (not tool calls — the app decides when to fetch these)
+- **Prompts**: Templated messages and workflows
+
+**Only MCP Tools become AI SDK tool calls.** Resources and Prompts are separate MCP capabilities that do not go through the tool calling pipeline.
+
+### MCP Tool
+
+A tool discovered from an MCP server and converted into a standard AI SDK tool via `mcpClient.tools()`. Once converted, it is indistinguishable from any other AI SDK tool — the model sees the same `description` + `inputSchema`, the SDK calls `execute()` the same way.
+
+> **Official definition** (AI SDK docs): The MCP client's `tools` method "acts as an adapter between MCP tools and AI SDK tools."
+
+```typescript
+// Loading MCP tools (from lib/mcp/load-tools.ts)
+const mcpClient = await createMCPClient({ transport: { type: "http", url } })
+const mcpTools: ToolSet = await mcpClient.tools()
+// mcpTools is now a standard ToolSet — same type as any other tools
+```
+
+In NaW, MCP tools are namespaced as `${serverSlug}_${toolName}` and filtered by user approvals before merging into `allTools`.
+
+### Tool Layers (NaW-specific)
+
+NaW organizes tools into three layers by **source and execution model**. This is a project-specific classification, not an AI SDK or MCP concept.
+
+| Layer | Name | Source | execute() | Wrapping | Example | Code |
+|-------|------|--------|-----------|----------|---------|------|
+| 1 | **Builtin** (Provider) | AI provider SDK | Provider-executed (`providerExecuted: true`); SDK bypasses user-land `execute()` entirely | None — opaque | `openai.tools.webSearch()` | `lib/tools/provider.ts` |
+| 2 | **Third-party** | Custom `tool()` definitions | User-defined `execute()` | Self-contained (inline timing, truncation, envelope) | Exa `web_search` | `lib/tools/third-party.ts` |
+| 3 | **MCP** | User-configured MCP servers via `@ai-sdk/mcp` | User-defined `execute()` (adapter from MCP protocol) | `wrapMcpTools()` (timeout, timing, truncation, envelope) | User MCP tools | `lib/mcp/load-tools.ts` |
+
+Layer 1 tools cannot be wrapped or instrumented because the provider handles execution. Layer 2 and 3 tools have user-land `execute()` functions that NaW can wrap for observability and error handling.
+
+### ToolSource (NaW-specific)
+
+Discriminator type used in `toolCallLog` and PostHog events to identify which layer produced a tool call. Defined in `lib/tools/types.ts`.
+
+```typescript
+type ToolSource = "builtin" | "third-party" | "mcp"
+```
+
+### Key Distinction: "Tool Call" vs "MCP"
+
+| | Tool Call | MCP |
+|---|----------|-----|
+| **What it is** | A model invoking a function | A protocol for discovering capabilities |
+| **Scope** | One invocation of one tool | A connection to an external server |
+| **Defined by** | AI SDK (`ai` package) | MCP specification (JSON-RPC 2.0) |
+| **In NaW** | Logged to `toolCallLog`, tracked in PostHog | Configured in `mcpServers`, tools loaded via `@ai-sdk/mcp` |
+| **Relationship** | All MCP tool invocations are tool calls | MCP is one of three sources of tools |
+
 ## File Locations
 
 | Term | Location |
@@ -191,3 +299,12 @@ Identifier for anonymous users in format `"guest_<uuid>"`. Required for tracking
 | Chat state | `lib/chat-store/` |
 | API routes | `app/api/` |
 | Chat components | `app/components/chat/` |
+| Tool definitions (Layer 1) | `lib/tools/provider.ts` |
+| Tool definitions (Layer 2) | `lib/tools/third-party.ts` |
+| Tool types & metadata | `lib/tools/types.ts` |
+| Tool utilities | `lib/tools/utils.ts` |
+| MCP client loading | `lib/mcp/load-tools.ts` |
+| MCP server config (DB) | `convex/mcpServers.ts` |
+| MCP tool approvals (DB) | `convex/mcpToolApprovals.ts` |
+| Tool audit log (DB) | `convex/toolCallLog.ts` |
+| MCP settings UI | `app/components/layout/settings/connections/mcp-*.tsx` |
