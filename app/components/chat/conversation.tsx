@@ -114,8 +114,8 @@ export function Conversation({
                 <Loader variant="chat" />
               </div>
             )}
-          <div className="absolute bottom-0 flex w-full max-w-3xl flex-1 items-end justify-end gap-4 px-6 pb-2">
-            <ScrollButton className="absolute top-[-50px] right-[30px]" />
+          <div className="absolute bottom-0 flex w-full max-w-3xl flex-1 items-end justify-center gap-4 px-6 pb-2">
+            <ScrollButton className="absolute top-[-50px] left-1/2 -translate-x-1/2" />
           </div>
         </ChatContainerContent>
       </ChatContainerRoot>

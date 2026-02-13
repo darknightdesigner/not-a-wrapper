@@ -215,8 +215,8 @@ export function MultiModelConversation({
                   </div>
                 );
               })}
-          <div className="absolute right-0 bottom-32 flex w-full max-w-3xl flex-1 items-end justify-end gap-4 pb-2 pl-6">
-            <ScrollButton className="absolute top-[-50px] right-[30px]" />
+          <div className="absolute right-0 bottom-32 flex w-full max-w-3xl flex-1 items-end justify-center gap-4 pb-2 pl-6">
+            <ScrollButton className="absolute top-[-50px] left-1/2 -translate-x-1/2" />
           </div>
         </ChatContainerContent>
       </ChatContainerRoot>
