@@ -74,6 +74,10 @@ export function messageHasToolContent(message: MessageAISDK): boolean {
  * Anthropic requires reasoning/tool artifacts to be replayed for continuity.
  * For other providers, replaying those internal parts can cause responses API
  * validation errors when required paired items are missing.
+ *
+ * @deprecated Phase 7 cleanup: `app/api/chat/route.ts` now always uses
+ * `adaptHistoryForProvider()`. Keep this only as a test/reference shim until
+ * adapter parity tests are fully retired.
  */
 export function sanitizeMessagesForProvider(
   messages: MessageAISDK[],

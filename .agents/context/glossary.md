@@ -124,6 +124,26 @@ const result = streamText({ model, messages: modelMessages, ... })
 
 Attachments are represented as `file` parts in the `parts` array (e.g., `{ type: "file", filename, mediaType, url }`).
 
+## History Adaptation
+
+### ProviderHistoryAdapter
+
+Adapter contract for provider-specific history replay normalization. Implementations transform `UIMessage[]` into provider-safe history while preserving as much useful context as possible (reasoning/tool chains) according to target provider invariants.
+
+Primary location: `app/api/chat/adapters/types.ts`
+
+### AdaptationContext
+
+Request-scoped input passed into a `ProviderHistoryAdapter` (`targetModelId`, `hasTools`, optional source hints). It lets adapters make provider- and model-aware transformation decisions without reading global state.
+
+Primary location: `app/api/chat/adapters/types.ts`
+
+### AdaptationResult
+
+Structured output from `adaptHistoryForProvider()`: adapted `UIMessage[]`, detailed transformation stats, and warnings. Used for both conversion input (`convertToModelMessages`) and observability (`history_adapt` logging / analytics).
+
+Primary locations: `app/api/chat/adapters/types.ts`, `app/api/chat/route.ts`
+
 ## Access Control
 
 ### accessible

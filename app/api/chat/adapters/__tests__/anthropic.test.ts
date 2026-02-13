@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest"
+import type { UIMessage } from "ai"
+import { anthropicAdapter } from "../anthropic"
+import * as fixtures from "./fixtures"
+
+const context = {
+  targetModelId: "claude-4.5-sonnet",
+  hasTools: true,
+}
+
+describe("anthropicAdapter", () => {
+  it("passes through non-step parts for assistant history", async () => {
+    const result = await anthropicAdapter.adaptMessages([fixtures.reasoningPlusText], context)
+
+    expect(result.messages[0].parts).toEqual(fixtures.reasoningPlusText.parts)
+    expect(result.stats.partsPreserved.reasoning).toBe(1)
+    expect(result.warnings).toHaveLength(0)
+  })
+
+  it("strips step-start while preserving reasoning and tools", async () => {
+    const result = await anthropicAdapter.adaptMessages([fixtures.singleSdkToolComplete], context)
+
+    expect(result.messages[0].parts.some((part) => part.type === "step-start")).toBe(false)
+    expect(result.messages[0].parts.some((part) => part.type === "reasoning")).toBe(true)
+    expect(result.stats.partsDropped["step-start"]).toBe(1)
+    expect(result.warnings).toHaveLength(0)
+  })
+
+  it("tolerates cross-provider reasoning and strips foreign provider metadata", async () => {
+    const result = await anthropicAdapter.adaptMessages([fixtures.crossProviderMetadata], context)
+    const toolPart = result.messages[0].parts.find((part) => part.type === "tool-web_search")
+
+    expect(result.messages[0].parts.some((part) => part.type === "reasoning")).toBe(true)
+    expect("callProviderMetadata" in (toolPart as Record<string, unknown>)).toBe(false)
+    expect(result.stats.providerIdsStripped).toBe(1)
+    expect(result.warnings.some((w) => w.code === "provider_ids_stripped")).toBe(true)
+  })
+
+  it("emits orphan warning when tool invocation/result counts mismatch", async () => {
+    const orphanAssistant = {
+      id: "msg-anthropic-orphan-1",
+      role: "assistant",
+      parts: [
+        { type: "reasoning", reasoning: "thinking", state: "done" },
+        { type: "tool-web_search", toolCallId: "tc_orphan_a", state: "input-available" },
+      ],
+    } as unknown as UIMessage
+
+    const result = await anthropicAdapter.adaptMessages([orphanAssistant], context)
+
+    expect(result.messages[0].parts).toEqual([{ type: "reasoning", reasoning: "thinking", state: "done" }])
+    expect(result.stats.partsDropped["tool-web_search"]).toBe(1)
+    expect(result.warnings.some((w) => w.code === "non_final_state_dropped")).toBe(true)
+  })
+
+  it("warns on orphan tool result without invocation", async () => {
+    const orphanResultAssistant = {
+      id: "msg-anthropic-orphan-2",
+      role: "assistant",
+      parts: [{ type: "tool-result", toolCallId: "tc_missing_invocation", output: { ok: true } }],
+    } as unknown as UIMessage
+
+    const result = await anthropicAdapter.adaptMessages([orphanResultAssistant], context)
+
+    expect(result.messages[0].parts).toEqual([{ type: "text", text: "" }])
+    expect(result.stats.partsDropped["tool-result"]).toBe(1)
+    expect(result.warnings.some((w) => w.code === "non_final_state_dropped")).toBe(true)
+  })
+})

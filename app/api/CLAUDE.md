@@ -10,6 +10,7 @@ This directory contains Next.js API routes for the Not A Wrapper backend.
 api/
 ├── chat/             # Main chat streaming endpoint (gold standard)
 │   ├── route.ts      # POST handler with streaming
+│   ├── adapters/      # Provider-aware history adaptation (pre-conversion)
 │   ├── api.ts        # Business logic (validation, storage)
 │   ├── db.ts         # Database operations
 │   └── utils.ts      # Error handling utilities
@@ -61,6 +62,15 @@ export async function POST(req: Request) {
   })
 }
 ```
+
+### Provider History Adapters (chat/adapters/)
+
+Use provider-specific adapters to normalize `UIMessage[]` history before `convertToModelMessages()`:
+
+- `adaptHistoryForProvider(messages, providerId, context)` is the single entry point.
+- Each adapter implements `ProviderHistoryAdapter` and encodes replay invariants for one provider family.
+- Keep adapters pure and non-mutating; route-level observability should use `AdaptationResult.stats` and `warnings`.
+- Preserve `hasProviderLinkedResponseIds()` and `toPlainTextModelMessages()` fallback in `chat/utils.ts` as defense-in-depth after conversion.
 
 ### Error Handling (utils.ts)
 

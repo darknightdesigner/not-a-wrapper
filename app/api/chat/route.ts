@@ -18,7 +18,14 @@ import {
   getPostHogClient,
 } from "@/lib/posthog"
 import type { Provider } from "@/lib/user-keys"
-import { UIMessage as MessageAISDK, streamText, ToolSet, stepCountIs, convertToModelMessages } from "ai";
+import {
+  UIMessage as MessageAISDK,
+  streamText,
+  ToolSet,
+  stepCountIs,
+  convertToModelMessages,
+  type ModelMessage,
+} from "ai"
 import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
@@ -32,9 +39,10 @@ import {
   createErrorResponse,
   extractErrorMessage,
   hasProviderLinkedResponseIds,
-  sanitizeMessagesForProvider,
   toPlainTextModelMessages,
 } from "./utils"
+import { adaptHistoryForProvider } from "./adapters"
+import type { AdaptationContext } from "./adapters/types"
 import {
   loadUserMcpTools,
   type LoadToolsResult,
@@ -56,6 +64,38 @@ type ChatRequest = {
   enableSearch: boolean
   message_group_id?: string
   userId?: string // Client-provided userId (for anonymous users)
+}
+
+function isReplayShapeError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return [
+    // OpenAI
+    "was provided without its required",
+    "no tool output found for function call",
+    // Anthropic
+    "thinking block must be followed by",
+    "tool_use block must be followed by tool_result",
+    // Google
+    "number of function response parts is equal to",
+    "missing a thought_signature",
+  ].some((pattern) => normalized.includes(pattern))
+}
+
+function summarizeHistoryPartTypes(messages: MessageAISDK[]): {
+  roleCounts: Record<string, number>
+  partTypeCounts: Record<string, number>
+} {
+  const roleCounts: Record<string, number> = {}
+  const partTypeCounts: Record<string, number> = {}
+
+  for (const message of messages) {
+    roleCounts[message.role] = (roleCounts[message.role] ?? 0) + 1
+    for (const part of message.parts ?? []) {
+      partTypeCounts[part.type] = (partTypeCounts[part.type] ?? 0) + 1
+    }
+  }
+
+  return { roleCounts, partTypeCounts }
 }
 
 export async function POST(req: Request) {
@@ -355,24 +395,63 @@ export async function POST(req: Request) {
       })
     }
 
-    // Provider-specific history sanitization before conversion.
-    // See sanitizeMessagesForProvider() for rationale and edge cases.
-    const sanitizedMessages = sanitizeMessagesForProvider(messages, provider)
-    if (process.env.NODE_ENV !== "production" && provider !== "anthropic") {
-      const originalMsgIdCount = messages.filter((m) => m.id.startsWith("msg_")).length
-      const sanitizedMsgIdCount = sanitizedMessages.filter((m) => m.id.startsWith("msg_")).length
-      if (originalMsgIdCount > 0 || sanitizedMsgIdCount > 0) {
-        console.log(
-          `[chat] sanitized history for ${provider}: msg_* ids ${originalMsgIdCount} -> ${sanitizedMsgIdCount}, ` +
-          `messages ${messages.length} -> ${sanitizedMessages.length}`
-        )
-      }
+    const adaptationContext: AdaptationContext = {
+      targetModelId: model,
+      hasTools: hasAnyTools,
+      sourceProviderHint: provider,
+    }
+
+    const adaptStartTime = Date.now()
+    const adapterResult = await adaptHistoryForProvider(
+      messages,
+      provider,
+      adaptationContext
+    )
+    const adaptationTimeMs = Date.now() - adaptStartTime
+    const warningCount = adapterResult.warnings.length
+    const partsDroppedTotal = Object.values(adapterResult.stats.partsDropped).reduce(
+      (sum, count) => sum + count,
+      0
+    )
+
+    console.log(
+      JSON.stringify({
+        _tag: "history_adapt",
+        chatId,
+        provider,
+        model,
+        ...adapterResult.stats,
+        warningCount,
+        warnings: adapterResult.warnings,
+        adaptationTimeMs,
+      })
+    )
+
+    if (phClient) {
+      phClient.capture({
+        distinctId: userId || "anonymous",
+        event: "history_adaptation",
+        properties: {
+          chatId,
+          provider,
+          model,
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+          partsDroppedTotal,
+          providerIdsStripped: adapterResult.stats.providerIdsStripped,
+          warningCount,
+          adaptationTimeMs,
+        },
+      })
     }
 
     // Convert UIMessage[] to ModelMessage[] for streamText (v6)
-    let modelMessages = await convertToModelMessages(sanitizedMessages, {
-      ignoreIncompleteToolCalls: true,
-    })
+    let modelMessages: ModelMessage[] = await convertToModelMessages(
+      adapterResult.messages,
+      {
+        ignoreIncompleteToolCalls: true,
+      }
+    )
 
     // OpenAI responses replay hardening:
     // If conversion output still contains provider-linked response IDs
@@ -382,7 +461,7 @@ export async function POST(req: Request) {
       console.warn(
         "[chat] OpenAI replay fallback activated: provider-linked response IDs detected after conversion."
       )
-      modelMessages = toPlainTextModelMessages(sanitizedMessages)
+      modelMessages = toPlainTextModelMessages(adapterResult.messages)
     }
 
     // Build provider-specific options to enable reasoning/thinking when
@@ -562,13 +641,26 @@ export async function POST(req: Request) {
 
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
+        const errorMessage = extractErrorMessage(err)
+
+        if (isReplayShapeError(errorMessage)) {
+          console.error(
+            JSON.stringify({
+              _tag: "replay_shape_error",
+              chatId,
+              provider,
+              model,
+              errorMessage,
+              messageCount: messages.length,
+              historyPartTypes: summarizeHistoryPartTypes(messages),
+            })
+          )
+        }
 
         // Capture failed generations to PostHog for complete analytics
         if (phClient) {
           try {
             const latencyMs = Date.now() - startTime
-            const errorMessage =
-              err instanceof Error ? err.message : String(err)
             captureGeneration({
               distinctId: userId,
               traceId: chatId,
