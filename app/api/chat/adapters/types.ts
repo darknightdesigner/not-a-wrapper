@@ -14,6 +14,9 @@ export type AdaptationWarningCode =
   | "non_final_state_dropped"
   | "role_alternation_repaired"
   | "thought_signature_injected"
+  | "replay_normalization_warning"
+  | "replay_compile_warning"
+  | "replay_compile_fallback"
 
 export interface AdaptationWarning {
   code: AdaptationWarningCode

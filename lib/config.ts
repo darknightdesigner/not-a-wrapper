@@ -242,6 +242,15 @@ export const PREPARE_STEP_THRESHOLD = 3
 export const TOOL_EXECUTION_TIMEOUT_MS = 15_000
 
 // ============================================================================
+// History Replay Compiler
+// ============================================================================
+
+export const HISTORY_REPLAY_COMPILER_V1 =
+  process.env.HISTORY_REPLAY_COMPILER_V1 === "1" ||
+  process.env.HISTORY_REPLAY_COMPILER_V1 === "true"
+export const HISTORY_REPLAY_NORMALIZER_VERSION = 1
+
+// ============================================================================
 // Sub-Agent Model Configuration
 // ============================================================================
 

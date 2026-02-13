@@ -24,6 +24,11 @@ function toPart(part: unknown): MessagePart {
   return part as MessagePart
 }
 
+function getTextValue(part: MessagePart): string {
+  const candidate = (part as { text?: unknown }).text
+  return typeof candidate === "string" ? candidate : ""
+}
+
 function hasToolInvocation(part: MessagePart): boolean {
   if (!isToolPart(part)) return false
   if (part.type === "tool-result") return false
@@ -69,9 +74,7 @@ function mergeUserTextParts(prev: UIMessage, current: UIMessage): UIMessage {
       return
     }
 
-    const textValue = typeof (part as { text?: unknown }).text === "string"
-      ? (part as { text: string }).text
-      : ""
+    const textValue = getTextValue(part)
 
     const previousPart = mergedParts[mergedParts.length - 1]
     if (previousPart?.type !== "text") {
@@ -79,9 +82,7 @@ function mergeUserTextParts(prev: UIMessage, current: UIMessage): UIMessage {
       return
     }
 
-    const previousText = typeof (previousPart as { text?: unknown }).text === "string"
-      ? (previousPart as { text: string }).text
-      : ""
+    const previousText = getTextValue(previousPart)
     const combinedText =
       previousText.length > 0 && textValue.length > 0
         ? `${previousText}\n\n${textValue}`

@@ -68,6 +68,78 @@ describe("cross-provider replay matrix", () => {
     const provider = "anthropic"
     const context = { targetModelId: "claude-4-opus", hasTools: true }
 
+    it("regression: handles OpenAI action/sources web_search replay without compile fallback", async () => {
+      const regressionHistory: UIMessage[] = [
+        userMessage("reg-openai-anthropic-user-1", "Find Batman products on Amazon"),
+        {
+          id: "reg-openai-anthropic-assistant-1",
+          role: "assistant",
+          parts: [
+            { type: "step-start" },
+            { type: "reasoning", reasoning: "I will check Amazon listings.", state: "done" },
+            {
+              type: "tool-web_search",
+              state: "output-available",
+              toolCallId: "reg_tc_openai_to_anthropic_1",
+              toolName: "web_search",
+              providerExecuted: true,
+              input: { query: "Batman products Amazon official links" },
+              output: {
+                action: "search",
+                sources: [
+                  {
+                    url: "https://www.amazon.com/s?k=batman+products",
+                    title: "Amazon Batman search",
+                    snippet: "Batman products and listings.",
+                  },
+                ],
+              },
+              callProviderMetadata: {
+                openai: {
+                  responseId: "msg_reg_openai_1",
+                  reasoningId: "rs_reg_openai_1",
+                },
+              },
+            },
+            { type: "text", text: "I found Amazon links and product context." },
+          ],
+        } as UIMessage,
+        userMessage("reg-openai-anthropic-user-2", "Why were links missing before?"),
+      ]
+
+      const result = await adaptHistoryForProvider(regressionHistory, provider, context, {
+        useReplayCompiler: true,
+      })
+      const assistant = result.messages.find((message) => message.role === "assistant")
+      const hasCompiledWebSearch = Boolean(
+        assistant?.parts.some((part) => part.type === "tool-web_search"),
+      )
+      const continuityTextKept = Boolean(
+        assistant?.parts.some(
+          (part) =>
+            part.type === "text" &&
+            typeof (part as { text?: unknown }).text === "string" &&
+            (part as { text: string }).text.includes("Amazon links"),
+        ),
+      )
+      const replayDropWarning = result.warnings.some(
+        (warning) =>
+          warning.code === "replay_compile_warning" &&
+          warning.detail.includes("tool_non_replayable"),
+      )
+
+      expect(result.warnings.some((warning) => warning.code === "replay_compile_fallback")).toBe(false)
+      expect(hasCompiledWebSearch || replayDropWarning).toBe(true)
+      expect(continuityTextKept).toBe(true)
+
+      if (hasCompiledWebSearch) {
+        const toolPart = assistant?.parts.find((part) => part.type === "tool-web_search") as
+          | { output?: unknown }
+          | undefined
+        expect(Array.isArray(toolPart?.output)).toBe(true)
+      }
+    })
+
     it("keeps text-only history unchanged", async () => {
       const result = await adaptHistoryForProvider(textOnlyConversation, provider, context)
       expect(getAssistantMessages(result.messages).every((message) => hasPartType([message], "text"))).toBe(true)

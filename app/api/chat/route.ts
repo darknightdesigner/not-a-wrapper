@@ -8,6 +8,7 @@ import {
   ANONYMOUS_MAX_STEP_COUNT,
   ANTHROPIC_BETA_HEADERS,
   PREPARE_STEP_THRESHOLD,
+  HISTORY_REPLAY_COMPILER_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -42,7 +43,7 @@ import {
   toPlainTextModelMessages,
 } from "./utils"
 import { adaptHistoryForProvider } from "./adapters"
-import type { AdaptationContext } from "./adapters/types"
+import type { AdaptationContext, AdaptationWarning } from "./adapters/types"
 import {
   loadUserMcpTools,
   type LoadToolsResult,
@@ -97,6 +98,27 @@ function summarizeHistoryPartTypes(messages: MessageAISDK[]): {
   }
 
   return { roleCounts, partTypeCounts }
+}
+
+function countWarningsByCode(warnings: AdaptationWarning[]): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const warning of warnings) {
+    counts[warning.code] = (counts[warning.code] ?? 0) + 1
+  }
+  return counts
+}
+
+function summarizeReplayWarningDetails(
+  warnings: AdaptationWarning[],
+  code: "replay_normalization_warning" | "replay_compile_warning",
+): Record<string, number> {
+  const counts: Record<string, number> = {}
+  for (const warning of warnings) {
+    if (warning.code !== code) continue
+    const subcode = warning.detail.split(":")[0]?.trim() || "unknown"
+    counts[subcode] = (counts[subcode] ?? 0) + 1
+  }
+  return counts
 }
 
 export async function POST(req: Request) {
@@ -406,14 +428,79 @@ export async function POST(req: Request) {
     const adapterResult = await adaptHistoryForProvider(
       messages,
       provider,
-      adaptationContext
+      adaptationContext,
+      {
+        useReplayCompiler: HISTORY_REPLAY_COMPILER_V1,
+      },
     )
     const adaptationTimeMs = Date.now() - adaptStartTime
     const warningCount = adapterResult.warnings.length
+    const warningCountsByCode = countWarningsByCode(adapterResult.warnings)
+    const replayNormalizeWarningCount =
+      warningCountsByCode.replay_normalization_warning ?? 0
+    const replayCompileWarningCount =
+      warningCountsByCode.replay_compile_warning ?? 0
+    const replayCompileFallbackCount =
+      warningCountsByCode.replay_compile_fallback ?? 0
+    const replayCompileFallbackActivated = replayCompileFallbackCount > 0
     const partsDroppedTotal = Object.values(adapterResult.stats.partsDropped).reduce(
       (sum, count) => sum + count,
       0
     )
+
+    if (HISTORY_REPLAY_COMPILER_V1) {
+      console.log(
+        JSON.stringify({
+          _tag: "replay_normalize_stage",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: true,
+          warningCount: replayNormalizeWarningCount,
+          warningCodes: summarizeReplayWarningDetails(
+            adapterResult.warnings,
+            "replay_normalization_warning"
+          ),
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+          totalPartsOriginal: adapterResult.stats.totalPartsOriginal,
+          totalPartsAdapted: adapterResult.stats.totalPartsAdapted,
+        })
+      )
+
+      console.log(
+        JSON.stringify({
+          _tag: "replay_compile_stage",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: true,
+          warningCount: replayCompileWarningCount,
+          warningCodes: summarizeReplayWarningDetails(
+            adapterResult.warnings,
+            "replay_compile_warning"
+          ),
+          fallbackActivated: replayCompileFallbackActivated,
+          fallbackCount: replayCompileFallbackCount,
+          adaptationTimeMs,
+        })
+      )
+    }
+
+    if (replayCompileFallbackActivated) {
+      console.warn(
+        JSON.stringify({
+          _tag: "replay_compile_fallback_activated",
+          chatId,
+          provider,
+          model,
+          compilerEnabled: HISTORY_REPLAY_COMPILER_V1,
+          fallbackCount: replayCompileFallbackCount,
+          originalMessageCount: adapterResult.stats.originalMessageCount,
+          adaptedMessageCount: adapterResult.stats.adaptedMessageCount,
+        })
+      )
+    }
 
     console.log(
       JSON.stringify({
@@ -421,9 +508,10 @@ export async function POST(req: Request) {
         chatId,
         provider,
         model,
+        replayCompilerEnabled: HISTORY_REPLAY_COMPILER_V1,
         ...adapterResult.stats,
         warningCount,
-        warnings: adapterResult.warnings,
+        warningCodes: warningCountsByCode,
         adaptationTimeMs,
       })
     )
@@ -460,7 +548,15 @@ export async function POST(req: Request) {
     // pairing invariant failures on follow-up turns.
     if (provider === "openai" && hasProviderLinkedResponseIds(modelMessages)) {
       console.warn(
-        "[chat] OpenAI replay fallback activated: provider-linked response IDs detected after conversion."
+        JSON.stringify({
+          _tag: "replay_plaintext_fallback_activated",
+          chatId,
+          provider,
+          model,
+          reason: "provider_linked_response_ids_detected_post_conversion",
+          messageCount: modelMessages.length,
+          compilerEnabled: HISTORY_REPLAY_COMPILER_V1,
+        })
       )
       modelMessages = toPlainTextModelMessages(adapterResult.messages)
     }
