@@ -11,7 +11,7 @@ import {
 import type { Id } from "@/convex/_generated/dataModel"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  MoreVerticalIcon,
+  MoreHorizontalIcon,
   PencilEdit01Icon,
   Delete01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
@@ -48,7 +48,7 @@ export function SidebarProjectMenu({
             className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <HugeiconsIcon icon={MoreVerticalIcon} size={18} className="text-primary" />
+            <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
