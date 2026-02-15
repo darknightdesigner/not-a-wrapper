@@ -1,247 +1,263 @@
-# Implementation Plan
+# Not A Wrapper — Project Plan
 
-Living document for tracking current work and next steps.
+> **Status**: Active  
+> **Last Updated**: 2026-02-15  
+> **Owner**: <!-- TODO: your name / GitHub handle -->
 
----
-
-## Current Sprint
-
-### Focus: Prompt-Kit Component Update
-
-**Goal**: Consolidate all prompt-kit components into `components/ui/`, install missing components, and update existing ones to latest versions.
+This is the **root-level plan** for the Not A Wrapper project. It serves as the high-level roadmap that connects vision to execution. Individual implementation plans live in `.agents/plans/` — this document ties them together with strategic context.
 
 ---
 
-## Task Status
+## How This Document Works
 
-### ✅ Completed
-- [x] Research tech stack decisions (Convex, Clerk, Flowglad)
-- [x] Document decisions in `.agents/context/research/tech-stack-evaluation.md`
-- [x] Create `AGENTS.md` with project overview
-- [x] Create `CLAUDE.md` with Claude-specific context
-- [x] Create `NOTES.md` for agentic memory
-- [x] Create `spec.md` for requirements
-- [x] Create `plan.md` (this file)
-- [x] Create context directory structure
-  - [x] `.agents/context/architecture.md`
-  - [x] `.agents/context/conventions.md`
-  - [x] `.agents/context/testing.md`
-  - [x] `.agents/context/api.md`
-  - [x] `.agents/context/database.md`
-  - [x] `.agents/context/deployment.md`
-- [x] Set up `.cursor/rules/` directory
-  - [x] `001_core.mdc` (core workspace rules)
-  - [x] `002_security.mdc` (security guidelines)
-  - [x] `100_typescript.mdc` (TypeScript conventions)
-  - [x] `101_react_nextjs.mdc` (React/Next.js patterns)
-  - [x] `200_testing.mdc` (testing patterns)
-  - [x] `201_api.mdc` (API patterns)
-- [x] Configure `.claude/` directory
-  - [x] `settings.json` (team permissions)
-  - [x] `commands/analyze.md`
-  - [x] `commands/refactor.md`
-  - [x] `commands/review.md`
-  - [x] `commands/test.md`
-  - [x] `commands/security/scan.md`
-- [x] Create nested CLAUDE.md files
-  - [x] `app/CLAUDE.md`
-  - [x] `app/api/CLAUDE.md`
-  - [x] `app/auth/CLAUDE.md`
-  - [x] `app/components/CLAUDE.md`
-  - [x] `lib/CLAUDE.md`
-  - [x] `lib/ai/CLAUDE.md`
-  - [x] `components/CLAUDE.md`
-  - [x] `hooks/CLAUDE.md`
-- [x] Implement Development Workflow
-  - [x] Create `.agents/workflows/development-cycle.md` with four-phase cycle, TDD, extended thinking
-  - [x] Create workflow commands: `/research`, `/plan`, `/tdd`, `/verify`, `/commit`
-  - [x] Update `CLAUDE.md` with workflow references
-  - [x] Update `AGENTS.md` with workflow overview
-  - [x] Create `.agents/workflows/examples.md` with practical examples
+This `plan.md` follows emerging best practices from the [ExecPlan pattern](https://developers.openai.com/cookbook/articles/codex_exec_plans), the [AGENTS.md standard](https://agents.md), and DeveloperToolkit.ai's context management guidance. Key principles:
 
-### ✅ Recently Completed (Sprint 3)
-- [x] Set up Convex project
-  - [x] Install Convex: `bun add convex`
-  - [x] Run `npx convex init`
-  - [x] Create `convex/schema.ts`
-  - [x] Configure Clerk integration
-- [x] Complete Convex migration from Supabase
-- [x] Set up Clerk authentication
-- [x] Split login/sign-up routes with reactive user sync
-- [x] Clean up legacy Supabase files
+1. **Self-contained**: A new contributor (human or AI agent) should understand the project direction from this file alone.
+2. **Living document**: Updated at every major milestone, decision, or pivot. Never stale.
+3. **Reference hub**: Points to detailed plans in `.agents/plans/` rather than duplicating them.
+4. **Outcome-focused**: Describes what users can do after each milestone, not just what code changes.
 
-### 🔄 In Progress
-- [ ] Prompt-Kit component consolidation
-  - [ ] **Phase 1**: Pre-flight checks & install dependencies
-  - [ ] **Phase 2**: Backup existing components
-  - [ ] **Phase 3**: Migrate 9 components from `prompt-kit/` to `ui/`
-  - [ ] **Phase 4**: Install 7 missing components (tool, source, chain-of-thought, etc.)
-  - [ ] **Phase 5**: Update existing components to latest versions
-  - [ ] **Phase 6**: Final verification (typecheck, lint, build)
+### Relationship to Other Docs
 
-### 📋 Next Up
-- [ ] Model comparison analytics
-  - [ ] Response time tracking
-  - [ ] Token usage comparison
-  - [ ] Cost analysis per response
-- [ ] Smart model routing
-  - [ ] Task-based auto-selection
-  - [ ] Cost/quality optimization
+```
+plan.md (this file)          ← Strategic: vision, milestones, priorities
+├── AGENTS.md                ← Tactical: commands, patterns, permissions
+├── CLAUDE.md                ← Agent config: Claude-specific behaviors
+├── .agents/plans/*.md       ← Execution: detailed implementation plans
+├── .agents/context/         ← Reference: architecture, API, glossary
+│   ├── research/            ← Evidence: evaluations, analyses
+│   ├── decisions/           ← ADRs: architecture decision records
+│   └── troubleshooting/     ← Fixes: known issues & solutions
+├── .agents/workflows/       ← Process: development cycle, debugging
+├── .agents/skills/          ← Guides: multi-step task instructions
+└── .agents/archive/         ← History: superseded documents
+```
 
-### 🔮 Backlog
-- [ ] Sub-agent architecture implementation
-- [ ] Model chains and workflow automation
-- [ ] Advanced multi-model UI (diff view, voting)
-- [ ] Flowglad payment setup
-- [ ] API access for developers
+**Convention**: This file answers *what* and *why*. `.agents/plans/` answers *how*. `AGENTS.md` answers *with what rules*. `.agents/context/` provides *supporting knowledge*.
 
 ---
 
-## Blockers
+## Vision
 
-<!-- Track blockers here -->
+<!-- TODO: 2-3 sentences describing the long-term vision for Not A Wrapper -->
+<!-- Example: "Not A Wrapper is the open-source alternative to ChatGPT, Claude.ai, and Gemini — 
+     a single interface for every AI model, where users own their data, keys, and workflow." -->
 
-| Blocker | Status | Resolution |
-|---------|--------|------------|
-| None currently | - | - |
+## Goals
+
+<!-- TODO: Define 3-5 measurable goals for the current development phase -->
+<!-- Tip: Make these SMART — Specific, Measurable, Achievable, Relevant, Time-bound -->
+
+| # | Goal | Measure of Success | Target Date |
+|---|------|--------------------|-------------|
+| 1 | <!-- e.g., Production-ready multi-provider chat --> | <!-- e.g., All 8 providers streaming without errors --> | <!-- e.g., 2026-Q1 --> |
+| 2 | <!-- e.g., Robust tool calling across providers --> | <!-- e.g., Web search works on all supported models --> | <!-- --> |
+| 3 | <!-- e.g., Beautiful, accessible UI --> | <!-- e.g., Base UI migration complete, WCAG 2.1 AA --> | <!-- --> |
+| 4 | <!-- e.g., Community adoption --> | <!-- e.g., 500+ GitHub stars, 10+ contributors --> | <!-- --> |
+| 5 | <!-- e.g., Monetization foundation --> | <!-- e.g., BYOK + hosted plans via Flowglad --> | <!-- --> |
 
 ---
 
-## Decisions Pending
+## Current Priorities
 
-<!-- Decisions that need to be made -->
+> Reference: `.agents/plans/todo-fixes-and-features.md` for the tactical backlog.
 
-1. **Loader naming**: Keep both `loader.tsx` (12+ variants) and `loader-dots.tsx` (simple)?
-2. **Model routing**: How to automatically select best model for task?
-3. **Response caching**: Cache identical prompts for cost savings?
+### Priority 1 — Stability & Polish
+
+<!-- TODO: Describe the current focus area and why it matters -->
+<!-- These should map to Priority 1 items in todo-fixes-and-features.md -->
+
+Active plans:
+- `.agents/plans/base-ui-migration.md` — <!-- brief status -->
+- `.agents/plans/base-ui-pattern-fixes.md` — <!-- brief status -->
+- `.agents/plans/provider-neutral-replay-compiler.md` — <!-- brief status -->
+
+### Priority 2 — UX Redesign
+
+<!-- TODO: Describe the redesign direction (ChatGPT-like? Claude-like? Original?) -->
+
+Active plans:
+- <!-- reference .agents/plans/ files or note "plan needed" -->
+
+### Priority 3 — Feature Expansion
+
+<!-- TODO: Describe the next wave of features -->
+
+Active plans:
+- `.agents/plans/tool-calling-infrastructure.md` — <!-- brief status -->
+- `.agents/plans/tool-calling-hardening.md` — <!-- brief status -->
+- `.agents/plans/cross-conversation-memory.md` — <!-- brief status -->
+- `.agents/plans/phase-7-future-tool-integrations.md` — <!-- brief status -->
 
 ---
 
-## Notes from Current Work
+## Milestones
 
-<!-- Scratch space for current session -->
+<!-- TODO: Define 3-6 milestones that represent meaningful progress -->
+<!-- Each milestone should describe: scope, what exists after, how to verify -->
 
-### 2026-01-19
+### Milestone 1: <!-- e.g., "Stable Multi-Provider Chat" -->
 
-**Current Focus:** Prompt-Kit Component Update
+**Target**: <!-- date -->  
+**Scope**: <!-- 1-2 sentences -->  
+**Acceptance**: <!-- What can a user do after this? How do you verify? -->  
+**Plans**: <!-- list of .agents/plans/ files that contribute to this milestone -->
 
-Before YouTube integration, consolidating UI components:
-1. Migrate 9 components from `components/prompt-kit/` → `components/ui/`
-2. Install 7 missing components (tool, source, chain-of-thought, feedback-bar, steps, system-message, image)
-3. Update existing components to latest prompt-kit versions
-4. Verify all imports updated to `@/components/ui/`
+### Milestone 2: <!-- e.g., "Tool Calling v1" -->
 
-### 2026-01-18
+**Target**: <!-- date -->  
+**Scope**: <!-- 1-2 sentences -->  
+**Acceptance**: <!-- What can a user do after this? How do you verify? -->  
+**Plans**: <!-- list of .agents/plans/ files -->
 
-**Convex Migration Complete!** Successfully migrated from Supabase to Convex:
-- All data operations now use Convex
-- Clerk authentication integrated
-- Legacy Supabase files cleaned up
-- User data sourced from Clerk (auth) + Convex (app data)
+### Milestone 3: <!-- e.g., "Public Beta" -->
 
-### 2026-01-13
+**Target**: <!-- date -->  
+**Scope**: <!-- 1-2 sentences -->  
+**Acceptance**: <!-- What can a user do after this? How do you verify? -->  
+**Plans**: <!-- list of .agents/plans/ files -->
 
-**AI Context Setup Complete!** All foundational AI context files are now in place:
+---
 
-**Core Files:**
-- `AGENTS.md` — Universal rules for all AI agents
-- `CLAUDE.md` — Claude-specific behaviors and preferences
-- `NOTES.md` — Persistent memory across sessions
-- `spec.md` — Requirements and architecture decisions
-- `plan.md` — This working document
+## Architecture Overview
 
-**Context Directory (6 files):**
-- `.agents/context/architecture.md`, `.agents/context/conventions.md`, `.agents/context/testing.md`
-- `.agents/context/api.md`, `.agents/context/database.md`, `.agents/context/deployment.md`
+> Full details: `.agents/context/architecture.md`  
+> Database schema: `.agents/context/database.md`  
+> API surface: `.agents/context/api.md`  
+> Terminology: `.agents/context/glossary.md`
 
-**Nested CLAUDE.md Files (8 files):**
-- `app/CLAUDE.md`, `app/api/CLAUDE.md`, `app/auth/CLAUDE.md`, `app/components/CLAUDE.md`
-- `lib/CLAUDE.md`, `lib/ai/CLAUDE.md`, `components/CLAUDE.md`, `hooks/CLAUDE.md`
+<!-- TODO: 3-5 sentence summary of the current architecture and any planned changes -->
+<!-- Example: "Next.js 16 App Router with Convex for reactive data, Clerk for auth, and 
+     Vercel AI SDK v6 for multi-provider streaming. The key architectural challenge is 
+     provider-neutral history replay (see ADR-003 and the replay compiler plan)." -->
+
+### Key Architecture Decisions
+
+<!-- TODO: Summarize the most impactful ADRs -->
+
+| ADR | Decision | Rationale |
+|-----|----------|-----------|
+| [001](.agents/context/decisions/001-convex-database.md) | Convex over Supabase | <!-- brief --> |
+| [002](.agents/context/decisions/002-vercel-ai-sdk.md) | Vercel AI SDK for multi-provider | <!-- brief --> |
+| [003](.agents/context/decisions/003-optimistic-updates.md) | Optimistic update pattern | <!-- brief --> |
+| <!-- new --> | <!-- e.g., Base UI over Radix --> | <!-- brief --> |
+
+---
+
+## Research & Context
+
+> Active research lives in `.agents/context/research/`
+
+### Completed Research
+
+<!-- TODO: List research docs that have informed decisions -->
+
+| Topic | Document | Key Findings |
+|-------|----------|--------------|
+| Provider history replay | `.agents/context/research/provider-aware-history-adaptation.md` | <!-- brief --> |
+| Open WebUI comparison | `.agents/context/research/open-webui-analysis/SUMMARY.md` | <!-- brief --> |
+| Latest models (Feb 2026) | `.agents/context/research/latest-models-february-2026.md` | <!-- brief --> |
+| Multi-tool calling | `.agents/context/research/multi-tool-calling-system-design.md` | <!-- brief --> |
+| Desktop/CLI access | `.agents/context/research/desktop-cli-local-access-evaluation.md` | <!-- brief --> |
+| Base UI migration | `.agents/context/research/radix-to-base-ui-css-variables.md` | <!-- brief --> |
+
+### Open Questions
+
+<!-- TODO: List research questions that still need answers -->
+<!-- These may become new docs in .agents/context/research/ -->
+
+- <!-- e.g., "What's the best approach for cross-conversation memory? Vector search vs. graph?" -->
+- <!-- e.g., "Should we support MCP (Model Context Protocol) for tool extensibility?" -->
+- <!-- e.g., "What's the right monetization model for hosted vs. self-hosted?" -->
+
+---
+
+## Progress
+
+> This section is a living checklist. Update at every stopping point.
+
+- [ ] <!-- (date) Define vision statement -->
+- [ ] <!-- (date) Fill in goals table -->
+- [ ] <!-- (date) Define milestones with acceptance criteria -->
+- [ ] <!-- (date) Summarize architecture decisions -->
+- [ ] <!-- (date) Link completed research findings -->
+- [ ] <!-- (date) Write open questions -->
+- [ ] <!-- (date) First milestone complete -->
+
+---
+
+## Decision Log
+
+> Record every strategic decision. For implementation-level decisions, use the relevant `.agents/plans/` file.
+
+<!-- 
+- **Decision**: ...
+  **Rationale**: ...
+  **Date**: ...
+  **Alternatives considered**: ...
+-->
+
+---
+
+## Surprises & Discoveries
+
+> Unexpected findings that shaped the project direction. For implementation-level discoveries, use the relevant plan file.
+
+<!-- 
+- **Observation**: ...
+  **Evidence**: ...
+  **Impact**: ...
+-->
+
+---
+
+## Outcomes & Retrospective
+
+> Updated at major milestones or phase completions.
+
+<!-- 
+### Milestone X — (date)
+**Achieved**: ...
+**Remaining**: ...
+**Lessons learned**: ...
+-->
 
 ---
 
 ## Quick Reference
 
 ### Commands
+
 ```bash
-bun run dev          # Start dev server
-bun run lint         # Check for issues
-bun run typecheck    # TypeScript check
+bun run dev          # Dev server (:3000)
+bun run lint         # ESLint
+bun run typecheck    # tsc --noEmit
 bun run build        # Production build
+bun run test         # Vitest
 ```
 
 ### Key Files
-- `AGENTS.md` — Project overview for AI
-- `spec.md` — Requirements
-- `.agents/context/research/tech-stack-evaluation.md` — Tech decisions
 
-### Gold Standard Patterns
-- API Route: `app/api/chat/route.ts`
-- Hook: `app/components/chat/use-chat-core.ts`
-- Provider: `lib/chat-store/chats/provider.tsx`
-- Component: `app/components/chat/chat.tsx`
+| Purpose | Path |
+|---------|------|
+| Agent instructions | `AGENTS.md` |
+| Claude config | `CLAUDE.md` |
+| Implementation plans | `.agents/plans/` |
+| Architecture docs | `.agents/context/` |
+| Development workflows | `.agents/workflows/` |
+| Task guides | `.agents/skills/` |
+| Todo backlog | `.agents/plans/todo-fixes-and-features.md` |
 
----
+### Creating New Plans
 
-## Sprint History
+When starting a new feature or refactor, create a plan in `.agents/plans/`:
 
-### Sprint 1 (Completed)
-- ✅ Initial research phase
-- ✅ Tech stack decisions
-- ✅ AGENTS.md creation
-
-### Sprint 2 (Completed)
-- ✅ AI context file setup (all files created)
-- ✅ Context directory with 6 domain-specific docs
-- ✅ Cursor rules with 6 numbered rule files
-- ✅ Claude commands with 5 slash commands
-- ✅ Nested CLAUDE.md files (8 modules covered)
-
-### Sprint 3 (Completed)
-- ✅ Convex project setup
-- ✅ Clerk authentication
-- ✅ Database migration (Supabase → Convex)
-- ✅ Auth route split (login/sign-up)
-
-### Sprint 4 (Current)
-- 🔄 Prompt-Kit component consolidation
-- 📋 Install missing AI chat components
-- 📋 Update existing components to latest
-
-### Sprint 5 (Next)
-- 📋 Model comparison analytics
-- 📋 Smart model routing
-- 📋 Multi-model UI enhancements
+1. Use the ExecPlan pattern (self-contained, living document, outcome-focused)
+2. Include: status, decision summary, file map, phases, verification steps
+3. Reference this `plan.md` for strategic context
+4. Follow `AGENTS.md` permissions for what requires approval
+5. See `.agents/plans/provider-neutral-replay-compiler.md` as a gold-standard example
 
 ---
 
-## Future Research & Open Questions
-
-### JSX Preview Component
-
-- **Description**: prompt-kit has a `jsx-preview.tsx` component that renders JSX strings as React components dynamically
-- **Potential use cases for Not A Wrapper**:
-  - Dynamic code previews from AI responses
-  - Interactive component visualization
-  - Generative UI features (dynamic component rendering from AI responses)
-- **Considerations**:
-  - Security: Requires careful sanitization of JSX strings before rendering
-  - Bundle size: Adds ~50KB for JSX parsing/rendering runtime
-  - Performance: Needs debouncing for streaming responses to avoid excessive re-renders
-- **Status**: Evaluate when implementing generative UI features
-- **Reference**: https://prompt-kit.com/docs
-
-### LLM Context Files
-
-- **Description**: prompt-kit provides `llms.txt` and `llms-full.txt` for AI-assisted development
-- **Purpose**: Gives AI assistants (Claude, Copilot, etc.) context about component APIs and usage patterns
-- **Potential for Not A Wrapper**:
-  - Create `/public/llms.txt` documenting customized prompt-kit components
-  - Include component customizations, upgrade notes, and usage examples
-  - Help AI assistants understand project-specific patterns vs upstream prompt-kit
-- **Status**: Consider when AI-assisted development becomes a priority
-- **Reference**: https://prompt-kit.com/llms.txt
-
----
-
-*Update this file as work progresses. AI agents should check and update task status.*
+*This plan follows the [ExecPlan methodology](https://developers.openai.com/cookbook/articles/codex_exec_plans) adapted for project-level planning. Individual feature plans use the full ExecPlan format in `.agents/plans/`.*
