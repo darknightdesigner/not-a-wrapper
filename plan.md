@@ -71,6 +71,7 @@ AGENTS.md            ← Rules & permissions
 | 25 | Admin-mutable config (PersistentConfig via Convex) | Not started | `research/open-webui-analysis/SUMMARY.md` |
 | 26 | OpenTelemetry integration | Not started | `research/open-webui-analysis/SUMMARY.md` |
 | 27 | Prompt library with `/` trigger | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 28 | Flowglad integration (billing, subscriptions, plan lifecycle) | Not started | `AGENTS.md` |
 
 ### Critical Path
 
