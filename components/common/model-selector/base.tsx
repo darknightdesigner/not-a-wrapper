@@ -38,7 +38,6 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "./pro-dialog"
-import { SubMenu } from "./sub-menu"
 
 type ModelSelectorProps = {
   selectedModelId: string
@@ -62,7 +61,6 @@ export function ModelSelector({
   )
   const isMobile = useBreakpoint(768)
 
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isProDialogOpen, setIsProDialogOpen] = useState(false)
@@ -124,9 +122,6 @@ export function ModelSelector({
       </div>
     )
   }
-
-  // Get the hovered model data
-  const hoveredModelData = models.find((model) => model.id === hoveredModel)
 
   const filteredModels = filterAndSortModels(
     models,
@@ -240,10 +235,7 @@ export function ModelSelector({
           onOpenChange={(open) => {
             setIsDropdownOpen(open)
             if (!open) {
-              setHoveredModel(null)
               setSearchQuery("")
-            } else {
-              if (selectedModelId) setHoveredModel(selectedModelId)
             }
           }}
         >
@@ -303,16 +295,6 @@ export function ModelSelector({
                         setSelectedModelId(model.id)
                         setIsDropdownOpen(false)
                       }}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
                     >
                       <div className="flex items-center gap-3">
                         {provider?.icon && <provider.icon className="size-5" />}
@@ -345,12 +327,6 @@ export function ModelSelector({
               )}
             </div>
 
-            {/* Submenu positioned absolutely */}
-            {hoveredModelData && (
-              <div className="absolute top-0 left-[calc(100%+8px)]">
-                <SubMenu hoveredModelData={hoveredModelData} />
-              </div>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </Tooltip>

@@ -41,7 +41,6 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
-import { SubMenu } from "../model-selector/sub-menu"
 
 type MultiModelSelectorProps = {
   selectedModelIds: string[]
@@ -66,7 +65,6 @@ export function MultiModelSelector({
   )
   const isMobile = useBreakpoint(768)
 
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isProDialogOpen, setIsProDialogOpen] = useState(false)
@@ -147,9 +145,6 @@ export function MultiModelSelector({
       </div>
     )
   }
-
-  // Get the hovered model data
-  const hoveredModelData = models.find((model) => model.id === hoveredModel)
 
   const filteredModels = filterAndSortModels(
     models,
@@ -405,11 +400,7 @@ export function MultiModelSelector({
           onOpenChange={(open) => {
             setIsDropdownOpen(open)
             if (!open) {
-              setHoveredModel(null)
               setSearchQuery("")
-            } else {
-              if (selectedModelIds.length > 0)
-                setHoveredModel(selectedModelIds[0])
             }
           }}
         >
@@ -464,16 +455,6 @@ export function MultiModelSelector({
                       )}
                       closeOnClick={false}
                       onClick={() => handleModelToggle(model.id, isLocked)}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
                     >
                       <div className="flex items-center gap-3">
                         {provider?.icon && <provider.icon className="size-5" />}
@@ -509,12 +490,6 @@ export function MultiModelSelector({
               )}
             </div>
 
-            {/* Submenu positioned absolutely */}
-            {hoveredModelData && (
-              <div className="absolute top-0 left-[calc(100%+8px)]">
-                <SubMenu hoveredModelData={hoveredModelData} />
-              </div>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </Tooltip>
