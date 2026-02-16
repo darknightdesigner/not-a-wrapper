@@ -83,7 +83,7 @@ export function DialogPublish() {
   const trigger = (
     <Button
       variant="ghost"
-      className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background p-1.5 transition-colors"
       onClick={handlePublish}
       disabled={isLoading}
     >

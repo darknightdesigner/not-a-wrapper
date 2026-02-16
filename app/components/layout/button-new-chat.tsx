@@ -2,6 +2,7 @@
 
 import { ChatActionsMenu } from "@/app/components/layout/chat-actions-menu"
 import { useKeyShortcut } from "@/app/hooks/use-key-shortcut"
+import { Button } from "@/components/ui/button"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -26,13 +27,15 @@ export function ButtonNewChat() {
     <ChatActionsMenu
       chat={chat}
       trigger={
-        <button
+        <Button
           type="button"
-          className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+          variant="ghost"
+          size="icon"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background p-1.5 transition-colors"
           aria-label="Chat actions"
         >
           <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="size-5" />
-        </button>
+        </Button>
       }
       contentSide="bottom"
       contentAlign="end"
