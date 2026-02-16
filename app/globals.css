@@ -69,6 +69,93 @@
       background-position: 0% center;
     }
   }
+
+  @keyframes caret-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes caret-fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes indicator-glyph-spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes indicator-wave {
+    0%,
+    100% {
+      transform: scaleY(0.6);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes indicator-dot-trail {
+    0% {
+      transform: translateX(-0.2em);
+      opacity: 0;
+    }
+    25% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(0.25em);
+      opacity: 0;
+    }
+  }
+
+  @keyframes indicator-pulse-dot {
+    0%,
+    100% {
+      transform: scale(0.8);
+      opacity: 0.5;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 1;
+    }
+  }
+
+  @keyframes indicator-underscore-shimmer {
+    from {
+      background-position: 200% center;
+    }
+    to {
+      background-position: 0% center;
+    }
+  }
+
+  @keyframes indicator-soft-glow {
+    0%,
+    100% {
+      opacity: 0.55;
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--foreground) 30%, transparent);
+    }
+    50% {
+      opacity: 1;
+      box-shadow: 0 0 8px 1px color-mix(in oklab, var(--foreground) 45%, transparent);
+    }
+  }
 }
 
 @theme inline {

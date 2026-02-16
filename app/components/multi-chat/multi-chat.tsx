@@ -629,18 +629,15 @@ export function MultiChat() {
 
   const handleStop = useCallback(() => {
     modelChats.forEach((chat) => {
-      if (chat.isLoading && selectedModelIds.includes(chat.model.id)) {
+      if (chat.isLoading) {
         chat.stop()
       }
     })
-  }, [modelChats, selectedModelIds])
+  }, [modelChats])
 
   const anyLoading = useMemo(
-    () =>
-      modelChats.some(
-        (chat) => chat.isLoading && selectedModelIds.includes(chat.model.id)
-      ),
-    [modelChats, selectedModelIds]
+    () => modelChats.some((chat) => chat.isLoading),
+    [modelChats]
   )
 
   const conversationProps = useMemo(() => ({ messageGroups }), [messageGroups])

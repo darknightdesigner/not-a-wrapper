@@ -9,6 +9,9 @@ import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
+import type { StreamingIndicatorVariant } from "@/components/ui/loader"
+
+const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
 
 // v6 helper: Extract text content from all text parts in order.
 // Tool-enabled responses can interleave multiple assistant text parts across
@@ -113,7 +116,12 @@ export function Conversation({
             messages[messages.length - 1].role === "user" && (
               <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2 min-h-scroll-anchor">
                 <div className="relative flex min-w-full flex-col gap-2">
-                  <Loader variant="chat" />
+                  <Loader
+                    variant="text-shimmer"
+                    text="Generating"
+                    showCaret
+                    streamingIndicatorVariant={STREAMING_INDICATOR_VARIANT}
+                  />
                 </div>
               </MessageContainer>
             )}

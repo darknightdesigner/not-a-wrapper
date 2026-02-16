@@ -13,3 +13,6 @@ export { SidebarLeftIcon as PanelLeftIcon, SidebarLeftIcon as PanelLeft } from "
 
 // Drag icons - Used by react-resizable-panels
 export { DragDropVerticalIcon as GripVerticalIcon, DragDropVerticalIcon as GripVertical } from "@hugeicons-pro/core-stroke-rounded"
+
+// Composer stop action - solid rounded stop glyph
+export { StopIcon as StopSolidRoundedIcon } from "@hugeicons-pro/core-bulk-rounded"

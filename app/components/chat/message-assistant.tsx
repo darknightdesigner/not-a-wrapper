@@ -1,4 +1,8 @@
-import { Loader } from "@/components/ui/loader"
+import {
+  Loader,
+  StreamingCaret,
+  type StreamingIndicatorVariant,
+} from "@/components/ui/loader"
 import {
   Message,
   MessageAction,
@@ -17,7 +21,7 @@ import {
   Copy01Icon,
   Alert02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { useCallback, useRef } from "react"
+import { useCallback, useRef, useState } from "react"
 import { getSources } from "./get-sources"
 import { QuoteButton } from "./quote-button"
 import { Reasoning } from "./reasoning"
@@ -41,6 +45,8 @@ type MessageAssistantProps = {
   onQuote?: (text: string, messageId: string) => void
   finishReason?: string
 }
+
+const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
 
 function formatToolProgressLabel(toolName: string): string {
   switch (toolName) {
@@ -89,6 +95,7 @@ export function MessageAssistant({
   const reasoningParts = parts?.find((part) => part.type === "reasoning")
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
+  const hasContent = !contentNullOrEmpty
   
   // Type for image search results
   type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
@@ -133,6 +140,27 @@ export function MessageAssistant({
       clearSelection()
     }
   }, [selectionInfo, onQuote, clearSelection])
+
+  const [contentCaretPhase, setContentCaretPhase] = useState<
+    "hidden" | "visible" | "fading"
+  >("hidden")
+  const showActiveContentCaret = Boolean(isLast && status === "streaming" && hasContent)
+
+  if (showActiveContentCaret && contentCaretPhase !== "visible") {
+    setContentCaretPhase("visible")
+  } else if (
+    !showActiveContentCaret &&
+    status === "ready" &&
+    isLast &&
+    contentCaretPhase === "visible"
+  ) {
+    setContentCaretPhase("fading")
+  } else if (
+    (!isLast || !hasContent || (status !== "streaming" && status !== "ready")) &&
+    contentCaretPhase !== "hidden"
+  ) {
+    setContentCaretPhase("hidden")
+  }
 
   return (
     <Message
@@ -186,7 +214,14 @@ export function MessageAssistant({
           <Loader variant="loading-dots" text="Generating image" />
         )}
 
-        {showStreamingLoader && <Loader variant="chat" />}
+        {showStreamingLoader && (
+          <Loader
+            variant="text-shimmer"
+            text="Generating"
+            showCaret
+            streamingIndicatorVariant={STREAMING_INDICATOR_VARIANT}
+          />
+        )}
 
         {contentNullOrEmpty ? null : (
           <MessageContent
@@ -199,6 +234,15 @@ export function MessageAssistant({
             {children}
           </MessageContent>
         )}
+        {contentCaretPhase !== "hidden" && (
+          <StreamingCaret
+            visible={contentCaretPhase === "visible"}
+            variant={STREAMING_INDICATOR_VARIANT}
+            className="-mt-1 ml-px"
+            onFadeOutComplete={() => setContentCaretPhase("hidden")}
+          />
+        )}
+
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
         {finishReason === "length" && status !== "streaming" && (
