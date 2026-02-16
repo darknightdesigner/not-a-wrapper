@@ -30,7 +30,7 @@ import { Chat01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type Project = {
   id: string
@@ -44,6 +44,7 @@ type ProjectViewProps = {
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
+  const isSendingRef = useRef(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
@@ -238,17 +239,20 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   )
 
   const submit = useCallback(async () => {
+    if (isSendingRef.current) return
+    isSendingRef.current = true
     setIsSubmitting(true)
 
     if (!user?.id) {
       setIsSubmitting(false)
+      isSendingRef.current = false
       return
     }
 
     // Capture current input value before clearing
     const currentInput = input
 
-    const optimisticId = `optimistic-${Date.now().toString()}`
+    const optimisticId = `optimistic-${crypto.randomUUID()}`
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
 
@@ -342,6 +346,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       cleanupOptimisticAttachments(getFileUrlsFromParts())
       toast({ title: "Failed to send message", status: "error" })
     } finally {
+      isSendingRef.current = false
       setIsSubmitting(false)
     }
   }, [

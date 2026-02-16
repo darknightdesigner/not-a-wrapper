@@ -106,7 +106,7 @@ export function useChatEdit({
       // Store original messages for potential rollback
       const originalMessages = [...messages]
 
-      const optimisticId = `optimistic-edit-${Date.now().toString()}`
+      const optimisticId = `optimistic-edit-${crypto.randomUUID()}`
 
       // Extract file parts from target message for the edited message
       const targetFileParts =

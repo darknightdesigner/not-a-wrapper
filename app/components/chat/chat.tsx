@@ -105,7 +105,7 @@ export function Chat() {
   const {
     messages,
     setMessages,
-    inputRef,
+    initialInputValue,
     registerInputListener,
     status,
     stop,
@@ -149,6 +149,10 @@ export function Chat() {
   // Auto-focus chat textarea when user types a printable character anywhere
   const focusTextareaRef = useRef<(() => void) | null>(null)
   useGlobalPromptFocus(focusTextareaRef)
+
+  const registerFocus = useCallback((fn: (() => void) | null) => {
+    focusTextareaRef.current = fn
+  }, [])
 
   // Memoize the conversation props to prevent unnecessary rerenders
   const conversationProps = useMemo(
@@ -195,7 +199,7 @@ export function Chat() {
       enableSearch,
       quotedText,
       registerInputListener,
-      focusRef: focusTextareaRef,
+      registerFocus,
     }),
     [
       handleSuggestion,
@@ -217,7 +221,7 @@ export function Chat() {
       enableSearch,
       quotedText,
       registerInputListener,
-      focusTextareaRef,
+      registerFocus,
     ]
   )
 
@@ -289,7 +293,7 @@ export function Chat() {
           },
         }}
       >
-        <ChatInput defaultValue={inputRef.current} {...chatInputProps} />
+        <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />

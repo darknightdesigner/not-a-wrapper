@@ -178,7 +178,7 @@ export function ChatsProvider({
     // For guest users, create a local-only chat (not persisted to Convex)
     // This allows unauthenticated users to send messages without database errors
     if (!isAuthenticated) {
-      const localChatId = `local-${Date.now().toString()}`
+      const localChatId = `local-${crypto.randomUUID()}`
       const localChat: Chats = {
         id: localChatId,
         title: title || "New chat",
@@ -207,7 +207,7 @@ export function ChatsProvider({
       await new Promise((resolve) => setTimeout(resolve, 500))
     }
 
-    const optimisticId = `optimistic-${Date.now().toString()}`
+    const optimisticId = `optimistic-${crypto.randomUUID()}`
     const optimisticChat: Chats = {
       id: optimisticId,
       title: title || "New chat",

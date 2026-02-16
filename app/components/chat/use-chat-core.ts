@@ -66,6 +66,8 @@ export function useChatCore({
 }: UseChatCoreProps) {
   // State management
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // Ref-based guard prevents concurrent sends (state updates are batched and can lag)
+  const isSendingRef = useRef(false)
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
@@ -92,7 +94,8 @@ export function useChatCore({
 
   // Ref-based input management — avoids cascading re-renders on every keystroke.
   // ChatInput owns the display state; this ref is the source of truth for submit/handlers.
-  const inputRef = useRef(prompt || draftValue || "")
+  const [initialInputValue] = useState(() => prompt || draftValue || "")
+  const inputRef = useRef(initialInputValue)
   const inputListenerRef = useRef<((value: string) => void) | null>(null)
 
   const getInput = useCallback(() => inputRef.current, [])
@@ -163,7 +166,8 @@ export function useChatCore({
           : null)
 
       if (effectiveChatId) {
-        cacheAndAddMessage(message, effectiveChatId)
+        // Await persistence so the DB has the latest messages before ID reconciliation
+        await cacheAndAddMessage(message, effectiveChatId)
       }
 
       try {
@@ -287,15 +291,13 @@ export function useChatCore({
       onSuccess?: (chatId: string) => void
       errorMessage?: string
     }) => {
+      // Synchronous ref guard: prevents duplicate sends from rapid clicks/key repeats
+      // (React state updates are batched and may not reflect in time)
+      if (isSendingRef.current) return
+      isSendingRef.current = true
       setIsSubmitting(true)
 
-      const uid = await getOrCreateGuestUserId(user)
-      if (!uid) {
-        setIsSubmitting(false)
-        return
-      }
-
-      const optimisticId = `optimistic-${Date.now().toString()}`
+      const optimisticId = `optimistic-${crypto.randomUUID()}`
       const optimisticMessage: OptimisticUIMessage = {
         id: optimisticId,
         role: "user",
@@ -324,6 +326,9 @@ export function useChatCore({
       }
 
       try {
+        const uid = await getOrCreateGuestUserId(user)
+        if (!uid) return
+
         const allowed = await checkLimitsAndNotify(uid)
         if (!allowed) {
           removeOptimistic()
@@ -383,6 +388,7 @@ export function useChatCore({
         removeOptimistic()
         toast({ title: errorMessage, status: "error" })
       } finally {
+        isSendingRef.current = false
         setIsSubmitting(false)
       }
     },
@@ -522,6 +528,7 @@ export function useChatCore({
     setHasSentFirstMessage,
 
     // Ref-based input API (no useState — avoids cascading re-renders)
+    initialInputValue,
     inputRef,
     getInput,
     setInputValue,

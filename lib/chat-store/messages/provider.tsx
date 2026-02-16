@@ -154,10 +154,28 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     if (chatId === null) return []
 
     // Merge server messages with optimistic messages for this chat
-    const serverIds = new Set(serverMessages.map((m) => m.id))
-    const pendingMessages = optimisticMessages.filter((m) => !serverIds.has(m.id))
+    // Deduplicate by ID to prevent duplicate-key React errors when optimistic
+    // messages overlap with server messages or with each other (e.g. rapid submissions)
+    const seenIds = new Set<string>()
+    const result: ExtendedUIMessage[] = []
 
-    return [...serverMessages, ...pendingMessages]
+    // Server messages take priority
+    for (const m of serverMessages) {
+      if (!seenIds.has(m.id)) {
+        seenIds.add(m.id)
+        result.push(m)
+      }
+    }
+
+    // Append optimistic messages that aren't already represented
+    for (const m of optimisticMessages) {
+      if (!seenIds.has(m.id)) {
+        seenIds.add(m.id)
+        result.push(m)
+      }
+    }
+
+    return result
   }, [serverMessages, optimisticMessages, chatId])
 
   // Helper to update optimistic messages for current chat
@@ -183,7 +201,10 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     // Optimistic update - add to pending messages (use effectiveChatId for map key)
     if (effectiveChatId === chatId) {
       // Only update optimistic state if we're in the same chat context
-      updateOptimisticMessages((prev) => [...prev, message])
+      // Guard against duplicate IDs from rapid submissions or re-renders
+      updateOptimisticMessages((prev) =>
+        prev.some((m) => m.id === message.id) ? prev : [...prev, message]
+      )
     }
 
     // Cache locally (works for both guest and authenticated users)
@@ -196,7 +217,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       seenIds.add(m.id)
       return true
     })
-    writeToIndexedDB("messages", { id: effectiveChatId, messages: updated })
+    await writeToIndexedDB("messages", { id: effectiveChatId, messages: updated })
 
     // Persist to Convex for authenticated users (valid Convex IDs only)
     // Guest users will silently skip this (auth required for mutations)

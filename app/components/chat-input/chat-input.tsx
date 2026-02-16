@@ -47,8 +47,8 @@ type ChatInputProps = {
   registerInputListener?: (
     listener: ((value: string) => void) | null
   ) => void
-  /** Ref populated with a callback to imperatively focus the textarea */
-  focusRef?: React.RefObject<(() => void) | null>
+  /** Callback to register a focus function so parents can imperatively focus the textarea */
+  registerFocus?: (fn: (() => void) | null) => void
 }
 
 export function ChatInput({
@@ -70,7 +70,7 @@ export function ChatInput({
   enableSearch,
   quotedText,
   registerInputListener,
-  focusRef,
+  registerFocus,
 }: ChatInputProps) {
   const selectModelConfig = getModelInfo(selectedModel)
   // Web search is disabled only when the model explicitly can't accept tool calls
@@ -84,17 +84,9 @@ export function ChatInput({
 
   // Expose a focus callback so parents / hooks can imperatively focus the textarea
   useEffect(() => {
-    if (focusRef) {
-      ;(focusRef as React.MutableRefObject<(() => void) | null>).current =
-        () => textareaRef.current?.focus()
-    }
-    return () => {
-      if (focusRef) {
-        ;(focusRef as React.MutableRefObject<(() => void) | null>).current =
-          null
-      }
-    }
-  }, [focusRef])
+    registerFocus?.(() => textareaRef.current?.focus())
+    return () => registerFocus?.(null)
+  }, [registerFocus])
 
   // Local state — ChatInput owns the displayed text to avoid re-renders in parent tree
   const [localValue, setLocalValue] = useState(defaultValue)
