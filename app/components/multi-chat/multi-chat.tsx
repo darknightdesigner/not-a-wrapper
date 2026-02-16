@@ -8,7 +8,7 @@ import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
 import {
   persistWebSearchToggle,
@@ -70,7 +70,9 @@ function getMessageText(message: MessageType): string {
 
 export function MultiChat() {
   const [prompt, setPrompt] = useState("")
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([
+    MODEL_DEFAULT,
+  ])
   const [multiChatId, setMultiChatId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 

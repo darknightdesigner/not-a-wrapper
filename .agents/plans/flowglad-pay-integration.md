@@ -4,6 +4,7 @@
 > **Priority**: P2 — Experimental / Demo
 > **Scope**: Minimal demo of a Flowglad Pay tool call buying a product in chat
 > **Date**: February 16, 2026
+> **Updated**: February 16, 2026 — Trimmed for lean demo (removed unused SSE consumer, excess schemas, capability flag)
 > **Research**: `.agents/research/flowglad-pay/` (documents 00–06)
 > **Architecture Reference**: `.agents/plans/flowglad-pay-architecture.md`
 > **Tool Infrastructure Reference**: `.agents/plans/tool-calling-infrastructure.md`
@@ -20,7 +21,7 @@ This plan is structured for AI agent step-by-step execution. Each phase is self-
 - **Verify** — how to confirm the phase is complete
 - **Rollback** — how to reverse the phase cleanly
 
-Phases must be executed in order (0 → 1 → 2 → 3 → 4). Each phase is independently testable and shippable.
+Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independently testable and shippable.
 
 **This is an experimental integration.** Every change must be:
 1. Minimal — avoid touching core infrastructure unless necessary
@@ -36,6 +37,7 @@ Phases must be executed in order (0 → 1 → 2 → 3 → 4). Each phase is inde
 3. **Follow industry standards**: The tool integrates as a standard Vercel AI SDK `tool()` call, fitting into our existing multi-tool Layer architecture (Layers 1-3 are search/MCP; this is Layer 4: Platform Tools).
 4. **Hardcoded auth**: Use the `user_name` environment variable for the PayClaw `userEmail` parameter. This is temporary and will change when per-user API keys land.
 5. **Expect breakage**: The PayClaw API is experimental and evolving. Our schemas track `main` as source of truth and should be easy to update.
+6. **Only build what the demo uses**: No speculative schemas, no unused SSE infrastructure, no shared type modifications. Add complexity only when the demo path requires it.
 
 ---
 
@@ -47,13 +49,17 @@ Phases must be executed in order (0 → 1 → 2 → 3 → 4). Each phase is inde
 | API schema tracking | Track `main` branch of `flowglad/provisioning-agent` | Source of truth; expect breaking changes |
 | Convex changes | None | Demo scope — avoid schema churn |
 | Credential display | Return in tool result, render in chat | Simplest path; credentials are ephemeral |
-| Progress UX | Summarize SSE stream every ~30 seconds | Balance between real-time and noise |
+| Progress UX | REST polling every ~30 seconds | Simpler than SSE; sufficient for demo |
 | Long-running jobs | Open research question | Needs deeper analysis (see Open Questions) |
 | Cancellation | Not supported (no API endpoint) | Inform user; job runs until completion or 10-min expiry |
 | Partial failure | Report what succeeded + what failed in plain language | Demo-friendly; don't over-engineer error states |
 | Credential expiration | Skip enforcement | `expiresAt` stored but not enforced by PayClaw; acceptable for demo |
 | Rate limits | None known | Single-user demo; revisit if scaling |
 | Max spend control | User-configurable via tool params | Flowglad Pay enforces the limit on their side |
+| SSE consumer | Skipped | Demo uses REST polling; SSE consumer can be added later if needed |
+| `platformTools` capability flag | Skipped | Config null-check already gates the tool; avoids modifying shared `ToolCapabilities` type |
+| Collision detection | Skipped | Single known tool name (`flowglad_pay_buy`); zero collision risk in demo |
+| Schema scope | Minimal — only schemas the demo validates against | Unused schemas (shipping, credentials list, SSE events) can be added when needed |
 
 ---
 
@@ -97,12 +103,12 @@ Layer 4 — Platform Tools             (lib/tools/platform.ts)    — Flowglad P
 **Coordination model** (identical to Layers 1-3):
 - `route.ts` imports and merges Layer 4 tools into `allTools` for `streamText()`
 - Layer 4 tools follow the same `tool()` + `ToolMetadata` pattern as Layer 2 (Exa)
-- Layer 4 is gated on: `isAuthenticated && capabilities.platformTools` (new capability flag)
-- No changes to Layers 1-3 or MCP infrastructure
+- Layer 4 is gated on: `isAuthenticated` + env var presence (config returns non-null)
+- No changes to Layers 1-3, MCP infrastructure, or `ToolCapabilities` type
 
 **Merge order** in `route.ts`:
 ```typescript
-const allTools = { ...searchTools, ...mcpTools, ...platformTools } as ToolSet
+const allTools = { ...searchTools, ...platformTools, ...mcpTools } as ToolSet
 ```
 
 Platform tools have lowest priority (MCP wins on collision). This is intentional — user-configured MCP tools should always override platform tools.
@@ -112,7 +118,7 @@ Platform tools have lowest priority (MCP wins on collision). This is intentional
 ## Open Questions (Requiring Further Research)
 
 ### Long-Running Job Handling
-> **Status**: Needs deeper analysis before Phase 3
+> **Status**: Needs deeper analysis before Phase 2
 
 PayClaw provisioning jobs take 2-8 minutes. Our `maxDuration = 60` in `route.ts` (Vercel function timeout) is far too short to hold an SSE connection for the full duration.
 
@@ -125,9 +131,9 @@ Possible approaches to investigate:
 - **Client-side polling** — a `useEffect` hook polls a status API route every N seconds
 - **Convex real-time subscription** — if we allow a Convex table, Convex's reactivity could push updates
 
-**For the demo**: We will use a pragmatic approach — the tool creates the job and immediately returns a confirmation. Progress updates are handled via a periodic summary mechanism (every ~30 seconds) that the user sees in the chat stream. The exact implementation depends on the research outcome.
+**For the demo**: We will use a pragmatic approach — the tool creates the job and immediately returns a confirmation. Progress updates are handled via REST polling (a lightweight status API route) that the client calls every ~30 seconds. No SSE stream consumer is needed for this approach.
 
-**Action item**: Research this before starting Phase 3. Write findings to `.agents/context/research/long-running-tool-calls.md`.
+**Action item**: Research this before starting Phase 2. Write findings to `.agents/context/research/long-running-tool-calls.md`.
 
 ### Per-User API Key Migration
 > **Status**: Follow up with Flowglad team
@@ -216,7 +222,7 @@ export function getPayClawConfig(): PayClawConfig | null {
 
 #### 0.2 Create `lib/payclaw/schemas.ts`
 
-Zod schemas mirroring the PayClaw API contracts. Based on doc 06 Section 2, updated for the current discriminated union API.
+Zod schemas covering only what the demo path validates against. Additional schemas (shipping address, credentials list, SSE events) can be added when those features are implemented.
 
 ```typescript
 // lib/payclaw/schemas.ts
@@ -238,39 +244,6 @@ export const payClawToolInputSchema = z.object({
     'Product search description. When provided with a vendor origin URL, triggers ' +
     'indirect buy mode where the agent searches for the product.'
   ),
-})
-
-// ── API Request Schemas (internal — sent to PayClaw) ────────
-
-export const shippingAddressSchema = z.object({
-  name: z.string().min(1),
-  line1: z.string().min(1),
-  line2: z.string().optional(),
-  city: z.string().min(1),
-  state: z.string().min(1),
-  postalCode: z.string().min(1),
-  country: z.string().min(1),
-  phone: z.string().optional(),
-  email: z.string().email().optional(),
-})
-
-// Direct buy: specific product page URL
-export const directBuyRequestSchema = z.object({
-  url: z.string().url(),
-  userEmail: z.string().email(),
-  cardId: z.string().min(1),
-  maxSpend: z.number().int().positive(),
-  shippingAddress: shippingAddressSchema.optional(),
-})
-
-// Indirect buy: vendor origin + product search
-export const indirectBuyRequestSchema = z.object({
-  vendor: z.string().url(),
-  product: z.string().min(1),
-  userEmail: z.string().email(),
-  cardId: z.string().min(1),
-  maxSpend: z.number().int().positive(),
-  shippingAddress: shippingAddressSchema.optional(),
 })
 
 // ── API Response Schemas ────────────────────────────────────
@@ -308,51 +281,13 @@ export const jobSchema = z.object({
   result: jobResultSchema,
 })
 
-// ── SSE Event Schemas ───────────────────────────────────────
+// ── Job Events Schema (returned by REST polling endpoint) ───
 
-export const jobEventTypes = [
-  'job.started', 'job.progress', 'card.issued', 'page.navigated',
-  'form.submitted', 'payment.completed', 'email.received',
-  'verification.completed', 'credentials.extracted',
-  'job.completed', 'job.failed',
-] as const
-
-export const jobEventTypeSchema = z.enum(jobEventTypes)
-
-export const sseJobEventSchema = z.object({
-  type: jobEventTypeSchema,
+export const jobEventSchema = z.object({
+  type: z.string(),
   timestamp: z.string(),
   message: z.string(),
   data: z.record(z.unknown()).optional(),
-})
-
-export const jobDonePayloadSchema = z.object({
-  status: z.enum(['completed', 'failed', 'cancelled']),
-  result: z.record(z.unknown()).optional(),
-})
-
-// ── Credential Schemas ──────────────────────────────────────
-
-export const storedCredentialSchema = z.object({
-  id: z.string(),
-  userId: z.string(),
-  jobId: z.string().nullable(),
-  vendorName: z.string(),
-  vendorUrl: z.string().nullable(),
-  label: z.string(),
-  metadata: z.record(z.string()).nullable(),
-  createdAt: z.string(),
-  accessedAt: z.string().nullable(),
-  expiresAt: z.string().nullable(),
-  revokedAt: z.string().nullable(),
-})
-
-export const credentialWithValueSchema = storedCredentialSchema.extend({
-  value: z.string(),
-})
-
-export const credentialsListResponseSchema = z.object({
-  credentials: z.array(storedCredentialSchema),
 })
 
 // ── API Error Schema ────────────────────────────────────────
@@ -369,12 +304,8 @@ export type PayClawToolInput = z.infer<typeof payClawToolInputSchema>
 export type CreateJobResponse = z.infer<typeof createJobResponseSchema>
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type Job = z.infer<typeof jobSchema>
-export type SseJobEvent = z.infer<typeof sseJobEventSchema>
-export type JobDonePayload = z.infer<typeof jobDonePayloadSchema>
-export type CredentialWithValue = z.infer<typeof credentialWithValueSchema>
-export type StoredCredential = z.infer<typeof storedCredentialSchema>
+export type JobEvent = z.infer<typeof jobEventSchema>
 export type ApiError = z.infer<typeof apiErrorSchema>
-export type ShippingAddress = z.infer<typeof shippingAddressSchema>
 ```
 
 #### 0.3 Update `.env.example`
@@ -433,7 +364,7 @@ Key behaviors:
 // lib/payclaw/client.ts — sketch of the public API
 
 import type { PayClawConfig } from './config'
-import type { PayClawToolInput, CreateJobResponse, Job, SseJobEvent, CredentialWithValue } from './schemas'
+import type { PayClawToolInput, CreateJobResponse, Job, JobEvent } from './schemas'
 
 /** Standard headers for all PayClaw API calls */
 function makeHeaders(config: PayClawConfig): Record<string, string> {
@@ -455,17 +386,11 @@ export async function getJob(
   config: PayClawConfig,
 ): Promise<Job> { /* ... */ }
 
-/** Get all events for a job (polling endpoint). */
+/** Get all events for a job (REST polling endpoint). */
 export async function getJobEvents(
   jobId: string,
   config: PayClawConfig,
-): Promise<SseJobEvent[]> { /* ... */ }
-
-/** List credentials for the configured user, optionally filtered by jobId. */
-export async function listCredentials(
-  config: PayClawConfig,
-  jobId?: string,
-): Promise<CredentialWithValue[]> { /* ... */ }
+): Promise<JobEvent[]> { /* ... */ }
 ```
 
 **Direct vs Indirect buy logic** (inside `createJob`):
@@ -536,112 +461,7 @@ rm lib/payclaw/client.ts
 
 ---
 
-## Phase 2: SSE Consumer
-
-**Goal**: A fetch-based SSE reader that consumes PayClaw's event stream and yields typed events.
-
-**Context to load**:
-- `.agents/research/flowglad-pay/03-events-and-streaming.md` — SSE wire format, frame types, keepalive
-- `.agents/research/flowglad-pay/06-integration-contract.md` — Section 5 (SSE Strategy)
-- `lib/payclaw/schemas.ts` — `sseJobEventSchema`, `jobDonePayloadSchema`
-
-### Steps
-
-#### 2.1 Create `lib/payclaw/sse.ts`
-
-Async generator that consumes the PayClaw SSE stream. Based on the reference implementation in doc 06 Section 5.
-
-Key behaviors:
-- Uses `fetch()` with `ReadableStream` (not `EventSource` — we need named event support)
-- Parses four SSE frame types: `data:` (regular), `event: done` (terminal), `event: error`, `: keepalive` (skip)
-- Yields a discriminated union: `{ type: 'event', event: SseJobEvent } | { type: 'done', payload: JobDonePayload }`
-- Respects `AbortSignal` for cancellation (passed via `fetch` options)
-- Frame boundary: split on `\r?\n\r?\n` (per SSE spec)
-- Validates each event through `sseJobEventSchema` with `safeParse` (skip malformed frames, don't crash)
-
-```typescript
-// lib/payclaw/sse.ts — public API sketch
-
-export type SseFrame =
-  | { type: 'event'; event: SseJobEvent }
-  | { type: 'done'; payload: JobDonePayload }
-
-export async function* consumeJobStream(
-  jobId: string,
-  config: PayClawConfig,
-  signal?: AbortSignal,
-): AsyncGenerator<SseFrame, void, undefined> { /* ... */ }
-```
-
-#### 2.2 Create event-to-message mapper
-
-A pure function that maps SSE events to human-readable progress messages for the chat UI. Based on doc 06 Section 9.
-
-```typescript
-// lib/payclaw/events.ts
-
-export function eventToProgressMessage(event: SseJobEvent): string {
-  switch (event.type) {
-    case 'job.started':
-      return `Starting provisioning for ${event.data?.vendorName ?? 'vendor'}...`
-    case 'job.progress':
-      return `${(event.data as { stage?: string })?.stage ?? 'Processing...'}`
-    case 'card.issued': {
-      const d = event.data as { last4?: string } | undefined
-      return `Virtual card issued${d?.last4 ? ` (****${d.last4})` : ''}`
-    }
-    case 'page.navigated':
-      return `Navigating to ${(event.data as { url?: string })?.url ?? 'page'}`
-    case 'form.submitted':
-      return 'Submitting form...'
-    case 'payment.completed':
-      return 'Payment completed'
-    case 'email.received':
-      return 'Verification email received'
-    case 'verification.completed':
-      return 'Verification completed'
-    case 'credentials.extracted':
-      return 'Credentials extracted'
-    case 'job.completed': {
-      const d = event.data as { stepCount?: number; hasCredentials?: boolean } | undefined
-      return d?.hasCredentials
-        ? `Provisioning complete (${d?.stepCount ?? '?'} steps) — credentials available`
-        : `Provisioning complete (${d?.stepCount ?? '?'} steps)`
-    }
-    case 'job.failed':
-      return `Provisioning failed: ${(event.data as { error?: string })?.error ?? 'unknown error'}`
-    default:
-      return event.message
-  }
-}
-
-/**
- * Summarize a batch of events into a concise progress string.
- * Used for periodic (~30s) progress updates in the chat stream.
- */
-export function summarizeEvents(events: SseJobEvent[]): string {
-  if (events.length === 0) return 'Waiting for updates...'
-  const lastEvent = events[events.length - 1]
-  const types = [...new Set(events.map(e => e.type))]
-  return `[${types.length} events] Latest: ${eventToProgressMessage(lastEvent)}`
-}
-```
-
-### Verify
-
-- `bun run typecheck` passes
-- `bun run lint` passes
-- Unit tests pass (mock ReadableStream with sample frames from doc 03 Section 2)
-
-### Rollback
-
-```bash
-rm lib/payclaw/sse.ts lib/payclaw/events.ts
-```
-
----
-
-## Phase 3: Tool Definition + Route Integration
+## Phase 2: Tool Definition + Route Integration
 
 **Goal**: A Vercel AI SDK `tool()` that the LLM can invoke to buy products via Flowglad Pay. Integrated into `app/api/chat/route.ts` as Layer 4.
 
@@ -650,7 +470,7 @@ rm lib/payclaw/sse.ts lib/payclaw/events.ts
 **Context to load**:
 - `app/api/chat/route.ts` — Gold standard API route; study how Layers 1-3 are loaded and merged
 - `lib/tools/third-party.ts` — Gold standard for custom `tool()` wrappers (Exa pattern)
-- `lib/tools/types.ts` — `ToolMetadata`, `ToolSource`, `ToolCapabilities`
+- `lib/tools/types.ts` — `ToolMetadata`, `ToolSource` (read-only — we do NOT modify this file)
 - `lib/tools/mcp-wrapper.ts` — Envelope pattern, trace collector
 - `lib/config.ts` — Constants pattern
 - `lib/payclaw/client.ts` (Phase 1)
@@ -659,7 +479,7 @@ rm lib/payclaw/sse.ts lib/payclaw/events.ts
 
 ### Steps
 
-#### 3.1 Create `lib/tools/platform.ts`
+#### 2.1 Create `lib/tools/platform.ts`
 
 The Layer 4 tool loader. Follows the exact pattern of `lib/tools/third-party.ts`.
 
@@ -737,41 +557,11 @@ export async function getPlatformTools(): Promise<{
 
 > **Design note**: We use `source: 'third-party'` instead of adding a new `'platform'` ToolSource. This avoids modifying `lib/tools/types.ts` and keeps changes minimal. The `serviceName: 'Flowglad Pay'` distinguishes it in logs and PostHog.
 
-#### 3.2 Add `platformTools` capability to `ToolCapabilities`
+#### 2.2 Integrate into `app/api/chat/route.ts`
 
-**File**: `lib/tools/types.ts`
+Add a new loading section between MCP tools and the merge. This follows the exact pattern of the existing Layer 2 loading.
 
-Add one optional field to `ToolCapabilities`:
-
-```typescript
-export type ToolCapabilities = {
-  search?: boolean
-  code?: boolean
-  mcp?: boolean
-  platformTools?: boolean  // NEW: Flowglad Pay and future platform tools
-}
-```
-
-Update `resolveToolCapabilities` to include it:
-
-```typescript
-export function resolveToolCapabilities(
-  tools: boolean | ToolCapabilities | undefined
-): Required<ToolCapabilities> {
-  if (tools === false) return { search: false, code: false, mcp: false, platformTools: false }
-  if (tools === true || tools === undefined) return { search: true, code: true, mcp: true, platformTools: true }
-  return {
-    search: tools.search !== false,
-    code: tools.code !== false,
-    mcp: tools.mcp !== false,
-    platformTools: tools.platformTools !== false,
-  }
-}
-```
-
-#### 3.3 Integrate into `app/api/chat/route.ts`
-
-Add a new loading section between MCP tools and the merge. This follows the exact pattern of the existing Layer 2 loading (lines 293-324 in `route.ts`).
+**No changes to `lib/tools/types.ts`** — we gate on `isAuthenticated` and let `getPayClawConfig()` handle the feature flag (returns null when env vars are absent).
 
 **Insert after the MCP tool loading section** (after `mcpTools` is populated, before the merge):
 
@@ -779,7 +569,7 @@ Add a new loading section between MCP tools and the merge. This follows the exac
 // -----------------------------------------------------------------------
 // Platform Tool Loading (Layer 4 — Experimental)
 // Flowglad Pay: AI-powered purchase agent.
-// Gated on: auth + model capability.
+// Gated on: auth + env var presence (getPlatformTools returns empty if not configured).
 // NOT loaded for anonymous users (has side effects — spends money).
 //
 // EXPERIMENTAL: This entire section can be removed to disable Flowglad Pay.
@@ -788,7 +578,7 @@ Add a new loading section between MCP tools and the merge. This follows the exac
 let platformTools: ToolSet = {} as ToolSet
 let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-if (isAuthenticated && capabilities.platformTools) {
+if (isAuthenticated) {
   const { getPlatformTools } = await import("@/lib/tools/platform")
   const platformResult = await getPlatformTools()
   platformTools = platformResult.tools
@@ -828,25 +618,6 @@ const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadat
 const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata, ...platformToolMetadata])
 ```
 
-#### 3.4 Add dev-mode collision detection for platform tools
-
-In the existing collision detection block (lines 391-398 in `route.ts`), extend to include platform tools:
-
-```typescript
-if (process.env.NODE_ENV !== "production") {
-  const searchKeys = new Set(Object.keys(searchTools))
-  const platformKeys = new Set(Object.keys(platformTools))
-  for (const key of Object.keys(mcpTools)) {
-    if (searchKeys.has(key)) {
-      console.warn(`[tools] Key collision: "${key}" exists in both search and MCP tools. MCP wins.`)
-    }
-    if (platformKeys.has(key)) {
-      console.warn(`[tools] Key collision: "${key}" exists in both platform and MCP tools. MCP wins.`)
-    }
-  }
-}
-```
-
 ### Verify
 
 - `bun run typecheck` passes
@@ -869,28 +640,25 @@ rm lib/tools/platform.ts
 #    - Remove the "Platform Tool Loading (Layer 4)" section
 #    - Revert the tool merge line: { ...searchTools, ...mcpTools }
 #    - Revert the metadata merge lines (remove ...platformToolMetadata)
-#    - Revert the collision detection block
 
-# 3. Revert lib/tools/types.ts
-#    - Remove `platformTools` from ToolCapabilities
-#    - Remove `platformTools` from resolveToolCapabilities
+# 3. Revert .env.example (remove PAYCLAW_APP_URL and PAYCLAW_CARD_ID lines)
 
-# 4. Revert .env.example (remove PAYCLAW_APP_URL and PAYCLAW_CARD_ID lines)
+# 4. Remove env vars from .env.local
 
-# 5. Remove env vars from .env.local
+# 5. Verify clean state
+bun run typecheck
+bun run lint
 ```
 
 ---
 
-## Phase 4: Progress Updates + Credential Display
+## Phase 3: Progress Updates + Credential Display
 
 **Goal**: After the tool creates a job, provide periodic progress summaries in the chat and display credentials on completion.
 
 **Prerequisite**: The long-running job research question must be resolved before finalizing this phase. The approach below is a pragmatic starting point.
 
 **Context to load**:
-- `lib/payclaw/sse.ts` (Phase 2)
-- `lib/payclaw/events.ts` (Phase 2)
 - `lib/payclaw/client.ts` (Phase 1)
 - `.agents/research/flowglad-pay/03-events-and-streaming.md` — Event taxonomy
 - `.agents/research/flowglad-pay/02-credentials-api.md` — Credential retrieval
@@ -901,16 +669,48 @@ rm lib/tools/platform.ts
 
 Create a lightweight API route that the client can poll for job progress. This avoids Convex changes and keeps the integration contained.
 
-#### 4.1 Create `app/api/payclaw/status/route.ts`
+#### 3.1 Create `app/api/payclaw/status/route.ts`
 
-A GET endpoint that polls PayClaw for job status and events.
+A GET endpoint that polls PayClaw for job status and events, with human-readable progress messages.
 
 ```typescript
 // app/api/payclaw/status/route.ts — sketch
 
 import { auth } from "@clerk/nextjs/server"
 import { getPayClawConfig } from "@/lib/payclaw/config"
-import { getJob, getJobEvents, listCredentials } from "@/lib/payclaw/client"
+import { getJob, getJobEvents } from "@/lib/payclaw/client"
+
+/** Map a raw event type to a human-readable progress message. */
+function eventToProgressMessage(
+  event: { type: string; message: string; data?: Record<string, unknown> },
+): string {
+  switch (event.type) {
+    case 'job.started':
+      return 'Starting provisioning...'
+    case 'job.progress':
+      return `${(event.data as { stage?: string })?.stage ?? 'Processing...'}`
+    case 'card.issued':
+      return 'Virtual card issued'
+    case 'page.navigated':
+      return `Navigating to ${(event.data as { url?: string })?.url ?? 'page'}`
+    case 'form.submitted':
+      return 'Submitting form...'
+    case 'payment.completed':
+      return 'Payment completed'
+    case 'email.received':
+      return 'Verification email received'
+    case 'verification.completed':
+      return 'Verification completed'
+    case 'credentials.extracted':
+      return 'Credentials extracted'
+    case 'job.completed':
+      return 'Provisioning complete'
+    case 'job.failed':
+      return `Provisioning failed: ${(event.data as { error?: string })?.error ?? 'unknown error'}`
+    default:
+      return event.message
+  }
+}
 
 export async function GET(req: Request) {
   const { userId } = await auth()
@@ -927,41 +727,39 @@ export async function GET(req: Request) {
   const events = await getJobEvents(jobId, config)
 
   const isTerminal = ['completed', 'failed', 'cancelled'].includes(job.status)
+  const progressMessages = events.map(eventToProgressMessage)
+  const latestMessage = progressMessages.length > 0
+    ? progressMessages[progressMessages.length - 1]
+    : 'Waiting for updates...'
 
-  // On completion with credentials, fetch them
-  let credentials = undefined
-  if (isTerminal && job.result?.credentials) {
-    credentials = await listCredentials(config, jobId)
-  }
-
-  return Response.json({ job, events, credentials, isTerminal })
+  return Response.json({ job, events, progressMessages, latestMessage, isTerminal })
 }
 ```
 
-#### 4.2 Progress display strategy
+#### 3.2 Progress display strategy
 
-The tool result from Phase 3 includes the `jobId`. The chat UI should:
+The tool result from Phase 2 includes the `jobId`. The chat UI should:
 
 1. Detect the `flowglad_pay_buy` tool result in the message stream
 2. Start polling `/api/payclaw/status?jobId=<id>` every ~30 seconds
-3. Display a progress summary using `summarizeEvents()` from Phase 2
+3. Display the `latestMessage` from the status response as a progress indicator
 4. On terminal state, display the final result (credentials or error)
 
 **For the demo**, this can be as simple as a `useEffect` in the chat message component that checks for Flowglad Pay tool results and polls accordingly. The exact UI implementation depends on how we render tool results in chat today.
 
-#### 4.3 Credential display
+#### 3.3 Credential display
 
-When the job completes with `hasCredentials: true`:
+When the job completes with credentials:
 
-1. The status route fetches credentials via `listCredentials()`
-2. Credentials are returned in the polling response
+1. The `job.result.credentials` field contains the credential data
+2. The status route includes it in the polling response via the `job` object
 3. The chat UI renders them as plain text in the message
 
 **For the demo**, we display credentials directly in the chat message. No copy-to-clipboard, no hide/reveal, no encryption. This is the simplest approach and acceptable for an experimental demo.
 
 > **Security note**: Credential values are transient — they exist only in the API response and the rendered chat message. They are never persisted in Convex or any other storage on our side.
 
-#### 4.4 Partial failure messaging
+#### 3.4 Partial failure messaging
 
 If provisioning fails partway (e.g., signup succeeded but credential extraction failed):
 
@@ -999,20 +797,17 @@ All files created by this integration, for easy cleanup:
 | File | Phase | Purpose |
 |------|-------|---------|
 | `lib/payclaw/config.ts` | 0 | Configuration loader |
-| `lib/payclaw/schemas.ts` | 0 | Zod schemas (API contract) |
+| `lib/payclaw/schemas.ts` | 0 | Zod schemas (API contract — demo subset) |
 | `lib/payclaw/client.ts` | 1 | HTTP client |
-| `lib/payclaw/sse.ts` | 2 | SSE consumer |
-| `lib/payclaw/events.ts` | 2 | Event-to-message mapping |
-| `lib/tools/platform.ts` | 3 | Layer 4 tool loader |
-| `app/api/payclaw/status/route.ts` | 4 | Status polling endpoint |
+| `lib/tools/platform.ts` | 2 | Layer 4 tool loader |
+| `app/api/payclaw/status/route.ts` | 3 | Status polling endpoint |
 
 Files **modified** (not created):
 
 | File | Phase | Change | Revert |
 |------|-------|--------|--------|
 | `.env.example` | 0 | Added `PAYCLAW_APP_URL`, `PAYCLAW_CARD_ID` | Remove those lines |
-| `lib/tools/types.ts` | 3 | Added `platformTools` to `ToolCapabilities` | Remove the field |
-| `app/api/chat/route.ts` | 3 | Added Layer 4 loading + merge | Remove the section, revert merge lines |
+| `app/api/chat/route.ts` | 2 | Added Layer 4 loading + merge | Remove the section, revert merge lines |
 
 ---
 
@@ -1027,7 +822,6 @@ rm -f lib/tools/platform.ts
 rm -rf app/api/payclaw/
 
 # 2. Revert modified files (use git)
-git checkout -- lib/tools/types.ts
 git checkout -- app/api/chat/route.ts
 git checkout -- .env.example
 
@@ -1054,6 +848,9 @@ bun run lint
 | Rate limits | **Unknown** | No known limits; single-user demo scope |
 | Cancellation | **Not available** | No PayClaw cancel endpoint; jobs run until completion or 10-min expiry |
 | Production security hardening | **Deferred** | Shared API key, plaintext credentials in chat — all acceptable for demo |
+| SSE consumer | **Deferred** | Add `lib/payclaw/sse.ts` if real-time streaming is needed post-demo |
+| Full schema coverage | **Deferred** | Add shipping, credentials list, SSE event schemas when those features are built |
+| `platformTools` capability flag | **Deferred** | Add to `ToolCapabilities` when platform tools need per-model gating |
 
 ---
 

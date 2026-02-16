@@ -224,7 +224,7 @@ export function MultiModelConversation({
                 );
               })}
         </ChatContainerContent>
-        <ChatContainerScrollButton />
+        <ChatContainerScrollButton className="bottom-36" />
       </ChatContainerRoot>
     </div>
   );

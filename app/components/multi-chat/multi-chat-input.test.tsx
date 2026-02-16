@@ -10,8 +10,8 @@ beforeAll(() => {
     .IS_REACT_ACT_ENVIRONMENT = true
 })
 
-vi.mock("@/components/common/multi-model-selector/base", () => ({
-  MultiModelSelector: () => null,
+vi.mock("@/components/common/model-selector/base", () => ({
+  ModelSelector: () => null,
 }))
 
 vi.mock("@/app/components/suggestions/prompt-system", () => ({

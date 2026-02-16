@@ -1,6 +1,6 @@
 "use client"
 
-import { MultiModelSelector } from "@/components/common/multi-model-selector/base"
+import { ModelSelector } from "@/components/common/model-selector/base"
 import { PromptSystem } from "@/app/components/suggestions/prompt-system"
 import { ButtonPlusMenu } from "@/app/components/chat-input/button-plus-menu"
 import { InputDropZone } from "@/app/components/chat-input/input-drop-zone"
@@ -158,9 +158,11 @@ export function MultiChatInput({
                   fileUploadDisabledMessage={fileUploadDisabledMessage}
                   searchDisabledMessage={searchDisabledMessage}
                 />
-                <MultiModelSelector
+                <ModelSelector
+                  mode="multi"
                   selectedModelIds={selectedModelIds}
                   setSelectedModelIds={onSelectedModelIdsChange}
+                  className="rounded-full"
                 />
               </div>
               <PromptInputAction

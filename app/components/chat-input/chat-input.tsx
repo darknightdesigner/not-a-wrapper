@@ -252,6 +252,7 @@ export function ChatInput({
                   isSearchDisabled={isSearchDisabled}
                 />
                 <ModelSelector
+                  mode="single"
                   selectedModelId={selectedModel}
                   setSelectedModelId={onSelectModel}
                   isUserAuthenticated={isUserAuthenticated}
