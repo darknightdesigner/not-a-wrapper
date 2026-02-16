@@ -1,6 +1,6 @@
 import type { UIMessage } from "ai"
 
-export interface AdaptationContext {
+export type AdaptationContext = {
   targetModelId: string
   hasTools: boolean
   sourceProviderHint?: string
@@ -18,13 +18,13 @@ export type AdaptationWarningCode =
   | "replay_compile_warning"
   | "replay_compile_fallback"
 
-export interface AdaptationWarning {
+export type AdaptationWarning = {
   code: AdaptationWarningCode
   messageIndex: number
   detail: string
 }
 
-export interface AdaptationStats {
+export type AdaptationStats = {
   originalMessageCount: number
   adaptedMessageCount: number
   droppedMessages: number
@@ -36,7 +36,7 @@ export interface AdaptationStats {
   providerIdsStripped: number
 }
 
-export interface AdaptationResult {
+export type AdaptationResult = {
   messages: UIMessage[]
   stats: AdaptationStats
   warnings: AdaptationWarning[]
@@ -61,7 +61,7 @@ export interface AdaptationResult {
  * - `complex`: OpenAI
  * - `structural`: Google
  */
-export interface ProviderHistoryAdapter {
+export type ProviderHistoryAdapter = {
   readonly providerId: string
   adaptMessages(
     messages: readonly UIMessage[],

@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface XIconProps extends SVGProps<SVGSVGElement> {
+export type XIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const XIcon = forwardRef<SVGSVGElement, XIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

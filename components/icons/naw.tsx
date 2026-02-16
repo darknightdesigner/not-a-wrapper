@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface NawIconProps extends SVGProps<SVGSVGElement> {
+export type NawIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const NawIcon = forwardRef<SVGSVGElement, NawIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

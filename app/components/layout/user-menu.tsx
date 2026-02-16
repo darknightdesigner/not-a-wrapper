@@ -31,7 +31,7 @@ import { AppInfoDialog, AppInfoMenuItem } from "./app-info/app-info-trigger"
 import { FeedbackMenuItem, FeedbackDialog } from "./feedback/feedback-trigger"
 import { SettingsMenuItem, SettingsDialog } from "./settings/settings-trigger"
 
-interface UserMenuProps {
+type UserMenuProps = {
   variant?: "header" | "sidebar"
 }
 

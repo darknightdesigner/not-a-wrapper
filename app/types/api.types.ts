@@ -7,7 +7,7 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export interface ContentPart {
+export type ContentPart = {
   type: string
   text?: string
   toolCallId?: string
@@ -26,25 +26,25 @@ export interface ContentPart {
   details?: Json[]
 }
 
-export interface Message {
+export type Message = {
   role: "user" | "assistant" | "system" | "data" | "tool" | "tool-call"
   content: string | null | ContentPart[]
   reasoningText?: string
 }
 
-export interface ChatApiParams {
+export type ChatApiParams = {
   userId: string
   model: string
   isAuthenticated: boolean
   token?: string
 }
 
-export interface ApiErrorResponse {
+export type ApiErrorResponse = {
   error: string
   details?: string
 }
 
-export interface ApiSuccessResponse<T = unknown> {
+export type ApiSuccessResponse<T = unknown> = {
   success: true
   data?: T
 }

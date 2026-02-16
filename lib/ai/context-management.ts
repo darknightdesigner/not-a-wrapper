@@ -37,7 +37,7 @@ export const DEFAULT_PRESERVE_RECENT = 10
 // Types
 // ============================================================================
 
-export interface ContextManagementConfig {
+export type ContextManagementConfig = {
   /** Token threshold before triggering compaction */
   compactionThreshold: number
   /** Number of recent messages to preserve */
@@ -46,7 +46,7 @@ export interface ContextManagementConfig {
   structuredNotesFile: string
 }
 
-export interface CompactionResult {
+export type CompactionResult = {
   /** Whether compaction was performed */
   compacted: boolean
   /** Original message count */
@@ -59,7 +59,7 @@ export interface CompactionResult {
   summary?: string
 }
 
-export interface TokenEstimate {
+export type TokenEstimate = {
   /** Estimated total tokens */
   total: number
   /** Breakdown by message role */
@@ -261,7 +261,7 @@ Note: This is a placeholder summary. Implement actual summarization with Claude 
 // Structured Note-Taking
 // ============================================================================
 
-export interface StructuredNote {
+export type StructuredNote = {
   timestamp: string
   category: "discovery" | "decision" | "pattern" | "issue" | "todo"
   content: string

@@ -11,7 +11,7 @@ export type ToolSource = "builtin" | "third-party" | "mcp"
 /**
  * Metadata for a tool, used for UI display, audit logging, and cost tracking.
  */
-export interface ToolMetadata {
+export type ToolMetadata = {
   /** Human-readable display name (e.g., "Web Search", "Exa Search") */
   displayName: string
   /** Tool source layer */
@@ -54,7 +54,7 @@ export interface ToolMetadata {
  * - Tool result caching (hash the envelope for dedup)
  * - Observability via meta field (duration, result count)
  */
-export interface ToolResultEnvelope<T = unknown> {
+export type ToolResultEnvelope<T = unknown> = {
   ok: boolean
   data: T | null
   error: string | null
@@ -76,7 +76,7 @@ export interface ToolResultEnvelope<T = unknown> {
  * When `tools: false` on a ModelConfig, ALL capabilities are disabled.
  * When `tools: ToolCapabilities`, individual capabilities can be toggled.
  */
-export interface ToolCapabilities {
+export type ToolCapabilities = {
   /** Web search (Layer 1 provider tools + Layer 2 Exa). Default: true */
   search?: boolean
   /** Code execution (provider sandboxes, future). Default: true */

@@ -254,6 +254,17 @@ export function useChatCore({
     [setWebSearchEnabled]
   )
 
+  // Debounced draft persistence — avoids writing to localStorage on every keystroke.
+  // Declared before executeSend/submit so submit's onSuccess can call .cancel().
+  const { setDraftValue } = useChatDraft(chatId)
+  const setDraftValueRef = useRef(setDraftValue)
+  setDraftValueRef.current = setDraftValue
+
+  const debouncedSetDraftValue = useMemo(
+    () => debounce((value: string) => setDraftValueRef.current(value), 500),
+    []
+  )
+
   // Shared send logic — used by both submit and handleSuggestion to avoid
   // duplicating optimistic-message creation, validation, and error rollback.
   const executeSend = useCallback(
@@ -423,6 +434,7 @@ export function useChatCore({
     executeSend,
     systemPrompt,
     enableSearch,
+    debouncedSetDraftValue,
     clearDraft,
     messages.length,
     bumpChat,
@@ -478,16 +490,6 @@ export function useChatCore({
 
     regenerate(options)
   }, [user, chatId, selectedModel, isAuthenticated, systemPrompt, regenerate])
-
-  // Debounced draft persistence — avoids writing to localStorage on every keystroke
-  const { setDraftValue } = useChatDraft(chatId)
-  const setDraftValueRef = useRef(setDraftValue)
-  setDraftValueRef.current = setDraftValue
-
-  const debouncedSetDraftValue = useMemo(
-    () => debounce((value: string) => setDraftValueRef.current(value), 500),
-    []
-  )
 
   // Flush pending draft on tab close; also flush on unmount (navigation)
   useEffect(() => {

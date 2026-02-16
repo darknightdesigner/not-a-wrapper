@@ -14,7 +14,7 @@ type OptimisticUpdate = { type: "update"; id: string; changes: Partial<Chats> }
 type OptimisticDelete = { type: "delete"; id: string }
 type OptimisticOperation = OptimisticAdd | OptimisticUpdate | OptimisticDelete
 
-interface ChatsContextType {
+type ChatsContextType = {
   chats: Chats[]
   refresh: () => Promise<void>
   isLoading: boolean

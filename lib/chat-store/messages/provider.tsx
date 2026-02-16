@@ -60,7 +60,7 @@ function getAttachmentsFromParts(
   }))
 }
 
-interface MessagesContextType {
+type MessagesContextType = {
   messages: ExtendedUIMessage[]
   isLoading: boolean
   setMessages: React.Dispatch<React.SetStateAction<ExtendedUIMessage[]>>

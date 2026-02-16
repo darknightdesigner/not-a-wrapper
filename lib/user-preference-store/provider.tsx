@@ -21,7 +21,7 @@ export {
 const PREFERENCES_STORAGE_KEY = "user-preferences"
 const LAYOUT_STORAGE_KEY = "preferred-layout"
 
-interface UserPreferencesContextType {
+type UserPreferencesContextType = {
   preferences: UserPreferences
   setLayout: (layout: LayoutType) => void
   setPromptSuggestions: (enabled: boolean) => void

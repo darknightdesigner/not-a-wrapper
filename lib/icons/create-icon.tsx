@@ -1,11 +1,11 @@
 import { forwardRef, type ReactNode, type SVGProps } from "react"
 
-export interface CustomIconProps extends SVGProps<SVGSVGElement> {
+export type CustomIconProps = {
   /** Icon size in pixels. Sets both width and height. @default 24 */
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
-interface CreateIconOptions {
+type CreateIconOptions = {
   /** SVG viewBox attribute @default "0 0 24 24" */
   viewBox?: string
   /** Display name for React DevTools */

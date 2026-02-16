@@ -32,7 +32,7 @@ export type ClaudeModel =
 /**
  * Base configuration for all sub-agents
  */
-export interface SubAgentConfig {
+export type SubAgentConfig = {
   /** Unique identifier for the agent type */
   type: SubAgentType
 
@@ -62,7 +62,7 @@ export interface SubAgentConfig {
 /**
  * Task classification result from the orchestrator
  */
-export interface TaskClassification {
+export type TaskClassification = {
   /** Primary task type */
   type: SubAgentType | "general"
 
@@ -76,7 +76,7 @@ export interface TaskClassification {
 /**
  * Base interface for sub-agent task input
  */
-export interface SubAgentTaskInput {
+export type SubAgentTaskInput = {
   /** The user's original request */
   userRequest: string
 
@@ -90,7 +90,7 @@ export interface SubAgentTaskInput {
 /**
  * Attachment types supported by sub-agents
  */
-export interface SubAgentAttachment {
+export type SubAgentAttachment = {
   type: "code" | "document" | "data" | "image" | "text"
   content: string
   mimeType?: string
@@ -104,7 +104,7 @@ export interface SubAgentAttachment {
 /**
  * Input for code assistance tasks
  */
-export interface CodeAssistanceInput extends SubAgentTaskInput {
+export type CodeAssistanceInput = {
   code?: string
   language?: string
   context?: {
@@ -112,37 +112,37 @@ export interface CodeAssistanceInput extends SubAgentTaskInput {
     projectType?: string
     framework?: string
   }
-}
+} & SubAgentTaskInput
 
 /**
  * Input for writing/editing tasks
  */
-export interface WritingEditInput extends SubAgentTaskInput {
+export type WritingEditInput = {
   content?: string
   style?: "formal" | "casual" | "technical" | "creative"
   purpose?: "blog" | "documentation" | "email" | "social" | "other"
   targetAudience?: string
-}
+} & SubAgentTaskInput
 
 /**
  * Input for research tasks
  */
-export interface ResearchInput extends SubAgentTaskInput {
+export type ResearchInput = {
   topic: string
   depth?: "overview" | "detailed" | "comprehensive"
   sources?: string[]
   constraints?: string[]
-}
+} & SubAgentTaskInput
 
 /**
  * Input for data analysis tasks
  */
-export interface DataAnalysisInput extends SubAgentTaskInput {
+export type DataAnalysisInput = {
   data?: string
   dataType?: "csv" | "json" | "table" | "text"
   analysisType?: "summary" | "trends" | "comparison" | "prediction"
   metrics?: string[]
-}
+} & SubAgentTaskInput
 
 // ============================================================================
 // Response Types
@@ -151,7 +151,7 @@ export interface DataAnalysisInput extends SubAgentTaskInput {
 /**
  * Base interface for sub-agent responses
  */
-export interface SubAgentResponse<T = unknown> {
+export type SubAgentResponse<T = unknown> = {
   /** Whether the task completed successfully */
   success: boolean
 
@@ -178,7 +178,7 @@ export interface SubAgentResponse<T = unknown> {
 /**
  * Code assistance response
  */
-export interface CodeAssistanceResponse {
+export type CodeAssistanceResponse = {
   code?: string
   explanation: string
   suggestions?: string[]
@@ -193,7 +193,7 @@ export interface CodeAssistanceResponse {
 /**
  * Writing/editing response
  */
-export interface WritingEditResponse {
+export type WritingEditResponse = {
   content: string
   changes?: {
     original: string
@@ -207,7 +207,7 @@ export interface WritingEditResponse {
 /**
  * Research response
  */
-export interface ResearchResponse {
+export type ResearchResponse = {
   summary: string
   keyFindings: string[]
   sources?: {
@@ -222,7 +222,7 @@ export interface ResearchResponse {
 /**
  * Data analysis response
  */
-export interface DataAnalysisResponse {
+export type DataAnalysisResponse = {
   summary: string
   insights: string[]
   trends?: {
@@ -242,7 +242,7 @@ export interface DataAnalysisResponse {
 /**
  * Configuration for the main orchestrator agent
  */
-export interface OrchestratorConfig {
+export type OrchestratorConfig = {
   /** Primary model for orchestration (typically Opus) */
   model: ClaudeModel
 
@@ -265,7 +265,7 @@ export interface OrchestratorConfig {
 /**
  * Result from the orchestrator including all sub-agent results
  */
-export interface OrchestratorResult {
+export type OrchestratorResult = {
   /** Primary response for the user */
   response: string
 

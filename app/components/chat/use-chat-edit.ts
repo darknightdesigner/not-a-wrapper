@@ -224,6 +224,7 @@ export function useChatEdit({
       isSubmitting,
       status,
       deleteMessagesFromTimestamp,
+      prevChatIdRef,
     ]
   )
 

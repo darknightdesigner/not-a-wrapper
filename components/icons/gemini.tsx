@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface GeminiIconProps extends SVGProps<SVGSVGElement> {
+export type GeminiIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const GeminiIcon = forwardRef<SVGSVGElement, GeminiIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

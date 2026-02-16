@@ -76,7 +76,7 @@ export class ToolTraceCollector {
 
 // ── Configuration ──────────────────────────────────────────
 
-interface WrapMcpToolsConfig {
+type WrapMcpToolsConfig = {
   /** Map of namespaced tool names → server info for display names and audit */
   toolServerMap: Map<
     string,

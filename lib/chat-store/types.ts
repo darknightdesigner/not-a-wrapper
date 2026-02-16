@@ -16,7 +16,7 @@ export type ConvexMessage = Doc<"messages">
  * Unified Chat type used throughout the application
  * Uses snake_case for compatibility with existing code
  */
-export interface Chat {
+export type Chat = {
   id: string
   user_id: string
   title: string | null
@@ -33,7 +33,7 @@ export interface Chat {
 /**
  * Unified Message type used throughout the application
  */
-export interface Message {
+export type Message = {
   id: string | number
   chat_id: string
   user_id?: string | null

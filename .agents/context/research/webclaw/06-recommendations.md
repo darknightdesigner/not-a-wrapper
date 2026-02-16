@@ -64,18 +64,28 @@ Phase 4: (Optional) Rename to features/chat/ (0.5 day)
 
 ### Hook Decomposition Strategy
 
-WebClaw's 13-hook decomposition proves that a monolithic chat hook can be broken into focused units that each own one concern. NaW's `use-chat-core.ts` (~670 LOC, 16-item return, 138-line `submit` callback with 16-item dependency array) is the extraction candidate.
+WebClaw's 13-hook decomposition proves that a monolithic chat hook can be broken into focused units that each own one concern. NaW's `use-chat-core.ts` was the extraction candidate.
 
-**Extraction plan:**
+**Original extraction plan (6 hooks) — revised after coupling analysis:**
 
-| New Hook | Extracted From | WebClaw Equivalent | LOC Estimate |
-|----------|---------------|-------------------|-------------|
-| `use-chat-streaming.ts` | useChat initialization (119–160) + status/error/stop | `use-chat-stream.ts` | ~100 |
-| `use-chat-submit.ts` | `submit` callback (225–363) + `handleSuggestion` (531–604) | `chat-screen.tsx` send flow | ~200 |
-| `use-chat-edit.ts` | `submitEdit` callback (365–528) | No equivalent | ~170 |
-| `use-chat-input.ts` | input/setInput state (92) + handleInputChange (628–634) | Implicit in `ChatComposer` | ~50 |
-| `use-chat-search.ts` | enableSearch state (69–71) + setEnableSearch (217–221) | `use-chat-settings.ts` | ~30 |
-| `use-chat-hydration.ts` | Chat transition effects (169–204) | `use-chat-redirect.ts` | ~50 |
+| Proposed Hook | Status | Outcome |
+|----------|--------|---------|
+| `use-chat-edit.ts` | **✅ Extracted** (232 LOC) | Largest single callback with distinct UI trigger path. Clean boundary. |
+| `use-chat-submit.ts` | **Replaced** by `executeSend` | Coupling analysis: would need 19 props. Instead, `submit` + `handleSuggestion` now share `executeSend` inside `use-chat-core.ts`, eliminating ~120 LOC of duplication. |
+| `use-chat-streaming.ts` | **Deferred** | Would be a thin wrapper around `useChat` returning nearly the same API. Low abstraction value. |
+| `use-chat-input.ts` | **Deferred** | Only ~50 LOC. Becomes worthwhile when input management grows (mentions, slash commands). |
+| `use-chat-search.ts` | **Deferred** | Only ~30 LOC (one useState, one useEffect, one useCallback). Premature extraction. |
+| `use-chat-hydration.ts` | **Deferred** | Effect ordering constraint (line 200: "MUST run before") becomes fragile across hook boundaries. Shared refs (`prevChatIdRef` used in 7 places) would need threading. |
+
+**Current hook system (post-refactoring):**
+
+| Hook | LOC | Responsibility |
+|------|-----|---------------|
+| `use-chat-core.ts` | 550 | Streaming init, submit, suggestions, reload, input/draft, hydration, search prefs |
+| `use-chat-edit.ts` | 232 | Message editing (truncate, delete history, re-submit) |
+| `use-chat-operations.ts` | 112 | Pure async utilities (rate limits, chat creation) |
+| `use-chat-draft.ts` | 51 | Draft persistence via localStorage + useSyncExternalStore |
+| **Total** | **945** | — |
 
 ### Convention Adoption
 
@@ -278,32 +288,32 @@ An honest assessment of NaW's advantages to protect.
 [✅ COMPLETED — Fully Implemented]
 ├── R01: Message Memoization ← DONE (areMessagesEqual + MemoizedMessage in message.tsx)
 ├── R02: Composer Ref Optimization ← DONE (inputRef + listener + debounced draft)
-├── R03: Generation Guard Timer ← DONE (120s timeout in use-chat-core.ts lines 184–196)
+├── R03: Generation Guard Timer ← DONE (120s timeout in use-chat-core.ts)
 ├── R04: Singleton Shiki ← DONE (module-level highlighterPromise in code-block.tsx)
+├── R05: Typography ← DONE (.prose + standalone headings + not-found)
+├── R07: Global Prompt Auto-Focus ← DONE (use-global-prompt-focus.ts)
 └── R11: Portal-Based Scroll Container ← NOT APPLICABLE (no ScrollArea in chat scroll)
 
-[⚡ PARTIALLY IMPLEMENTED]
-├── R05: Typography (text-balance/text-pretty) ← .prose context done; sidebar/standalone headings remain
-├── R06: Hook Decomposition ← use-chat-operations.ts + use-chat-draft.ts extracted; core still 723 LOC
+[⚡ SUBSTANTIALLY PROGRESSED]
+├── R06: Hook Decomposition ← use-chat-edit.ts extracted, executeSend consolidated, use-chat-operations cleaned; core 723→550 LOC
+├── R09: Convention Enforcement ← ESLint type-over-interface rule active; useEffect policy + TQ naming remaining
 └── R13: Unified Message Component ← shared primitives in ui/message.tsx; user/assistant still separate files
 
-[No Dependencies — Do Immediately]
-├── R05: Typography remaining scope ← no deps
-└── R09: Convention Enforcement ← no deps (policy change)
-
-[Performance Chain]
-R06: Hook Decomposition (continue extraction — do after perf wins verified)
-└──→ R10: Screen-Based Feature Module (organizational, after hook boundaries clear)
+[Remaining Work — No Dependencies]
+├── R09: Convention Enforcement (remaining policy docs) ← no deps
+└── R13: Unified Message Component (collapse user/assistant) ← no deps
 
 [UX Chain]
-R07: Global Prompt Auto-Focus ← no deps
 R08: Context Meter ← needs token counting from AI SDK usage object
      └──→ R12: Pin-to-Top Scroll (evaluate after context meter ships)
+
+[Organizational]
+R10: Screen-Based Feature Module ← hook boundaries now clearer after R06 work
 ```
 
-**Critical path:** R06 → R10 is the longest remaining chain. All P0 performance prerequisites (R01, R02, R04) are fully landed; R05 is nearly complete.
+**Critical path:** R08 → R12 is the longest remaining chain. All P0 items are fully completed. R06 targeted work is done; full decomposition deferred after coupling analysis showed diminishing returns.
 
-**Parallel work:** R05 (remaining scope), R09 have zero dependencies and can proceed in any order alongside the refactoring chain. R07 is now complete.
+**Parallel work:** R09 (remaining policy docs), R13 (message unification), R08 (context meter), R10 (feature module) have no mutual dependencies and can proceed in any order.
 
 ---
 
@@ -415,15 +425,15 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R05: Typography Utilities (text-balance, text-pretty) — ⚡ PARTIAL
+#### R05: Typography Utilities (text-balance, text-pretty) — ✅ DONE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Typography Utilities |
-| **Action** | ~~Adopt~~ **Partially implemented** |
+| **Action** | ~~Adopt~~ **COMPLETED** |
 | **Confidence** | High |
 | **Transferability** | Direct — CSS standard properties |
-| **Effort** | ~~< 0.5 day~~ ~0.25 day remaining |
+| **Effort** | ~~< 0.5 day~~ 0 remaining |
 | **Impact** | UX — improved text rendering at zero performance cost |
 | **Evidence** | WC-A5-C15 |
 | **Risk if wrong** | None — CSS progressive enhancement, ignored by unsupported browsers |
@@ -434,12 +444,11 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 > - `.prose p, .prose li { text-wrap: pretty; }` — body text in markdown content
 > - `components/ui/tooltip.tsx` also uses `text-balance` class
 >
-> **Not yet applied to:**
-> - Sidebar session titles (`sidebar-item.tsx` uses `line-clamp-1`, `project-chat-item.tsx` uses `truncate`)
-> - Standalone headings outside `.prose` (e.g., `chat.tsx` `<h1>`, `multi-chat.tsx` `<h1>`)
-> - Body text outside `.prose` context (settings descriptions, etc.)
-
-**Remaining implementation:** Extend `text-balance` to headings and `text-pretty` to body text outside the `.prose` wrapper — sidebar titles, standalone page headings, and multi-line UI text.
+> **Updated Feb 16, 2026:** Standalone headings now covered:
+> - `chat.tsx` `<h1>` — `text-balance` class applied
+> - `multi-chat.tsx` `<h1>` — `text-balance` class applied
+> - `not-found.tsx` — `text-balance` on `<h1>`, `text-pretty` on `<p>`
+> - Sidebar titles (`sidebar-item.tsx`, `project-chat-item.tsx`) confirmed as single-line (`line-clamp-1`/`truncate`) — `text-wrap` has no effect on single-line text, so no change needed.
 
 ---
 
@@ -447,7 +456,7 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R06: Hook Decomposition of `use-chat-core.ts` — ⚡ PARTIAL
+#### R06: Hook Decomposition of `use-chat-core.ts` — ⚡ SUBSTANTIAL PROGRESS
 
 | Field | Value |
 |-------|-------|
@@ -455,19 +464,23 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | **Action** | Adapt |
 | **Confidence** | High |
 | **Transferability** | Direct — same React hook composition model |
-| **Effort** | ~~3–5 days~~ ~2–4 days remaining |
+| **Effort** | ~~3–5 days~~ Done for targeted extractions; full 6-hook decomposition deferred (see analysis below) |
 | **Impact** | DX + Performance — easier maintenance, better re-render isolation, each hook independently testable |
 | **Evidence** | WC-A5-C02, WC-A5-C03, WC-A2-C09–C14, WC-A4-C08 |
 | **Risk if wrong** | Medium — increased indirection (more files, more imports). Mitigate: keep all hooks co-located in `hooks/` subdirectory with clear naming. Worse case: more boilerplate for the same functionality. |
 | **Synergy with OWUI** | OWUI's 1,500-line `Chat.svelte` is the cautionary tale; WebClaw's 13-hook pattern is the positive example. Both converge on the same prescription: decompose. |
 
-> **Verified Feb 15, 2026:** Decomposition has started but is incomplete:
-> - **Extracted:** `use-chat-operations.ts` (145 LOC) — handles chat operations (stop, regenerate, etc.)
-> - **Extracted:** `use-chat-draft.ts` (in `app/hooks/`) — handles draft persistence
-> - **Remaining:** `use-chat-core.ts` is still 723 LOC with the `submit` callback, edit logic, streaming setup, input management, search state, and hydration effects all in one file
-> - **None of the 6 recommended hooks exist yet:** `use-chat-streaming.ts`, `use-chat-submit.ts`, `use-chat-edit.ts`, `use-chat-input.ts`, `use-chat-search.ts`, `use-chat-hydration.ts`
-
-**Remaining implementation:** Extract the remaining 4–5 concerns from `use-chat-core.ts` (see Section 2 above). The operations and draft extractions establish the pattern; the core file still needs streaming, submission, editing, input, search, and hydration extracted.
+> **Verified Feb 15, 2026:** Decomposition has started but is incomplete.
+>
+> **Updated Feb 16, 2026:** Targeted decomposition completed. After detailed coupling analysis, the full 6-hook extraction was replaced with a more pragmatic approach:
+> - **Extracted:** `use-chat-edit.ts` (232 LOC) — the `submitEdit` callback, the largest single concern with a distinct UI trigger path (message edit button vs. input submit)
+> - **Consolidated:** `executeSend` shared helper inside `use-chat-core.ts` — `submit` and `handleSuggestion` now share a common validation-send-cleanup pipeline, eliminating ~120 LOC of duplication. `handleSuggestion` went from 73 LOC to 8 LOC.
+> - **Cleaned:** `use-chat-operations.ts` (112 LOC) — removed `handleDelete`/`handleEdit` + dummy `setMessages` prop. Now contains only pure async utilities (`checkLimitsAndNotify`, `ensureChatExists`). `handleDelete` moved to `chat.tsx` as a local callback.
+> - **Result:** `use-chat-core.ts` reduced from 723 → 550 LOC. Total hook system: `use-chat-core.ts` (550) + `use-chat-edit.ts` (232) + `use-chat-operations.ts` (112) + `use-chat-draft.ts` (51) = 945 LOC across 4 focused files.
+>
+> **Why the full 6-hook plan was deferred:** Coupling analysis revealed that `submit`, `handleSuggestion`, and the streaming/hydration effects share too many dependencies (15-19 props per extracted hook, multiple shared mutable refs like `prevChatIdRef` used in 7 places). Extracting `use-chat-streaming`, `use-chat-hydration`, `use-chat-search` (30 LOC), or `use-chat-input` (50 LOC) would add indirection without reducing coupling. The hydration effects have explicit ordering constraints (line 200 comment: "This effect MUST run before the hydration effect below") that become fragile across hook boundaries. The `executeSend` consolidation addressed the actual duplication problem that extraction would have just relocated.
+>
+> **Remaining opportunity:** `use-chat-input.ts` extraction becomes worthwhile when input management grows (mention system, slash commands, inline triggers per Open WebUI P0 recommendation).
 
 ---
 
@@ -510,21 +523,25 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R09: Convention Enforcement
+#### R09: Convention Enforcement — ⚡ PARTIAL
 
 | Field | Value |
 |-------|-------|
 | **Title** | Convention Enforcement (type, useEffect policy, named functions) |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ **Partially implemented** |
 | **Confidence** | High |
 | **Transferability** | Direct — convention + ESLint rules |
-| **Effort** | 1 day (policy) + ongoing (enforcement) |
+| **Effort** | ~~1 day (policy) + ongoing (enforcement)~~ ~0.5 day remaining |
 | **Impact** | DX — consistency, better tooling, React 19/Compiler alignment |
 | **Evidence** | WC-A4-C07, WC-A4-C08, WC-A4-C09, WC-A1-C06 |
 | **Risk if wrong** | None — conventions are reversible policy decisions |
 | **Synergy with OWUI** | OWUI has disabled lint entirely. Convention enforcement is the opposite approach — confirms NaW's quality-first philosophy. |
 
-**Implementation:** (1) Add `@typescript-eslint/consistent-type-definitions: ['error', 'type']` to ESLint config. (2) Document "no useEffect for derivable state" in `AGENTS.md`. (3) Adopt named function expressions for TQ callbacks in coding standards.
+> **Updated Feb 16, 2026:** Part 1 of 3 completed:
+> - ✅ `@typescript-eslint/consistent-type-definitions: ['error', 'type']` added to `eslint.config.mjs`. Rule is active; 71 pre-existing `interface` violations flagged (to be fixed opportunistically).
+> - Remaining: (2) Document "no useEffect for derivable state" in `AGENTS.md`. (3) Adopt named function expressions for TQ callbacks in coding standards.
+
+**Implementation:** ~~(1) Add `@typescript-eslint/consistent-type-definitions: ['error', 'type']` to ESLint config.~~ (2) Document "no useEffect for derivable state" in `AGENTS.md`. (3) Adopt named function expressions for TQ callbacks in coding standards.
 
 ---
 
@@ -664,11 +681,11 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | R02 | Composer Ref Optimization | **P0** | ~~Adapt~~ | ~~1–2d~~ | Performance | None | **✅ DONE** |
 | R03 | Generation Guard Timer | **P0** | ~~Adopt~~ | ~~<1d~~ | UX Reliability | None | **✅ DONE** |
 | R04 | Singleton Shiki | **P0** | ~~Adopt~~ | ~~<1d~~ | Performance | None | **✅ DONE** |
-| R05 | Typography Utilities | **P0** | Adopt | ~0.25d remaining | UX | None | **⚡ Partial** — `.prose` done |
-| R06 | Hook Decomposition | **P1** | Adapt | ~2–4d remaining | DX + Perf | ~~R01, R02~~ None | **⚡ Partial** — operations + draft extracted |
-| R07 | Global Prompt Focus | **P1** | Adopt | ~~<1d~~ | UX | None | **✅ DONE** |
+| R05 | Typography Utilities | **P0** | ~~Adopt~~ | ~~<0.5d~~ | UX | None | **✅ DONE** |
+| R06 | Hook Decomposition | **P1** | Adapt | Targeted work done; full 6-hook deferred | DX + Perf | None | **⚡ Substantial** — edit extracted, send consolidated, ops cleaned |
+| R07 | Global Prompt Focus | **P1** | ~~Adopt~~ | ~~<1d~~ | UX | None | **✅ DONE** |
 | R08 | Context Meter | **P1** | Adopt | 3–5d | UX | None | Open |
-| R09 | Convention Enforcement | **P1** | Adopt | 1d | DX | None | Open |
+| R09 | Convention Enforcement | **P1** | Adopt | ~0.5d remaining | DX | None | **⚡ Partial** — ESLint rule active |
 | R10 | Feature Module | **P1** | Adapt | 2–3d | DX | R06 | Open |
 | R11 | Portal Scroll Container | **P2** | ~~Adapt~~ | ~~1–2d~~ | ~~Performance~~ | ~~Profile first~~ | **❌ N/A** |
 | R12 | Pin-to-Top Scroll | **P2** | Adapt | 2–3d | UX | R08 | Open |
@@ -676,16 +693,18 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | R14 | cmdk Replacement | **P2** | Skip | 1–2w | DX | Evaluate later | Open |
 | R15 | Streaming Batching | **P2** | Skip | 2–3d | Performance | Profile first | Open |
 
-**Completed:** R01, R02, R03, R04, R07 (4 of 5 P0 items + 1 P1 item fully shipped)
-**Partially implemented:** R05 (P0), R06 (P1), R13 (P2)
+**Completed:** R01, R02, R03, R04, R05, R07 (all 5 P0 items + 1 P1 item fully shipped)
+**Substantially progressed:** R06 (P1) — targeted extractions done, full decomposition deferred after coupling analysis
+**Partially implemented:** R09 (P1), R13 (P2)
 **Not applicable:** R11 (wrong scroll architecture — `use-stick-to-bottom` uses plain divs, not ScrollArea)
-**Remaining effort for P0:** ~0.25 days (R05 remainder only)
-**Remaining effort for P0 + P1:** ~9–11 days (R05 remainder + R06 remainder + R08 + R09 + R10)
-**Remaining effort for all items:** ~14–17 days
+**Remaining effort for P0:** 0 days (all P0 complete)
+**Remaining effort for P0 + P1:** ~6–9 days (R08 + R09 remainder + R10)
+**Remaining effort for all items:** ~11–15 days
 
 ---
 
 *Research synthesis completed February 15, 2026. Updated February 15, 2026 after codebase verification.*
 *Full codebase scan February 15, 2026: verified R04 as fully implemented, R05/R06/R13 as partially implemented.*
+*Updated February 16, 2026: R05 completed (typography on standalone headings). R06 substantially progressed (use-chat-edit extracted, executeSend consolidated, use-chat-operations cleaned; full 6-hook decomposition deferred after coupling analysis). R07 verified as complete. R09 partially implemented (ESLint type-over-interface rule active).*
 *Based on 5 WebClaw research documents (65 coded claims), Open WebUI analysis summary (80 coded claims), and Not A Wrapper codebase on branch `am-i-in-over-my-head`.*
 *Post-analysis verified R01, R02, R03, R04 as already implemented and R11 as not applicable to NaW's scroll architecture.*

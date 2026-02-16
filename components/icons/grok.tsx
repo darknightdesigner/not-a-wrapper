@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface GrokIconProps extends SVGProps<SVGSVGElement> {
+export type GrokIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const GrokIcon = forwardRef<SVGSVGElement, GrokIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

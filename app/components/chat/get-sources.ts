@@ -3,7 +3,7 @@ import type { SourceUrlUIPart, ToolUIPart } from "ai"
 import { isStaticToolUIPart, getStaticToolName } from "ai"
 
 // Source type for validation
-interface SourceLike {
+type SourceLike = {
   url: string
   title?: string
   sourceId?: string

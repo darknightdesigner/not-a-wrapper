@@ -6,7 +6,7 @@ import {
 } from "@/lib/chat-store/messages/api"
 import { useCallback, useEffect, useRef, useState } from "react"
 
-interface ChatMessage {
+type ChatMessage = {
   id: string
   content: string
   role: "user" | "assistant"
@@ -28,7 +28,7 @@ function getMessageText(message: ExtendedUIMessage): string {
   return textParts.join("")
 }
 
-interface UseChatPreviewReturn {
+type UseChatPreviewReturn = {
   messages: ChatMessage[]
   isLoading: boolean
   error: string | null

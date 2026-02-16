@@ -17,7 +17,8 @@ components/
 │   ├── message-assistant.tsx # AI response with reasoning
 │   ├── message-user.tsx      # User message with edit
 │   ├── use-chat-core.ts      # Core chat hook (gold standard)
-│   ├── use-chat-operations.ts # Rate limiting, CRUD
+│   ├── use-chat-edit.ts      # Message edit flow (extracted from core)
+│   ├── use-chat-operations.ts # Rate limits, chat creation (pure async utils)
 │   ├── use-file-upload.ts    # File handling
 │   └── use-model.ts          # Model selection
 ├── chat-input/       # Input area components
@@ -37,18 +38,21 @@ components/
 
 ```typescript
 // Orchestrator pattern: compose multiple hooks
-export function Chat({ chatId, user, initialMessages }: ChatProps) {
+export function Chat() {
   // 1. File handling
-  const { files, setFiles, handleFileUploads, ... } = useFileUpload(user)
+  const { files, setFiles, handleFileUploads, ... } = useFileUpload()
   
   // 2. Model selection
-  const { selectedModel, setSelectedModel } = useModel(chat?.model)
+  const { selectedModel, handleModelChange } = useModel({ ... })
   
-  // 3. Chat operations
-  const { ensureChatExists, checkLimitsAndNotify, ... } = useChatOperations({ ... })
+  // 3. Chat operations (pure async utilities — no React state)
+  const { checkLimitsAndNotify, ensureChatExists } = useChatOperations({ ... })
   
-  // 4. Core chat state (combines all the above)
-  const { messages, input, submit, ... } = useChatCore({ ... })
+  // 4. Core chat state (combines all the above; internally uses useChatEdit)
+  const { messages, submit, submitEdit, ... } = useChatCore({ ... })
+
+  // 5. Local handlers that need setMessages from core
+  const handleDelete = useCallback((id) => setMessages(...), [setMessages])
 
   return <ChatContainer>...</ChatContainer>
 }
@@ -126,7 +130,9 @@ try {
 
 | Pattern | File | Key Strengths |
 |---------|------|---------------|
-| **Hook** | `use-chat-core.ts` | Typed props/returns, `useCallback`, clean separation |
+| **Core Hook** | `use-chat-core.ts` | `executeSend` shared pipeline, ref-based input, debounced drafts |
+| **Extracted Hook** | `use-chat-edit.ts` | Single-concern extraction, shared ref threading via props |
+| **Async Utils Hook** | `use-chat-operations.ts` | Pure async utilities, no React state dependency |
 | **Component** | `chat.tsx` | Hook composition, dynamic imports, guard clauses |
 | **Message** | `message-assistant.tsx` | Reasoning display, streaming support |
 

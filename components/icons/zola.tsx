@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface ZolaIconProps extends SVGProps<SVGSVGElement> {
+export type ZolaIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const ZolaIcon = forwardRef<SVGSVGElement, ZolaIconProps>(
   ({ size = 24, width, height, className, ...props }, ref) => (

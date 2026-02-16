@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface MistralIconProps extends SVGProps<SVGSVGElement> {
+export type MistralIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const MistralIcon = forwardRef<SVGSVGElement, MistralIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (
