@@ -104,10 +104,9 @@ function ContextMenuSubContent({
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-sub-content"
           className={cn(
-            "bg-popover text-popover-foreground data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)] z-50 min-w-[8rem] origin-(--transform-origin) overflow-hidden rounded-md border p-1 shadow-lg",
+            "bg-popover text-popover-foreground z-50 min-w-[8rem] overflow-hidden rounded-md border p-1 shadow-lg",
             className
           )}
-          style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
           {...props}
         />
       </ContextMenuPrimitive.Positioner>
@@ -125,10 +124,9 @@ function ContextMenuContent({
         <ContextMenuPrimitive.Popup
           data-slot="context-menu-content"
           className={cn(
-            "bg-popover text-popover-foreground data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)] z-50 max-h-(--available-height) min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
+            "bg-popover text-popover-foreground z-50 max-h-(--available-height) min-w-[8rem] overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
             className
           )}
-          style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
           {...props}
         />
       </ContextMenuPrimitive.Positioner>

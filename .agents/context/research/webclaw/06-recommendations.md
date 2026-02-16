@@ -13,8 +13,10 @@
 Across five research documents, 65 coded claims, and direct comparison with Not A Wrapper's codebase, the WebClaw analysis reveals a clear pattern: **the most transferable findings are React-level performance optimizations and code organization patterns, not architectural decisions.** WebClaw's gateway-dependent, stateless-client architecture is non-transferable to NaW's multi-provider serverless platform. But WebClaw's streaming performance discipline — content-based memoization, ~~ref-based composer isolation~~, ~~portal-based scroll containers~~, and 13-hook decomposition — addresses the exact performance gaps in NaW's current chat implementation.
 
 > **Post-analysis update (Feb 15, 2026):** Codebase verification revealed that 2 of the original 5 P0 recommendations were already implemented or not applicable. R02 (Composer Ref Optimization) is already fully implemented in the current branch — `use-chat-core.ts` uses `useRef` + listener pattern + debounced draft persistence. R11 (Portal-Based Scroll Container) is not applicable because NaW's chat scroll uses `use-stick-to-bottom` with plain `<div>` elements and imperative DOM scroll, not React `ScrollArea` components. See updated R02 and R11 cards below for details.
+>
+> **Codebase scan update (Feb 15, 2026):** Full codebase scan revealed additional implementation progress. R04 (Singleton Shiki) is fully implemented in `components/ui/code-block.tsx`. R05 (Typography Utilities) is partially implemented — `text-wrap: balance` and `text-wrap: pretty` are applied in `.prose` context via `globals.css`, but not outside prose (sidebar titles, standalone headings). R06 (Hook Decomposition) is partially started — `use-chat-operations.ts` (145 LOC) was extracted, but `use-chat-core.ts` remains at 723 LOC. R13 (Unified Message Component) is partially implemented — shared compound primitives (`MessageContent`, `MessageActions`, `MessageAvatar`) exist in `components/ui/message.tsx`, but `message-user.tsx` and `message-assistant.tsx` remain separate.
 
-This document distills the research into **15 recommendations** (5 P0, 5 P1, 5 P2), each with full evidence tracing, risk assessment, and cross-reference to Open WebUI findings. The remaining P0 recommendations would reduce per-streaming-chunk DOM work from O(N × message_complexity) to O(1), and add a critical safety net for dropped streams.
+This document distills the research into **15 recommendations** (5 P0, 5 P1, 5 P2), each with full evidence tracing, risk assessment, and cross-reference to Open WebUI findings. All 5 P0 recommendations are now complete or partially complete. Of the remaining 10 items (P1 + P2), 2 are partially implemented.
 
 ---
 
@@ -27,8 +29,8 @@ These patterns are adoptable immediately with minimal risk and high payoff.
 | 1 | Message memoization | `app/components/chat/message.tsx` | Wrap in `React.memo` with `areMessagesEqual` content comparator | O(N) → O(1) re-renders per streaming chunk | **✅ DONE** — `areMessagesEqual` + `MemoizedMessage` already in `message.tsx` |
 | 2 | Composer ref isolation | `app/components/chat/use-chat-core.ts` line 92 | Move `input` from `useState` to `useRef`; debounce draft persistence to 500ms | Eliminate keystroke cascade through chat.tsx → conversation.tsx | **✅ DONE** — `inputRef` + `inputListenerRef` + 500ms debounced draft + `beforeunload` flush already implemented |
 | 3 | Generation guard timer | `app/components/chat/use-chat-core.ts` (new effect) | 120s timeout when `status === "streaming"`; on timeout: `stop()` + error toast | Prevent stuck "generating" UI when streams drop silently | **✅ DONE** — 120s guard effect at lines 184–196 |
-| 4 | Singleton Shiki highlighter | `app/components/chat/code-block.tsx` (or equivalent) | Module-level `let highlighterPromise` initialized once on first use | Eliminate redundant Shiki WASM initialization per code block | Open |
-| 5 | Typography utilities | `app/components/chat/markdown.tsx` + global markdown styles | Add `text-balance` to headings, `text-pretty` to body text | Better text rendering at zero perf cost (CSS progressive enhancement) | Open |
+| 4 | Singleton Shiki highlighter | `components/ui/code-block.tsx` | Module-level `let highlighterPromise` initialized once on first use | Eliminate redundant Shiki WASM initialization per code block | **✅ DONE** — `highlighterPromise` singleton + `getHighlighter()` lazy init at module scope |
+| 5 | Typography utilities | `app/globals.css` + markdown styles | Add `text-balance` to headings, `text-pretty` to body text | Better text rendering at zero perf cost (CSS progressive enhancement) | **⚡ Partial** — Applied in `.prose` context only; not in sidebar titles or standalone headings |
 
 ---
 
@@ -273,19 +275,24 @@ An honest assessment of NaW's advantages to protect.
 ## 8. Implementation Dependencies
 
 ```
-[✅ COMPLETED — Already Implemented]
+[✅ COMPLETED — Fully Implemented]
 ├── R01: Message Memoization ← DONE (areMessagesEqual + MemoizedMessage in message.tsx)
 ├── R02: Composer Ref Optimization ← DONE (inputRef + listener + debounced draft)
 ├── R03: Generation Guard Timer ← DONE (120s timeout in use-chat-core.ts lines 184–196)
+├── R04: Singleton Shiki ← DONE (module-level highlighterPromise in code-block.tsx)
 └── R11: Portal-Based Scroll Container ← NOT APPLICABLE (no ScrollArea in chat scroll)
 
+[⚡ PARTIALLY IMPLEMENTED]
+├── R05: Typography (text-balance/text-pretty) ← .prose context done; sidebar/standalone headings remain
+├── R06: Hook Decomposition ← use-chat-operations.ts + use-chat-draft.ts extracted; core still 723 LOC
+└── R13: Unified Message Component ← shared primitives in ui/message.tsx; user/assistant still separate files
+
 [No Dependencies — Do Immediately]
-├── R04: Singleton Shiki ← no deps
-├── R05: Typography (text-balance/text-pretty) ← no deps
+├── R05: Typography remaining scope ← no deps
 └── R09: Convention Enforcement ← no deps (policy change)
 
 [Performance Chain]
-R06: Hook Decomposition (largest refactor — do after perf wins verified)
+R06: Hook Decomposition (continue extraction — do after perf wins verified)
 └──→ R10: Screen-Based Feature Module (organizational, after hook boundaries clear)
 
 [UX Chain]
@@ -294,9 +301,9 @@ R08: Context Meter ← needs token counting from AI SDK usage object
      └──→ R12: Pin-to-Top Scroll (evaluate after context meter ships)
 ```
 
-**Critical path:** R06 → R10 is the longest remaining chain. The performance prerequisites (R01, R02) are already landed.
+**Critical path:** R06 → R10 is the longest remaining chain. All P0 performance prerequisites (R01, R02, R04) are fully landed; R05 is nearly complete.
 
-**Parallel work:** R04, R05, R07, R09 have zero dependencies and can proceed in any order alongside the refactoring chain.
+**Parallel work:** R05 (remaining scope), R07, R09 have zero dependencies and can proceed in any order alongside the refactoring chain.
 
 ---
 
@@ -388,39 +395,51 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R04: Singleton Shiki Highlighter
+#### R04: Singleton Shiki Highlighter — ✅ DONE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Singleton Shiki Highlighter |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ **COMPLETED** |
 | **Confidence** | High |
 | **Transferability** | Direct — module-level singleton pattern |
-| **Effort** | < 1 day |
+| **Effort** | ~~< 1 day~~ 0 (already implemented) |
 | **Impact** | Performance — eliminates redundant WASM initialization per code block |
 | **Evidence** | WC-A5-C06, WC-A2-C03 |
 | **Risk if wrong** | None — strictly better than per-render initialization |
 | **Synergy with OWUI** | N/A — different syntax highlighting approach. New insight from WebClaw. |
 
-**Implementation:** Create a module-level `let highlighterPromise: Promise<HighlighterCore> | null = null` in the code block component. Initialize with `createHighlighterCore()` on first use. All code blocks share the same instance. Pre-load common languages (JS, TS, Python, Bash, JSON, etc.).
+> **Verified Feb 15, 2026:** Already implemented in `components/ui/code-block.tsx`. Module-level `let highlighterPromise: Promise<Highlighter> | null = null` (line 43) with lazy `getHighlighter()` function (lines 45–53). Uses `createHighlighter()` with `github-dark` and `github-light` themes and pre-loaded `DEFAULT_LANGS` array. All `CodeBlockCode` components share the same singleton instance.
+
+~~**Implementation:** Create a module-level `let highlighterPromise: Promise<HighlighterCore> | null = null` in the code block component. Initialize with `createHighlighterCore()` on first use. All code blocks share the same instance. Pre-load common languages (JS, TS, Python, Bash, JSON, etc.).~~
 
 ---
 
-#### R05: Typography Utilities (text-balance, text-pretty)
+#### R05: Typography Utilities (text-balance, text-pretty) — ⚡ PARTIAL
 
 | Field | Value |
 |-------|-------|
 | **Title** | Typography Utilities |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ **Partially implemented** |
 | **Confidence** | High |
 | **Transferability** | Direct — CSS standard properties |
-| **Effort** | < 0.5 day |
+| **Effort** | ~~< 0.5 day~~ ~0.25 day remaining |
 | **Impact** | UX — improved text rendering at zero performance cost |
 | **Evidence** | WC-A5-C15 |
 | **Risk if wrong** | None — CSS progressive enhancement, ignored by unsupported browsers |
 | **Synergy with OWUI** | N/A — typography-specific, not covered in OWUI research. |
 
-**Implementation:** Add `text-balance` to heading styles (h1–h3) and `text-pretty` to body/paragraph styles in the markdown component. Also apply in chat sidebar session titles and any multi-line UI text.
+> **Verified Feb 15, 2026:** Partially implemented in `app/globals.css` (lines 212–219):
+> - `.prose :is(h1, h2, h3, h4) { text-wrap: balance; }` — headings in markdown content
+> - `.prose p, .prose li { text-wrap: pretty; }` — body text in markdown content
+> - `components/ui/tooltip.tsx` also uses `text-balance` class
+>
+> **Not yet applied to:**
+> - Sidebar session titles (`sidebar-item.tsx` uses `line-clamp-1`, `project-chat-item.tsx` uses `truncate`)
+> - Standalone headings outside `.prose` (e.g., `chat.tsx` `<h1>`, `multi-chat.tsx` `<h1>`)
+> - Body text outside `.prose` context (settings descriptions, etc.)
+
+**Remaining implementation:** Extend `text-balance` to headings and `text-pretty` to body text outside the `.prose` wrapper — sidebar titles, standalone page headings, and multi-line UI text.
 
 ---
 
@@ -428,7 +447,7 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R06: Hook Decomposition of `use-chat-core.ts`
+#### R06: Hook Decomposition of `use-chat-core.ts` — ⚡ PARTIAL
 
 | Field | Value |
 |-------|-------|
@@ -436,13 +455,19 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | **Action** | Adapt |
 | **Confidence** | High |
 | **Transferability** | Direct — same React hook composition model |
-| **Effort** | 3–5 days |
+| **Effort** | ~~3–5 days~~ ~2–4 days remaining |
 | **Impact** | DX + Performance — easier maintenance, better re-render isolation, each hook independently testable |
 | **Evidence** | WC-A5-C02, WC-A5-C03, WC-A2-C09–C14, WC-A4-C08 |
 | **Risk if wrong** | Medium — increased indirection (more files, more imports). Mitigate: keep all hooks co-located in `hooks/` subdirectory with clear naming. Worse case: more boilerplate for the same functionality. |
 | **Synergy with OWUI** | OWUI's 1,500-line `Chat.svelte` is the cautionary tale; WebClaw's 13-hook pattern is the positive example. Both converge on the same prescription: decompose. |
 
-**Implementation:** Extract 6 hooks from `use-chat-core.ts` (see Section 2 above). Each hook owns one concern: streaming, submission, editing, input, search, hydration. The orchestrator (`chat.tsx`) calls hooks at the top level and passes results as props.
+> **Verified Feb 15, 2026:** Decomposition has started but is incomplete:
+> - **Extracted:** `use-chat-operations.ts` (145 LOC) — handles chat operations (stop, regenerate, etc.)
+> - **Extracted:** `use-chat-draft.ts` (in `app/hooks/`) — handles draft persistence
+> - **Remaining:** `use-chat-core.ts` is still 723 LOC with the `submit` callback, edit logic, streaming setup, input management, search state, and hydration effects all in one file
+> - **None of the 6 recommended hooks exist yet:** `use-chat-streaming.ts`, `use-chat-submit.ts`, `use-chat-edit.ts`, `use-chat-input.ts`, `use-chat-search.ts`, `use-chat-hydration.ts`
+
+**Remaining implementation:** Extract the remaining 4–5 concerns from `use-chat-core.ts` (see Section 2 above). The operations and draft extractions establish the pattern; the core file still needs streaming, submission, editing, input, search, and hydration extracted.
 
 ---
 
@@ -567,7 +592,7 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 ---
 
-#### R13: Unified Message Component Pattern
+#### R13: Unified Message Component Pattern — ⚡ PARTIAL
 
 | Field | Value |
 |-------|-------|
@@ -575,13 +600,20 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | **Action** | Adapt |
 | **Confidence** | High |
 | **Transferability** | Direct — component composition pattern |
-| **Effort** | 2–3 days |
+| **Effort** | ~~2–3 days~~ ~1–2 days remaining |
 | **Impact** | DX — reduces duplication between `message-user.tsx` and `message-assistant.tsx` |
 | **Evidence** | WC-A5-C01 |
 | **Risk if wrong** | Low — component refactoring, easily reversible |
 | **Synergy with OWUI** | N/A — different component model |
 
-**Implementation:** Create a unified `Message` component with compound sub-components (`MessageContent`, `MessageActions`, `MessageAvatar`). Use `MessageContent markdown={boolean}` to switch between plain text (user) and markdown (assistant) rendering. Eliminate duplicated avatar, layout, and action logic.
+> **Verified Feb 15, 2026:** The shared compound primitive layer is already in place:
+> - `components/ui/message.tsx` (from prompt-kit) provides: `MessageContainer`, `MessageContent` (with `markdown` prop), `MessageActions`, `MessageAction`, `MessageAvatar`
+> - Both `message-user.tsx` and `message-assistant.tsx` import and compose these shared primitives
+> - `message.tsx` acts as a unified router dispatching to `MessageUser` or `MessageAssistant` by `variant`
+>
+> **What remains:** The user and assistant message components still have separate files with duplicated layout/action logic. The shared primitives exist (the foundation of R13), but the final unification — collapsing `message-user.tsx` and `message-assistant.tsx` into a single component that uses `MessageContent markdown={boolean}` — has not been done.
+
+**Remaining implementation:** Collapse the two variant components into the unified `Message` component, using the existing `MessageContent markdown={boolean}` prop to switch rendering. Deduplicate avatar, layout, and action logic that currently exists in both files.
 
 ---
 
@@ -628,27 +660,29 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | R01 | Message Memoization | **P0** | ~~Adopt~~ | ~~1–2d~~ | Performance | None | **✅ DONE** |
 | R02 | Composer Ref Optimization | **P0** | ~~Adapt~~ | ~~1–2d~~ | Performance | None | **✅ DONE** |
 | R03 | Generation Guard Timer | **P0** | ~~Adopt~~ | ~~<1d~~ | UX Reliability | None | **✅ DONE** |
-| R04 | Singleton Shiki | **P0** | Adopt | <1d | Performance | None | Open |
-| R05 | Typography Utilities | **P0** | Adopt | <0.5d | UX | None | Open |
-| R06 | Hook Decomposition | **P1** | Adapt | 3–5d | DX + Perf | ~~R01, R02~~ None | Open |
+| R04 | Singleton Shiki | **P0** | ~~Adopt~~ | ~~<1d~~ | Performance | None | **✅ DONE** |
+| R05 | Typography Utilities | **P0** | Adopt | ~0.25d remaining | UX | None | **⚡ Partial** — `.prose` done |
+| R06 | Hook Decomposition | **P1** | Adapt | ~2–4d remaining | DX + Perf | ~~R01, R02~~ None | **⚡ Partial** — operations + draft extracted |
 | R07 | Global Prompt Focus | **P1** | Adopt | <1d | UX | None | Open |
 | R08 | Context Meter | **P1** | Adopt | 3–5d | UX | None | Open |
 | R09 | Convention Enforcement | **P1** | Adopt | 1d | DX | None | Open |
 | R10 | Feature Module | **P1** | Adapt | 2–3d | DX | R06 | Open |
 | R11 | Portal Scroll Container | **P2** | ~~Adapt~~ | ~~1–2d~~ | ~~Performance~~ | ~~Profile first~~ | **❌ N/A** |
 | R12 | Pin-to-Top Scroll | **P2** | Adapt | 2–3d | UX | R08 | Open |
-| R13 | Unified Message Component | **P2** | Adapt | 2–3d | DX | ~~R01~~ None | Open |
+| R13 | Unified Message Component | **P2** | Adapt | ~1–2d remaining | DX | ~~R01~~ None | **⚡ Partial** — shared primitives done |
 | R14 | cmdk Replacement | **P2** | Skip | 1–2w | DX | Evaluate later | Open |
 | R15 | Streaming Batching | **P2** | Skip | 2–3d | Performance | Profile first | Open |
 
-**Completed:** R01, R02, R03 (3 of 5 P0 items — ~4 days of effort already shipped)
+**Completed:** R01, R02, R03, R04 (4 of 5 P0 items fully shipped)
+**Partially implemented:** R05 (P0), R06 (P1), R13 (P2)
 **Not applicable:** R11 (wrong scroll architecture — `use-stick-to-bottom` uses plain divs, not ScrollArea)
-**Remaining effort for P0:** ~1.5 days (R04 + R05)
-**Remaining effort for P0 + P1:** ~14 days
-**Remaining effort for all remaining items:** ~20 days
+**Remaining effort for P0:** ~0.25 days (R05 remainder only)
+**Remaining effort for P0 + P1:** ~10–12 days (R05 remainder + R06 remainder + R07 + R08 + R09 + R10)
+**Remaining effort for all items:** ~15–18 days
 
 ---
 
 *Research synthesis completed February 15, 2026. Updated February 15, 2026 after codebase verification.*
+*Full codebase scan February 15, 2026: verified R04 as fully implemented, R05/R06/R13 as partially implemented.*
 *Based on 5 WebClaw research documents (65 coded claims), Open WebUI analysis summary (80 coded claims), and Not A Wrapper codebase on branch `am-i-in-over-my-head`.*
-*Post-analysis verified R01, R02, R03 as already implemented and R11 as not applicable to NaW's scroll architecture.*
+*Post-analysis verified R01, R02, R03, R04 as already implemented and R11 as not applicable to NaW's scroll architecture.*

@@ -80,15 +80,15 @@ AGENTS.md            ← Rules & permissions
 | # | What | Benefit | Status | Sources |
 |---|------|---------|--------|---------|
 | 29 | **Message memoization** — `React.memo` with content-based `areMessagesEqual` comparator; O(N) → O(1) re-renders per streaming chunk | Eliminates jank in long conversations; only the actively streaming message re-renders | Done | `research/webclaw/06-recommendations.md` R01 |
-| 30 | **Composer ref isolation** — move `input` from `useState` to `useRef` in composer; debounce draft persistence 500ms + `beforeunload` flush | Stops every keystroke from cascading re-renders through the entire chat tree | Not started | `research/webclaw/06-recommendations.md` R02 |
+| 30 | **Composer ref isolation** — move `input` from `useState` to `useRef` in composer; debounce draft persistence 500ms + `beforeunload` flush | Stops every keystroke from cascading re-renders through the entire chat tree | Done | `research/webclaw/06-recommendations.md` R02 |
 | 31 | **Singleton Shiki highlighter** — module-level `highlighterPromise` initialized once; eliminates redundant WASM init per code block | Faster code block rendering; avoids repeated ~2MB WASM load per block | Done | `research/webclaw/06-recommendations.md` R04 |
-| 32 | **Typography utilities** — `text-balance` on headings, `text-pretty` on body in markdown styles (CSS progressive enhancement, zero cost) | Polished text rendering with no performance cost; degrades gracefully | Not started | `research/webclaw/06-recommendations.md` R05 |
-| 33 | **Pragmatic hook decomposition** — extract `use-chat-submit.ts` (~200 LOC) and `use-chat-edit.ts` (~170 LOC) from `use-chat-core.ts`; skip full 6-hook split until file exceeds ~1000 LOC | Makes the two most complex flows independently testable and easier to modify | Not started | `research/webclaw/06-recommendations.md` R06 (adapted) |
+| 32 | **Typography utilities** — `text-balance` on headings, `text-pretty` on body in markdown styles (CSS progressive enhancement, zero cost) | Polished text rendering with no performance cost; degrades gracefully | Partial — `.prose` context in `globals.css`; not yet in sidebar titles or standalone headings | `research/webclaw/06-recommendations.md` R05 |
+| 33 | **Pragmatic hook decomposition** — extract `use-chat-submit.ts` (~200 LOC) and `use-chat-edit.ts` (~170 LOC) from `use-chat-core.ts`; skip full 6-hook split until file exceeds ~1000 LOC | Makes the two most complex flows independently testable and easier to modify | In progress — `use-chat-operations.ts` (145 LOC) + `use-chat-draft.ts` extracted; core still 723 LOC | `research/webclaw/06-recommendations.md` R06 (adapted) |
 | 34 | **`type` over `interface`** — adopt for new code only; no codemod. Add ESLint rule opportunistically | Consistency across codebase; better composability with unions and utility types | Not started | `research/webclaw/06-recommendations.md` R09 |
 | 35 | **Context meter** — token usage progress bar in chat header; Phase 1: estimate from messages, Phase 2: accumulate actual `usage.promptTokens` from AI SDK. _Note: follow Cursor's approach and research how to make this work with our multi-model configuration_ | Users can see how much context window remains before hitting limits | Not started | `research/webclaw/06-recommendations.md` R08 |
 | 36 | **Global prompt auto-focus** — ~20 LOC global `keydown` listener; auto-focus textarea on printable chars (exclude meta/ctrl/alt, editable elements) | Removes click-to-focus friction; matches VS Code behavior users already expect | Not started | `research/webclaw/06-recommendations.md` R07 |
 
-> **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11, needs profiling first), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts` lines 167–179.
+> **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts` lines 184–196.
 
 ### Critical Path
 
@@ -100,8 +100,8 @@ UX Redesign → Settings Page + Model Selector (P1 chain)
 Audit Logging → OpenTelemetry
 Inline Triggers ← no deps → Prompt Library (P2, deferred)
 Memory System ← Convex vectors → RAG Pipeline (P2, shares infra)
-Message Memo (#29) → Composer Ref (#30) → Hook Decomposition (#33) (P4 perf chain)
-Shiki Singleton (#31) + Typography (#32) + Auto-Focus (#36) ← no deps (P4 parallel)
+Message Memo (#29) ✅ → Composer Ref (#30) ✅ → Hook Decomposition (#33, in progress) (P4 perf chain)
+Shiki Singleton (#31) ✅ + Typography (#32, partial) + Auto-Focus (#36) ← no deps (P4 parallel)
 Context Meter (#35) ← needs token accumulation from AI SDK usage object
 ```
 

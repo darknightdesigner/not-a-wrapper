@@ -591,25 +591,15 @@ These are worth adopting globally. The "never bolder than `font-medium`" rule is
 
 ## Recommendations
 
-### 1. ADOPT — Message-Level Content-Based Memoization
+> **Update (Feb 15, 2026):** Recommendations 1, 2, and 8 are marked as completed. The portal scroll container recommendation has been removed (not applicable).
 
-**Transferability**: Directly Transferable
-**Evidence**: WC-A5-C07, WC-A3-C02, WC-A2-C17
-**Effort**: 1-2 days
-**Impact**: Performance — reduces per-streaming-chunk work from O(N × message_complexity) to O(1 streaming message)
-**Risk if wrong**: Negligible — memoization can be removed if profiling shows no benefit.
-**Synergy with OWUI**: OWUI's 500MB+ memory at 100+ messages confirms that avoiding unnecessary work per message is critical.
-**Implementation**: Wrap `Message` in `React.memo` with a custom comparator that compares text content, parts signatures, and relevant props. Model on WebClaw's `areMessagesEqual`.
+### 1. ~~ADOPT — Message-Level Content-Based Memoization~~ ✅ DONE
 
-### 2. ADOPT — Generation Guard Timer
+**Status**: Already implemented in `message.tsx` with `areMessagesEqual` comparator + `React.memo(MessageInner, areMessagesEqual)`.
 
-**Transferability**: Directly Transferable
-**Evidence**: WC-A5-C13, WC-A2-C09 (auto-reconnection + guard)
-**Effort**: < 1 day
-**Impact**: UX reliability — prevents stuck "streaming" state
-**Risk if wrong**: Timer fires too early on slow models. Mitigate with configurable timeout (default 120s).
-**Synergy with OWUI**: OWUI's "silent failure modes" anti-pattern confirms this is essential.
-**Implementation**: Add a `useEffect` in `use-chat-core.ts` that sets a timeout when `status === "streaming"`. On timeout, call `stop()` and show an error toast.
+### 2. ~~ADOPT — Generation Guard Timer~~ ✅ DONE
+
+**Status**: Already implemented in `use-chat-core.ts` lines 184–196. 120s timeout with `stopRef` pattern to avoid stale closures.
 
 ### 3. ADOPT — Global Prompt Focus
 
@@ -660,15 +650,9 @@ These are worth adopting globally. The "never bolder than `font-medium`" rule is
 **Synergy with OWUI**: OWUI's 1,500-line Chat.svelte is the cautionary tale of what happens without decomposition.
 **Implementation**: Extract streaming, submission, edit, search, and hydration concerns into separate hooks. Keep the orchestrator in `chat.tsx`.
 
-### 8. ADAPT — Composer Input Ref Optimization
+### 8. ~~ADAPT — Composer Input Ref Optimization~~ ✅ DONE
 
-**Transferability**: Directly Transferable
-**Evidence**: WC-A5-C08, WC-A3-C04, WC-A2-C15
-**Effort**: 1-2 days
-**Impact**: Performance — eliminates keystroke-triggered cascading re-renders
-**Risk if wrong**: Breaks draft persistence (IndexedDB sync relies on `useState`). Mitigate by debouncing draft saves.
-**Synergy with OWUI**: N/A.
-**Implementation**: Move `input` from `useState` to `useRef`. Debounce draft persistence to 500ms. Expose `getValue()` callback for submission.
+**Status**: Already implemented. `use-chat-core.ts` uses `useRef` for input value, `inputListenerRef` for imperative display updates, 500ms debounced draft persistence via `debouncedSetDraftValue`, and `beforeunload` flush. `ChatInput` owns local `useState(defaultValue)` for display only.
 
 ### 9. ADAPT — Pin-to-Top Scroll Behavior
 
@@ -723,4 +707,6 @@ These are worth adopting globally. The "never bolder than `font-medium`" rule is
 
 ---
 
-*Research completed February 15, 2026. Based on WebClaw repository (`main` branch, ~80 commits), Not A Wrapper codebase on branch `am-i-in-over-my-head`, and Open WebUI analysis (Feb 12, 2026). All code references verified against current source files.*
+*Research completed February 15, 2026. Updated February 15, 2026 after codebase verification.*
+*Based on WebClaw repository (`main` branch, ~80 commits), Not A Wrapper codebase on branch `am-i-in-over-my-head`, and Open WebUI analysis (Feb 12, 2026).*
+*Post-analysis verified: WC-A5-C07 (message memo), WC-A5-C08 (composer ref), WC-A5-C13 (generation guard) are already implemented. WC-A5-C09 (portal scroll) is not applicable to NaW's scroll architecture.*
