@@ -201,7 +201,7 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
       >
         <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
-            <h3 className="truncate font-medium">{displayTitle}</h3>
+            <h3 className="truncate font-medium text-balance">{displayTitle}</h3>
             <p className="text-muted-foreground mt-1 text-sm">
               {chat.updated_at
                 ? formatDate(chat.updated_at)

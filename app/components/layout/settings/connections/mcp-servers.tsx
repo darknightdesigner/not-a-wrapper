@@ -134,8 +134,8 @@ export function McpServers() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h3 className="mb-1 text-lg font-medium">MCP Servers</h3>
-          <p className="text-muted-foreground text-sm">
+          <h3 className="mb-1 text-lg font-medium text-balance">MCP Servers</h3>
+          <p className="text-muted-foreground text-sm text-pretty">
             Connect external tool servers to enhance AI capabilities.
           </p>
         </div>
@@ -165,10 +165,10 @@ export function McpServers() {
             size={48}
             className="text-muted-foreground mx-auto mb-2"
           />
-          <h4 className="mb-1 text-sm font-medium">
+          <h4 className="mb-1 text-sm font-medium text-balance">
             No MCP servers configured
           </h4>
-          <p className="text-muted-foreground mb-4 text-sm">
+          <p className="text-muted-foreground mb-4 text-sm text-pretty">
             Add an MCP server to give your AI conversations access to external
             tools.
           </p>
@@ -188,7 +188,7 @@ export function McpServers() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="mb-1 flex items-center gap-2">
-                      <h4 className="truncate font-medium">{server.name}</h4>
+                      <h4 className="truncate font-medium text-balance">{server.name}</h4>
                       {server.lastError ? (
                         <Badge variant="destructive" className="text-xs">
                           Error

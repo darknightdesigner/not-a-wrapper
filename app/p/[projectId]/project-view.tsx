@@ -463,7 +463,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           >
             <div className="mb-6 flex items-center justify-center gap-2">
               <HugeiconsIcon icon={Chat01Icon} size={24} className="text-muted-foreground" />
-              <h1 className="text-center text-3xl font-medium tracking-tight">
+              <h1 className="text-center text-3xl font-medium tracking-tight text-balance">
                 {project?.name || ""}
               </h1>
             </div>

@@ -216,12 +216,12 @@ export function ToolKeys() {
 
   return (
     <div>
-      <h3 className="mb-1 text-lg font-medium">Tool Keys</h3>
-      <p className="text-muted-foreground text-sm">
+      <h3 className="mb-1 text-lg font-medium text-balance">Tool Keys</h3>
+      <p className="text-muted-foreground text-sm text-pretty">
         Add your own API keys for third-party tools. Your keys take priority
         over platform defaults.
       </p>
-      <p className="text-muted-foreground mt-0.5 text-sm">
+      <p className="text-muted-foreground mt-0.5 text-sm text-pretty">
         Keys are stored securely with end-to-end encryption.
       </p>
 

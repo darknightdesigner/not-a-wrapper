@@ -15,7 +15,7 @@ export function ThemeSelection() {
 
   return (
     <div>
-      <h4 className="mb-3 text-sm font-medium">Theme</h4>
+      <h4 className="mb-3 text-sm font-medium text-balance">Theme</h4>
       <div className="grid grid-cols-3 gap-3">
         {themes.map((theme) => (
           <button

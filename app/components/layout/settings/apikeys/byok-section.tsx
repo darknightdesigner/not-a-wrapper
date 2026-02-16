@@ -224,16 +224,16 @@ export function ByokSection() {
 
   return (
     <div>
-      <h3 className="relative mb-2 inline-flex text-lg font-medium">
+      <h3 className="relative mb-2 inline-flex text-lg font-medium text-balance">
         Model Providers{" "}
         <span className="text-muted-foreground absolute top-0 -right-7 text-xs">
           new
         </span>
       </h3>
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-sm text-pretty">
         Add your own API keys to unlock access to models.
       </p>
-      <p className="text-muted-foreground text-sm">
+      <p className="text-muted-foreground text-sm text-pretty">
         Your keys are stored securely with end-to-end encryption.
       </p>
 

@@ -19,8 +19,8 @@ export function InteractionPreferences() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">Prompt suggestions</h3>
-            <p className="text-muted-foreground text-xs">
+            <h3 className="text-sm font-medium text-balance">Prompt suggestions</h3>
+            <p className="text-muted-foreground text-xs text-pretty">
               Show suggested prompts when starting a new conversation
             </p>
           </div>
@@ -34,8 +34,8 @@ export function InteractionPreferences() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">Tool invocations</h3>
-            <p className="text-muted-foreground text-xs">
+            <h3 className="text-sm font-medium text-balance">Tool invocations</h3>
+            <p className="text-muted-foreground text-xs text-pretty">
               Show tool execution details in conversations
             </p>
           </div>
@@ -49,8 +49,8 @@ export function InteractionPreferences() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">Conversation previews</h3>
-            <p className="text-muted-foreground text-xs">
+            <h3 className="text-sm font-medium text-balance">Conversation previews</h3>
+            <p className="text-muted-foreground text-xs text-pretty">
               Show conversation previews in history
             </p>
           </div>
@@ -64,8 +64,8 @@ export function InteractionPreferences() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">Multi-model chat</h3>
-            <p className="text-muted-foreground text-xs">
+            <h3 className="text-sm font-medium text-balance">Multi-model chat</h3>
+            <p className="text-muted-foreground text-xs text-pretty">
               Send prompts to multiple models at once
             </p>
           </div>
@@ -79,8 +79,8 @@ export function InteractionPreferences() {
       <div>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-medium">Web search default</h3>
-            <p className="text-muted-foreground text-xs">
+            <h3 className="text-sm font-medium text-balance">Web search default</h3>
+            <p className="text-muted-foreground text-xs text-pretty">
               Remember whether web search is enabled in new chats
             </p>
           </div>

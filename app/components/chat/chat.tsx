@@ -4,6 +4,7 @@ import { ChatInput } from "@/app/components/chat-input/chat-input"
 import { Conversation } from "@/app/components/chat/conversation"
 import { useModel } from "@/app/components/chat/use-model"
 import { useChatDraft } from "@/app/hooks/use-chat-draft"
+import { useGlobalPromptFocus } from "@/app/hooks/use-global-prompt-focus"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
@@ -138,6 +139,10 @@ export function Chat() {
     deleteMessagesFromTimestamp,
   })
 
+  // Auto-focus chat textarea when user types a printable character anywhere
+  const focusTextareaRef = useRef<(() => void) | null>(null)
+  useGlobalPromptFocus(focusTextareaRef)
+
   // Memoize the conversation props to prevent unnecessary rerenders
   const conversationProps = useMemo(
     () => ({
@@ -183,6 +188,7 @@ export function Chat() {
       enableSearch,
       quotedText,
       registerInputListener,
+      focusRef: focusTextareaRef,
     }),
     [
       handleSuggestion,
@@ -204,6 +210,7 @@ export function Chat() {
       enableSearch,
       quotedText,
       registerInputListener,
+      focusTextareaRef,
     ]
   )
 
@@ -254,7 +261,7 @@ export function Chat() {
               },
             }}
           >
-            <h1 className="mb-6 text-3xl font-medium tracking-tight">
+            <h1 className="mb-6 text-3xl font-medium tracking-tight text-balance">
               What&apos;s on your mind?
             </h1>
           </motion.div>
