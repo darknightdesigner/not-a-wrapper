@@ -21,7 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { StopCircleBulkRoundedIcon } from "@/lib/icons"
+import { StopBulkRoundedIcon } from "@/lib/icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowUp02Icon,
@@ -260,7 +260,7 @@ export function MultiChatInput({
                 aria-label={primaryAction.ariaLabel}
               >
                 {primaryAction.mode === "stop" ? (
-                  <HugeiconsIcon icon={StopCircleBulkRoundedIcon} size={16} />
+                  <HugeiconsIcon icon={StopBulkRoundedIcon} size={16} />
                 ) : (
                   <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2.5} className="size-5" />
                 )}

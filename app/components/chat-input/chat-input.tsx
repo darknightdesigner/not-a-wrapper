@@ -12,7 +12,7 @@ import {
   PromptInputTextarea,
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
-import { StopCircleBulkRoundedIcon } from "@/lib/icons"
+import { StopBulkRoundedIcon } from "@/lib/icons"
 import { ACCEPTED_FILE_PICKER_TYPES } from "@/lib/file-handling"
 import { getModelInfo } from "@/lib/models"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -279,7 +279,7 @@ export function ChatInput({
                   aria-label={primaryAction.ariaLabel}
                 >
                   {primaryAction.mode === "stop" ? (
-                    <HugeiconsIcon icon={StopCircleBulkRoundedIcon} size={16} />
+                    <HugeiconsIcon icon={StopBulkRoundedIcon} size={16} />
                   ) : (
                     <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2.5} className="size-5" />
                   )}
