@@ -476,6 +476,12 @@ export function StreamingCaret({
   onFadeOutComplete?: () => void
   className?: string
 }) {
+  React.useEffect(() => {
+    if (variant === "none" && !visible && onFadeOutComplete) {
+      onFadeOutComplete()
+    }
+  }, [variant, visible, onFadeOutComplete])
+
   const animationStateClass = visible
     ? undefined
     : "animate-[caret-fade-out_300ms_forwards]"
