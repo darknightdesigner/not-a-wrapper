@@ -28,6 +28,7 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
+import { useStickToBottomContext } from "use-stick-to-bottom"
 
 const getTextFromDataUrl = (dataUrl: string) => {
   const base64 = dataUrl.split(",")[1]
@@ -71,6 +72,8 @@ export function MessageUser({
   const [isEditing, setIsEditing] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const savedScrollTopRef = useRef<number | null>(null)
+  const { stopScroll, scrollRef } = useStickToBottomContext()
 
   const handleEditCancel = () => {
     setIsEditing(false)
@@ -100,18 +103,34 @@ export function MessageUser({
     }
   }
 
-  const handleEditStart = async () => {
+  const handleEditStart = () => {
+    savedScrollTopRef.current = scrollRef.current?.scrollTop ?? null
     setIsEditing(true)
     setEditInput(children)
   }
 
+  // Auto-resize textarea on content change
   useEffect(() => {
     if (!isEditing) return
     const editTextarea = textareaRef.current
     if (!editTextarea) return
     editTextarea.style.height = "auto"
-    editTextarea.style.height = `${Math.min(editTextarea.scrollHeight, editTextarea.scrollHeight)}px`
+    editTextarea.style.height = `${editTextarea.scrollHeight}px`
   }, [editInput, isEditing])
+
+  // Focus textarea and preserve scroll position when entering edit mode
+  useEffect(() => {
+    if (!isEditing) return
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus({ preventScroll: true })
+      stopScroll()
+      const scrollEl = scrollRef.current
+      if (scrollEl && savedScrollTopRef.current !== null) {
+        scrollEl.scrollTop = savedScrollTopRef.current
+        savedScrollTopRef.current = null
+      }
+    })
+  }, [isEditing, stopScroll, scrollRef])
 
   return (
     <MessageContainer
@@ -184,7 +203,6 @@ export function MessageUser({
                 handleEditCancel()
               }
             }}
-            autoFocus
             style={{
               maxHeight: "50vh",
               overflowY: "auto",
