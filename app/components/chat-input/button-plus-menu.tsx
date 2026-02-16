@@ -51,18 +51,16 @@ export function ButtonPlusMenu({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="More options"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger render={<PopoverTrigger asChild />}>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+              type="button"
+              aria-label="More options"
+            >
+              <HugeiconsIcon icon={Add01Icon} size={16} />
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>
             More options
@@ -93,18 +91,22 @@ export function ButtonPlusMenu({
       />
       <DropdownMenu>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="More options"
-              >
-                <HugeiconsIcon icon={Add01Icon} size={16} />
-              </Button>
-            </DropdownMenuTrigger>
+          <TooltipTrigger
+            render={
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="More options"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={Add01Icon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>
             More options
@@ -112,18 +114,20 @@ export function ButtonPlusMenu({
         </Tooltip>
         <DropdownMenuContent side="top" align="start">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuItem
-                aria-disabled={!isFileUploadAvailable || undefined}
-                className={!isFileUploadAvailable ? "cursor-not-allowed opacity-50" : ""}
-                onClick={() => {
-                  if (!isFileUploadAvailable) return
-                  fileInputRef.current?.click()
-                }}
-              >
-                <HugeiconsIcon icon={AttachmentIcon} size={16} />
-                Add files or photos
-              </DropdownMenuItem>
+            <TooltipTrigger
+              render={
+                <DropdownMenuItem
+                  aria-disabled={!isFileUploadAvailable || undefined}
+                  className={!isFileUploadAvailable ? "cursor-not-allowed opacity-50" : ""}
+                  onClick={() => {
+                    if (!isFileUploadAvailable) return
+                    fileInputRef.current?.click()
+                  }}
+                />
+              }
+            >
+              <HugeiconsIcon icon={AttachmentIcon} size={16} />
+              Add files or photos
             </TooltipTrigger>
             {!isFileUploadAvailable && (
               <TooltipContent side="right" sideOffset={4}>
@@ -134,25 +138,27 @@ export function ButtonPlusMenu({
           {/* Web search — always visible, stays open on click (toggle behavior). */}
           {/* Disabled with tooltip when model can't use tools (e.g., Perplexity). */}
           <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuItem
-                closeOnClick={false}
-                className={isSearchDisabled ? "cursor-not-allowed opacity-50" : ""}
-                onClick={() => {
-                  if (isSearchDisabled) return
-                  onToggleSearch(!enableSearch)
-                }}
-              >
-                <HugeiconsIcon icon={Globe02Icon} size={16} />
-                Web search
-                {!isSearchDisabled && enableSearch && (
-                  <HugeiconsIcon
-                    icon={Tick02Icon}
-                    size={14}
-                    className="ml-auto"
-                  />
-                )}
-              </DropdownMenuItem>
+            <TooltipTrigger
+              render={
+                <DropdownMenuItem
+                  closeOnClick={false}
+                  className={isSearchDisabled ? "cursor-not-allowed opacity-50" : ""}
+                  onClick={() => {
+                    if (isSearchDisabled) return
+                    onToggleSearch(!enableSearch)
+                  }}
+                />
+              }
+            >
+              <HugeiconsIcon icon={Globe02Icon} size={16} />
+              Web search
+              {!isSearchDisabled && enableSearch && (
+                <HugeiconsIcon
+                  icon={Tick02Icon}
+                  size={14}
+                  className="ml-auto"
+                />
+              )}
             </TooltipTrigger>
             {isSearchDisabled && (
               <TooltipContent side="right" sideOffset={4}>

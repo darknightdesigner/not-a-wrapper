@@ -25,7 +25,7 @@ import Image from "next/image"
 import { AppInfoContent } from "./app-info-content"
 
 type AppInfoTriggerProps = {
-  trigger?: React.ReactNode
+  trigger?: React.ReactElement
 }
 
 export function AppInfoTrigger({ trigger }: AppInfoTriggerProps) {
@@ -41,7 +41,7 @@ export function AppInfoTrigger({ trigger }: AppInfoTriggerProps) {
   if (isMobile) {
     return (
       <Drawer>
-        <DrawerTrigger asChild>{trigger || defaultTrigger}</DrawerTrigger>
+        <DrawerTrigger render={trigger || defaultTrigger} />
         <DrawerContent className="bg-background border-border">
           <DrawerHeader>
             <Image
@@ -66,7 +66,7 @@ export function AppInfoTrigger({ trigger }: AppInfoTriggerProps) {
 
   return (
     <Dialog>
-      <DialogTrigger asChild>{trigger || defaultTrigger}</DialogTrigger>
+      <DialogTrigger render={trigger || defaultTrigger} />
       <DialogContent className="[&>button:last-child]:bg-background gap-0 overflow-hidden rounded-3xl p-0 shadow-xs sm:max-w-md [&>button:last-child]:rounded-full [&>button:last-child]:p-1">
         <DialogHeader className="p-0">
           <Image

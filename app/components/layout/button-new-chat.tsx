@@ -23,15 +23,17 @@ export function ButtonNewChat() {
   if (pathname === "/") return null
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          href="/"
-          className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
-          prefetch
-          aria-label="New chat"
-        >
-          <HugeiconsIcon icon={PencilEdit02Icon} size={24} />
-        </Link>
+      <TooltipTrigger
+        render={
+          <Link
+            href="/"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+            prefetch
+            aria-label="New chat"
+          />
+        }
+      >
+        <HugeiconsIcon icon={PencilEdit02Icon} size={24} />
       </TooltipTrigger>
       <TooltipContent>New chat ⌘⇧U</TooltipContent>
     </Tooltip>

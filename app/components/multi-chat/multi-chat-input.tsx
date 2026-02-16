@@ -97,18 +97,22 @@ export function MultiChatInput({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="Add files"
-              >
-                <HugeiconsIcon icon={AttachmentIcon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="Add files"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={AttachmentIcon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
         </Tooltip>
@@ -144,18 +148,22 @@ export function MultiChatInput({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="Web search unavailable"
-              >
-                <HugeiconsIcon icon={Globe02Icon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="Web search unavailable"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={Globe02Icon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Web search</TooltipContent>
         </Tooltip>

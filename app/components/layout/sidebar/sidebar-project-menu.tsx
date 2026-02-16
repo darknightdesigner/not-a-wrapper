@@ -43,13 +43,15 @@ export function SidebarProjectMenu({
         modal={isMobile ? true : false}
         onOpenChange={onMenuOpenChange}
       >
-        <DropdownMenuTrigger asChild>
-          <button
-            className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
-          </button>
+        <DropdownMenuTrigger
+          render={
+            <button
+              className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
+              onClick={(e) => e.stopPropagation()}
+            />
+          }
+        >
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           <DropdownMenuItem

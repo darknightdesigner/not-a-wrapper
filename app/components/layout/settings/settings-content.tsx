@@ -46,10 +46,8 @@ export function SettingsContent({
       {isDrawer && (
         <div className="border-border mb-2 flex items-center justify-between border-b px-4 pb-2">
           <h2 className="text-lg font-medium">Settings</h2>
-          <DrawerClose asChild>
-            <Button variant="ghost" size="icon">
-              <HugeiconsIcon icon={Cancel01Icon} size={16} />
-            </Button>
+          <DrawerClose render={<Button variant="ghost" size="icon" />}>
+            <HugeiconsIcon icon={Cancel01Icon} size={16} />
           </DrawerClose>
         </div>
       )}

@@ -25,14 +25,16 @@ export function ButtonSearch({
   if (!isAuthenticated) {
     return (
       <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            variant="ghost"
-            className="rounded-full"
-          >
-            <HugeiconsIcon icon={GlobeIcon} size={20} />
-            Search
-          </Button>
+        <PopoverTrigger
+          render={
+            <Button
+              variant="ghost"
+              className="rounded-full"
+            />
+          }
+        >
+          <HugeiconsIcon icon={GlobeIcon} size={20} />
+          Search
         </PopoverTrigger>
         <PopoverContentAuth />
       </Popover>

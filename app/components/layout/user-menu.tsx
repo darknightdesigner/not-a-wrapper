@@ -100,33 +100,35 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
               onOpenChange={setMenuOpen}
               modal={false}
             >
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="w-full"
-                  tooltip={user?.display_name || "Account"}
-                >
-                  <Avatar className="size-6 bg-emerald-600">
-                    <AvatarImage src={user?.profile_image ?? undefined} />
-                    <AvatarFallback className="bg-emerald-600 text-xs text-white">
-                      {user?.display_name?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
-                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
-                    <span className="truncate font-semibold">
-                      {user?.display_name}
-                    </span>
-                    <span className="text-muted-foreground truncate text-xs">
-                      {user?.premium ? "Plus" : "Free"}
-                    </span>
-                  </div>
-                  <HugeiconsIcon
-                    icon={UnfoldLessIcon}
-                    size={16}
-                    className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+              <DropdownMenuTrigger
+                render={
+                  <SidebarMenuButton
+                    size="lg"
+                    className="w-full"
+                    tooltip={user?.display_name || "Account"}
                   />
-                </SidebarMenuButton>
+                }
+              >
+                <Avatar className="size-6 bg-emerald-600">
+                  <AvatarImage src={user?.profile_image ?? undefined} />
+                  <AvatarFallback className="bg-emerald-600 text-xs text-white">
+                    {user?.display_name?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
+                  <span className="truncate font-semibold">
+                    {user?.display_name}
+                  </span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    {user?.premium ? "Plus" : "Free"}
+                  </span>
+                </div>
+                <HugeiconsIcon
+                  icon={UnfoldLessIcon}
+                  size={16}
+                  className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
@@ -148,13 +150,11 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
     <>
       <DropdownMenu open={isMenuOpen} onOpenChange={setMenuOpen} modal={false}>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger>
-              <Avatar className="bg-background hover:bg-muted">
-                <AvatarImage src={user?.profile_image ?? undefined} />
-                <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger />}>
+            <Avatar className="bg-background hover:bg-muted">
+              <AvatarImage src={user?.profile_image ?? undefined} />
+              <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
+            </Avatar>
           </TooltipTrigger>
           <TooltipContent>Profile</TooltipContent>
         </Tooltip>
