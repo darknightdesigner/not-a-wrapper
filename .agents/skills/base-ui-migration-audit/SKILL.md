@@ -185,6 +185,12 @@ Then check: Is the child a native <button> or a component that renders <button>?
 
 ### 6. `asChild` on Non-Trigger Components
 
+> **Migration note**: The `adaptAsChild` / `adaptSlotAsChild` compatibility shim (`lib/as-child-adapter.ts`) is being removed as part of the base-ui-pattern-fixes plan. After that plan completes:
+> - All `asChild` usages will be replaced with Base UI's native `render` prop
+> - Trigger components become simple pass-throughs (no shim needed)
+> - Slot-style components (`Button`, `Badge`, `Sidebar*`) use `useRender` + `mergeProps` for `render` prop support
+> - This section can be simplified to just say: "Use `render` prop — `asChild` is not supported"
+
 **What to look for**: `asChild` used on components that don't support it in Base UI (e.g., content wrappers, non-interactive elements).
 
 **Scan command**:
@@ -193,7 +199,7 @@ Search app/ for: asChild
 Cross-reference with components/ui/ to verify the wrapper supports asChild
 ```
 
-**Supported wrappers** (have `adaptAsChild` in their implementation):
+**Currently supported wrappers** (have `adaptAsChild` in their implementation — being migrated to native `render` prop):
 - `DialogTrigger`, `DrawerTrigger`, `DrawerClose`
 - `DropdownMenuTrigger`
 - `PopoverTrigger`
@@ -201,6 +207,15 @@ Cross-reference with components/ui/ to verify the wrapper supports asChild
 - `CollapsibleTrigger`
 - `HoverCardTrigger`
 - `Button` (via `adaptSlotAsChild`)
+
+**Target pattern** (after migration):
+```tsx
+// Trigger components — render prop is inherited from Base UI primitive
+<DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
+
+// Slot-style components — render prop via useRender hook
+<Button render={<Link href="/" />}>Home</Button>
+```
 
 ## Audit Workflow
 
@@ -216,16 +231,17 @@ Cross-reference with components/ui/ to verify the wrapper supports asChild
 
 | Radix Pattern | Base UI Equivalent |
 |--------------|-------------------|
-| `asChild` | `render={<Element />}` (via shim for now) |
+| `asChild` (on triggers) | `render={<Element />}` — native Base UI prop on trigger primitives |
+| `asChild` (on slot-style: Button, Badge, etc.) | `useRender` hook + `mergeProps` for `render` prop support |
+| `Slot` / `adaptSlotAsChild` | `useRender` + `mergeProps` (see `base-ui-useRender` skill) |
 | `onSelect` (MenuItem) | `onClick` (action) + `closeOnClick={false}` (keep open) |
 | `onSelect` + `e.preventDefault()` | `closeOnClick={false}` on `Menu.Item` |
 | `onInteractOutside` | Controlled `open` + `onOpenChange` |
 | `onCloseAutoFocus` | Manual focus management |
-| `onEscapeKeyDown` | Handled by `onOpenChange(false)` |
+| `onEscapeKeyDown` | Handled by `onOpenChange(false)` or `eventDetails.cancel()` |
 | `forceMount` | Controlled `open` state |
 | `onOpenAutoFocus` | No equivalent; use `autoFocus` or `useEffect` |
 | `modal` (Dialog) | `modal` (same API) |
-| `Slot` | `useRender` / `render` prop |
 
 ## Gold Standard: Fixed Patterns
 

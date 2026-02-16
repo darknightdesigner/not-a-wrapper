@@ -27,6 +27,8 @@ This plan aligns the codebase with official Shadcn Base UI patterns and fixes is
 - `@.agents/skills/base-ui-animation/SKILL.md` — Animation patterns (CSS transitions vs CSS animations)
 - `@.agents/skills/base-ui-migration-audit/SKILL.md` — Radix → Base UI migration audit checklist
 - `@.agents/skills/base-ui-styling/SKILL.md` — Styling patterns (data attributes, CSS variables)
+- `@.agents/skills/base-ui-typescript/SKILL.md` — TypeScript namespace typing (Props, State, events)
+- `@.agents/skills/base-ui-composition/SKILL.md` — Composition via `render` prop (nested triggers, element overrides)
 
 ---
 
@@ -895,6 +897,7 @@ bun run typecheck
 - `app/components/layout/user-menu.tsx` — Gold standard for dialog-outside-dropdown pattern
 - `app/components/layout/settings/settings-trigger.tsx` — Gold standard for separated trigger/dialog
 - `app/components/layout/feedback/feedback-trigger.tsx` — Gold standard for separated trigger/dialog
+- `@.agents/skills/base-ui-customization/SKILL.md` — Base UI event customization (`eventDetails.cancel()`, controlled components). Useful for edge cases where you need to prevent specific state changes without fully controlling the component.
 
 ### Step 3.1: Refactor `app-info-trigger.tsx`
 
