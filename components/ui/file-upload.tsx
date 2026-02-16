@@ -159,7 +159,7 @@ function FileUploadTrigger({
 
 type FileUploadContentProps = React.HTMLAttributes<HTMLDivElement>
 
-function FileUploadContent({ className, ...props }: FileUploadContentProps) {
+function FileUploadContent({ className, style, ...props }: FileUploadContentProps) {
   const context = useContext(FileUploadContext)
   const mounted = useHydrated()
 
@@ -171,9 +171,14 @@ function FileUploadContent({ className, ...props }: FileUploadContentProps) {
     <div
       className={cn(
         "bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm",
-        "animate-in fade-in-0 slide-in-from-bottom-10 zoom-in-90 duration-150",
+        "opacity-100 [transform:translateY(0)_scale(1)]",
+        "starting:opacity-0 starting:[transform:translateY(2.5rem)_scale(0.9)]",
         className
       )}
+      style={{
+        transition: "opacity 150ms ease-out, transform 150ms ease-out",
+        ...style,
+      }}
       {...props}
     />
   )

@@ -186,23 +186,26 @@ export function AppSidebar() {
                     <HugeiconsIcon icon={Cancel01Icon} size={24} />
                   </button>
                 ) : (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <Link
-                          href="/"
-                          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
-                          data-sidebar-item="true"
-                        />
-                      }
-                    >
-                      <NawIcon className="size-5" />
-                    </TooltipTrigger>
-                    <TooltipContent side="right">Home</TooltipContent>
-                  </Tooltip>
+                  <Link
+                    href="/"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
+                    data-sidebar-item="true"
+                    aria-label="Home"
+                  >
+                    <NawIcon className="size-5" />
+                  </Link>
                 )}
                 {/* Toggle button with resize cursor */}
-                <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                    }
+                  />
+                  <TooltipContent side="bottom" align="center">
+                    Close sidebar
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -384,7 +387,7 @@ function CollapsedHeaderToggle() {
           className="hidden group-hover/toggle:block group-focus-visible/toggle:block"
         />
       </TooltipTrigger>
-      <TooltipContent side="right">Open sidebar (⌘B)</TooltipContent>
+      <TooltipContent side="right">Open sidebar</TooltipContent>
     </Tooltip>
   )
 }

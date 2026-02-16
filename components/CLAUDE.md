@@ -11,8 +11,8 @@ This directory contains reusable UI components, primarily Shadcn/Base UI primiti
 
 - All `components/ui/` files import from `@base-ui/react/*` (not `@radix-ui/*`)
 - The `components.json` style is `"base-vega"` — future `npx shadcn@latest add` pulls Base UI variants
-- The `asChild` prop is supported via a compatibility shim (`lib/as-child-adapter.ts`) that translates to Base UI's `render` prop internally
-- **Deprecation plan**: The `asChild` shim will eventually be removed; app-level code should migrate to the `render` prop pattern
+- Composition uses Base UI's native `render` prop pattern
+- Legacy `asChild` compatibility utilities have been removed
 
 ### Third-Party Dependencies
 
@@ -149,11 +149,8 @@ npx shadcn@latest add [component-name]
 ### Dialog with Form
 
 ```typescript
-// asChild is supported via shim (translates to Base UI render prop internally)
 <Dialog>
-  <DialogTrigger asChild>
-    <Button>Open</Button>
-  </DialogTrigger>
+  <DialogTrigger render={<Button />}>Open</DialogTrigger>
   <DialogContent>
     <DialogHeader>
       <DialogTitle>Title</DialogTitle>
@@ -171,10 +168,8 @@ npx shadcn@latest add [component-name]
 
 ```typescript
 <DropdownMenu>
-  <DropdownMenuTrigger asChild>
-    <Button variant="ghost" size="icon">
-      <MoreVertical />
-    </Button>
+  <DropdownMenuTrigger render={<Button variant="ghost" size="icon" />}>
+    <MoreVertical />
   </DropdownMenuTrigger>
   <DropdownMenuContent>
     <DropdownMenuItem>Edit</DropdownMenuItem>
@@ -183,23 +178,17 @@ npx shadcn@latest add [component-name]
 </DropdownMenu>
 ```
 
-### asChild Compatibility Shim
+### Render Prop Pattern
 
-The `asChild` prop is preserved for backward compatibility. Internally, `lib/as-child-adapter.ts` translates it to Base UI's `render` prop:
+Use `render` for composition in trigger and slot-style components:
 
 ```typescript
-// Current (works via shim — will be deprecated)
-<DialogTrigger asChild>
-  <Button>Open</Button>
-</DialogTrigger>
-
-// Future (native Base UI pattern — preferred for new code)
 <DialogTrigger render={<Button />}>
   Open
 </DialogTrigger>
-```
 
-When writing **new** code, prefer the `render` prop pattern. Existing `asChild` usages will continue to work until the shim is removed.
+<Button render={<a href="/docs" />}>Docs</Button>
+```
 
 ## Notes
 

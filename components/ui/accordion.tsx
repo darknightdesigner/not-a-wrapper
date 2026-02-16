@@ -56,7 +56,7 @@ function AccordionContent({
   return (
     <AccordionPrimitive.Panel
       data-slot="accordion-content"
-      className="data-[closed]:animate-accordion-up data-[open]:animate-accordion-down overflow-hidden text-sm"
+      className="data-[closed]:animate-collapsible-up data-[open]:animate-collapsible-down overflow-hidden text-sm"
       {...props}
     >
       <div className={cn("pt-0 pb-4", className)}>{children}</div>

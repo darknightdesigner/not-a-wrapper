@@ -1,6 +1,6 @@
 # Base UI Pattern Fixes — Agent Execution Plan (Revised)
 
-> **Status**: Pending
+> **Status**: Complete (February 15, 2026)
 > **Priority**: P0 (Shadcn alignment + animation bugs) → P1 (app patterns) → P2 (cleanup)
 > **Created**: February 11, 2026
 > **Revised**: February 15, 2026
@@ -1012,10 +1012,10 @@ bun run build
 ### Step 5C: Update documentation
 
 Update `.agents/` documentation to reflect the completed alignment:
-- Mark this plan as Complete
-- Update `components/CLAUDE.md` to remove references to `asChild` shim and `adaptAsChild`
-- Update the "asChild Compatibility Shim" section to note it was removed
-- Update code examples to use `render` prop pattern
+- Completed: plan status is now marked as Complete
+- Completed: `components/CLAUDE.md` references to compatibility shim utilities were removed
+- Completed: "asChild Compatibility Shim" section was replaced with a render-prop-only pattern section
+- Completed: code examples now use the `render` prop pattern
 
 ---
 
@@ -1025,22 +1025,22 @@ Update `.agents/` documentation to reflect the completed alignment:
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| A | 1 (asChild → render in app/ + ui consumers) | P0 | ~21 files, ~49 usages (groups 1–6 only; 7–9 deferred to 2F.8) | Pending |
-| B | 2-safe (animations, no asChild) | P0 | 6 files in `components/ui/` | Pending |
-| C | 3 (app-info-trigger refactor) | P1 | `app-info-trigger.tsx` + consumer | Pending |
-| D | 4 (isolation: isolate) | P1 | `app/layout.tsx` | Pending |
+| A | 1 (asChild → render in app/ + ui consumers) | P0 | ~21 files, ~49 usages (groups 1–6 only; 7–9 deferred to 2F.8) | Complete |
+| B | 2-safe (animations, no asChild) | P0 | 6 files in `components/ui/` | Complete |
+| C | 3 (app-info-trigger refactor) | P1 | `app-info-trigger.tsx` + consumer | Complete |
+| D | 4 (isolation: isolate) | P1 | `app/layout.tsx` | Complete |
 
 ### Batch 2 — After Phase 1
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| — | 2-full (complete component alignment) | P0 | 7 trigger + 9 slot-style files in `components/ui/` + deferred app/ call sites (~9 usages) | Pending |
+| — | 2-full (complete component alignment) | P0 | 7 trigger + 9 slot-style files in `components/ui/` + deferred app/ call sites (~9 usages) | Complete |
 
 ### Batch 3 — After Batch 2
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| — | 5 (cleanup) | P2 | `lib/as-child-adapter.*`, `package.json`, docs | Pending |
+| — | 5 (cleanup) | P2 | `lib/as-child-adapter.*`, `package.json`, docs | Complete |
 
 ---
 
