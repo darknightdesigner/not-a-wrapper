@@ -53,7 +53,7 @@ export default async function RootLayout({
         />
       ) : null}
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased isolate`}
       >
         <Providers>
           <TanstackQueryProvider>

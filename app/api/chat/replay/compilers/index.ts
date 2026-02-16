@@ -3,7 +3,7 @@ import type { ReplayMessage } from "../types"
 import { anthropicReplayCompiler } from "./anthropic"
 import { openaiReplayCompiler } from "./openai"
 
-export interface ReplayCompileContext {
+export type ReplayCompileContext = {
   targetModelId: string
   hasTools: boolean
   sourceProviderHint?: string
@@ -19,14 +19,14 @@ export type ReplayCompileWarningCode =
   | "empty_message_fallback"
   | "source_url_dropped"
 
-export interface ReplayCompileWarning {
+export type ReplayCompileWarning = {
   code: ReplayCompileWarningCode
   messageIndex: number
   partIndex?: number
   detail: string
 }
 
-export interface ReplayCompileStats {
+export type ReplayCompileStats = {
   originalMessageCount: number
   compiledMessageCount: number
   droppedMessages: number
@@ -38,13 +38,13 @@ export interface ReplayCompileStats {
   invariantsRepaired: number
 }
 
-export interface ReplayCompileResult {
+export type ReplayCompileResult = {
   messages: UIMessage[]
   warnings: ReplayCompileWarning[]
   stats: ReplayCompileStats
 }
 
-export interface ReplayCompiler {
+export type ReplayCompiler = {
   providerId: string
   compileReplay(
     messages: readonly ReplayMessage[],

@@ -41,7 +41,6 @@ import {
 import { AnimatePresence, motion } from "motion/react"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "../model-selector/pro-dialog"
-import { SubMenu } from "../model-selector/sub-menu"
 
 type MultiModelSelectorProps = {
   selectedModelIds: string[]
@@ -66,7 +65,6 @@ export function MultiModelSelector({
   )
   const isMobile = useBreakpoint(768)
 
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isProDialogOpen, setIsProDialogOpen] = useState(false)
@@ -147,9 +145,6 @@ export function MultiModelSelector({
       </div>
     )
   }
-
-  // Get the hovered model data
-  const hoveredModelData = models.find((model) => model.id === hoveredModel)
 
   const filteredModels = filterAndSortModels(
     models,
@@ -309,21 +304,25 @@ export function MultiModelSelector({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
-                  className
-                )}
-                type="button"
-              >
-                <span>Select models</span>
-                <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className={cn(
+                      "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
+                      className
+                    )}
+                    type="button"
+                  />
+                }
+              />
+            }
+          >
+            <span>Select models</span>
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Select models</TooltipContent>
         </Tooltip>
@@ -341,7 +340,7 @@ export function MultiModelSelector({
           currentModel={selectedProModel || ""}
         />
         <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerTrigger render={trigger} />
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>
@@ -405,17 +404,11 @@ export function MultiModelSelector({
           onOpenChange={(open) => {
             setIsDropdownOpen(open)
             if (!open) {
-              setHoveredModel(null)
               setSearchQuery("")
-            } else {
-              if (selectedModelIds.length > 0)
-                setHoveredModel(selectedModelIds[0])
             }
           }}
         >
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>
             Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
           </TooltipContent>
@@ -464,16 +457,6 @@ export function MultiModelSelector({
                       )}
                       closeOnClick={false}
                       onClick={() => handleModelToggle(model.id, isLocked)}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
                     >
                       <div className="flex items-center gap-3">
                         {provider?.icon && <provider.icon className="size-5" />}
@@ -509,12 +492,6 @@ export function MultiModelSelector({
               )}
             </div>
 
-            {/* Submenu positioned absolutely */}
-            {hoveredModelData && (
-              <div className="absolute top-0 left-[calc(100%+8px)]">
-                <SubMenu hoveredModelData={hoveredModelData} />
-              </div>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </Tooltip>

@@ -4,6 +4,7 @@ import { ChatInput } from "@/app/components/chat-input/chat-input"
 import { Conversation } from "@/app/components/chat/conversation"
 import { useModel } from "@/app/components/chat/use-model"
 import { useChatDraft } from "@/app/hooks/use-chat-draft"
+import { useGlobalPromptFocus } from "@/app/hooks/use-global-prompt-focus"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
@@ -89,24 +90,23 @@ export function Chat() {
     []
   )
 
-  // Chat operations (utils + handlers) - created first
-  const { checkLimitsAndNotify, ensureChatExists, handleDelete } =
+  // Chat operations (pure async utilities) - created first
+  const { checkLimitsAndNotify, ensureChatExists } =
     useChatOperations({
       isAuthenticated,
       chatId,
-      messages: initialMessages,
       selectedModel,
       systemPrompt,
       createNewChat,
       setHasDialogAuth,
-      setMessages: () => {},
-      setInput: () => {},
     })
 
   // Core chat functionality (initialization + state + actions)
   const {
     messages,
-    input,
+    setMessages,
+    initialInputValue,
+    registerInputListener,
     status,
     stop,
     hasSentFirstMessage,
@@ -138,6 +138,22 @@ export function Chat() {
     deleteMessagesFromTimestamp,
   })
 
+  // Local delete handler — filters a message from the local array
+  const handleDelete = useCallback(
+    (id: string) => {
+      setMessages((prev) => prev.filter((message) => message.id !== id))
+    },
+    [setMessages]
+  )
+
+  // Auto-focus chat textarea when user types a printable character anywhere
+  const focusTextareaRef = useRef<(() => void) | null>(null)
+  useGlobalPromptFocus(focusTextareaRef)
+
+  const registerFocus = useCallback((fn: (() => void) | null) => {
+    focusTextareaRef.current = fn
+  }, [])
+
   // Memoize the conversation props to prevent unnecessary rerenders
   const conversationProps = useMemo(
     () => ({
@@ -165,7 +181,6 @@ export function Chat() {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-      value: input,
       onSuggestion: handleSuggestion,
       onValueChange: handleInputChange,
       onSend: submit,
@@ -183,9 +198,10 @@ export function Chat() {
       setEnableSearch,
       enableSearch,
       quotedText,
+      registerInputListener,
+      registerFocus,
     }),
     [
-      input,
       handleSuggestion,
       handleInputChange,
       submit,
@@ -204,6 +220,8 @@ export function Chat() {
       setEnableSearch,
       enableSearch,
       quotedText,
+      registerInputListener,
+      registerFocus,
     ]
   )
 
@@ -254,7 +272,7 @@ export function Chat() {
               },
             }}
           >
-            <h1 className="mb-6 text-3xl font-medium tracking-tight">
+            <h1 className="mb-6 text-3xl font-medium tracking-tight text-balance">
               What&apos;s on your mind?
             </h1>
           </motion.div>
@@ -275,7 +293,7 @@ export function Chat() {
           },
         }}
       >
-        <ChatInput {...chatInputProps} />
+        <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />

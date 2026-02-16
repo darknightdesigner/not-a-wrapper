@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface GoogleIconProps extends SVGProps<SVGSVGElement> {
+export type GoogleIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const GoogleIcon = forwardRef<SVGSVGElement, GoogleIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

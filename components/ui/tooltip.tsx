@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -39,19 +38,10 @@ function Tooltip({
 }
 
 function TooltipTrigger({
-  asChild,
-  children,
   ...props
-}: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
-  const adapted = adaptAsChild(asChild, children)
+}: TooltipPrimitive.Trigger.Props) {
   return (
-    <TooltipPrimitive.Trigger
-      data-slot="tooltip-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </TooltipPrimitive.Trigger>
+    <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
   )
 }
 
@@ -81,7 +71,7 @@ function TooltipContent({
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            "bg-foreground text-background z-50 w-fit rounded-md px-3 py-1.5 text-xs text-balance",
+            "bg-foreground text-background z-50 w-fit rounded-md px-2 py-1 text-xs font-medium text-balance",
             className
           )}
           {...props}

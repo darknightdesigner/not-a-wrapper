@@ -42,18 +42,22 @@ export function ButtonFileUpload({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="Add files"
-              >
-                <HugeiconsIcon icon={AttachmentIcon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="Add files"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={AttachmentIcon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
         </Tooltip>
@@ -72,18 +76,22 @@ export function ButtonFileUpload({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-                type="button"
-                aria-label="Add files"
-              >
-                <HugeiconsIcon icon={AttachmentIcon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="Add files"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={AttachmentIcon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
         </Tooltip>
@@ -100,22 +108,26 @@ export function ButtonFileUpload({
       accept={ACCEPTED_FILE_PICKER_TYPES}
     >
       <Tooltip>
-        <TooltipTrigger asChild>
-          <FileUploadTrigger asChild>
-            <Button
-              size="sm"
-              variant="secondary"
-              className={cn(
-                "border-border dark:bg-secondary size-9 rounded-full border bg-transparent",
-                !isUserAuthenticated && "opacity-50"
-              )}
-              type="button"
-              disabled={!isUserAuthenticated}
-              aria-label="Add files"
-            >
-              <HugeiconsIcon icon={AttachmentIcon} size={16} />
-            </Button>
-          </FileUploadTrigger>
+        <TooltipTrigger
+          render={
+            <FileUploadTrigger
+              render={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className={cn(
+                    "border-border dark:bg-secondary size-9 rounded-full border bg-transparent",
+                    !isUserAuthenticated && "opacity-50"
+                  )}
+                  type="button"
+                  disabled={!isUserAuthenticated}
+                  aria-label="Add files"
+                />
+              }
+            />
+          }
+        >
+          <HugeiconsIcon icon={AttachmentIcon} size={16} />
         </TooltipTrigger>
         <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
       </Tooltip>

@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface ClaudeIconProps extends SVGProps<SVGSVGElement> {
+export type ClaudeIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const ClaudeIcon = forwardRef<SVGSVGElement, ClaudeIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

@@ -47,11 +47,11 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           <div />
           {!isLoggedIn ? (
             <div className="pointer-events-auto flex flex-1 items-center justify-end gap-2">
-              <Button variant="outline" asChild>
-                <Link href="/auth/login">Login</Link>
+              <Button variant="outline" render={<Link href="/auth/login" />}>
+                Login
               </Button>
-              <Button asChild>
-                <Link href="/auth/sign-up">Sign up</Link>
+              <Button render={<Link href="/auth/sign-up" />}>
+                Sign up
               </Button>
             </div>
           ) : (

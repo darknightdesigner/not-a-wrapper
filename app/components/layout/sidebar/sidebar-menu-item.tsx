@@ -130,7 +130,7 @@ export const SidebarMenuItem = forwardRef<
   if (isCollapsed) {
     return (
       <Tooltip>
-        <TooltipTrigger asChild>{itemElement}</TooltipTrigger>
+        <TooltipTrigger render={itemElement} />
         <TooltipContent side="right" sideOffset={10}>
           {label}
         </TooltipContent>

@@ -28,6 +28,7 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
+import { useStickToBottomContext } from "use-stick-to-bottom"
 
 const getTextFromDataUrl = (dataUrl: string) => {
   const base64 = dataUrl.split(",")[1]
@@ -71,6 +72,8 @@ export function MessageUser({
   const [isEditing, setIsEditing] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const savedScrollTopRef = useRef<number | null>(null)
+  const { stopScroll, scrollRef } = useStickToBottomContext()
 
   const handleEditCancel = () => {
     setIsEditing(false)
@@ -100,18 +103,34 @@ export function MessageUser({
     }
   }
 
-  const handleEditStart = async () => {
+  const handleEditStart = () => {
+    savedScrollTopRef.current = scrollRef.current?.scrollTop ?? null
     setIsEditing(true)
     setEditInput(children)
   }
 
+  // Auto-resize textarea on content change
   useEffect(() => {
     if (!isEditing) return
     const editTextarea = textareaRef.current
     if (!editTextarea) return
     editTextarea.style.height = "auto"
-    editTextarea.style.height = `${Math.min(editTextarea.scrollHeight, editTextarea.scrollHeight)}px`
+    editTextarea.style.height = `${editTextarea.scrollHeight}px`
   }, [editInput, isEditing])
+
+  // Focus textarea and preserve scroll position when entering edit mode
+  useEffect(() => {
+    if (!isEditing) return
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus({ preventScroll: true })
+      stopScroll()
+      const scrollEl = scrollRef.current
+      if (scrollEl && savedScrollTopRef.current !== null) {
+        scrollEl.scrollTop = savedScrollTopRef.current
+        savedScrollTopRef.current = null
+      }
+    })
+  }, [isEditing, stopScroll, scrollRef])
 
   return (
     <MessageContainer
@@ -165,7 +184,7 @@ export function MessageUser({
       ))}
       {isEditing ? (
         <div
-          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-3xl px-5 py-2.5"
+          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-3xl px-4 py-2"
           style={{
             width: contentRef.current?.offsetWidth,
           }}
@@ -184,7 +203,6 @@ export function MessageUser({
                 handleEditCancel()
               }
             }}
-            autoFocus
             style={{
               maxHeight: "50vh",
               overflowY: "auto",
@@ -195,13 +213,13 @@ export function MessageUser({
               Cancel
             </Button>
             <Button size="sm" onClick={handleSave} disabled={!editInput.trim()}>
-              Save
+              Send
             </Button>
           </div>
         </div>
       ) : (
         <MessageContent
-          className="bg-accent prose dark:prose-invert relative max-w-[70%] rounded-3xl px-5 py-2.5"
+          className="bg-accent prose dark:prose-invert relative max-w-[70%] rounded-3xl px-4 py-2"
           markdown={true}
           ref={contentRef}
           components={{
@@ -222,18 +240,18 @@ export function MessageUser({
           {children}
         </MessageContent>
       )}
-      <MessageActions className="flex gap-0 opacity-0 transition-opacity duration-0 group-hover:opacity-100">
+      <MessageActions className="flex gap-0">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
             aria-label="Copy text"
             onClick={copyToClipboard}
             type="button"
           >
 {copied ? (
-              <HugeiconsIcon icon={Tick02Icon} size={16} />
+              <HugeiconsIcon icon={Tick02Icon} size={20} />
             ) : (
-              <HugeiconsIcon icon={Copy01Icon} size={16} />
+              <HugeiconsIcon icon={Copy01Icon} size={20} />
             )}
           </button>
         </MessageAction>
@@ -245,15 +263,15 @@ export function MessageUser({
             delay={0}
           >
             <button
-              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
               aria-label={isEditing ? "Cancel edit" : "Edit message"}
               onClick={isEditing ? handleEditCancel : handleEditStart}
               type="button"
             >
               {isEditing ? (
-                <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
+                <HugeiconsIcon icon={PencilEdit02Icon} size={20} />
               ) : (
-                <HugeiconsIcon icon={PencilEdit01Icon} size={16} />
+                <HugeiconsIcon icon={PencilEdit01Icon} size={20} />
               )}
             </button>
           </MessageAction>

@@ -9,7 +9,7 @@ Scan and fix issues left over from the Radix UI → Base UI (`@base-ui/react`) m
 
 ## Background
 
-This project migrated from Radix UI to Base UI in February 2026. The `components/ui/` wrappers use a compatibility shim (`lib/as-child-adapter.ts`) that translates Radix's `asChild` prop to Base UI's `render` prop. Several Radix-era patterns silently break under Base UI because the wrappers accept deprecated props without error but discard them.
+This project migrated from Radix UI to Base UI in February 2026. Composition is now standardized on Base UI's native `render` prop pattern. Several Radix-era patterns still silently break under Base UI when legacy assumptions are carried into app code.
 
 ## Audit Checklist
 
@@ -119,7 +119,7 @@ className="transition-[opacity,transform] data-[starting-style]:scale-95 ..."
 Search app/ for components that:
 1. Are rendered inside DropdownMenuContent (directly or via shared menuContent)
 2. Contain <Dialog>, <Drawer>, or <Popover> roots
-3. Use <DialogTrigger asChild> / <DrawerTrigger asChild> wrapping a DropdownMenuItem
+3. Use menu items that open dialogs/drawers/popovers while those roots are still nested under DropdownMenuContent
 ```
 
 **Fix pattern**: Separate the menu item from the dialog. Render the dialog outside the dropdown tree.
@@ -129,8 +129,8 @@ Search app/ for components that:
 <DropdownMenu>
   <DropdownMenuContent>
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <DropdownMenuItem>Settings</DropdownMenuItem>
+      <DialogTrigger render={<DropdownMenuItem nativeButton={false} />}>
+        Settings
       </DialogTrigger>
       <DialogContent>...</DialogContent>
     </Dialog>
@@ -163,7 +163,7 @@ This fires when a Base UI trigger (Dialog, Menu, Popover, Collapsible) renders a
 
 **Scan command**:
 ```
-Search app/ for: Trigger asChild> or render={
+Search app/ for: render={
 Then check: Is the child a native <button> or a component that renders <button>?
 ```
 
@@ -171,36 +171,34 @@ Then check: Is the child a native <button> or a component that renders <button>?
 
 ```tsx
 // Child is a <div>-based component (e.g. DropdownMenuItem) — needs nativeButton={false}
-<DialogTrigger asChild nativeButton={false}>
-  <DropdownMenuItem>Open</DropdownMenuItem>
+<DialogTrigger render={<DropdownMenuItem />} nativeButton={false}>
+  Open
 </DialogTrigger>
 
 // Child IS a <button> (e.g. Button, SidebarMenuButton) — no prop needed
-<DropdownMenuTrigger asChild>
-  <SidebarMenuButton>Menu</SidebarMenuButton>
-</DropdownMenuTrigger>
+<DropdownMenuTrigger render={<SidebarMenuButton />}>Menu</DropdownMenuTrigger>
 ```
 
-**Note**: Prefer fixing issue #4 (dialogs inside dropdowns) first — if you lift the dialog out of the dropdown, you won't need `asChild` on DialogTrigger with a DropdownMenuItem at all.
+**Note**: Prefer fixing issue #4 (dialogs inside dropdowns) first — if you lift the dialog out of the dropdown, you often won't need trigger composition for menu-item driven dialogs at all.
 
-### 6. `asChild` on Non-Trigger Components
+### 6. Legacy Composition Patterns
 
-**What to look for**: `asChild` used on components that don't support it in Base UI (e.g., content wrappers, non-interactive elements).
+**What to look for**: Composition attempts that do not follow the `render` prop pattern (for example, wrapping non-button elements without `nativeButton={false}`, or using custom wrappers that bypass `useRender` in slot-style components).
 
 **Scan command**:
 ```
-Search app/ for: asChild
-Cross-reference with components/ui/ to verify the wrapper supports asChild
+Search app/ and components/ui/ for: render={
+Cross-reference with wrapper types to verify the target component supports render composition correctly
 ```
 
-**Supported wrappers** (have `adaptAsChild` in their implementation):
-- `DialogTrigger`, `DrawerTrigger`, `DrawerClose`
-- `DropdownMenuTrigger`
-- `PopoverTrigger`
-- `TooltipTrigger`
-- `CollapsibleTrigger`
-- `HoverCardTrigger`
-- `Button` (via `adaptSlotAsChild`)
+**Target pattern**:
+```tsx
+// Trigger components — render prop is inherited from Base UI primitive
+<DialogTrigger render={<Button variant="outline" />}>Open</DialogTrigger>
+
+// Slot-style components — render prop via useRender hook
+<Button render={<Link href="/" />}>Home</Button>
+```
 
 ## Audit Workflow
 
@@ -208,7 +206,7 @@ Cross-reference with components/ui/ to verify the wrapper supports asChild
 2. **Triage** — Categorize findings by severity:
    - **P0 (broken)**: Dialogs that flash/disappear, click handlers that do nothing
    - **P1 (console noise)**: `nativeButton` warnings, deprecated prop warnings
-   - **P2 (tech debt)**: `asChild` usages that should migrate to `render` prop
+   - **P2 (tech debt)**: composition patterns that should be normalized to `render` + `useRender`
 3. **Fix** — Apply fix patterns, prioritizing P0 issues
 4. **Verify** — Run `bun run lint` and `bun run typecheck`, then test in browser
 
@@ -216,16 +214,17 @@ Cross-reference with components/ui/ to verify the wrapper supports asChild
 
 | Radix Pattern | Base UI Equivalent |
 |--------------|-------------------|
-| `asChild` | `render={<Element />}` (via shim for now) |
+| `asChild` (on triggers) | `render={<Element />}` — native Base UI prop on trigger primitives |
+| `asChild` (on slot-style: Button, Badge, etc.) | `useRender` hook + `mergeProps` for `render` prop support |
+| Legacy Slot polymorphism | `useRender` + `mergeProps` (see `base-ui-useRender` skill) |
 | `onSelect` (MenuItem) | `onClick` (action) + `closeOnClick={false}` (keep open) |
 | `onSelect` + `e.preventDefault()` | `closeOnClick={false}` on `Menu.Item` |
 | `onInteractOutside` | Controlled `open` + `onOpenChange` |
 | `onCloseAutoFocus` | Manual focus management |
-| `onEscapeKeyDown` | Handled by `onOpenChange(false)` |
+| `onEscapeKeyDown` | Handled by `onOpenChange(false)` or `eventDetails.cancel()` |
 | `forceMount` | Controlled `open` state |
 | `onOpenAutoFocus` | No equivalent; use `autoFocus` or `useEffect` |
 | `modal` (Dialog) | `modal` (same API) |
-| `Slot` | `useRender` / `render` prop |
 
 ## Gold Standard: Fixed Patterns
 

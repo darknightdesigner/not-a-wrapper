@@ -38,7 +38,6 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useRef, useState } from "react"
 import { ProModelDialog } from "./pro-dialog"
-import { SubMenu } from "./sub-menu"
 
 type ModelSelectorProps = {
   selectedModelId: string
@@ -62,7 +61,6 @@ export function ModelSelector({
   )
   const isMobile = useBreakpoint(768)
 
-  const [hoveredModel, setHoveredModel] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const [isProDialogOpen, setIsProDialogOpen] = useState(false)
@@ -125,9 +123,6 @@ export function ModelSelector({
     )
   }
 
-  // Get the hovered model data
-  const hoveredModelData = models.find((model) => model.id === hoveredModel)
-
   const filteredModels = filterAndSortModels(
     models,
     favoriteModels || [],
@@ -157,11 +152,7 @@ export function ModelSelector({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              {trigger}
-            </PopoverTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<PopoverTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>Select a model</TooltipContent>
         </Tooltip>
         <PopoverContentAuth />
@@ -178,7 +169,7 @@ export function ModelSelector({
           currentModel={selectedProModel || ""}
         />
         <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerTrigger render={trigger} />
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>Select Model</DrawerTitle>
@@ -240,21 +231,17 @@ export function ModelSelector({
           onOpenChange={(open) => {
             setIsDropdownOpen(open)
             if (!open) {
-              setHoveredModel(null)
               setSearchQuery("")
-            } else {
-              if (selectedModelId) setHoveredModel(selectedModelId)
             }
           }}
         >
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>Switch model ⌘⇧P</TooltipContent>
           <DropdownMenuContent
             className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
+            animated={false}
             side="top"
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
@@ -303,16 +290,6 @@ export function ModelSelector({
                         setSelectedModelId(model.id)
                         setIsDropdownOpen(false)
                       }}
-                      onFocus={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
-                      onMouseEnter={() => {
-                        if (isDropdownOpen) {
-                          setHoveredModel(model.id)
-                        }
-                      }}
                     >
                       <div className="flex items-center gap-3">
                         {provider?.icon && <provider.icon className="size-5" />}
@@ -345,12 +322,6 @@ export function ModelSelector({
               )}
             </div>
 
-            {/* Submenu positioned absolutely */}
-            {hoveredModelData && (
-              <div className="absolute top-0 left-[calc(100%+8px)]">
-                <SubMenu hoveredModelData={hoveredModelData} />
-              </div>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </Tooltip>

@@ -80,7 +80,7 @@ export function SystemPromptSection() {
           )}
         </AnimatePresence>
       </div>
-      <p className="text-muted-foreground mt-2 text-xs">
+      <p className="text-muted-foreground mt-2 text-xs text-pretty">
         This prompt will be used for new chats.
       </p>
     </div>

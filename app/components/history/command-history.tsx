@@ -49,7 +49,7 @@ type CommandHistoryProps = {
   chatHistory: Chats[]
   onSaveEdit: (id: string, newTitle: string) => Promise<void>
   onConfirmDelete: (id: string) => Promise<void>
-  trigger: React.ReactNode
+  trigger: React.ReactElement
   isOpen: boolean
   setIsOpen: (open: boolean) => void
   onOpenChange?: (open: boolean) => void
@@ -108,31 +108,35 @@ function CommandItemEdit({
       />
       <div className="ml-2 flex gap-1">
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="group/edit-confirm text-muted-foreground hover:bg-primary/10 size-8"
-              type="submit"
-              aria-label="Confirm"
-            >
-              <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/edit-confirm:text-primary" />
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="group/edit-confirm text-muted-foreground hover:bg-primary/10 size-8"
+                type="submit"
+                aria-label="Confirm"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/edit-confirm:text-primary" />
           </TooltipTrigger>
           <TooltipContent>Confirm</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="group/edit-cancel text-muted-foreground hover:bg-primary/10 size-8"
-              type="button"
-              onClick={onCancel}
-              aria-label="Cancel"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/edit-cancel:text-primary" />
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="group/edit-cancel text-muted-foreground hover:bg-primary/10 size-8"
+                type="button"
+                onClick={onCancel}
+                aria-label="Cancel"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/edit-cancel:text-primary" />
           </TooltipTrigger>
           <TooltipContent>Cancel</TooltipContent>
         </Tooltip>
@@ -174,31 +178,35 @@ function CommandItemDelete({
       </div>
       <div className="ml-2 flex gap-1">
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="group/delete-confirm text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
-              type="submit"
-              aria-label="Confirm"
-            >
-              <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/delete-confirm:text-primary" />
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="group/delete-confirm text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
+                type="submit"
+                aria-label="Confirm"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Tick02Icon} size={16} className="group-hover/delete-confirm:text-primary" />
           </TooltipTrigger>
           <TooltipContent>Confirm</TooltipContent>
         </Tooltip>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="group/delete-cancel text-muted-foreground hover:text-foreground hover:bg-primary/10 size-8"
-              onClick={onCancel}
-              type="button"
-              aria-label="Cancel"
-            >
-              <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/delete-cancel:text-primary" />
-            </Button>
+          <TooltipTrigger
+            render={
+              <Button
+                size="icon"
+                variant="ghost"
+                className="group/delete-cancel text-muted-foreground hover:text-foreground hover:bg-primary/10 size-8"
+                onClick={onCancel}
+                type="button"
+                aria-label="Cancel"
+              />
+            }
+          >
+            <HugeiconsIcon icon={Cancel01Icon} size={16} className="group-hover/delete-cancel:text-primary" />
           </TooltipTrigger>
           <TooltipContent>Cancel</TooltipContent>
         </Tooltip>
@@ -235,62 +243,68 @@ function CommandItemRow({
 
         <div className="absolute right-0 flex gap-1 opacity-0 group-hover:opacity-100">
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  togglePinned(chat.id, !chat.pinned)
-                }}
-                disabled={!!editingId || !!deletingId}
-                aria-label={chat.pinned ? "Unpin" : "Pin"}
-              >
-                {chat.pinned ? (
-                  <HugeiconsIcon icon={PinOff} size={12} className="group-hover/edit:text-primary" />
-                ) : (
-                  <HugeiconsIcon icon={Pin} size={12} className="group-hover/edit:text-primary" />
-                )}
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    togglePinned(chat.id, !chat.pinned)
+                  }}
+                  disabled={!!editingId || !!deletingId}
+                  aria-label={chat.pinned ? "Unpin" : "Pin"}
+                />
+              }
+            >
+              {chat.pinned ? (
+                <HugeiconsIcon icon={PinOff} size={12} className="group-hover/edit:text-primary" />
+              ) : (
+                <HugeiconsIcon icon={Pin} size={12} className="group-hover/edit:text-primary" />
+              )}
             </TooltipTrigger>
             <TooltipContent>{chat.pinned ? "Unpin" : "Pin"}</TooltipContent>
           </Tooltip>
 
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onEdit(chat)
-                }}
-                disabled={!!editingId || !!deletingId}
-                aria-label="Edit"
-              >
-                <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="group-hover/edit:text-primary" />
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="group/edit text-muted-foreground hover:bg-primary/10 size-8"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onEdit(chat)
+                  }}
+                  disabled={!!editingId || !!deletingId}
+                  aria-label="Edit"
+                />
+              }
+            >
+              <HugeiconsIcon icon={PencilEdit01Icon} size={16} className="group-hover/edit:text-primary" />
             </TooltipTrigger>
             <TooltipContent>Edit</TooltipContent>
           </Tooltip>
 
           <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="group/delete text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onDelete(chat.id)
-                }}
-                disabled={!!editingId || !!deletingId}
-                aria-label="Delete"
-              >
-                <HugeiconsIcon icon={Delete01Icon} size={16} className="group-hover/delete:text-primary" />
-              </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="group/delete text-muted-foreground hover:text-destructive-foreground hover:bg-primary/10 size-8"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete(chat.id)
+                  }}
+                  disabled={!!editingId || !!deletingId}
+                  aria-label="Delete"
+                />
+              }
+            >
+              <HugeiconsIcon icon={Delete01Icon} size={16} className="group-hover/delete:text-primary" />
             </TooltipTrigger>
             <TooltipContent>Delete</TooltipContent>
           </Tooltip>
@@ -569,7 +583,7 @@ export function CommandHistory({
     <>
       {hasPopover ? (
         <Tooltip>
-          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipTrigger render={trigger} />
           <TooltipContent>History ⌘+K</TooltipContent>
         </Tooltip>
       ) : (

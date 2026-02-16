@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface AnthropicIconProps extends SVGProps<SVGSVGElement> {
+export type AnthropicIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const AnthropicIcon = forwardRef<SVGSVGElement, AnthropicIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

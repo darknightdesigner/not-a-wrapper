@@ -90,16 +90,18 @@ function NavigationMenuTrigger({
 
 function NavigationMenuContent({
   className,
+  style,
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Content>) {
   return (
     <NavigationMenuPrimitive.Content
       data-slot="navigation-menu-content"
       className={cn(
-        "data-[open]:animate-in data-[closed]:animate-out data-[open]:fade-in data-[closed]:fade-out data-[open]:data-[activation-direction=right]:slide-in-from-right-52 data-[open]:data-[activation-direction=left]:slide-in-from-left-52 data-[closed]:data-[activation-direction=right]:slide-out-to-left-52 data-[closed]:data-[activation-direction=left]:slide-out-to-right-52 top-0 left-0 w-full p-2 pr-2.5 md:absolute md:w-auto",
-        "group-data-[viewport=false]/navigation-menu:bg-popover group-data-[viewport=false]/navigation-menu:text-popover-foreground group-data-[viewport=false]/navigation-menu:data-[open]:animate-in group-data-[viewport=false]/navigation-menu:data-[closed]:animate-out group-data-[viewport=false]/navigation-menu:data-[closed]:zoom-out-95 group-data-[viewport=false]/navigation-menu:data-[open]:zoom-in-95 group-data-[viewport=false]/navigation-menu:data-[open]:fade-in-0 group-data-[viewport=false]/navigation-menu:data-[closed]:fade-out-0 group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden group-data-[viewport=false]/navigation-menu:rounded-md group-data-[viewport=false]/navigation-menu:border group-data-[viewport=false]/navigation-menu:shadow group-data-[viewport=false]/navigation-menu:duration-200 **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none",
+        "top-0 left-0 w-full p-2 pr-2.5 md:absolute md:w-auto data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
+        "group-data-[viewport=false]/navigation-menu:bg-popover group-data-[viewport=false]/navigation-menu:text-popover-foreground group-data-[viewport=false]/navigation-menu:data-[starting-style]:opacity-0 group-data-[viewport=false]/navigation-menu:data-[ending-style]:opacity-0 group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden group-data-[viewport=false]/navigation-menu:rounded-md group-data-[viewport=false]/navigation-menu:border group-data-[viewport=false]/navigation-menu:shadow **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none",
         className
       )}
+      style={{ transition: "opacity 200ms ease-out", ...style }}
       {...props}
     />
   )
@@ -118,9 +120,12 @@ function NavigationMenuViewport({
       <NavigationMenuPrimitive.Popup
         data-slot="navigation-menu-viewport"
         className={cn(
-          "origin-top-center bg-popover text-popover-foreground data-[open]:animate-in data-[closed]:animate-out data-[closed]:zoom-out-95 data-[open]:zoom-in-90 relative h-(--popup-height) w-full overflow-hidden rounded-md border shadow md:w-(--popup-width)",
+          "origin-top-center bg-popover text-popover-foreground relative h-(--popup-height) w-full overflow-hidden rounded-md border shadow md:w-(--popup-width) data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
           className
         )}
+        style={{
+          transition: "opacity 200ms ease-out, transform 200ms ease-out",
+        }}
       >
         <NavigationMenuPrimitive.Viewport {...props} />
       </NavigationMenuPrimitive.Popup>
@@ -144,30 +149,6 @@ function NavigationMenuLink({
   )
 }
 
-/**
- * @deprecated Base UI NavigationMenu has no Indicator equivalent.
- * This renders a static div — it does NOT track or animate between
- * active trigger positions like the original Radix NavigationMenu.Indicator.
- * Remove this export or implement custom tracking logic if needed.
- */
-function NavigationMenuIndicator({
-  className,
-  ...props
-}: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="navigation-menu-indicator"
-      className={cn(
-        "top-full z-[1] flex h-1.5 items-end justify-center overflow-hidden",
-        className
-      )}
-      {...props}
-    >
-      <div className="bg-border relative top-[60%] h-2 w-2 rotate-45 rounded-tl-sm shadow-md" />
-    </div>
-  )
-}
-
 export {
   NavigationMenu,
   NavigationMenuList,
@@ -175,7 +156,6 @@ export {
   NavigationMenuContent,
   NavigationMenuTrigger,
   NavigationMenuLink,
-  NavigationMenuIndicator,
   NavigationMenuViewport,
   navigationMenuTriggerStyle,
 }

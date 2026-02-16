@@ -17,7 +17,7 @@ import {
 import { AnimatePresence, motion } from "framer-motion"
 import { useMemo, useState } from "react"
 
-interface ToolInvocationProps {
+type ToolInvocationProps = {
   toolInvocations: ToolUIPart[]
   className?: string
   defaultOpen?: boolean

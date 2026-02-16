@@ -186,21 +186,26 @@ export function AppSidebar() {
                     <HugeiconsIcon icon={Cancel01Icon} size={24} />
                   </button>
                 ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Link
-                        href="/"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
-                        data-sidebar-item="true"
-                      >
-                        <NawIcon className="size-5" />
-                      </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">Home</TooltipContent>
-                  </Tooltip>
+                  <Link
+                    href="/"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
+                    data-sidebar-item="true"
+                    aria-label="Home"
+                  >
+                    <NawIcon className="size-5" />
+                  </Link>
                 )}
                 {/* Toggle button with resize cursor */}
-                <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                    }
+                  />
+                  <TooltipContent side="bottom" align="center">
+                    Close sidebar
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -330,13 +335,15 @@ export function AppSidebar() {
               <UserMenu variant="sidebar" />
             ) : (
               <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link
-                    href="/auth/login"
-                    className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium"
-                  >
-                    Log in
-                  </Link>
+                <TooltipTrigger
+                  render={
+                    <Link
+                      href="/auth/login"
+                      className="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex h-9 w-full items-center justify-center rounded-md border border-border px-4 text-sm font-medium"
+                    />
+                  }
+                >
+                  Log in
                 </TooltipTrigger>
                 <TooltipContent side="right">Log in</TooltipContent>
               </Tooltip>
@@ -361,24 +368,26 @@ function CollapsedHeaderToggle() {
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-          aria-label="Open sidebar"
-        >
-          {/* Default: Logo icon */}
-          <NawIcon className="size-5 group-hover/toggle:hidden group-focus-visible/toggle:hidden" />
-          {/* Hover: Sidebar icon */}
-          <HugeiconsIcon
-            icon={PanelLeft}
-            size={20}
-            className="hidden group-hover/toggle:block group-focus-visible/toggle:block"
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            aria-label="Open sidebar"
           />
-        </button>
+        }
+      >
+        {/* Default: Logo icon */}
+        <NawIcon className="size-5 group-hover/toggle:hidden group-focus-visible/toggle:hidden" />
+        {/* Hover: Sidebar icon */}
+        <HugeiconsIcon
+          icon={PanelLeft}
+          size={20}
+          className="hidden group-hover/toggle:block group-focus-visible/toggle:block"
+        />
       </TooltipTrigger>
-      <TooltipContent side="right">Open sidebar (⌘B)</TooltipContent>
+      <TooltipContent side="right">Open sidebar</TooltipContent>
     </Tooltip>
   )
 }
@@ -419,21 +428,21 @@ function CollapsedMenuItem({
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        {href ? (
-          <Link href={href} className={className} data-sidebar-item="true">
-            {content}
-          </Link>
-        ) : (
-          <button
-            type="button"
-            onClick={onClick}
-            className={className}
-            data-sidebar-item="true"
-          >
-            {content}
-          </button>
-        )}
+      <TooltipTrigger
+        render={
+          href ? (
+            <Link href={href} className={className} data-sidebar-item="true" />
+          ) : (
+            <button
+              type="button"
+              onClick={onClick}
+              className={className}
+              data-sidebar-item="true"
+            />
+          )
+        }
+      >
+        {content}
       </TooltipTrigger>
       <TooltipContent side="right">{tooltipContent}</TooltipContent>
     </Tooltip>
@@ -450,13 +459,15 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
   if (!user) {
     return (
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            href="/auth/login"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent mx-auto"
-          >
-            <NawIcon className="size-5" />
-          </Link>
+        <TooltipTrigger
+          render={
+            <Link
+              href="/auth/login"
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent mx-auto"
+            />
+          }
+        >
+          <NawIcon className="size-5" />
         </TooltipTrigger>
         <TooltipContent side="right">Log in</TooltipContent>
       </Tooltip>
@@ -465,29 +476,31 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          type="button"
-          onClick={toggleSidebar}
-          className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-          aria-label={`${user.display_name} - Open profile`}
-        >
-          <div className="flex items-center justify-center">
-            {user.profile_image ? (
-              <Image
-                src={user.profile_image}
-                alt=""
-                width={24}
-                height={24}
-                className="h-6 w-6 shrink-0 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-medium text-white">
-                {user.display_name?.slice(0, 2).toUpperCase()}
-              </div>
-            )}
-          </div>
-        </button>
+      <TooltipTrigger
+        render={
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            aria-label={`${user.display_name} - Open profile`}
+          />
+        }
+      >
+        <div className="flex items-center justify-center">
+          {user.profile_image ? (
+            <Image
+              src={user.profile_image}
+              alt=""
+              width={24}
+              height={24}
+              className="h-6 w-6 shrink-0 rounded-full object-cover"
+            />
+          ) : (
+            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-medium text-white">
+              {user.display_name?.slice(0, 2).toUpperCase()}
+            </div>
+          )}
+        </div>
       </TooltipTrigger>
       <TooltipContent side="right">{user.display_name || "Account"}</TooltipContent>
     </Tooltip>

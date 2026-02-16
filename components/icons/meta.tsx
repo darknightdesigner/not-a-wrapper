@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface MetaIconProps extends SVGProps<SVGSVGElement> {
+export type MetaIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const MetaIcon = forwardRef<SVGSVGElement, MetaIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

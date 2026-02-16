@@ -13,7 +13,7 @@ import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
  * based on what Layer 1 (built-in provider tools) already provides.
  * Route.ts only calls getThirdPartyTools when Layer 1 didn't provide search.
  */
-export interface ThirdPartyToolOptions {
+export type ThirdPartyToolOptions = {
   /**
    * Skip loading search tools.
    * Set to true when Layer 1 already provides a search tool for this provider.

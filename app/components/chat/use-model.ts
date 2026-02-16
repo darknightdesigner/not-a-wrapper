@@ -5,7 +5,7 @@ import { useModel as useModelProvider } from "@/lib/model-store/provider"
 import type { UserProfile } from "@/lib/user/types"
 import { useCallback, useState } from "react"
 
-interface UseModelProps {
+type UseModelProps = {
   currentChat: Chats | null
   user: UserProfile | null
   updateChatModel?: (chatId: string, model: string) => Promise<void>

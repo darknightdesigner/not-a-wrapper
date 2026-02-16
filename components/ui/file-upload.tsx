@@ -1,9 +1,9 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import {
-  Children,
-  cloneElement,
   createContext,
   useCallback,
   useContext,
@@ -130,50 +130,36 @@ function FileUpload({
 }
 
 export type FileUploadTriggerProps =
-  React.ComponentPropsWithoutRef<"button"> & {
-    asChild?: boolean
-  }
+  useRender.ComponentProps<"button">
 
 function FileUploadTrigger({
-  asChild = false,
   className,
-  children,
+  render,
   ...props
 }: FileUploadTriggerProps) {
   const context = useContext(FileUploadContext)
   const handleClick = () => context?.inputRef.current?.click()
 
-  if (asChild) {
-    const child = Children.only(children) as React.ReactElement<
-      React.HTMLAttributes<HTMLElement>
-    >
-    return cloneElement(child, {
-      ...props,
-      role: "button",
-      className: cn(className, child.props.className),
-      onClick: (e: React.MouseEvent) => {
-        e.stopPropagation()
-        handleClick()
-        child.props.onClick?.(e as React.MouseEvent<HTMLElement>)
-      },
-    })
+  const defaultProps: useRender.ElementProps<"button"> = {
+    type: "button",
+    className,
+    disabled: context?.disabled,
+    onClick: (e) => {
+      e.stopPropagation()
+      handleClick()
+    },
   }
 
-  return (
-    <button
-      type="button"
-      className={className}
-      onClick={handleClick}
-      {...props}
-    >
-      {children}
-    </button>
-  )
+  return useRender({
+    defaultTagName: "button",
+    render,
+    props: mergeProps<"button">(defaultProps, props),
+  })
 }
 
 type FileUploadContentProps = React.HTMLAttributes<HTMLDivElement>
 
-function FileUploadContent({ className, ...props }: FileUploadContentProps) {
+function FileUploadContent({ className, style, ...props }: FileUploadContentProps) {
   const context = useContext(FileUploadContext)
   const mounted = useHydrated()
 
@@ -185,9 +171,14 @@ function FileUploadContent({ className, ...props }: FileUploadContentProps) {
     <div
       className={cn(
         "bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm",
-        "animate-in fade-in-0 slide-in-from-bottom-10 zoom-in-90 duration-150",
+        "opacity-100 [transform:translateY(0)_scale(1)]",
+        "starting:opacity-0 starting:[transform:translateY(2.5rem)_scale(0.9)]",
         className
       )}
+      style={{
+        transition: "opacity 150ms ease-out, transform 150ms ease-out",
+        ...style,
+      }}
       {...props}
     />
   )

@@ -27,10 +27,11 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
+import { AppInfoDialog, AppInfoMenuItem } from "./app-info/app-info-trigger"
 import { FeedbackMenuItem, FeedbackDialog } from "./feedback/feedback-trigger"
 import { SettingsMenuItem, SettingsDialog } from "./settings/settings-trigger"
 
-interface UserMenuProps {
+type UserMenuProps = {
   variant?: "header" | "sidebar"
 }
 
@@ -42,6 +43,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [appInfoOpen, setAppInfoOpen] = useState(false)
 
   if (!user) return null
 
@@ -70,6 +72,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
       <DropdownMenuSeparator />
       <SettingsMenuItem onClick={() => setSettingsOpen(true)} />
       <FeedbackMenuItem onClick={() => setFeedbackOpen(true)} />
+      <AppInfoMenuItem onClick={() => setAppInfoOpen(true)} />
       <DropdownMenuSeparator />
       <DropdownMenuItem
         onClick={handleSignOut}
@@ -86,6 +89,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
     <>
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <AppInfoDialog open={appInfoOpen} onOpenChange={setAppInfoOpen} />
     </>
   )
 
@@ -100,33 +104,35 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
               onOpenChange={setMenuOpen}
               modal={false}
             >
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="w-full"
-                  tooltip={user?.display_name || "Account"}
-                >
-                  <Avatar className="size-6 bg-emerald-600">
-                    <AvatarImage src={user?.profile_image ?? undefined} />
-                    <AvatarFallback className="bg-emerald-600 text-xs text-white">
-                      {user?.display_name?.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
-                  <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
-                    <span className="truncate font-semibold">
-                      {user?.display_name}
-                    </span>
-                    <span className="text-muted-foreground truncate text-xs">
-                      {user?.premium ? "Plus" : "Free"}
-                    </span>
-                  </div>
-                  <HugeiconsIcon
-                    icon={UnfoldLessIcon}
-                    size={16}
-                    className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+              <DropdownMenuTrigger
+                render={
+                  <SidebarMenuButton
+                    size="lg"
+                    className="w-full"
+                    tooltip={user?.display_name || "Account"}
                   />
-                </SidebarMenuButton>
+                }
+              >
+                <Avatar className="size-6 bg-emerald-600">
+                  <AvatarImage src={user?.profile_image ?? undefined} />
+                  <AvatarFallback className="bg-emerald-600 text-xs text-white">
+                    {user?.display_name?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
+                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
+                  <span className="truncate font-semibold">
+                    {user?.display_name}
+                  </span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    {user?.premium ? "Plus" : "Free"}
+                  </span>
+                </div>
+                <HugeiconsIcon
+                  icon={UnfoldLessIcon}
+                  size={16}
+                  className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 side="top"
@@ -148,13 +154,11 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
     <>
       <DropdownMenu open={isMenuOpen} onOpenChange={setMenuOpen} modal={false}>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger>
-              <Avatar className="bg-background hover:bg-muted">
-                <AvatarImage src={user?.profile_image ?? undefined} />
-                <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
-              </Avatar>
-            </DropdownMenuTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger />}>
+            <Avatar className="bg-background hover:bg-muted">
+              <AvatarImage src={user?.profile_image ?? undefined} />
+              <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
+            </Avatar>
           </TooltipTrigger>
           <TooltipContent>Profile</TooltipContent>
         </Tooltip>

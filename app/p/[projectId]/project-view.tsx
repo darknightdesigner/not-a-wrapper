@@ -2,7 +2,6 @@
 
 import { ChatInput } from "@/app/components/chat-input/chat-input"
 import { Conversation } from "@/app/components/chat/conversation"
-import { useChatOperations } from "@/app/components/chat/use-chat-operations"
 import { useFileUpload } from "@/app/components/chat/use-file-upload"
 import { useModel } from "@/app/components/chat/use-model"
 import { ProjectChatItem } from "@/app/components/layout/sidebar/project-chat-item"
@@ -31,7 +30,7 @@ import { Chat01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useQuery } from "@tanstack/react-query"
 import { AnimatePresence, motion } from "motion/react"
 import { usePathname } from "next/navigation"
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 type Project = {
   id: string
@@ -45,6 +44,7 @@ type ProjectViewProps = {
 }
 
 export function ProjectView({ projectId }: ProjectViewProps) {
+  const isSendingRef = useRef(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
@@ -210,17 +210,32 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     ]
   )
 
-  const { handleDelete, handleEdit } = useChatOperations({
-    isAuthenticated: true, // Always authenticated in project context
-    chatId: null,
-    messages,
-    selectedModel,
-    systemPrompt: SYSTEM_PROMPT_DEFAULT,
-    createNewChat,
-    setHasDialogAuth: () => {}, // Not used in project context
-    setMessages,
-    setInput, // Now using our local setInput from useState
-  })
+  // Project context doesn't need rate-limit or chat-creation utils from
+  // useChatOperations — only local message handlers are needed here.
+  const handleDelete = useCallback(
+    (id: string) => {
+      setMessages((prev) => prev.filter((message) => message.id !== id))
+    },
+    [setMessages]
+  )
+
+  const handleEdit = useCallback(
+    (id: string, newText: string) => {
+      setMessages((prev) =>
+        prev.map((message) => {
+          if (message.id !== id) return message
+          const nonTextParts =
+            message.parts?.filter((p) => p.type !== "text") ?? []
+          return {
+            ...message,
+            content: newText,
+            parts: [{ type: "text" as const, text: newText }, ...nonTextParts],
+          }
+        })
+      )
+    },
+    [setMessages]
+  )
 
   // Simple input change handler for project context (no draft saving needed)
   const handleInputChange = useCallback(
@@ -231,17 +246,20 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   )
 
   const submit = useCallback(async () => {
+    if (isSendingRef.current) return
+    isSendingRef.current = true
     setIsSubmitting(true)
 
     if (!user?.id) {
       setIsSubmitting(false)
+      isSendingRef.current = false
       return
     }
 
     // Capture current input value before clearing
     const currentInput = input
 
-    const optimisticId = `optimistic-${Date.now().toString()}`
+    const optimisticId = `optimistic-${crypto.randomUUID()}`
     const optimisticAttachments =
       files.length > 0 ? createOptimisticAttachments(files) : []
 
@@ -335,6 +353,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       cleanupOptimisticAttachments(getFileUrlsFromParts())
       toast({ title: "Failed to send message", status: "error" })
     } finally {
+      isSendingRef.current = false
       setIsSubmitting(false)
     }
   }, [
@@ -397,7 +416,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-      value: input,
+      defaultValue: input,
       onSuggestion: () => {},
       onValueChange: handleInputChange,
       onSend: submit,
@@ -464,7 +483,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
           >
             <div className="mb-6 flex items-center justify-center gap-2">
               <HugeiconsIcon icon={Chat01Icon} size={24} className="text-muted-foreground" />
-              <h1 className="text-center text-3xl font-medium tracking-tight">
+              <h1 className="text-center text-3xl font-medium tracking-tight text-balance">
                 {project?.name || ""}
               </h1>
             </div>

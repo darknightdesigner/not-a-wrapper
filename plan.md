@@ -1,247 +1,140 @@
-# Implementation Plan
+# Not A Wrapper — Project Plan
 
-Living document for tracking current work and next steps.
+> **Status**: Active | **Updated**: 2026-02-15 | **Owner**: <!-- TODO -->
 
----
+High-level roadmap connecting vision to execution. Detailed implementation plans live in `.agents/plans/`.
 
-## Current Sprint
-
-### Focus: Prompt-Kit Component Update
-
-**Goal**: Consolidate all prompt-kit components into `components/ui/`, install missing components, and update existing ones to latest versions.
-
----
-
-## Task Status
-
-### ✅ Completed
-- [x] Research tech stack decisions (Convex, Clerk, Flowglad)
-- [x] Document decisions in `.agents/context/research/tech-stack-evaluation.md`
-- [x] Create `AGENTS.md` with project overview
-- [x] Create `CLAUDE.md` with Claude-specific context
-- [x] Create `NOTES.md` for agentic memory
-- [x] Create `spec.md` for requirements
-- [x] Create `plan.md` (this file)
-- [x] Create context directory structure
-  - [x] `.agents/context/architecture.md`
-  - [x] `.agents/context/conventions.md`
-  - [x] `.agents/context/testing.md`
-  - [x] `.agents/context/api.md`
-  - [x] `.agents/context/database.md`
-  - [x] `.agents/context/deployment.md`
-- [x] Set up `.cursor/rules/` directory
-  - [x] `001_core.mdc` (core workspace rules)
-  - [x] `002_security.mdc` (security guidelines)
-  - [x] `100_typescript.mdc` (TypeScript conventions)
-  - [x] `101_react_nextjs.mdc` (React/Next.js patterns)
-  - [x] `200_testing.mdc` (testing patterns)
-  - [x] `201_api.mdc` (API patterns)
-- [x] Configure `.claude/` directory
-  - [x] `settings.json` (team permissions)
-  - [x] `commands/analyze.md`
-  - [x] `commands/refactor.md`
-  - [x] `commands/review.md`
-  - [x] `commands/test.md`
-  - [x] `commands/security/scan.md`
-- [x] Create nested CLAUDE.md files
-  - [x] `app/CLAUDE.md`
-  - [x] `app/api/CLAUDE.md`
-  - [x] `app/auth/CLAUDE.md`
-  - [x] `app/components/CLAUDE.md`
-  - [x] `lib/CLAUDE.md`
-  - [x] `lib/ai/CLAUDE.md`
-  - [x] `components/CLAUDE.md`
-  - [x] `hooks/CLAUDE.md`
-- [x] Implement Development Workflow
-  - [x] Create `.agents/workflows/development-cycle.md` with four-phase cycle, TDD, extended thinking
-  - [x] Create workflow commands: `/research`, `/plan`, `/tdd`, `/verify`, `/commit`
-  - [x] Update `CLAUDE.md` with workflow references
-  - [x] Update `AGENTS.md` with workflow overview
-  - [x] Create `.agents/workflows/examples.md` with practical examples
-
-### ✅ Recently Completed (Sprint 3)
-- [x] Set up Convex project
-  - [x] Install Convex: `bun add convex`
-  - [x] Run `npx convex init`
-  - [x] Create `convex/schema.ts`
-  - [x] Configure Clerk integration
-- [x] Complete Convex migration from Supabase
-- [x] Set up Clerk authentication
-- [x] Split login/sign-up routes with reactive user sync
-- [x] Clean up legacy Supabase files
-
-### 🔄 In Progress
-- [ ] Prompt-Kit component consolidation
-  - [ ] **Phase 1**: Pre-flight checks & install dependencies
-  - [ ] **Phase 2**: Backup existing components
-  - [ ] **Phase 3**: Migrate 9 components from `prompt-kit/` to `ui/`
-  - [ ] **Phase 4**: Install 7 missing components (tool, source, chain-of-thought, etc.)
-  - [ ] **Phase 5**: Update existing components to latest versions
-  - [ ] **Phase 6**: Final verification (typecheck, lint, build)
-
-### 📋 Next Up
-- [ ] Model comparison analytics
-  - [ ] Response time tracking
-  - [ ] Token usage comparison
-  - [ ] Cost analysis per response
-- [ ] Smart model routing
-  - [ ] Task-based auto-selection
-  - [ ] Cost/quality optimization
-
-### 🔮 Backlog
-- [ ] Sub-agent architecture implementation
-- [ ] Model chains and workflow automation
-- [ ] Advanced multi-model UI (diff view, voting)
-- [ ] Flowglad payment setup
-- [ ] API access for developers
-
----
-
-## Blockers
-
-<!-- Track blockers here -->
-
-| Blocker | Status | Resolution |
-|---------|--------|------------|
-| None currently | - | - |
-
----
-
-## Decisions Pending
-
-<!-- Decisions that need to be made -->
-
-1. **Loader naming**: Keep both `loader.tsx` (12+ variants) and `loader-dots.tsx` (simple)?
-2. **Model routing**: How to automatically select best model for task?
-3. **Response caching**: Cache identical prompts for cost savings?
-
----
-
-## Notes from Current Work
-
-<!-- Scratch space for current session -->
-
-### 2026-01-19
-
-**Current Focus:** Prompt-Kit Component Update
-
-Before YouTube integration, consolidating UI components:
-1. Migrate 9 components from `components/prompt-kit/` → `components/ui/`
-2. Install 7 missing components (tool, source, chain-of-thought, feedback-bar, steps, system-message, image)
-3. Update existing components to latest prompt-kit versions
-4. Verify all imports updated to `@/components/ui/`
-
-### 2026-01-18
-
-**Convex Migration Complete!** Successfully migrated from Supabase to Convex:
-- All data operations now use Convex
-- Clerk authentication integrated
-- Legacy Supabase files cleaned up
-- User data sourced from Clerk (auth) + Convex (app data)
-
-### 2026-01-13
-
-**AI Context Setup Complete!** All foundational AI context files are now in place:
-
-**Core Files:**
-- `AGENTS.md` — Universal rules for all AI agents
-- `CLAUDE.md` — Claude-specific behaviors and preferences
-- `NOTES.md` — Persistent memory across sessions
-- `spec.md` — Requirements and architecture decisions
-- `plan.md` — This working document
-
-**Context Directory (6 files):**
-- `.agents/context/architecture.md`, `.agents/context/conventions.md`, `.agents/context/testing.md`
-- `.agents/context/api.md`, `.agents/context/database.md`, `.agents/context/deployment.md`
-
-**Nested CLAUDE.md Files (8 files):**
-- `app/CLAUDE.md`, `app/api/CLAUDE.md`, `app/auth/CLAUDE.md`, `app/components/CLAUDE.md`
-- `lib/CLAUDE.md`, `lib/ai/CLAUDE.md`, `components/CLAUDE.md`, `hooks/CLAUDE.md`
-
----
-
-## Quick Reference
-
-### Commands
-```bash
-bun run dev          # Start dev server
-bun run lint         # Check for issues
-bun run typecheck    # TypeScript check
-bun run build        # Production build
+```
+plan.md              ← What & why (this file)
+AGENTS.md            ← Rules & permissions
+.agents/plans/       ← How (implementation details)
+.agents/context/     ← Reference (architecture, research, ADRs)
+.agents/workflows/   ← Process (dev cycle, debugging)
+.agents/skills/      ← Guides (multi-step tasks)
 ```
 
-### Key Files
-- `AGENTS.md` — Project overview for AI
-- `spec.md` — Requirements
-- `.agents/context/research/tech-stack-evaluation.md` — Tech decisions
+---
 
-### Gold Standard Patterns
-- API Route: `app/api/chat/route.ts`
-- Hook: `app/components/chat/use-chat-core.ts`
-- Provider: `lib/chat-store/chats/provider.tsx`
-- Component: `app/components/chat/chat.tsx`
+## Vision
+
+<!-- TODO: 2-3 sentences on the long-term vision -->
 
 ---
 
-## Sprint History
+## Priorities
 
-### Sprint 1 (Completed)
-- ✅ Initial research phase
-- ✅ Tech stack decisions
-- ✅ AGENTS.md creation
+> Sources: `.agents/plans/todo-fixes-and-features.md`, `.agents/context/research/open-webui-analysis/SUMMARY.md`, `.agents/context/research/webclaw/06-recommendations.md`
 
-### Sprint 2 (Completed)
-- ✅ AI context file setup (all files created)
-- ✅ Context directory with 6 domain-specific docs
-- ✅ Cursor rules with 6 numbered rule files
-- ✅ Claude commands with 5 slash commands
-- ✅ Nested CLAUDE.md files (8 modules covered)
+### P0 — Do Now
 
-### Sprint 3 (Completed)
-- ✅ Convex project setup
-- ✅ Clerk authentication
-- ✅ Database migration (Supabase → Convex)
-- ✅ Auth route split (login/sign-up)
+| # | What | Status | Sources |
+|---|------|--------|---------|
+| 1 | **Bug fixes** — Base UI migration fixes, text loading animation shifting, stop streaming button, streaming continues after exit, model persistence, link text formatting (`()` artifacts) | In progress | `plans/base-ui-pattern-fixes.md`, `plans/provider-neutral-replay-compiler.md` |
+| 2 | **Tool calling infra** — 3-layer hybrid (provider + third-party + MCP) with dual-gate injection | Done | `plans/tool-calling-infrastructure.md`, `plans/tool-calling-hardening.md`, `research/multi-tool-calling-system-design.md`, `research/tool-calling-infrastructure.md` |
+| 3 | **Prompt-kit integration** — Integrate new Prompt-kit components into chat UI | Not started | `plans/prompt-kit-component-audit.md` |
+| 4 | **Visible failure feedback** — status indicators for tool calls, RAG, context truncation | In progress | `research/open-webui-analysis/SUMMARY.md` |
+| 5 | **Security headers** — CSP, HSTS, X-Frame-Options out of the box | Not started | `research/open-webui-analysis/SUMMARY.md` |
 
-### Sprint 4 (Current)
-- 🔄 Prompt-Kit component consolidation
-- 📋 Install missing AI chat components
-- 📋 Update existing components to latest
+### P1 — Do Next
 
-### Sprint 5 (Next)
-- 📋 Model comparison analytics
-- 📋 Smart model routing
-- 📋 Multi-model UI enhancements
+| # | What | Status | Sources |
+|---|------|--------|---------|
+| 6 | **UX redesign: tools/thinking** — redesign tools & thinking component to match ChatGPT & Claude patterns | Not started | `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md` |
+| 7 | **UX redesign: sources** — redesign sources component to match ChatGPT & Claude patterns | Not started | `research/competitive-feature-analysis.md` |
+| 8 | **Settings page** — convert settings modal to a full settings page (Claude-style) | Not started | `research/competitive-feature-analysis.md` |
+| 9 | **Model selector simplification** — simplify popovers, surface thinking effort controls instead of model info | Not started | `research/competitive-feature-analysis.md` |
+| 10 | **Inline message controls** — edit model, toggle web search, attach/remove files per message (Cursor-like) | Not started | `research/competitive-feature-analysis.md` |
+| 11 | Message rating/feedback (thumbs up/down) | In progress | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 12 | Conversation export (Markdown + JSON) | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 13 | Template variables in prompts (`{{CURRENT_DATE}}`, `{{USER_NAME}}`) | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 14 | Task model separation — cheap model for title/tag generation | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 15 | Structured audit logging — configurable levels, Convex wrappers | In progress | `research/open-webui-analysis/SUMMARY.md` |
+| 16 | RAG pipeline — Convex vector search + API embedding + chunking | Not started | `research/open-webui-analysis/SUMMARY.md`, `context/database.md` |
+
+### P2 — Major Features
+
+| # | What | Status | Sources |
+|---|------|--------|---------|
+| 17 | **Image generation** in chat (DALL-E + Gemini via BYOK) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 18 | **Inline triggers** — `#` files, `/` commands, `@` models/tools | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 19 | **Cross-conversation memory** — Convex vectors + model-callable tools (search, add, replace) | Not started | `plans/cross-conversation-memory.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 20 | **Personalization** — custom instructions, rules, fonts, colors, model presets/personas | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 21 | Code execution sandbox (E2B or WebContainers) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 22 | Audio STT/TTS (OpenAI, Deepgram, ElevenLabs) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 23 | Extend replay model — preserve full provider-native tool payload per origin (consider expanding) | Done | `plans/provider-neutral-replay-compiler.md`, `plans/provider-aware-history-adaptation.md`, `research/provider-aware-history-adaptation.md` |
+| 24 | **Inline `style` override safety** — all animated UI components (`select`, `dialog`, `alert-dialog`, `sheet`, `dropdown-menu`) place `style={{ transition: ... }}` before `{...props}`. If a consumer passes a `style` prop, React replaces the entire object, silently breaking the open/close animation. Fix: merge consumer `style` with transition style across all affected components | Not started | Identified during dropdown-menu transition fix |
+
+### P3 — Strategic
+
+| # | What | Status | Sources |
+|---|------|--------|---------|
+| 25 | Model access control ACLs | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 26 | Admin-mutable config (PersistentConfig via Convex) | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 27 | OpenTelemetry integration | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 28 | Prompt library with `/` trigger | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 29 | Flowglad integration (billing, subscriptions, plan lifecycle) | Not started | `AGENTS.md` |
+
+### P4 — Performance & DX
+
+> Sources: `.agents/context/research/webclaw/06-recommendations.md` (Sections 1, 2, 4)
+
+| # | What | Benefit | Status | Sources |
+|---|------|---------|--------|---------|
+| 30 | **Message memoization** — `React.memo` with content-based `areMessagesEqual` comparator; O(N) → O(1) re-renders per streaming chunk | Eliminates jank in long conversations; only the actively streaming message re-renders | Done | `research/webclaw/06-recommendations.md` R01 |
+| 31 | **Composer ref isolation** — move `input` from `useState` to `useRef` in composer; debounce draft persistence 500ms + `beforeunload` flush | Stops every keystroke from cascading re-renders through the entire chat tree | Done | `research/webclaw/06-recommendations.md` R02 |
+| 32 | **Singleton Shiki highlighter** — module-level `highlighterPromise` initialized once; eliminates redundant WASM init per code block | Faster code block rendering; avoids repeated ~2MB WASM load per block | Done | `research/webclaw/06-recommendations.md` R04 |
+| 33 | **Typography utilities** — `text-balance` on headings, `text-pretty` on body in markdown styles (CSS progressive enhancement, zero cost) | Polished text rendering with no performance cost; degrades gracefully | Partial — `.prose` context in `globals.css`; not yet in sidebar titles or standalone headings | `research/webclaw/06-recommendations.md` R05 |
+| 34 | **Pragmatic hook decomposition** — extract `use-chat-submit.ts` (~200 LOC) and `use-chat-edit.ts` (~170 LOC) from `use-chat-core.ts`; skip full 6-hook split until file exceeds ~1000 LOC | Makes the two most complex flows independently testable and easier to modify | In progress — `use-chat-operations.ts` (145 LOC) + `use-chat-draft.ts` extracted; core still 723 LOC | `research/webclaw/06-recommendations.md` R06 (adapted) |
+| 35 | **`type` over `interface`** — adopt for new code only; no codemod. Add ESLint rule opportunistically | Consistency across codebase; better composability with unions and utility types | Not started | `research/webclaw/06-recommendations.md` R09 |
+| 36 | **Context meter** — token usage progress bar in chat header; Phase 1: estimate from messages, Phase 2: accumulate actual `usage.promptTokens` from AI SDK. _Note: follow Cursor's approach and research how to make this work with our multi-model configuration_ | Users can see how much context window remains before hitting limits | Not started | `research/webclaw/06-recommendations.md` R08 |
+| 37 | **Global prompt auto-focus** — ~20 LOC global `keydown` listener; auto-focus textarea on printable chars (exclude meta/ctrl/alt, editable elements) | Removes click-to-focus friction; matches VS Code behavior users already expect | Not started | `research/webclaw/06-recommendations.md` R07 |
+
+> **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts` lines 184–196.
+
+### Critical Path
+
+```
+Bug Fixes + Prompt-kit ← no deps (do first, P0)
+Security Headers ← no deps (do first, P0)
+Tool Calling Infra → Built-in Injection → Phase 7 → Code Execution (longest chain)
+UX Redesign → Settings Page + Model Selector (P1 chain)
+Audit Logging → OpenTelemetry
+Inline Triggers ← no deps → Prompt Library (P2, deferred)
+Memory System ← Convex vectors → RAG Pipeline (P2, shares infra)
+Message Memo (#30) ✅ → Composer Ref (#31) ✅ → Hook Decomposition (#34, in progress) (P4 perf chain)
+Shiki Singleton (#32) ✅ + Typography (#33, partial) + Auto-Focus (#37) ← no deps (P4 parallel)
+Context Meter (#36) ← needs token accumulation from AI SDK usage object
+Style Override Safety (#24) ← no deps (P2, affects select/dialog/alert-dialog/sheet/dropdown-menu)
+```
 
 ---
 
-## Future Research & Open Questions
+## Architecture
 
-### JSX Preview Component
+> Details: `.agents/context/architecture.md` | DB: `.agents/context/database.md` | API: `.agents/context/api.md` | Terms: `.agents/context/glossary.md`
 
-- **Description**: prompt-kit has a `jsx-preview.tsx` component that renders JSX strings as React components dynamically
-- **Potential use cases for Not A Wrapper**:
-  - Dynamic code previews from AI responses
-  - Interactive component visualization
-  - Generative UI features (dynamic component rendering from AI responses)
-- **Considerations**:
-  - Security: Requires careful sanitization of JSX strings before rendering
-  - Bundle size: Adds ~50KB for JSX parsing/rendering runtime
-  - Performance: Needs debouncing for streaming responses to avoid excessive re-renders
-- **Status**: Evaluate when implementing generative UI features
-- **Reference**: https://prompt-kit.com/docs
+<!-- TODO: 2-3 sentence summary of current architecture and planned changes -->
 
-### LLM Context Files
-
-- **Description**: prompt-kit provides `llms.txt` and `llms-full.txt` for AI-assisted development
-- **Purpose**: Gives AI assistants (Claude, Copilot, etc.) context about component APIs and usage patterns
-- **Potential for Not A Wrapper**:
-  - Create `/public/llms.txt` documenting customized prompt-kit components
-  - Include component customizations, upgrade notes, and usage examples
-  - Help AI assistants understand project-specific patterns vs upstream prompt-kit
-- **Status**: Consider when AI-assisted development becomes a priority
-- **Reference**: https://prompt-kit.com/llms.txt
+| ADR | Decision | Rationale |
+|-----|----------|-----------|
+| [001](.agents/context/decisions/001-convex-database.md) | Convex over Supabase | <!-- brief --> |
+| [002](.agents/context/decisions/002-vercel-ai-sdk.md) | Vercel AI SDK for multi-provider | <!-- brief --> |
+| [003](.agents/context/decisions/003-optimistic-updates.md) | Optimistic update pattern | <!-- brief --> |
 
 ---
 
-*Update this file as work progresses. AI agents should check and update task status.*
+## Research
+
+> All research: `.agents/context/research/`
+
+| Topic | Document |
+|-------|----------|
+| Provider history replay | `.agents/context/research/provider-aware-history-adaptation.md` |
+| Open WebUI comparison | `.agents/context/research/open-webui-analysis/SUMMARY.md` |
+| Latest models (Feb 2026) | `.agents/context/research/latest-models-february-2026.md` |
+| Multi-tool calling | `.agents/context/research/multi-tool-calling-system-design.md` |
+| Desktop/CLI access | `.agents/context/research/desktop-cli-local-access-evaluation.md` |
+| Base UI migration | `.agents/context/research/radix-to-base-ui-css-variables.md` |
+| WebClaw architecture & perf | `.agents/context/research/webclaw/06-recommendations.md` |
+
+---

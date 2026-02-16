@@ -42,6 +42,16 @@ const eslintConfig = [
       ],
     },
   },
+  {
+    // Prefer `type` over `interface` for type definitions (R09).
+    // Reasons: consistency across the codebase, better union/intersection composability,
+    // and alignment with React 19 patterns (e.g. props as type aliases).
+    // Existing violations should be fixed opportunistically during other work.
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/consistent-type-definitions": ["error", "type"],
+    },
+  },
 ]
 
 export default eslintConfig

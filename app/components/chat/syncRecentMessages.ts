@@ -21,6 +21,12 @@ export async function syncRecentMessages(
     const updated = [...prev]
     let changed = false
 
+    // Build a set of all IDs currently in the local array so we can
+    // detect when a DB ID already exists at a different position.
+    // This prevents duplicate keys when the DB query returns stale data
+    // (e.g. cacheAndAddMessage hasn't persisted yet).
+    const existingIds = new Set(updated.map((m) => String(m.id)))
+
     // Track which local indices have been updated to avoid assigning
     // the same DB ID to multiple local messages
     const updatedIndices = new Set<number>()
@@ -29,6 +35,7 @@ export async function syncRecentMessages(
     for (let d = lastFromDb.length - 1; d >= 0; d--) {
       const dbMsg = lastFromDb[d]
       if (!dbMsg) continue
+      const dbId = String(dbMsg.id)
       const dbRole = dbMsg.role
 
       for (let i = updated.length - 1; i >= 0; i--) {
@@ -38,10 +45,20 @@ export async function syncRecentMessages(
         const local: ExtendedUIMessage | undefined = updated[i]
         if (!local || local.role !== dbRole) continue
 
-        if (String(local.id) !== String(dbMsg.id)) {
+        // If this local message already has the DB ID, just mark it and move on
+        if (String(local.id) === dbId) {
+          updatedIndices.add(i)
+          break
+        }
+
+        // Only assign the DB ID if it doesn't already exist elsewhere in the array.
+        // This guards against stale DB reads that return IDs from a previous turn.
+        if (!existingIds.has(dbId)) {
+          existingIds.delete(String(local.id))
+          existingIds.add(dbId)
           updated[i] = {
             ...local,
-            id: String(dbMsg.id),
+            id: dbId,
             createdAt: dbMsg.createdAt,
           }
           changed = true

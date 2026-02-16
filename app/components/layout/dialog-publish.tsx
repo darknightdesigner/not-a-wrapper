@@ -89,21 +89,23 @@ export function DialogPublish() {
   const trigger = (
     <TooltipProvider>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
-            onClick={handlePublish}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <HugeiconsIcon icon={Loading01Icon} size={20} className="animate-spin" />
-            ) : (
-              <HugeiconsIcon icon={GlobeIcon} size={20} />
-            )}
-            <span className="sr-only">Make public</span>
-          </Button>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+              onClick={handlePublish}
+              disabled={isLoading}
+            />
+          }
+        >
+          {isLoading ? (
+            <HugeiconsIcon icon={Loading01Icon} size={20} className="animate-spin" />
+          ) : (
+            <HugeiconsIcon icon={GlobeIcon} size={20} />
+          )}
+          <span className="sr-only">Make public</span>
         </TooltipTrigger>
         <TooltipContent>
           <p>Make public</p>

@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface PerplexityIconProps extends SVGProps<SVGSVGElement> {
+export type PerplexityIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const PerplexityIcon = forwardRef<SVGSVGElement, PerplexityIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

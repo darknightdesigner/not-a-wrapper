@@ -27,7 +27,7 @@ type DrawerHistoryProps = {
   chatHistory: Chats[]
   onSaveEdit: (id: string, newTitle: string) => Promise<void>
   onConfirmDelete: (id: string) => Promise<void>
-  trigger: React.ReactNode
+  trigger: React.ReactElement
   isOpen: boolean
   setIsOpen: (open: boolean) => void
 }
@@ -295,9 +295,7 @@ export function DrawerHistory({
   return (
     <Drawer open={isOpen} onOpenChange={handleOpenChange}>
       <Tooltip>
-        <TooltipTrigger asChild>
-          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
-        </TooltipTrigger>
+        <TooltipTrigger render={<DrawerTrigger render={trigger} />} />
         <TooltipContent>History</TooltipContent>
       </Tooltip>
       <DrawerContent>

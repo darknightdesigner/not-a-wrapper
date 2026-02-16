@@ -1,8 +1,8 @@
 import { forwardRef, type SVGProps } from "react"
 
-export interface DeepseekIconProps extends SVGProps<SVGSVGElement> {
+export type DeepseekIconProps = {
   size?: number | string
-}
+} & SVGProps<SVGSVGElement>
 
 export const DeepseekIcon = forwardRef<SVGSVGElement, DeepseekIconProps>(
   ({ size = 24, width, height, ...props }, ref) => (

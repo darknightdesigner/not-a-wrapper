@@ -46,8 +46,13 @@ Transitions are recommended over CSS animations because a transition can be **sm
 
 ### Tailwind CSS Equivalent
 
+> **Important**: Tailwind v4 emits `scale` as an individual CSS property (not inside `transform`), so `transition: transform` won't cover `scale-95`. Use `[transform:scale(0.95)]` to keep scaling on the `transform` property, and an inline `style` for the transition to avoid ambiguity.
+
 ```tsx
-<Menu.Popup className="origin-[var(--transform-origin)] transition-[transform,scale,opacity] data-[ending-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:scale-90 data-[starting-style]:opacity-0">
+<Menu.Popup
+  className="origin-[var(--transform-origin)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)] data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)]"
+  style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
+>
   {/* content */}
 </Menu.Popup>
 ```
@@ -291,15 +296,26 @@ function ManualUnmountPopover() {
 
 ### Flash on Dismiss (Tailwind v4 + Base UI)
 
-Tailwind v4's preflight applies `display: none !important` to `[hidden]`. Base UI sets `hidden` when `mounted` becomes false. CSS animations from `tailwindcss-animate` or `tw-animate-css` may not be reliably detected by `element.getAnimations()`, causing abrupt unmounting before the exit animation completes.
+Tailwind v4's preflight applies `display: none !important` to `[hidden]`. Base UI sets `hidden` when `mounted` becomes false. CSS keyframe animations from `tailwindcss-animate` or `tw-animate-css` may not be reliably detected by `element.getAnimations()`, causing abrupt unmounting before the exit animation completes.
 
-**Fix**: Use Motion with the `render` prop instead of CSS animation classes. Motion's opacity/scale animations are properly detected by `getAnimations()`.
+**Primary fix**: Use **CSS transitions** with `data-[starting-style]` / `data-[ending-style]`. CSS transitions ARE detected by `getAnimations()`, so Base UI correctly waits for them to complete before unmounting. Use `[transform:scale(0.95)]` (not Tailwind's `scale-95`) to keep scaling on the `transform` property — see Tailwind CSS Equivalent section above.
+
+**Alternative**: Use Motion with the `render` prop. This works but adds a JS animation dependency that isn't needed for most cases.
 
 ```tsx
-// ❌ CSS animations (can flash — getAnimations() may not detect tw-animate)
+// ❌ CSS keyframe animations (flash — getAnimations() may not detect tw-animate)
 className="data-[open]:animate-in data-[closed]:animate-out ..."
 
-// ✅ Motion render prop (smooth, reliable)
+// ❌ Tailwind scale-95 + transition-[opacity,transform] (jittery — scale is individual property in v4)
+className="transition-[opacity,transform] data-[starting-style]:scale-95 data-[starting-style]:opacity-0 ..."
+
+// ✅ CSS transitions with [transform:scale()] (smooth, cancelable, no JS dependency)
+<Popup
+  className="data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]"
+  style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
+/>
+
+// ✅ Motion render prop (alternative — smooth but adds JS dependency)
 render={(props, state) => (
   <motion.div
     {...props}
@@ -330,4 +346,4 @@ animate={{ x: state.open ? 0 : -300, opacity: state.open ? 1 : 0.9999 }}
 - **Styling guide**: See `@.agents/skills/base-ui-styling/SKILL.md`
 - **Migration audit**: See `@.agents/skills/base-ui-migration-audit/SKILL.md` for Radix-to-Base-UI migration patterns and the Dialog flash fix
 - **Motion library**: <https://motion.dev>
-- **Dialog implementation**: `components/ui/dialog.tsx` uses Motion for DialogOverlay and DialogContent
+- **Dialog implementation**: `components/ui/dialog.tsx` uses CSS transitions with `data-[starting-style]`/`data-[ending-style]` + inline `style={{ transition }}` — the gold standard for all popup animations in this project

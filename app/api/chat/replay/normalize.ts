@@ -8,7 +8,7 @@ import {
   type ReplayWebSearchResult,
 } from "./types"
 
-export interface ReplayNormalizationWarning {
+export type ReplayNormalizationWarning = {
   code:
     | "message_invalid"
     | "part_invalid"
@@ -20,7 +20,7 @@ export interface ReplayNormalizationWarning {
   detail: string
 }
 
-export interface ReplayNormalizationResult {
+export type ReplayNormalizationResult = {
   messages: ReplayMessage[]
   warnings: ReplayNormalizationWarning[]
 }

@@ -122,15 +122,15 @@ export function ModelsSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="mb-2 text-lg font-medium">Models</h3>
-        <p className="text-muted-foreground mb-4 text-sm">
+        <h3 className="mb-2 text-lg font-medium text-balance">Models</h3>
+        <p className="text-muted-foreground mb-4 text-sm text-pretty">
           Reorder and manage the models shown in your selector.
         </p>
       </div>
 
       {/* Favorite Models - Drag and Drop List */}
       <div>
-        <h4 className="mb-3 text-sm font-medium">
+        <h4 className="mb-3 text-sm font-medium text-balance">
           Your favorites ({favoriteModels.length})
         </h4>
         <AnimatePresence initial={false}>
@@ -206,8 +206,8 @@ export function ModelsSettings() {
 
       {/* Available Models */}
       <div>
-        <h4 className="mb-3 text-sm font-medium">Available models</h4>
-        <p className="text-muted-foreground mb-4 text-sm">
+        <h4 className="mb-3 text-sm font-medium text-balance">Available models</h4>
+        <p className="text-muted-foreground mb-4 text-sm text-pretty">
           Choose models to add to your favorites.
         </p>
 
@@ -233,7 +233,7 @@ export function ModelsSettings() {
                 <div key={iconKey} className="space-y-3">
                   <div className="flex items-center gap-2">
                     {provider?.icon && <provider.icon className="size-5" />}
-                    <h4 className="font-medium">{provider?.name || iconKey}</h4>
+                    <h4 className="font-medium text-balance">{provider?.name || iconKey}</h4>
                     <span className="text-muted-foreground text-sm">
                       ({modelsGroup.length} models)
                     </span>

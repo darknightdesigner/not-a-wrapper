@@ -1,9 +1,9 @@
 # Base UI Pattern Fixes — Agent Execution Plan (Revised)
 
-> **Status**: Pending
+> **Status**: Complete (February 15, 2026)
 > **Priority**: P0 (Shadcn alignment + animation bugs) → P1 (app patterns) → P2 (cleanup)
 > **Created**: February 11, 2026
-> **Revised**: February 11, 2026
+> **Revised**: February 15, 2026
 > **Prerequisite**: Base UI migration completed (February 9, 2026)
 > **Branch**: Create `fix/base-ui-patterns` from current branch
 
@@ -27,6 +27,75 @@ This plan aligns the codebase with official Shadcn Base UI patterns and fixes is
 - `@.agents/skills/base-ui-animation/SKILL.md` — Animation patterns (CSS transitions vs CSS animations)
 - `@.agents/skills/base-ui-migration-audit/SKILL.md` — Radix → Base UI migration audit checklist
 - `@.agents/skills/base-ui-styling/SKILL.md` — Styling patterns (data attributes, CSS variables)
+- `@.agents/skills/base-ui-typescript/SKILL.md` — TypeScript namespace typing (Props, State, events)
+- `@.agents/skills/base-ui-composition/SKILL.md` — Composition via `render` prop (nested triggers, element overrides)
+
+---
+
+## Official Shadcn Base UI Reference
+
+> **Repository**: [`shadcn-ui/ui`](https://github.com/shadcn-ui/ui) (main branch)
+> **Last verified**: February 15, 2026
+
+### Registry Paths
+
+| Path | Contents | Our target? |
+|------|----------|-------------|
+| `apps/v4/registry/bases/base/ui/` | **Base UI components** — structural patterns using `@base-ui/react` | **YES — this is the source of truth** |
+| `apps/v4/registry/new-york-v4/ui/` | Styled components still using **Radix UI** (`radix-ui`) | No — still Radix-based, NOT Base UI |
+
+**Important**: The `new-york-v4` registry still uses Radix UI. Only the `bases/base/ui/` registry uses `@base-ui/react`. Always reference `bases/base/ui/` for structural patterns.
+
+### Component Reference URLs
+
+Before modifying each component, fetch the official version from the raw GitHub URL and compare. All URLs follow this pattern:
+
+```
+https://raw.githubusercontent.com/shadcn-ui/ui/main/apps/v4/registry/bases/base/ui/{component}.tsx
+```
+
+| Our Component | Official Reference | Notable Differences |
+|---------------|-------------------|---------------------|
+| `dialog.tsx` | [bases/base/ui/dialog.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/dialog.tsx) | Gold standard — already aligned structurally |
+| `dropdown-menu.tsx` | [bases/base/ui/dropdown-menu.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/dropdown-menu.tsx) | No `asChild`, no deprecated props, uses `cn-*` tokens for animation |
+| `tooltip.tsx` | [bases/base/ui/tooltip.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/tooltip.tsx) | Includes `TooltipPrimitive.Arrow`, uses `delay` (not `delayDuration`) |
+| `popover.tsx` | [bases/base/ui/popover.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/popover.tsx) | Includes `PopoverPrimitive.Arrow` |
+| `hover-card.tsx` | [bases/base/ui/hover-card.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/hover-card.tsx) | Uses `PreviewCard` primitive (`@base-ui/react/preview-card`), not `HoverCard` |
+| `select.tsx` | [bases/base/ui/select.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/select.tsx) | Uses `ScrollUpButton`/`ScrollDownButton` sub-components |
+| `alert-dialog.tsx` | [bases/base/ui/alert-dialog.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/alert-dialog.tsx) | `AlertDialogCancel` uses `render={<Button />}` for composition |
+| `sheet.tsx` | [bases/base/ui/sheet.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/sheet.tsx) | Uses `@base-ui/react/dialog` (not a separate Sheet primitive) |
+| `drawer.tsx` | [bases/base/ui/drawer.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/drawer.tsx) | Uses `vaul` (not `vaul-base`) — triggers are simple pass-throughs |
+| `collapsible.tsx` | [bases/base/ui/collapsible.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/collapsible.tsx) | Clean pass-through, uses `CollapsiblePrimitive.Panel` for content |
+| `button.tsx` | [bases/base/ui/button.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/button.tsx) | Uses `@base-ui/react/button` directly — `render` prop is built-in |
+| `badge.tsx` | [bases/base/ui/badge.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/badge.tsx) | Uses `useRender` + `mergeProps` (no Base UI primitive) |
+| `breadcrumb.tsx` | [bases/base/ui/breadcrumb.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/breadcrumb.tsx) | `BreadcrumbLink` uses `useRender` + `mergeProps` |
+| `sidebar.tsx` | [bases/base/ui/sidebar.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/sidebar.tsx) | `SidebarMenuButton`, `SidebarMenuAction`, `SidebarMenuSubButton` use `useRender` |
+| `context-menu.tsx` | [bases/base/ui/context-menu.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/context-menu.tsx) | — |
+| `menubar.tsx` | [bases/base/ui/menubar.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/menubar.tsx) | — |
+| `navigation-menu.tsx` | [bases/base/ui/navigation-menu.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/navigation-menu.tsx) | No `NavigationMenuIndicator` export |
+
+### Key Architectural Findings from Official Source
+
+1. **`render` prop support comes from two mechanisms**:
+   - **Primitive-wrapping components** (Button, Dialog triggers, etc.): The `render` prop is inherited from the Base UI primitive's `.Props` type. No `useRender` needed.
+   - **Non-primitive components** (Badge, BreadcrumbLink, SidebarMenuButton, etc.): Use `useRender` hook + `mergeProps` to add `render` prop support manually.
+
+2. **All animations are in CSS** via `cn-*` token classes. No inline `data-[starting-style]` or `style={{ transition }}` in the JSX. Since we are NOT adopting `cn-*` tokens, we inline these styles — but the animation mechanism (`data-[starting-style]`/`data-[ending-style]`) is the same underneath.
+
+3. **HoverCard uses `PreviewCard` primitive** — `@base-ui/react/preview-card`, not a `HoverCard` API. Our wrapper still exports `HoverCard*` names for API compatibility.
+
+4. **Official Drawer uses `vaul`**, not `vaul-base`. Our codebase may use either — verify before modifying.
+
+### Pre-Implementation Verification
+
+**Before starting each phase**, the implementing agent MUST:
+
+1. **Fetch the latest official component** from the raw GitHub URL above
+2. **Compare** the official structure against our component AND the plan's instructions
+3. **If the official version has changed** since this plan was written (February 15, 2026), update the plan's instructions to match before proceeding
+4. **Document** any discrepancies found in the verification step
+
+This ensures the plan stays aligned with Shadcn's evolving patterns.
 
 ---
 
@@ -80,7 +149,7 @@ Composition happens at the **call site** via the native `render` prop:
 </DialogTrigger>
 ```
 
-Our current components inject an `asChild` shim that must be removed. But first, all ~40 `asChild` usages in `app/` must migrate to `render` — otherwise they break.
+Our current components inject an `asChild` shim that must be removed. But first, all ~49 `asChild` usages across `app/` and `components/ui/` consumers must migrate to `render` — otherwise they break.
 
 ---
 
@@ -88,7 +157,7 @@ Our current components inject an `asChild` shim that must be removed. But first,
 
 ```
 Batch 1 — All independent, run in parallel:
-├── Track A: Phase 1 — Migrate asChild → render in app/ (~20 files, ~40 usages)
+├── Track A: Phase 1 — Migrate asChild → render in app/ + ui consumers (~21 files, ~49 usages)
 ├── Track B: Phase 2-safe — Fix animations in components/ui/ files WITHOUT asChild shims
 │   ├── select.tsx
 │   ├── context-menu.tsx
@@ -120,7 +189,8 @@ Batch 3 — After Batch 2:
 
 | Ordering | Reason |
 |----------|--------|
-| Phase 1 first | App code must use `render` before components drop `asChild` — otherwise ~40 call sites break |
+| Phase 1 (groups 1–6) first | App code must use `render` before components drop `asChild` — otherwise ~40 trigger call sites break |
+| Phase 1 groups 7–9 deferred | Slot-style call sites (`Button asChild`, etc.) can't migrate until Phase 2F.8 adds `render` prop support |
 | Track B in Batch 1 | These files have no `asChild` shim — animation fixes are independent of Phase 1 |
 | Track C in Batch 1 | App-level fix in different directory, no shared files with Tracks A/B |
 | Phase 2-full after Phase 1 | Files with both `asChild` + animation changes done in a single pass to avoid redundant edits |
@@ -218,7 +288,7 @@ function Button({ render, className, ...props }: ButtonProps) {
 ## Phase 1: Migrate `asChild` → `render` in `app/` (P0 — BLOCKING)
 
 > **Impact**: Prerequisite for aligning `components/ui/` with official Shadcn
-> **Scope**: ~40 usages across ~20 files in `app/`
+> **Scope**: ~49 usages across ~21 files in `app/` and `components/ui/` consumers
 > **Pattern**: Replace `asChild` composition with Base UI's native `render` prop
 
 ### Context to Load
@@ -274,43 +344,53 @@ function Button({ render, className, ...props }: ButtonProps) {
 </Button>
 ```
 
-Note: This pattern requires Button to support `render` prop (done in Phase 2-full, Step 2F.7). If migrating these before Phase 2-full, do them together.
+Note: This pattern requires Button to support `render` prop (done in Phase 2-full, Step 2F.8). These call sites are **deferred to Phase 2F.8** — migrate them together with the component-side `useRender` changes. Same applies to `FileUploadTrigger asChild` and Sidebar `asChild` usages.
 
 ### Recommended Migration Order
 
 Migrate by component type, simplest first:
 
-1. **`TooltipTrigger asChild`** (~22 usages) — Most common, simplest
-2. **`PopoverTrigger asChild`** (~4 usages)
-3. **`DropdownMenuTrigger asChild`** (~3 usages)
-4. **`DialogTrigger asChild`** (~2 usages)
-5. **`DrawerTrigger/Close asChild`** (~3 usages)
-6. **`CollapsibleTrigger asChild`** (~1 usage in `tool.tsx`)
-7. **`Button asChild`** (~3 usages) — Slot-style, coordinate with Phase 2F.7
-8. **`Sidebar components`** (~5 usages) — Slot-style, coordinate with Phase 2F.7
+**Groups 1–6: Trigger-style (can complete independently)**
 
-### Files with `asChild` in `app/`
+1. **`TooltipTrigger asChild`** (~31 usages) — Most common, simplest
+2. **`PopoverTrigger asChild`** (~6 usages)
+3. **`DropdownMenuTrigger asChild`** (~4 usages)
+4. **`DialogTrigger asChild`** (~1 usage)
+5. **`DrawerTrigger/Close asChild`** (~3 usages)
+6. **`CollapsibleTrigger asChild`** (~1 usage in `components/ui/tool.tsx`)
+
+**Groups 7–9: Slot-style (DEFERRED — require Phase 2F.8 first)**
+
+These call sites use `asChild` on slot-style components (`Button`, `FileUploadTrigger`, Sidebar components) that need `useRender` support before consumers can switch to `render`. Migrate these call sites **together with** Phase 2F.8.
+
+7. **`Button asChild`** (~3 usages in `header.tsx`, `error/page.tsx`) — Needs Button `render` prop (Phase 2F.8)
+8. **`FileUploadTrigger asChild`** (~1 usage in `button-file-upload.tsx`) — Needs FileUpload `render` prop (Phase 2F.8)
+9. **`Sidebar components`** (~5 usages) — Needs Sidebar `render` props (Phase 2F.8)
+
+### Files with `asChild` in `app/` and `components/ui/` consumers
 
 ```
+app/components/chat-input/button-plus-menu.tsx      ← 6 usages (was missing from original plan)
+app/components/chat-input/button-file-upload.tsx
+app/components/chat-input/button-search.tsx
+app/components/chat-input/file-items.tsx
+app/components/history/command-history.tsx
+app/components/history/command-footer.tsx
+app/components/history/drawer-history.tsx
+app/components/layout/app-info/app-info-trigger.tsx
+app/components/layout/button-new-chat.tsx
+app/components/layout/dialog-publish.tsx
 app/components/layout/header-sidebar-trigger.tsx
 app/components/layout/header.tsx
-app/components/history/drawer-history.tsx
-app/auth/error/page.tsx
-app/components/layout/dialog-publish.tsx
-app/components/chat-input/button-search.tsx
-app/components/layout/app-info/app-info-trigger.tsx
-app/components/multi-chat/multi-chat-input.tsx
-app/components/chat-input/file-items.tsx
+app/components/layout/settings/settings-content.tsx
 app/components/layout/sidebar/app-sidebar.tsx
 app/components/layout/sidebar/sidebar-item-menu.tsx
+app/components/layout/sidebar/sidebar-menu-item.tsx
 app/components/layout/sidebar/sidebar-project-menu.tsx
 app/components/layout/user-menu.tsx
-app/components/layout/settings/settings-content.tsx
-app/components/chat-input/button-file-upload.tsx
-app/components/layout/sidebar/sidebar-menu-item.tsx
-app/components/history/command-history.tsx
-app/components/layout/button-new-chat.tsx
-app/components/history/command-footer.tsx
+app/components/multi-chat/multi-chat-input.tsx
+app/auth/error/page.tsx
+components/ui/tool.tsx                               ← 1 usage (CollapsibleTrigger asChild, lives in components/ui/)
 ```
 
 ### Verify Phase 1
@@ -321,13 +401,16 @@ bun run typecheck
 bun run lint
 
 # After all trigger-style migrations (groups 1–6):
-rg "asChild" app/ --glob="*.tsx" | rg -v "Button asChild|SidebarMenu"
-# Expected: No matches (only slot-style usages may remain if deferred)
+rg "asChild" app/ components/ui/tool.tsx --glob="*.tsx"
+# Expected: Only slot-style usages remain (Button asChild, FileUploadTrigger asChild,
+# SidebarMenu* asChild) — these are deferred to Phase 2F.8
 
-# After all migrations:
-rg "asChild" app/ --glob="*.tsx"
+# Verify trigger-style asChild is fully gone:
+rg "TooltipTrigger asChild|PopoverTrigger asChild|DropdownMenuTrigger asChild|DialogTrigger asChild|DrawerTrigger asChild|DrawerClose asChild|CollapsibleTrigger asChild" app/ components/ui/tool.tsx --glob="*.tsx"
 # Expected: No matches
 ```
+
+**Note**: Groups 7–9 (`Button asChild`, `FileUploadTrigger asChild`, Sidebar `asChild`) will remain until Phase 2F.8 adds `render` prop support to those components. Phase 1 is considered complete when all trigger-style `asChild` usages (groups 1–6) are migrated.
 
 ---
 
@@ -489,7 +572,7 @@ bun run typecheck
 ## Phase 2-full: Complete `components/ui/` Alignment (P0)
 
 > **Impact**: Brings all Shadcn components in line with official Base UI patterns
-> **Prerequisite**: Phase 1 must be complete (all `asChild` usages migrated in `app/`)
+> **Prerequisite**: Phase 1 groups 1–6 must be complete (all trigger-style `asChild` usages migrated). Groups 7–9 (slot-style) are migrated alongside Step 2F.8.
 > **Pattern**: Remove `asChild` shim + fix remaining animations + remove deprecated code, all in a single pass per file
 
 ### Context to Load
@@ -562,6 +645,9 @@ function DropdownMenuContent({
 
 ### Step 2F.3: Fix `hover-card.tsx` (asChild + animation + delay bridge)
 
+> **Official reference**: [bases/base/ui/hover-card.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/hover-card.tsx)
+> **Note**: Official Shadcn uses `@base-ui/react/preview-card` (`PreviewCard` primitive), not a `HoverCard` API. Our wrapper keeps the `HoverCard*` export names for API compatibility but should use `PreviewCardPrimitive` internally.
+
 **A) Remove `asChild` from `HoverCardTrigger`:** Same pattern as 2F.1A.
 
 **B) Fix animation on `HoverCardContent`:** Same popup pattern (fade + scale, 150ms) as 2F.1B.
@@ -593,7 +679,9 @@ ADD inline style:
   style={{ transition: "opacity 200ms ease-out" }}
 ```
 
-Note: `DrawerContent` uses `vaul-base` for its own slide/drag animation. Do NOT modify `DrawerContent`.
+Note: `DrawerContent` uses `vaul`/`vaul-base` for its own slide/drag animation. Do NOT modify `DrawerContent`.
+
+> **Official reference**: [bases/base/ui/drawer.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/drawer.tsx) — uses `vaul` (not `vaul-base`). Verify which package our codebase uses before modifying.
 
 ### Step 2F.5: Fix `dialog.tsx` (asChild only — animation already correct)
 
@@ -629,28 +717,38 @@ function TooltipTrigger({ ...props }: TooltipPrimitive.Trigger.Props) {
 
 Remove `asChild` from `CollapsibleTrigger`: same pass-through pattern.
 
-### Step 2F.8: Remove `asChild` from slot-style components
-
-These components use `adaptSlotAsChild` (not `adaptAsChild`) for polymorphic rendering. The migration path is to adopt Base UI's `useRender` hook so they support the native `render` prop.
-
-**Files:**
-
-```
-components/ui/button.tsx
-components/ui/badge.tsx
-components/ui/breadcrumb.tsx
-components/ui/sidebar.tsx (SidebarMenuAction, SidebarMenuButton, SidebarMenuSubButton, SidebarMenuBadge)
-components/ui/file-upload.tsx
-components/ui/morphing-popover.tsx
-components/ui/prompt-input.tsx
-components/ui/source.tsx
-components/ui/message.tsx
-```
-
-**Migration pattern for each:**
+**Companion migration**: `components/ui/tool.tsx` has a `CollapsibleTrigger asChild` usage at line 138. This is a **consumer** (not a component definition), but it lives in `components/ui/` rather than `app/`. If not already migrated in Phase 1 (group 6), migrate it here alongside the component-side change:
 
 ```tsx
-// BEFORE (adaptSlotAsChild):
+// BEFORE:
+<CollapsibleTrigger asChild>
+  <Button ...>...</Button>
+</CollapsibleTrigger>
+
+// AFTER:
+<CollapsibleTrigger render={<Button ... />}>
+  ...
+</CollapsibleTrigger>
+```
+
+### Step 2F.8: Remove `asChild` from slot-style components
+
+These components use `adaptSlotAsChild` (not `adaptAsChild`) for polymorphic rendering. There are **two migration strategies** depending on whether a Base UI primitive exists for the component.
+
+> **Official references** — fetch and compare before implementing:
+> - [bases/base/ui/button.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/button.tsx) — uses `@base-ui/react/button` directly
+> - [bases/base/ui/badge.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/badge.tsx) — uses `useRender` + `mergeProps`
+> - [bases/base/ui/breadcrumb.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/breadcrumb.tsx) — `BreadcrumbLink` uses `useRender`
+> - [bases/base/ui/sidebar.tsx](https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/base/ui/sidebar.tsx) — `SidebarMenuButton`, `SidebarMenuAction`, `SidebarMenuSubButton` use `useRender`
+
+#### Strategy A: Primitive-wrapping — use Base UI primitive directly
+
+**Applies to**: `button.tsx`
+
+When a Base UI primitive exists (`@base-ui/react/button`), wrap it directly. The `render` prop is inherited from the primitive's `.Props` type — no `useRender` needed.
+
+```tsx
+// BEFORE (adaptSlotAsChild shim):
 import { adaptSlotAsChild } from "@/lib/as-child-adapter"
 
 function Button({ asChild, children, className, variant, size, ...props }: ButtonProps) {
@@ -658,25 +756,96 @@ function Button({ asChild, children, className, variant, size, ...props }: Butto
   // ... uses adapted.render and adapted.children
 }
 
-// AFTER (useRender):
+// AFTER (Base UI primitive — official Shadcn pattern):
+import { Button as ButtonPrimitive } from "@base-ui/react/button"
+
+function Button({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+  return (
+    <ButtonPrimitive
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size }), className)}
+      {...props}
+    />
+  )
+}
+```
+
+The `render` prop is automatically available via `ButtonPrimitive.Props`. No type extension needed.
+
+#### Strategy B: Non-primitive — use `useRender` + `mergeProps`
+
+**Applies to**: `badge.tsx`, `breadcrumb.tsx` (`BreadcrumbLink`), `sidebar.tsx` (`SidebarMenuButton`, `SidebarMenuAction`, `SidebarMenuSubButton`), `file-upload.tsx`, `morphing-popover.tsx`, `prompt-input.tsx`, `source.tsx`, `message.tsx`
+
+When no Base UI primitive exists, use `useRender` + `mergeProps` to add `render` prop support manually.
+
+```tsx
+// BEFORE (adaptSlotAsChild shim):
+import { adaptSlotAsChild } from "@/lib/as-child-adapter"
+
+function Badge({ asChild, children, className, variant, ...props }: BadgeProps) {
+  const adapted = adaptSlotAsChild(asChild, children, "span")
+  // ... uses adapted.render and adapted.children
+}
+
+// AFTER (useRender — official Shadcn pattern):
 import { useRender } from "@base-ui/react/use-render"
 import { mergeProps } from "@base-ui/react/merge-props"
 
-function Button({ render, className, variant, size, ...props }: ButtonProps) {
+function Badge({
+  className,
+  variant = "default",
+  render,
+  ...props
+}: useRender.ComponentProps<"span"> & VariantProps<typeof badgeVariants>) {
   return useRender({
-    defaultTagName: "button",
-    render,
-    props: mergeProps<"button">(
-      { className: cn(buttonVariants({ variant, size }), className) },
+    defaultTagName: "span",
+    props: mergeProps<"span">(
+      { className: cn(badgeVariants({ className, variant })) },
       props
     ),
+    render,
+    state: { slot: "badge", variant },
   })
 }
 ```
 
-**Type change:** Replace `asChild?: boolean` with `render?: useRender.ComponentProps<'button'>['render']` in the props type, or extend `useRender.ComponentProps<'button'>`.
+**Type change**: Replace `asChild?: boolean` with the appropriate type:
+- Strategy A: No change needed — `render` comes from `ButtonPrimitive.Props`
+- Strategy B: Use `useRender.ComponentProps<'span'>` (or appropriate tag) as the base props type
 
 See `@.agents/skills/base-ui-useRender/SKILL.md` for full `useRender` patterns.
+
+#### Files and their strategy
+
+| File | Component(s) | Strategy |
+|------|-------------|----------|
+| `components/ui/button.tsx` | `Button` | **A** — use `@base-ui/react/button` |
+| `components/ui/badge.tsx` | `Badge` | **B** — `useRender` |
+| `components/ui/breadcrumb.tsx` | `BreadcrumbLink` | **B** — `useRender` |
+| `components/ui/sidebar.tsx` | `SidebarMenuButton`, `SidebarMenuAction`, `SidebarMenuSubButton` | **B** — `useRender` |
+| `components/ui/file-upload.tsx` | `FileUploadTrigger` | **B** — `useRender` |
+| `components/ui/morphing-popover.tsx` | TBD | **B** — `useRender` |
+| `components/ui/prompt-input.tsx` | TBD | **B** — `useRender` |
+| `components/ui/source.tsx` | TBD | **B** — `useRender` |
+| `components/ui/message.tsx` | TBD | **B** — `useRender` |
+
+**Companion call-site migrations** (deferred from Phase 1 groups 7–9): When migrating each slot-style component, also update its consumers in `app/`:
+
+- **`button.tsx`** → Migrate `Button asChild` in `app/components/layout/header.tsx` (~2) and `app/auth/error/page.tsx` (~1)
+- **`file-upload.tsx`** → Migrate `FileUploadTrigger asChild` in `app/components/chat-input/button-file-upload.tsx` (~1)
+- **`sidebar.tsx`** → Migrate `SidebarMenu* asChild` usages in `app/components/layout/sidebar/` (~5)
+
+**Note on `file-upload.tsx` animation**: This file has `animate-in fade-in-0 slide-in-from-bottom-10 zoom-in-90` classes on its **dropzone overlay** (the full-screen drag-and-drop indicator). This is intentionally **NOT migrated** to `data-[starting-style]`/`data-[ending-style]` because:
+- It's not a Base UI popup/portal — it's a custom overlay triggered by drag events
+- It doesn't use Base UI's unmount detection (`getAnimations()`) so the flash-on-dismiss issue doesn't apply
+- The `animate-in` classes work correctly for this use case
+
+If `tailwindcss-animate` is removed in Phase 5B, revisit this animation and replace with an equivalent CSS transition or Tailwind v4 animation.
 
 ### Verify Phase 2-full
 
@@ -685,23 +854,28 @@ See `@.agents/skills/base-ui-useRender/SKILL.md` for full `useRender` patterns.
 rg "asChild" components/ui/ --glob="*.tsx"
 # Expected: No matches
 
-# 2. No adaptAsChild/adaptSlotAsChild imports
+# 2. No asChild remaining in app/ (slot-style call sites migrated alongside 2F.8)
+rg "asChild" app/ --glob="*.tsx"
+# Expected: No matches
+
+# 3. No adaptAsChild/adaptSlotAsChild imports
 rg "adaptAsChild|adaptSlotAsChild" components/ --glob="*.{ts,tsx}"
 # Expected: No matches
 
-# 3. No animate-in/animate-out in popup components
+# 4. No animate-in/animate-out in popup components
 rg "animate-in|animate-out" components/ui/dropdown-menu.tsx components/ui/popover.tsx components/ui/hover-card.tsx components/ui/drawer.tsx
 # Expected: No matches
+# NOTE: components/ui/file-upload.tsx still has animate-in on its dropzone overlay — intentional (see Step 2F.8 note)
 
-# 4. Deprecated props removed
+# 5. Deprecated props removed
 rg "forceMount|onCloseAutoFocus|onInteractOutside" components/ui/dropdown-menu.tsx
 # Expected: No matches
 
-# 5. HoverCard delay bridge removed
+# 6. HoverCard delay bridge removed
 rg "HoverCardDelayContext|openDelay" components/ui/hover-card.tsx
 # Expected: No matches
 
-# 6. Lint and typecheck
+# 7. Lint and typecheck
 bun run lint
 bun run typecheck
 ```
@@ -723,6 +897,7 @@ bun run typecheck
 - `app/components/layout/user-menu.tsx` — Gold standard for dialog-outside-dropdown pattern
 - `app/components/layout/settings/settings-trigger.tsx` — Gold standard for separated trigger/dialog
 - `app/components/layout/feedback/feedback-trigger.tsx` — Gold standard for separated trigger/dialog
+- `@.agents/skills/base-ui-customization/SKILL.md` — Base UI event customization (`eventDetails.cancel()`, controlled components). Useful for edge cases where you need to prevent specific state changes without fully controlling the component.
 
 ### Step 3.1: Refactor `app-info-trigger.tsx`
 
@@ -817,7 +992,9 @@ rg "as-child-adapter|adaptAsChild|adaptSlotAsChild" --glob="*.{ts,tsx}" --glob="
 rg "tailwindcss-animate" --glob="*.{css,ts,mjs,json}" --glob="!bun.lock" --glob="!node_modules/**"
 ```
 
-Expected: Only in `package.json`. If it appears anywhere else, do NOT remove.
+Expected: Only in `package.json`. If it appears anywhere else (e.g., CSS imports), do NOT remove.
+
+**Important**: `components/ui/file-upload.tsx` uses `animate-in` classes on its dropzone overlay (see Step 2F.8 note). If removing `tailwindcss-animate`, replace those classes with an equivalent CSS transition first.
 
 2. Remove:
 
@@ -835,10 +1012,10 @@ bun run build
 ### Step 5C: Update documentation
 
 Update `.agents/` documentation to reflect the completed alignment:
-- Mark this plan as Complete
-- Update `components/CLAUDE.md` to remove references to `asChild` shim and `adaptAsChild`
-- Update the "asChild Compatibility Shim" section to note it was removed
-- Update code examples to use `render` prop pattern
+- Completed: plan status is now marked as Complete
+- Completed: `components/CLAUDE.md` references to compatibility shim utilities were removed
+- Completed: "asChild Compatibility Shim" section was replaced with a render-prop-only pattern section
+- Completed: code examples now use the `render` prop pattern
 
 ---
 
@@ -848,22 +1025,22 @@ Update `.agents/` documentation to reflect the completed alignment:
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| A | 1 (asChild → render in app/) | P0 | ~20 files in `app/` | Pending |
-| B | 2-safe (animations, no asChild) | P0 | 6 files in `components/ui/` | Pending |
-| C | 3 (app-info-trigger refactor) | P1 | `app-info-trigger.tsx` + consumer | Pending |
-| D | 4 (isolation: isolate) | P1 | `app/layout.tsx` | Pending |
+| A | 1 (asChild → render in app/ + ui consumers) | P0 | ~21 files, ~49 usages (groups 1–6 only; 7–9 deferred to 2F.8) | Complete |
+| B | 2-safe (animations, no asChild) | P0 | 6 files in `components/ui/` | Complete |
+| C | 3 (app-info-trigger refactor) | P1 | `app-info-trigger.tsx` + consumer | Complete |
+| D | 4 (isolation: isolate) | P1 | `app/layout.tsx` | Complete |
 
 ### Batch 2 — After Phase 1
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| — | 2-full (complete component alignment) | P0 | 7 trigger files + 9 slot-style files in `components/ui/` | Pending |
+| — | 2-full (complete component alignment) | P0 | 7 trigger + 9 slot-style files in `components/ui/` + deferred app/ call sites (~9 usages) | Complete |
 
 ### Batch 3 — After Batch 2
 
 | Track | Phase | Priority | Files | Status |
 |-------|-------|----------|-------|--------|
-| — | 5 (cleanup) | P2 | `lib/as-child-adapter.*`, `package.json`, docs | Pending |
+| — | 5 (cleanup) | P2 | `lib/as-child-adapter.*`, `package.json`, docs | Complete |
 
 ---
 
@@ -923,8 +1100,9 @@ style:     transition: translate 250ms ease-in-out, opacity 250ms ease-in-out
 | `data-[open]:slide-in-from-top-2` (etc.) | `data-[starting-style]:[transform:translateY(-0.5rem)]` (etc.) |
 | `data-[closed]:slide-out-to-right` (etc.) | `data-[ending-style]:translate-x-full` (etc.) |
 | `duration-200` | `style={{ transition: "... 200ms ..." }}` |
-| `asChild` + child element | `render={<ChildElement />}` with children as content |
-| `Slot` / `adaptSlotAsChild` | `useRender` hook with `mergeProps` |
+| `asChild` + child element (on triggers) | `render={<ChildElement />}` with children as content |
+| `Slot` / `adaptSlotAsChild` (on Button) | Wrap `@base-ui/react/button` directly — `render` prop is built-in (Strategy A) |
+| `Slot` / `adaptSlotAsChild` (on Badge, etc.) | `useRender` hook with `mergeProps` (Strategy B — no Base UI primitive) |
 | `onSelect={(e) => e.preventDefault()}` | Remove (use `onClick` for item actions) |
 | `forceMount` / `onCloseAutoFocus` / `onInteractOutside` | Remove (no Base UI equivalent) |
 

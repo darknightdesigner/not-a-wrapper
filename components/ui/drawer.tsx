@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul-base"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -13,21 +12,10 @@ function Drawer({
 }
 
 function DrawerTrigger({
-  asChild,
-  children,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Trigger> & {
-  asChild?: boolean
-}) {
-  const adapted = adaptAsChild(asChild, children)
+}: React.ComponentProps<typeof DrawerPrimitive.Trigger>) {
   return (
-    <DrawerPrimitive.Trigger
-      data-slot="drawer-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </DrawerPrimitive.Trigger>
+    <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />
   )
 }
 
@@ -38,21 +26,10 @@ function DrawerPortal({
 }
 
 function DrawerClose({
-  asChild,
-  children,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Close> & {
-  asChild?: boolean
-}) {
-  const adapted = adaptAsChild(asChild, children)
+}: React.ComponentProps<typeof DrawerPrimitive.Close>) {
   return (
-    <DrawerPrimitive.Close
-      data-slot="drawer-close"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </DrawerPrimitive.Close>
+    <DrawerPrimitive.Close data-slot="drawer-close" {...props} />
   )
 }
 
@@ -64,9 +41,12 @@ function DrawerOverlay({
     <DrawerPrimitive.Overlay
       data-slot="drawer-overlay"
       className={cn(
-        "data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        "fixed inset-0 z-50 bg-black/50",
+        "data-[starting-style]:opacity-0",
+        "data-[ending-style]:opacity-0",
         className
       )}
+      style={{ transition: "opacity 200ms ease-out" }}
       {...props}
     />
   )
