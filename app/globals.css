@@ -314,6 +314,32 @@ code {
   text-wrap: pretty;
 }
 
+/* Typography plugin → design token bridge
+   Maps @tailwindcss/typography color variables to our design tokens
+   so prose content (chat messages) uses the same palette as the UI.
+   Must target .prose (not :root) because the plugin sets these vars
+   on .prose elements directly — a direct declaration beats inheritance. */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted-foreground);
+  --tw-prose-links: var(--foreground);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--muted-foreground);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--muted-foreground);
+  --tw-prose-kbd: var(--foreground);
+  --tw-prose-kbd-shadows: color-mix(in oklab, var(--foreground) 10%, transparent);
+  --tw-prose-code: var(--foreground);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--muted);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+
 /* sonner toast */
 [data-sonner-toaster] > li {
   width: 100%;
