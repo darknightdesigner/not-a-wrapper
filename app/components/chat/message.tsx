@@ -85,13 +85,15 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
   if (prev.messageGroupId !== next.messageGroupId) return false
   if (prev.isUserAuthenticated !== next.isUserAuthenticated) return false
 
-  // Attachments: compare by count and URLs
+  // Attachments: compare all rendered fields
   const prevLen = prev.attachments?.length ?? 0
   const nextLen = next.attachments?.length ?? 0
   if (prevLen !== nextLen) return false
   if (prev.attachments && next.attachments) {
     for (let i = 0; i < prevLen; i++) {
-      if (prev.attachments[i].url !== next.attachments[i].url) return false
+      const p = prev.attachments[i]
+      const n = next.attachments[i]
+      if (p.url !== n.url || p.name !== n.name || p.contentType !== n.contentType) return false
     }
   }
 

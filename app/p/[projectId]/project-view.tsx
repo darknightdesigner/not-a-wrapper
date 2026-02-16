@@ -222,9 +222,16 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   const handleEdit = useCallback(
     (id: string, newText: string) => {
       setMessages((prev) =>
-        prev.map((message) =>
-          message.id === id ? { ...message, content: newText } : message
-        )
+        prev.map((message) => {
+          if (message.id !== id) return message
+          const nonTextParts =
+            message.parts?.filter((p) => p.type !== "text") ?? []
+          return {
+            ...message,
+            content: newText,
+            parts: [{ type: "text" as const, text: newText }, ...nonTextParts],
+          }
+        })
       )
     },
     [setMessages]
