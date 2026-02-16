@@ -221,21 +221,25 @@ NaW's wrappers add `data-slot` attributes (useful for CSS selectors and testing)
 
 ### Strategy Comparison
 
-| Pattern | WebClaw | NaW |
-|---------|---------|-----|
-| Message memoization | Content-based equality (`areMessagesEqual`) | None visible — `Message` not wrapped in `React.memo` |
-| Scroll container isolation | Portal (`createPortal`) + memoized shell | `use-stick-to-bottom` (library-managed) |
-| Composer input isolation | `useRef` for value, `memo()` wrapper | `useState` in `use-chat-core.ts` (line 92) |
-| History reference stability | Signature-based (`stableHistorySignatureRef`) | Not applicable (Convex subscriptions) |
-| Streaming message targeting | O(1) DOM update via content-based memo | All messages re-render on every token |
-| CSS custom properties | `--chat-header-height`, `--chat-composer-height` | Not used for measurements |
-| Derived state | Inline computation, no useEffect | Some useEffect for derived state (lines 213-215) |
+> **Update (Feb 15, 2026):** Post-analysis codebase verification revealed that NaW has already implemented several of these patterns. The table below reflects the state at the time of original research; see annotations for current status.
+
+| Pattern | WebClaw | NaW | NaW Status (Feb 15) |
+|---------|---------|-----|---------------------|
+| Message memoization | Content-based equality (`areMessagesEqual`) | ~~None visible~~ `areMessagesEqual` + `MemoizedMessage` in `message.tsx` | **✅ DONE** |
+| Scroll container isolation | Portal (`createPortal`) + memoized shell | `use-stick-to-bottom` (plain divs, imperative DOM scroll) | **❌ N/A** — no ScrollArea to isolate |
+| Composer input isolation | `useRef` for value, `memo()` wrapper | ~~`useState` in `use-chat-core.ts`~~ `useRef` + listener pattern + debounced draft | **✅ DONE** |
+| History reference stability | Signature-based (`stableHistorySignatureRef`) | Not applicable (Convex subscriptions) | N/A |
+| Streaming message targeting | O(1) DOM update via content-based memo | ~~All messages re-render on every token~~ O(1) via `areMessagesEqual` | **✅ DONE** |
+| CSS custom properties | `--chat-header-height`, `--chat-composer-height` | Not used for measurements | Open |
+| Derived state | Inline computation, no useEffect | Some useEffect for derived state (lines 213-215) | Open |
 
 ### Who Avoids Re-renders Better?
 
-**WebClaw, decisively.** Their streaming pipeline has a clear re-render budget:
+> **Update (Feb 15, 2026):** The original analysis below was written before NaW implemented content-based message memoization and ref-based composer input. NaW's current streaming pipeline is now comparable to WebClaw's. The original text is preserved (struck through where outdated) for research traceability.
 
-Per streaming chunk:
+**~~WebClaw, decisively.~~ Both are now comparable.** WebClaw's streaming pipeline has a clear re-render budget:
+
+Per streaming chunk (WebClaw):
 1. `ChatScreen` — No re-render (messages in TQ, not useState)
 2. `ChatComposer` — No re-render (memo + no message dependency)
 3. `ChatContainerShell` — No re-render (portal pattern)
@@ -246,46 +250,52 @@ Per streaming chunk:
 
 Total DOM updates per chunk: **1 message subtree**.
 
-NaW's current pipeline:
+NaW's ~~current~~ **updated** pipeline (Feb 15, 2026):
 1. Vercel AI SDK `useChat` updates `messages` state
 2. `use-chat-core.ts` returns new `messages` reference
 3. `chat.tsx` recalculates `conversationProps` (new `messages` ref → new memo result)
 4. `Conversation` receives new `messages` prop → re-renders
-5. All `Message` components re-render (no `React.memo` with custom equality)
-6. Each message's `Markdown` component re-renders if content differs
+5. ~~All `Message` components re-render (no `React.memo` with custom equality)~~ N × `MemoizedMessage` equality check — O(N) checks via `areMessagesEqual`, all pass except streaming message
+6. Streaming message re-renders → `Markdown` → per-block memoization
 7. Per-block memoization catches unchanged blocks
 
-Total DOM updates per chunk: **All message components re-render, but only changed markdown blocks update DOM.** React's reconciliation prevents actual DOM changes for unchanged content, but the virtual DOM work is still O(N × message_complexity).
+Total DOM updates per chunk: **1 message subtree** (same as WebClaw). ~~All message components re-render, but only changed markdown blocks update DOM.~~
 
-### WC-A5-C07: NaW Lacks Message-Level Memoization During Streaming
+### WC-A5-C07: ~~NaW Lacks Message-Level Memoization During Streaming~~ ✅ RESOLVED
 
-**Claim**: NaW re-renders all `Message` components on every streaming chunk because there is no content-based `React.memo` on the message component.
+**Claim**: ~~NaW re-renders all `Message` components on every streaming chunk because there is no content-based `React.memo` on the message component.~~
 
-**Evidence**: `conversation.tsx` maps over `messages` and renders `<Message>` for each. The `Message` component is not wrapped in `React.memo`. The `Conversation` component itself is not memoized with a custom comparator — it receives `messages` as a prop, and every streaming token creates a new `messages` array reference from Vercel AI SDK's `useChat`.
+> **Update (Feb 15, 2026):** This claim is **no longer accurate**. NaW now has `areMessagesEqual` + `React.memo(MessageInner, areMessagesEqual)` in `message.tsx`. The comparator checks: `variant`, `id`, text content (via `getTextContent`), reasoning (via `getReasoningContent`), tool signatures (via `getToolSignature`), `children`, `isLast`, `status`, `finishReason`, `hasScrollAnchor`.
 
-**Confidence**: High — visible in source code.
-**Impact**: Performance — significant during streaming in long conversations.
-**Transferability**: Directly Transferable — add `React.memo` with content-based equality to `Message`.
+**Evidence** (original): `conversation.tsx` maps over `messages` and renders `<Message>` for each. ~~The `Message` component is not wrapped in `React.memo`.~~ The component is now exported as `const MemoizedMessage = React.memo(MessageInner, areMessagesEqual)`.
 
-### WC-A5-C08: NaW's Composer Uses `useState` — Every Keystroke Cascades
+**Confidence**: ~~High~~ **Superseded** — claim was accurate at time of research; no longer applies.
+**Impact**: ~~Performance — significant during streaming in long conversations.~~ Already addressed.
+**Transferability**: ~~Directly Transferable~~ **Already transferred.**
 
-**Claim**: NaW's composer input state (`useState` in `use-chat-core.ts` line 92) causes re-renders in the parent `chat.tsx` on every keystroke.
+### WC-A5-C08: ~~NaW's Composer Uses `useState` — Every Keystroke Cascades~~ ✅ RESOLVED
 
-**Evidence**: `use-chat-core.ts` line 92: `const [input, setInput] = useState(draftValue || "")`. This state is returned from the hook and passed through `chat.tsx` → `chatInputProps.value`. Every keystroke triggers: `setInput` → `useChatCore` re-evaluates → `chat.tsx` recalculates `chatInputProps` → `ChatInput` re-renders. WebClaw's composer uses `useRef('')` for value — keystrokes are invisible to React's reconciler.
+**Claim**: ~~NaW's composer input state (`useState` in `use-chat-core.ts` line 92) causes re-renders in the parent `chat.tsx` on every keystroke.~~
 
-**Confidence**: High.
-**Impact**: Performance — input lag on lower-end devices, unnecessary work during typing.
-**Transferability**: Directly Transferable — move input value to `useRef`, expose via callback.
+> **Update (Feb 15, 2026):** This claim is **no longer accurate**. `use-chat-core.ts` line 94 now reads `const inputRef = useRef(prompt || draftValue || "")`. The hook returns `inputRef`, `getInput`, `setInputValue`, and `registerInputListener` — no `useState` for input. `ChatInput` owns a local `useState(defaultValue)` for display only; keystrokes do not propagate to `chat.tsx`.
 
-### WC-A5-C09: WebClaw's Portal-Based Scroll Container Prevents Shell Re-renders
+**Evidence** (original): ~~`use-chat-core.ts` line 92: `const [input, setInput] = useState(draftValue || "")`~~ Now: `const inputRef = useRef(prompt || draftValue || "")`. Draft persistence is debounced at 500ms with `beforeunload` flush.
 
-**Claim**: WebClaw's `createPortal` pattern for the scroll container prevents scroll area components from re-rendering when message content changes. NaW's `use-stick-to-bottom` manages scroll differently but doesn't isolate shell re-renders.
+**Confidence**: ~~High~~ **Superseded** — claim was accurate at time of research; no longer applies.
+**Impact**: ~~Performance — input lag on lower-end devices, unnecessary work during typing.~~ Already addressed.
+**Transferability**: ~~Directly Transferable~~ **Already transferred.**
 
-**Evidence**: WebClaw `chat-container.tsx` uses `MemoizedChatContainerShell` + `ChatContainerPortal`. NaW's `chat-container.tsx` wraps content in `<StickToBottom>` / `<StickToBottom.Content>` which is a third-party library that manages its own scroll behavior.
+### WC-A5-C09: WebClaw's Portal-Based Scroll Container Prevents Shell Re-renders — ❌ NOT APPLICABLE
 
-**Confidence**: Medium — NaW's `use-stick-to-bottom` may already handle this internally. Need profiling to confirm whether scroll components actually re-render during streaming.
-**Impact**: Performance — potentially significant if scroll components are expensive.
-**Transferability**: Adaptable — NaW uses a different scroll strategy; the portal concept could be layered on top.
+**Claim**: WebClaw's `createPortal` pattern for the scroll container prevents scroll area components from re-rendering when message content changes. ~~NaW's `use-stick-to-bottom` manages scroll differently but doesn't isolate shell re-renders.~~
+
+> **Update (Feb 15, 2026):** Codebase verification confirmed this pattern is **not applicable** to NaW. The chat scroll uses `use-stick-to-bottom` (v1.1.2) which renders plain `<div>` elements — not `ScrollArea` components with React-rendered scrollbars. There are zero `ScrollArea` imports in `app/components/chat/`. The library manages scroll imperatively via `scrollRef.current.scrollTop` (direct DOM API + `ResizeObserver`), not React state. The `isAtBottom` state only flips at a 70px threshold, not per streaming token. There are no React scrollbar components (`ScrollAreaScrollbar`, `ScrollAreaThumb`) to re-render.
+
+**Evidence**: WebClaw `chat-container.tsx` uses `MemoizedChatContainerShell` + `ChatContainerPortal`. NaW's `chat-container.tsx` wraps content in `<StickToBottom>` / `<StickToBottom.Content>` which renders two nested plain `<div>` elements with refs. No ScrollArea components exist in the scroll path.
+
+**Confidence**: ~~Medium~~ **High** — verified by reading `use-stick-to-bottom` library source and confirming zero `ScrollArea` imports in chat.
+**Impact**: ~~Performance — potentially significant if scroll components are expensive.~~ **None** — the problem doesn't exist in NaW's architecture.
+**Transferability**: ~~Adaptable~~ **Not applicable** — NaW's scroll implementation doesn't have the re-render problem this pattern solves.
 
 ---
 
@@ -329,23 +339,29 @@ For streaming: **WebClaw**, by design. They write streaming tokens directly into
 
 ## 7. Composer Architecture: Local State Isolation
 
+> **Update (Feb 15, 2026):** NaW has already implemented the ref-based input pattern recommended in this section. The comparison table and analysis below are updated to reflect current state.
+
 ### Comparison
 
-| Aspect | WebClaw (`ChatComposer`) | NaW (`use-chat-core.ts` + `ChatInput`) |
-|--------|------------------------|----------------------------------------|
-| Input value storage | `useRef('')` — no re-renders | `useState(draftValue)` — re-renders on keystroke |
-| External value access | `valueRef.current` (imperative read) | `input` from hook return (reactive) |
-| External value set | `setValueRef.current(newValue)` | `setInput(newValue)` |
-| Attachment state | `useState` (visual updates needed) | Separate `useFileUpload` hook |
-| Memo wrapper | `memo(ChatComposerComponent)` | Not memoized separately |
-| Draft persistence | Not implemented | `useChatDraft` → IndexedDB |
-| Global focus | `bindGlobalPromptListener()` — auto-focuses on printable keys | Not implemented |
+| Aspect | WebClaw (`ChatComposer`) | NaW (`use-chat-core.ts` + `ChatInput`) | NaW Status |
+|--------|------------------------|----------------------------------------|------------|
+| Input value storage | `useRef('')` — no re-renders | ~~`useState(draftValue)`~~ `useRef(prompt \|\| draftValue \|\| "")` — no re-renders | **✅ DONE** |
+| External value access | `valueRef.current` (imperative read) | ~~`input` from hook return (reactive)~~ `inputRef.current` / `getInput()` (imperative) | **✅ DONE** |
+| External value set | `setValueRef.current(newValue)` | ~~`setInput(newValue)`~~ `setInputValue(newValue)` → writes ref + notifies `inputListenerRef` | **✅ DONE** |
+| Attachment state | `useState` (visual updates needed) | Separate `useFileUpload` hook | Same |
+| Memo wrapper | `memo(ChatComposerComponent)` | Not memoized (not needed — local state in `ChatInput`) | Equivalent |
+| Draft persistence | Not implemented | `useChatDraft` → localStorage, 500ms debounced + `beforeunload` flush | **NaW advantage** |
+| Global focus | `bindGlobalPromptListener()` — auto-focuses on printable keys | Not implemented | Open |
 
-### NaW's Draft Sync Complicates Ref-Based Input
+### ~~NaW's Draft Sync Complicates Ref-Based Input~~ ✅ RESOLVED
 
-NaW's `handleInputChange` (line 628-634) calls both `setInput(value)` and `setDraftValue(value)` on every keystroke to persist drafts to IndexedDB. If we switch to ref-based input, we'd need to debounce the draft persistence (which is fine — draft saves don't need to be synchronous) but we'd lose the ability to reflect the current input value in React's render cycle.
+> **Update (Feb 15, 2026):** This concern has been fully addressed.
 
-**Recommended approach**: Keep `useState` for draft persistence but add `React.memo` to the `ChatInput` component with a custom comparator that ignores `value` changes when only the input itself triggered the change. Alternatively, use `useRef` for the input value and debounce `setDraftValue` to 500ms.
+~~NaW's `handleInputChange` (line 628-634) calls both `setInput(value)` and `setDraftValue(value)` on every keystroke to persist drafts to IndexedDB. If we switch to ref-based input, we'd need to debounce the draft persistence (which is fine — draft saves don't need to be synchronous) but we'd lose the ability to reflect the current input value in React's render cycle.~~
+
+**Current implementation:** `handleInputChange` (line 677–683) writes `inputRef.current = value` and calls `debouncedSetDraftValue(value)` (500ms debounce). `ChatInput` owns a local `useState(defaultValue)` for display. The `registerInputListener` pattern lets `use-chat-core.ts` imperatively update `ChatInput`'s display when needed (e.g., clear on submit, hydrate from `?prompt=` search param). A `beforeunload` listener (lines 668–675) flushes pending debounced drafts on tab close.
+
+~~**Recommended approach**: Keep `useState` for draft persistence but add `React.memo` to the `ChatInput` component with a custom comparator that ignores `value` changes when only the input itself triggered the change. Alternatively, use `useRef` for the input value and debounce `setDraftValue` to 500ms.~~
 
 ### WC-A5-C11: WebClaw's Global Prompt Focus Is a Low-Effort UX Win
 
@@ -521,13 +537,13 @@ These are worth adopting globally. The "never bolder than `font-medium`" rule is
 | WC-A5-C04 | WebClaw builds command palette from Base UI primitives without cmdk | Code comparison | WC `command.tsx` vs NaW `command.tsx` (uses cmdk → Radix transitive dep) | High | DX | Adaptable | Non-trivial migration but eliminates Radix dep |
 | WC-A5-C05 | NaW's per-block markdown memoization is superior for completed content | Code comparison | NaW `markdown.tsx` (marked.lexer blocks) vs WC whole-component memo | Medium | Performance | N/A (NaW advantage) | WebClaw's Streamdown is better for active streaming |
 | WC-A5-C06 | WebClaw's singleton Shiki highlighter avoids redundant initialization | Code pattern | WC `code-block/index.tsx` (module-level promise) vs NaW `code-block.tsx` (per-render codeToHtml) | High | Performance | Directly Transferable | NaW should cache the highlighter instance |
-| WC-A5-C07 | NaW re-renders all Message components on every streaming chunk (no content-based memo) | Code analysis | NaW `conversation.tsx` — no `React.memo` on Message, no custom equality | High | Performance | Directly Transferable | Single highest-impact performance fix |
-| WC-A5-C08 | NaW's composer uses `useState` — every keystroke causes parent re-renders | Code analysis | NaW `use-chat-core.ts` line 92: `useState(draftValue)` | High | Performance | Directly Transferable | WebClaw uses `useRef` — keystrokes invisible to React |
-| WC-A5-C09 | WebClaw's portal-based scroll container prevents shell re-renders during streaming | Code pattern | WC `chat-container.tsx` (`createPortal` + memoized shell) | Medium | Performance | Adaptable | NaW uses `use-stick-to-bottom` — may handle this internally |
+| WC-A5-C07 | ~~NaW re-renders all Message components on every streaming chunk~~ | Code analysis | NaW `message.tsx` — `areMessagesEqual` + `MemoizedMessage` | **Superseded** | Performance | **✅ DONE** | Already implemented — `React.memo(MessageInner, areMessagesEqual)` |
+| WC-A5-C08 | ~~NaW's composer uses `useState` — every keystroke causes parent re-renders~~ | Code analysis | NaW `use-chat-core.ts` line 94: `useRef` | **Superseded** | Performance | **✅ DONE** | Already uses `useRef` + listener + debounced draft |
+| WC-A5-C09 | ~~Portal-based scroll container prevents shell re-renders~~ | Code pattern | WC `chat-container.tsx` | **High (N/A)** | N/A | **❌ N/A** | NaW uses plain divs via `use-stick-to-bottom`, no ScrollArea |
 | WC-A5-C10 | NaW's Convex subscriptions are structurally superior to WebClaw's 30s polling | Architecture comparison | NaW `provider.tsx` (real-time) vs WC (refetchInterval: 30000) | High | State reliability | N/A (NaW advantage) | Convex auto-reconciles optimistic state |
 | WC-A5-C11 | WebClaw's global prompt focus auto-focuses textarea on printable keystrokes | Code pattern | WC `prompt-input.tsx` — `bindGlobalPromptListener()` | High | UX | Directly Transferable | ~20 lines, matches VS Code behavior |
 | WC-A5-C12 | Pin-to-top scroll behavior keeps user message visible during response streaming | Code pattern | WC `chat-message-list.tsx` — `scrollIntoView({ block: 'start' })` | Medium | UX | Adaptable | Requires changes alongside use-stick-to-bottom |
-| WC-A5-C13 | NaW lacks a generation guard timer — streams can leave UI stuck in "streaming" state | Code analysis (absence) | NaW `use-chat-core.ts` — no timeout for streaming status | High | UX reliability | Directly Transferable | ~35 lines, essential safety net |
+| WC-A5-C13 | ~~NaW lacks a generation guard timer~~ | Code analysis | NaW `use-chat-core.ts` lines 184–196 | **Superseded** | UX reliability | **✅ DONE** | Already implemented — 120s timeout effect |
 | WC-A5-C14 | Context meter (token usage visibility) is a cross-competitor pattern NaW is missing | Cross-reference | WC `context-meter.tsx`, OWUI context display, NaW model data in `lib/models/` | High | UX | Directly Transferable | Confirmed by both WebClaw and Open WebUI research |
 | WC-A5-C15 | `text-balance` and `text-pretty` CSS utilities improve text rendering at zero cost | Code convention | WC markdown component typography classes | High | UX | Directly Transferable | CSS standard, browser-supported |
 | WC-A5-C16 | Animations should be reserved for structural changes, not streaming path | Convention (inferred) | WC animates only sidebar; NaW animates onboarding + layout transitions | Medium | Performance | Adaptable | Confirms NaW's existing restrained approach |
@@ -538,22 +554,22 @@ These are worth adopting globally. The "never bolder than `font-medium`" rule is
 
 ### Top 3 Unresolved Questions
 
-1. **Does NaW's `Message` component actually cause visible jank during streaming?** The analysis shows all messages re-render, but React's reconciliation prevents actual DOM changes for unchanged content. The virtual DOM overhead may be negligible on modern hardware. **Evidence needed**: React DevTools profiling of NaW during active streaming with 50+ messages. If frame times stay under 16ms, WC-A5-C07's urgency decreases.
+1. ~~**Does NaW's `Message` component actually cause visible jank during streaming?**~~ **RESOLVED — WC-A5-C07 implemented.** Content-based `areMessagesEqual` comparator in `message.tsx` now ensures only the streaming message re-renders per chunk. Profiling would measure the improvement vs the pre-memo state, but the fix is already in place.
 
-2. **Does `use-stick-to-bottom` already prevent scroll component re-renders internally?** The library may implement its own memoization strategy that makes WebClaw's portal pattern (WC-A5-C09) redundant for NaW. **Evidence needed**: React DevTools profiling of `StickToBottom` during streaming. If the library memoizes its shell, skip the portal pattern.
+2. ~~**Does `use-stick-to-bottom` already prevent scroll component re-renders internally?**~~ **RESOLVED — verified.** Library source inspection confirmed: `use-stick-to-bottom` renders plain `<div>` elements, manages scroll via imperative DOM API (`scrollRef.current.scrollTop`), and only flips `isAtBottom` state at a 70px threshold. No React scrollbar components re-render during streaming. WebClaw's portal pattern (WC-A5-C09) is not applicable.
 
 3. **How does Streamdown compare to react-markdown in bundle size and reliability?** WebClaw uses Streamdown for streaming-native markdown, but the library is newer and less battle-tested. **Evidence needed**: Bundle size comparison, GitHub issue count, maintenance cadence. If Streamdown is >50KB gzip or has known issues, skip evaluation.
 
 ### Falsification Criteria
 
-- **WC-A5-C07 (message-level memoization)** would be downgraded if React 19's automatic memoization or React Compiler eliminates the need for manual `React.memo` on message components. Test: remove all manual memos in a React 19 + Compiler setup and profile.
-- **WC-A5-C08 (useState vs useRef for composer)** would be irrelevant if React 19's automatic batching eliminates cascading re-renders from input state changes. Test: profile keystroke propagation in current NaW.
+- ~~**WC-A5-C07 (message-level memoization)** would be downgraded if React 19's automatic memoization or React Compiler eliminates the need for manual `React.memo` on message components.~~ **Moot — already implemented.** However, if React Compiler makes the manual memo redundant, it can be removed.
+- ~~**WC-A5-C08 (useState vs useRef for composer)** would be irrelevant if React 19's automatic batching eliminates cascading re-renders from input state changes.~~ **Moot — already implemented as useRef.**
 - **WC-A5-C02 (hook decomposition)** would be weakened if profiling shows the 13-hook composition in WebClaw's ChatScreen adds measurable overhead vs NaW's single hook. The decomposition trades per-hook overhead for re-render isolation; which wins depends on the ratio.
 - **WC-A5-C06 (singleton Shiki)** would be unnecessary if `shiki`'s `codeToHtml` already caches the highlighter internally (check Shiki docs/source).
 
 ### Claims Based on Inference
 
-- WC-A5-C07: The re-render analysis is based on code structure, not runtime profiling. Actual impact depends on React's reconciliation efficiency.
+- ~~WC-A5-C07: The re-render analysis is based on code structure, not runtime profiling. Actual impact depends on React's reconciliation efficiency.~~ **Superseded — memoization already implemented.**
 - WC-A5-C16: The animation philosophy is inferred from absence of animation code in the streaming path, not from stated design decisions.
 - WC-A5-C05: The "superior for completed content" claim assumes `marked.lexer()` produces stable block boundaries, which may not hold for all markdown structures.
 

@@ -100,13 +100,13 @@ export function Chat() {
       createNewChat,
       setHasDialogAuth,
       setMessages: () => {},
-      setInput: () => {},
     })
 
   // Core chat functionality (initialization + state + actions)
   const {
     messages,
-    input,
+    inputRef,
+    registerInputListener,
     status,
     stop,
     hasSentFirstMessage,
@@ -165,7 +165,6 @@ export function Chat() {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-      value: input,
       onSuggestion: handleSuggestion,
       onValueChange: handleInputChange,
       onSend: submit,
@@ -183,9 +182,9 @@ export function Chat() {
       setEnableSearch,
       enableSearch,
       quotedText,
+      registerInputListener,
     }),
     [
-      input,
       handleSuggestion,
       handleInputChange,
       submit,
@@ -204,6 +203,7 @@ export function Chat() {
       setEnableSearch,
       enableSearch,
       quotedText,
+      registerInputListener,
     ]
   )
 
@@ -275,7 +275,7 @@ export function Chat() {
           },
         }}
       >
-        <ChatInput {...chatInputProps} />
+        <ChatInput defaultValue={inputRef.current} {...chatInputProps} />
       </motion.div>
 
       <FeedbackWidget authUserId={user?.id} />

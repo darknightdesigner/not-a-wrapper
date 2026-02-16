@@ -22,7 +22,6 @@ type UseChatOperationsProps = {
   setMessages: (
     messages: Message[] | ((messages: Message[]) => Message[])
   ) => void
-  setInput: (input: string) => void
 }
 
 export function useChatOperations({

@@ -209,6 +209,15 @@ code {
   font-variation-settings: var(--default-mono-font-variation-settings);
 }
 
+/* Typography: balanced headings, pretty body text (progressive enhancement) */
+.prose :is(h1, h2, h3, h4) {
+  text-wrap: balance;
+}
+.prose p,
+.prose li {
+  text-wrap: pretty;
+}
+
 /* sonner toast */
 [data-sonner-toaster] > li {
   width: 100%;

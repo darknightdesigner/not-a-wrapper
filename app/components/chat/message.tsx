@@ -1,4 +1,5 @@
 import { UIMessage as MessageType } from "@ai-sdk/react"
+import { isStaticToolUIPart, getStaticToolName } from "ai"
 import React, { useState } from "react"
 import { MessageAssistant } from "./message-assistant"
 import { MessageUser } from "./message-user"
@@ -29,7 +30,64 @@ type MessageProps = {
   finishReason?: string
 }
 
-export function Message({
+// --- Content-based equality helpers for React.memo ---
+
+function getTextContent(parts: MessageType["parts"] | undefined): string {
+  if (!parts) return ""
+  let text = ""
+  for (const part of parts) {
+    if (part.type === "text") text += part.text
+  }
+  return text
+}
+
+function getReasoningContent(parts: MessageType["parts"] | undefined): string {
+  if (!parts) return ""
+  let text = ""
+  for (const part of parts) {
+    if (part.type === "reasoning") text += part.text
+  }
+  return text
+}
+
+function getToolSignature(parts: MessageType["parts"] | undefined): string {
+  if (!parts) return ""
+  let sig = ""
+  for (const part of parts) {
+    if (isStaticToolUIPart(part)) {
+      sig += getStaticToolName(part) + ":" + part.state + ";"
+    }
+  }
+  return sig
+}
+
+function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
+  if (prev.variant !== next.variant) return false
+  if (prev.id !== next.id) return false
+
+  // Content comparisons via parts
+  if (getTextContent(prev.parts) !== getTextContent(next.parts)) return false
+  if (getReasoningContent(prev.parts) !== getReasoningContent(next.parts)) return false
+  if (getToolSignature(prev.parts) !== getToolSignature(next.parts)) return false
+
+  // Fallback: if parts are both empty/undefined, compare children directly
+  if (!prev.parts?.length && !next.parts?.length) {
+    if (prev.children !== next.children) return false
+  }
+  // If parts matched but children diverged (shouldn't happen, but safety net)
+  if (prev.children !== next.children) return false
+
+  if (prev.isLast !== next.isLast) return false
+  if (prev.status !== next.status) return false
+  if (prev.finishReason !== next.finishReason) return false
+  if (prev.hasScrollAnchor !== next.hasScrollAnchor) return false
+
+  return true
+}
+
+// --- Component ---
+
+function MessageInner({
   variant,
   children,
   id,
@@ -95,3 +153,6 @@ export function Message({
 
   return null
 }
+
+const MemoizedMessage = React.memo(MessageInner, areMessagesEqual)
+export { MemoizedMessage as Message }

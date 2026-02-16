@@ -17,6 +17,7 @@ import type { UIMessage } from "@ai-sdk/react"
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport } from "ai"
 import { useSearchParams } from "next/navigation"
+import { debounce } from "@/lib/utils"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
 // Extended UIMessage type for optimistic updates that includes createdAt
@@ -88,8 +89,24 @@ export function useChatCore({
   const searchParams = useSearchParams()
   const prompt = searchParams.get("prompt")
 
-  // Manual input state management (v6 no longer returns input/setInput from useChat)
-  const [input, setInput] = useState(draftValue || "")
+  // Ref-based input management — avoids cascading re-renders on every keystroke.
+  // ChatInput owns the display state; this ref is the source of truth for submit/handlers.
+  const inputRef = useRef(prompt || draftValue || "")
+  const inputListenerRef = useRef<((value: string) => void) | null>(null)
+
+  const getInput = useCallback(() => inputRef.current, [])
+
+  const registerInputListener = useCallback(
+    (listener: ((value: string) => void) | null) => {
+      inputListenerRef.current = listener
+    },
+    []
+  )
+
+  const setInputValue = useCallback((value: string) => {
+    inputRef.current = value
+    inputListenerRef.current?.(value)
+  }, [])
 
   // Chats operations
   const { updateTitle } = useChats()
@@ -163,6 +180,21 @@ export function useChatCore({
   const stopRef = useRef(stop)
   stopRef.current = stop
 
+  // Generation guard: prevent stuck "streaming" UI when a stream drops silently
+  useEffect(() => {
+    if (status !== "streaming") return
+
+    const timeout = setTimeout(() => {
+      stopRef.current()
+      toast({
+        title: "Response timed out — please try again",
+        status: "error",
+      })
+    }, 120_000)
+
+    return () => clearTimeout(timeout)
+  }, [status])
+
   // Handle chat transitions: stop active streams, reset state.
   // IMPORTANT: This effect MUST run before the hydration effect below so that
   // chat-to-chat navigation correctly stops the old stream before setting new messages.
@@ -203,12 +235,12 @@ export function useChatCore({
     }
   }, [chatId, initialMessages, setMessages])
 
-  // Handle search params on mount
+  // Handle search params — hydrate input from ?prompt= on mount or navigation
   useEffect(() => {
     if (prompt && typeof window !== "undefined") {
-      requestAnimationFrame(() => setInput(prompt))
+      requestAnimationFrame(() => setInputValue(prompt))
     }
-  }, [prompt, setInput])
+  }, [prompt, setInputValue])
 
   useEffect(() => {
     setEnableSearchState(resolveWebSearchEnabled(preferences.webSearchEnabled))
@@ -223,6 +255,8 @@ export function useChatCore({
 
   // Submit action
   const submit = useCallback(async () => {
+    // Capture input from ref before any async work — caller may clear it after onSend returns
+    const currentInput = inputRef.current
     setIsSubmitting(true)
 
     const uid = await getOrCreateGuestUserId(user)
@@ -230,9 +264,6 @@ export function useChatCore({
       setIsSubmitting(false)
       return
     }
-
-    // Capture current input value before clearing
-    const currentInput = input
 
     const optimisticId = `optimistic-${Date.now().toString()}`
     const optimisticAttachments =
@@ -255,7 +286,7 @@ export function useChatCore({
     }
 
     setMessages((prev) => [...prev, optimisticMessage])
-    setInput("")
+    setInputValue("")
 
     const submittedFiles = [...files]
     setFiles([])
@@ -344,7 +375,7 @@ export function useChatCore({
     user,
     files,
     createOptimisticAttachments,
-    input,
+    setInputValue,
     setMessages,
     setFiles,
     checkLimitsAndNotify,
@@ -623,29 +654,51 @@ export function useChatCore({
     regenerate(options)
   }, [user, chatId, selectedModel, isAuthenticated, systemPrompt, regenerate])
 
-  // Handle input change - now with access to the real setInput function!
+  // Debounced draft persistence — avoids writing to localStorage on every keystroke
   const { setDraftValue } = useChatDraft(chatId)
+  const setDraftValueRef = useRef(setDraftValue)
+  setDraftValueRef.current = setDraftValue
+
+  const debouncedSetDraftValue = useMemo(
+    () => debounce((value: string) => setDraftValueRef.current(value), 500),
+    []
+  )
+
+  // Flush pending draft on tab close; also flush on unmount (navigation)
+  useEffect(() => {
+    const flush = () => debouncedSetDraftValue.flush()
+    window.addEventListener("beforeunload", flush)
+    return () => {
+      window.removeEventListener("beforeunload", flush)
+      debouncedSetDraftValue.flush()
+    }
+  }, [debouncedSetDraftValue])
+
   const handleInputChange = useCallback(
     (value: string) => {
-      setInput(value)
-      setDraftValue(value)
+      inputRef.current = value
+      debouncedSetDraftValue(value)
     },
-    [setInput, setDraftValue]
+    [debouncedSetDraftValue]
   )
 
   return {
     // Chat state
     messages,
-    input,
     status,
     error,
     stop,
     setMessages,
-    setInput,
     isAuthenticated,
     systemPrompt,
     hasSentFirstMessage,
     setHasSentFirstMessage,
+
+    // Ref-based input API (no useState — avoids cascading re-renders)
+    inputRef,
+    getInput,
+    setInputValue,
+    registerInputListener,
 
     // v5 API functions (exposed for direct access if needed)
     sendMessage,

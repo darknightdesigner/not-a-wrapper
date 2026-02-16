@@ -20,13 +20,13 @@ import {
   FileUploadIcon,
   StopCircleIcon,
 } from "@hugeicons-pro/core-stroke-rounded"
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonPlusMenu } from "./button-plus-menu"
 import { FileList } from "./file-list"
 
 type ChatInputProps = {
-  value: string
+  defaultValue?: string
   onValueChange: (value: string) => void
   onSend: () => void
   isSubmitting?: boolean
@@ -44,10 +44,13 @@ type ChatInputProps = {
   setEnableSearch: (enabled: boolean) => void
   enableSearch: boolean
   quotedText?: { text: string; messageId: string } | null
+  registerInputListener?: (
+    listener: ((value: string) => void) | null
+  ) => void
 }
 
 export function ChatInput({
-  value,
+  defaultValue = "",
   onValueChange,
   onSend,
   isSubmitting,
@@ -64,6 +67,7 @@ export function ChatInput({
   setEnableSearch,
   enableSearch,
   quotedText,
+  registerInputListener,
 }: ChatInputProps) {
   const selectModelConfig = getModelInfo(selectedModel)
   // Web search is disabled only when the model explicitly can't accept tool calls
@@ -74,6 +78,25 @@ export function ChatInput({
   const isFileUploadAvailable = Boolean(selectModelConfig?.vision)
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Local state — ChatInput owns the displayed text to avoid re-renders in parent tree
+  const [localValue, setLocalValue] = useState(defaultValue)
+
+  // Register local setState so use-chat-core can imperatively update display
+  // (e.g. clear on submit, hydrate from ?prompt= search param)
+  useEffect(() => {
+    registerInputListener?.(setLocalValue)
+    return () => registerInputListener?.(null)
+  }, [registerInputListener])
+
+  // Wrapper: updates local display state + notifies parent (ref + debounced draft)
+  const handleValueChange = useCallback(
+    (newValue: string) => {
+      setLocalValue(newValue)
+      onValueChange(newValue)
+    },
+    [onValueChange]
+  )
 
   const handleSend = useCallback(() => {
     if (isSubmitting) {
@@ -101,7 +124,7 @@ export function ChatInput({
       }
 
       if (e.key === "Enter" && !e.shiftKey) {
-        if (isOnlyWhitespace(value)) {
+        if (isOnlyWhitespace(localValue)) {
           return
         }
 
@@ -109,7 +132,7 @@ export function ChatInput({
         onSend()
       }
     },
-    [isSubmitting, onSend, status, value]
+    [isSubmitting, onSend, status, localValue]
   )
 
   const handlePaste = useCallback(
@@ -152,10 +175,10 @@ export function ChatInput({
     [isUserAuthenticated, onFileUpload]
   )
 
-  const valueRef = useRef(value)
+  const valueRef = useRef(localValue)
   useEffect(() => {
-    valueRef.current = value
-  }, [value])
+    valueRef.current = localValue
+  }, [localValue])
 
   useEffect(() => {
     if (quotedText) {
@@ -164,21 +187,23 @@ export function ChatInput({
         .split("\n")
         .map((line) => `> ${line}`)
         .join("\n")
-      onValueChange(current ? `${current}\n\n${quoted}\n\n` : `${quoted}\n\n`)
+      handleValueChange(
+        current ? `${current}\n\n${quoted}\n\n` : `${quoted}\n\n`
+      )
 
       requestAnimationFrame(() => {
         textareaRef.current?.focus()
       })
     }
-  }, [quotedText, onValueChange])
+  }, [quotedText, handleValueChange])
 
   return (
     <div className="relative flex w-full flex-col gap-4">
       {hasSuggestions && (
         <PromptSystem
-          onValueChange={onValueChange}
+          onValueChange={handleValueChange}
           onSuggestion={onSuggestion}
-          value={value}
+          value={localValue}
         />
       )}
       <FileUpload
@@ -194,8 +219,8 @@ export function ChatInput({
           <PromptInput
             className="bg-popover relative z-10 p-0 pt-1 shadow-xs backdrop-blur-xl"
             maxHeight={200}
-            value={value}
-            onValueChange={onValueChange}
+            value={localValue}
+            onValueChange={handleValueChange}
           >
             <FileList files={files} onFileRemove={onFileRemove} />
             <PromptInputTextarea
@@ -228,7 +253,7 @@ export function ChatInput({
                 <Button
                   size="sm"
                   className="size-9 rounded-full transition-all duration-300 ease-out"
-                  disabled={!value || isSubmitting || isOnlyWhitespace(value)}
+                  disabled={!localValue || isSubmitting || isOnlyWhitespace(localValue)}
                   type="button"
                   onClick={handleSend}
                   aria-label={status === "streaming" ? "Stop" : "Send message"}

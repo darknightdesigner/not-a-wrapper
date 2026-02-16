@@ -18,7 +18,39 @@
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 import React, { useEffect, useState } from "react"
-import { codeToHtml } from "shiki"
+import type { Highlighter } from "shiki"
+import { createHighlighter } from "shiki"
+
+const DEFAULT_LANGS = [
+  "javascript",
+  "typescript",
+  "python",
+  "bash",
+  "json",
+  "html",
+  "css",
+  "jsx",
+  "tsx",
+  "markdown",
+  "sql",
+  "rust",
+  "go",
+  "java",
+  "yaml",
+  "shell",
+] as const
+
+let highlighterPromise: Promise<Highlighter> | null = null
+
+function getHighlighter(): Promise<Highlighter> {
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({
+      themes: ["github-dark", "github-light"],
+      langs: [...DEFAULT_LANGS],
+    })
+  }
+  return highlighterPromise
+}
 
 export type CodeBlockProps = {
   children?: React.ReactNode
@@ -56,19 +88,33 @@ function CodeBlockCode({
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     async function highlight() {
-      // Guard against undefined/null code
       if (!code) {
         setHighlightedHtml(null)
         return
       }
-      const html = await codeToHtml(code, {
-        lang: language,
-        theme: appTheme === "dark" ? "github-dark" : "github-light",
-      })
-      setHighlightedHtml(html)
+
+      const highlighter = await getHighlighter()
+      const theme = appTheme === "dark" ? "github-dark" : "github-light"
+
+      let html: string
+      try {
+        html = highlighter.codeToHtml(code, { lang: language, theme })
+      } catch {
+        html = highlighter.codeToHtml(code, { lang: "text", theme })
+      }
+
+      if (!cancelled) {
+        setHighlightedHtml(html)
+      }
     }
     highlight()
+
+    return () => {
+      cancelled = true
+    }
   }, [code, language, appTheme])
 
   const classNames = cn(

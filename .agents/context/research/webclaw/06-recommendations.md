@@ -10,9 +10,11 @@
 
 ## Executive Summary
 
-Across five research documents, 65 coded claims, and direct comparison with Not A Wrapper's codebase, the WebClaw analysis reveals a clear pattern: **the most transferable findings are React-level performance optimizations and code organization patterns, not architectural decisions.** WebClaw's gateway-dependent, stateless-client architecture is non-transferable to NaW's multi-provider serverless platform. But WebClaw's streaming performance discipline — content-based memoization, ref-based composer isolation, portal-based scroll containers, and 13-hook decomposition — addresses the exact performance gaps in NaW's current chat implementation.
+Across five research documents, 65 coded claims, and direct comparison with Not A Wrapper's codebase, the WebClaw analysis reveals a clear pattern: **the most transferable findings are React-level performance optimizations and code organization patterns, not architectural decisions.** WebClaw's gateway-dependent, stateless-client architecture is non-transferable to NaW's multi-provider serverless platform. But WebClaw's streaming performance discipline — content-based memoization, ~~ref-based composer isolation~~, ~~portal-based scroll containers~~, and 13-hook decomposition — addresses the exact performance gaps in NaW's current chat implementation.
 
-This document distills the research into **15 recommendations** (5 P0, 5 P1, 5 P2), each with full evidence tracing, risk assessment, and cross-reference to Open WebUI findings. The P0 recommendations alone would reduce per-streaming-chunk DOM work from O(N × message_complexity) to O(1), eliminate keystroke-triggered re-render cascades, and add a critical safety net for dropped streams.
+> **Post-analysis update (Feb 15, 2026):** Codebase verification revealed that 2 of the original 5 P0 recommendations were already implemented or not applicable. R02 (Composer Ref Optimization) is already fully implemented in the current branch — `use-chat-core.ts` uses `useRef` + listener pattern + debounced draft persistence. R11 (Portal-Based Scroll Container) is not applicable because NaW's chat scroll uses `use-stick-to-bottom` with plain `<div>` elements and imperative DOM scroll, not React `ScrollArea` components. See updated R02 and R11 cards below for details.
+
+This document distills the research into **15 recommendations** (5 P0, 5 P1, 5 P2), each with full evidence tracing, risk assessment, and cross-reference to Open WebUI findings. The remaining P0 recommendations would reduce per-streaming-chunk DOM work from O(N × message_complexity) to O(1), and add a critical safety net for dropped streams.
 
 ---
 
@@ -20,13 +22,13 @@ This document distills the research into **15 recommendations** (5 P0, 5 P1, 5 P
 
 These patterns are adoptable immediately with minimal risk and high payoff.
 
-| # | Quick Win | File to Change | Pattern | Expected Improvement |
-|---|-----------|---------------|---------|---------------------|
-| 1 | Message memoization | `app/components/chat/message.tsx` | Wrap in `React.memo` with `areMessagesEqual` content comparator | O(N) → O(1) re-renders per streaming chunk |
-| 2 | Composer ref isolation | `app/components/chat/use-chat-core.ts` line 92 | Move `input` from `useState` to `useRef`; debounce draft persistence to 500ms | Eliminate keystroke cascade through chat.tsx → conversation.tsx |
-| 3 | Generation guard timer | `app/components/chat/use-chat-core.ts` (new effect) | 120s timeout when `status === "streaming"`; on timeout: `stop()` + error toast | Prevent stuck "generating" UI when streams drop silently |
-| 4 | Singleton Shiki highlighter | `app/components/chat/code-block.tsx` (or equivalent) | Module-level `let highlighterPromise` initialized once on first use | Eliminate redundant Shiki WASM initialization per code block |
-| 5 | Typography utilities | `app/components/chat/markdown.tsx` + global markdown styles | Add `text-balance` to headings, `text-pretty` to body text | Better text rendering at zero perf cost (CSS progressive enhancement) |
+| # | Quick Win | File to Change | Pattern | Expected Improvement | Status |
+|---|-----------|---------------|---------|---------------------|--------|
+| 1 | Message memoization | `app/components/chat/message.tsx` | Wrap in `React.memo` with `areMessagesEqual` content comparator | O(N) → O(1) re-renders per streaming chunk | **✅ DONE** — `areMessagesEqual` + `MemoizedMessage` already in `message.tsx` |
+| 2 | Composer ref isolation | `app/components/chat/use-chat-core.ts` line 92 | Move `input` from `useState` to `useRef`; debounce draft persistence to 500ms | Eliminate keystroke cascade through chat.tsx → conversation.tsx | **✅ DONE** — `inputRef` + `inputListenerRef` + 500ms debounced draft + `beforeunload` flush already implemented |
+| 3 | Generation guard timer | `app/components/chat/use-chat-core.ts` (new effect) | 120s timeout when `status === "streaming"`; on timeout: `stop()` + error toast | Prevent stuck "generating" UI when streams drop silently | **✅ DONE** — 120s guard effect at lines 184–196 |
+| 4 | Singleton Shiki highlighter | `app/components/chat/code-block.tsx` (or equivalent) | Module-level `let highlighterPromise` initialized once on first use | Eliminate redundant Shiki WASM initialization per code block | Open |
+| 5 | Typography utilities | `app/components/chat/markdown.tsx` + global markdown styles | Add `text-balance` to headings, `text-pretty` to body text | Better text rendering at zero perf cost (CSS progressive enhancement) | Open |
 
 ---
 
@@ -153,30 +155,46 @@ const MemoizedMessage = React.memo(Message, areMessagesEqual)
 
 **Cost analysis:** Per streaming chunk with 200 messages: 200 signature comparisons (string extraction + comparison). Each is O(text_length) — cheap. Total: sub-millisecond. Versus current: 200 full component re-renders with virtual DOM diffing.
 
-### R04 — Ref-Based Composer Input
+### ~~R04 — Ref-Based Composer Input~~ ✅ ALREADY IMPLEMENTED
+
+> **Verified Feb 15, 2026:** The codebase already implements this exact pattern. The research was conducted against an earlier version where `input` was `useState`.
 
 ```typescript
-// Current (use-chat-core.ts line 92): every keystroke triggers parent re-render
-const [input, setInput] = useState(draftValue || "")
+// CURRENT implementation (use-chat-core.ts lines 92–109):
+// Ref-based input management — avoids cascading re-renders on every keystroke.
+const inputRef = useRef(prompt || draftValue || "")
+const inputListenerRef = useRef<((value: string) => void) | null>(null)
 
-// Target: move to useRef in composer component
-const valueRef = useRef('')
-const setValueRef = useRef<((v: string) => void) | null>(null)
+const getInput = useCallback(() => inputRef.current, [])
+const setInputValue = useCallback((value: string) => {
+  inputRef.current = value
+  inputListenerRef.current?.(value)
+}, [])
 
-// Draft persistence: debounce to 500ms
-const debouncedSetDraft = useMemo(
-  () => debounce((v: string) => setDraftValue(v), 500),
-  [setDraftValue]
+// Draft persistence debounced at 500ms (lines 662–665):
+const debouncedSetDraftValue = useMemo(
+  () => debounce((value: string) => setDraftValueRef.current(value), 500), []
 )
+
+// beforeunload flush (lines 668–675):
+useEffect(() => {
+  const flush = () => debouncedSetDraftValue.flush()
+  window.addEventListener("beforeunload", flush)
+  return () => { window.removeEventListener("beforeunload", flush); debouncedSetDraftValue.flush() }
+}, [debouncedSetDraftValue])
 ```
 
-**Why this matters:** Currently, typing "hello" triggers 5 state updates in `use-chat-core.ts`, each propagating through `chat.tsx` → `conversationProps` memo → `Conversation` → all `Message` components. With ref-based input, keystrokes are invisible to React's reconciler.
+**How it works:** `ChatInput` owns a local `useState(defaultValue)` for display. On keystroke, only `ChatInput` re-renders (local state). `handleInputChange` writes to `inputRef.current` and calls the debounced draft saver — no React state change propagates to `chat.tsx`, `Conversation`, or `Message`. When the hook needs to imperatively set display (clear on submit, hydrate from `?prompt=`), it calls `inputListenerRef.current?.(value)` which directly invokes `ChatInput`'s local `setLocalValue`.
 
-### Portal-Based Scroll Container (Evaluate First)
+### ~~Portal-Based Scroll Container~~ ❌ NOT APPLICABLE
 
-WebClaw uses `createPortal()` to inject message content into a memoized scroll shell, preventing `ScrollAreaRoot`, `ScrollAreaScrollbar`, and `ScrollAreaThumb` from re-rendering on every content update.
+> **Verified Feb 15, 2026:** NaW's chat scroll does not use React `ScrollArea` components. The portal pattern solves a problem that does not exist in this codebase.
 
-**Before adopting:** Profile NaW's `use-stick-to-bottom` during streaming with React DevTools. If the scroll library already memoizes its shell internally, this pattern is redundant. If scroll components show up in the profiler during streaming, layer the portal pattern on top.
+WebClaw uses `createPortal()` to prevent `ScrollAreaRoot`, `ScrollAreaScrollbar`, and `ScrollAreaThumb` from re-rendering on every content update. **NaW's chat scroll uses `use-stick-to-bottom` (v1.1.2) which renders plain `<div>` elements and manages scroll position imperatively via `scrollRef.current.scrollTop`.** There are no React scrollbar components to re-render. The `isAtBottom` state in the library only flips at a 70px threshold (a discrete event), not per streaming token. Scroll position updates happen via `requestAnimationFrame` + direct DOM manipulation, not React state.
+
+**Evidence:** Zero `ScrollArea` imports in `app/components/chat/`. The scroll stack is: `ChatContainerRoot` → `StickToBottom` (plain div) → `ChatContainerContent` → `StickToBottom.Content` (two nested plain divs with refs). During streaming, `ResizeObserver` detects content growth → spring animation → `scrollRef.current.scrollTop = newValue` (imperative). No React re-render of scroll container components.
+
+**When this would become relevant:** Only if the scroll implementation switches from `use-stick-to-bottom` to a Base UI `ScrollArea` with React-rendered scrollbar components, or if custom scrollbar styling is added as React components that re-render on content size changes.
 
 ### Stable Reference via Signature
 
@@ -255,41 +273,38 @@ An honest assessment of NaW's advantages to protect.
 ## 8. Implementation Dependencies
 
 ```
+[✅ COMPLETED — Already Implemented]
+├── R01: Message Memoization ← DONE (areMessagesEqual + MemoizedMessage in message.tsx)
+├── R02: Composer Ref Optimization ← DONE (inputRef + listener + debounced draft)
+├── R03: Generation Guard Timer ← DONE (120s timeout in use-chat-core.ts lines 184–196)
+└── R11: Portal-Based Scroll Container ← NOT APPLICABLE (no ScrollArea in chat scroll)
+
 [No Dependencies — Do Immediately]
-├── R01: Message Memoization ← no deps
-├── R03: Generation Guard Timer ← no deps
 ├── R04: Singleton Shiki ← no deps
 ├── R05: Typography (text-balance/text-pretty) ← no deps
 └── R09: Convention Enforcement ← no deps (policy change)
 
 [Performance Chain]
-R01: Message Memoization
-└──→ R02: Composer Ref Optimization (can co-land, but test memo first)
-     └──→ R06: Hook Decomposition (largest refactor — do after perf wins land)
-          └──→ R10: Screen-Based Feature Module (organizational, after hook boundaries clear)
+R06: Hook Decomposition (largest refactor — do after perf wins verified)
+└──→ R10: Screen-Based Feature Module (organizational, after hook boundaries clear)
 
 [UX Chain]
 R07: Global Prompt Auto-Focus ← no deps
 R08: Context Meter ← needs token counting from AI SDK usage object
      └──→ R12: Pin-to-Top Scroll (evaluate after context meter ships)
-
-[Evaluation-Gated]
-R11: Portal-Based Scroll Container ← GATED on profiling results
-     Profile use-stick-to-bottom during streaming first.
-     Only implement if scroll components appear in React DevTools profiler.
 ```
 
-**Critical path:** R01 → R02 → R06 → R10 is the longest chain. Start R01 immediately; it unblocks the performance chain.
+**Critical path:** R06 → R10 is the longest remaining chain. The performance prerequisites (R01, R02) are already landed.
 
-**Parallel work:** R03, R04, R05, R07, R09 have zero dependencies and can proceed in any order alongside the performance chain.
+**Parallel work:** R04, R05, R07, R09 have zero dependencies and can proceed in any order alongside the refactoring chain.
 
 ---
 
 ## 9. Unresolved Questions (Requiring Human Decision)
 
-1. **Does NaW's `Message` component cause measurable jank during streaming?** The analysis (WC-A5-C07) shows all messages re-render per chunk, but React's reconciliation may keep frame times under 16ms on modern hardware. **Decision needed:** Profile with React DevTools before or after implementing R01? Recommendation: implement R01 first (low risk, high ceiling), then profile to measure improvement.
+1. ~~**Does NaW's `Message` component cause measurable jank during streaming?**~~ **RESOLVED — R01 is already implemented.** Content-based `areMessagesEqual` comparator in `message.tsx` ensures only the actively streaming message re-renders per chunk. Profile to measure actual improvement vs theoretical, but the fix is already in place.
 
-2. **Should draft persistence remain synchronous with input state?** Moving composer input to `useRef` (R02) requires decoupling draft saves from React state. A 500ms debounce is proposed, but this means drafts could be lost on tab close within the debounce window. **Decision needed:** Is 500ms draft loss acceptable? Alternative: use `beforeunload` to flush pending draft.
+2. ~~**Should draft persistence remain synchronous with input state?**~~ **RESOLVED — Already implemented with correct mitigations.** The codebase uses `useRef` for input value, 500ms debounced draft persistence, and a `beforeunload` listener that flushes pending drafts. The debounce window draft loss concern is addressed.
 
 3. **Should the hook decomposition (R06) happen before or after the AI SDK v6 patterns settle?** NaW uses Vercel AI SDK, which manages its own streaming state via `useChat`. Decomposing `use-chat-core.ts` may be affected by any upcoming SDK changes to the `useChat` API. **Decision needed:** Proceed now or wait for SDK v6 to stabilize?
 
@@ -305,57 +320,71 @@ R11: Portal-Based Scroll Container ← GATED on profiling results
 
 ---
 
-#### R01: Content-Based Message Memoization
+#### R01: Content-Based Message Memoization — ✅ DONE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Content-Based Message Memoization |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ **COMPLETED** |
 | **Confidence** | High |
 | **Transferability** | Direct — same React 19 stack, identical problem |
-| **Effort** | 1–2 days |
+| **Effort** | ~~1–2 days~~ 0 (already implemented) |
 | **Impact** | Performance — reduces per-streaming-chunk DOM work from O(N) to O(1) |
 | **Evidence** | WC-A5-C07, WC-A3-C02, WC-A2-C17 |
 | **Risk if wrong** | Negligible — `React.memo` can be removed. Worst case: custom comparator has a bug that skips a needed re-render (testable) |
 | **Synergy with OWUI** | Confirms OWUI finding that 100+ messages cause degradation. Memoization is the first defense before virtualization. |
 
-**Implementation:** Wrap `Message` in `React.memo` with `areMessagesEqual`. The comparator extracts text content, reasoning content, and tool call signatures as strings and compares them. Only the message whose content actually changed re-renders.
+> **Verified Feb 15, 2026:** Already implemented in `message.tsx`. The `areMessagesEqual` comparator checks `variant`, `id`, text content (via `getTextContent`), reasoning content (via `getReasoningContent`), tool signatures (via `getToolSignature`), `children`, `isLast`, `status`, `finishReason`, and `hasScrollAnchor`. The component is exported as `const MemoizedMessage = React.memo(MessageInner, areMessagesEqual)`.
+
+~~**Implementation:** Wrap `Message` in `React.memo` with `areMessagesEqual`. The comparator extracts text content, reasoning content, and tool call signatures as strings and compares them. Only the message whose content actually changed re-renders.~~
 
 ---
 
-#### R02: Composer Input Ref Optimization
+#### R02: Composer Input Ref Optimization — ✅ DONE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Composer Input Ref Optimization |
-| **Action** | Adapt |
+| **Action** | ~~Adapt~~ **COMPLETED** |
 | **Confidence** | High |
 | **Transferability** | Direct — universal React pattern |
-| **Effort** | 1–2 days |
+| **Effort** | ~~1–2 days~~ 0 (already implemented) |
 | **Impact** | Performance — eliminates keystroke-triggered cascading re-renders |
 | **Evidence** | WC-A5-C08, WC-A3-C04, WC-A2-C15 |
-| **Risk if wrong** | Medium — breaks draft persistence if debounce isn't wired correctly. Mitigate: `beforeunload` flush. |
+| **Risk if wrong** | N/A — already shipped and working |
 | **Synergy with OWUI** | N/A — different stack (Svelte). New insight unique to WebClaw research. |
 
-**Implementation:** Move `input` from `useState` in `use-chat-core.ts` (line 92) to `useRef` in the composer component. Debounce `setDraftValue` to 500ms. Expose `getValue()` callback for submission. Add `beforeunload` listener to flush pending draft.
+> **Verified Feb 15, 2026:** Already fully implemented in the current branch. The complete ref-based input architecture:
+> - `use-chat-core.ts` line 94: `const inputRef = useRef(prompt || draftValue || "")` — ref-based value storage
+> - `use-chat-core.ts` line 95: `const inputListenerRef = useRef<...>` — imperative display update channel
+> - `use-chat-core.ts` lines 662–665: `debouncedSetDraftValue` — 500ms debounced draft persistence
+> - `use-chat-core.ts` lines 668–675: `beforeunload` flush + unmount flush
+> - `chat-input.tsx` line 83: `const [localValue, setLocalValue] = useState(defaultValue)` — local display state
+> - `chat-input.tsx` lines 87–90: listener registration wiring
+>
+> **Re-render path on keystroke:** `ChatInput` local state only → `handleInputChange` writes `inputRef.current` + debounced draft → no state change propagates to `chat.tsx`, `Conversation`, or `Message`. Verified: zero cascading re-renders.
+
+~~**Implementation:** Move `input` from `useState` in `use-chat-core.ts` (line 92) to `useRef` in the composer component. Debounce `setDraftValue` to 500ms. Expose `getValue()` callback for submission. Add `beforeunload` listener to flush pending draft.~~
 
 ---
 
-#### R03: Generation Guard Timer
+#### R03: Generation Guard Timer — ✅ DONE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Generation Guard Timer |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ **COMPLETED** |
 | **Confidence** | High |
 | **Transferability** | Direct — ~35 lines of framework-agnostic timeout logic |
-| **Effort** | < 1 day |
+| **Effort** | ~~< 1 day~~ 0 (already implemented) |
 | **Impact** | UX reliability — prevents permanent "streaming" state when connections drop |
 | **Evidence** | WC-A5-C13, WC-A2-C09 (auto-reconnection + guard) |
 | **Risk if wrong** | Timer fires too early on slow models (long thinking). Mitigate: configurable timeout (120s default), extend for reasoning-enabled models. |
 | **Synergy with OWUI** | Confirms OWUI anti-pattern #4 (silent failure modes). Generation guard is the streaming equivalent of visible failure feedback. |
 
-**Implementation:** Add a `useEffect` in `use-chat-core.ts` (or extracted `use-chat-streaming.ts`) that starts a timeout when `status === "streaming"`. On timeout: call `stop()`, show error toast ("Response timed out — please try again"), reset streaming state.
+> **Verified Feb 15, 2026:** Already implemented at `use-chat-core.ts` lines 184–196. Uses `stopRef` to avoid stale closures. 120s timeout when `status === "streaming"`, calls `stop()` + error toast on timeout. Uses `useEffect` cleanup to clear timeout on status change.
+
+~~**Implementation:** Add a `useEffect` in `use-chat-core.ts` (or extracted `use-chat-streaming.ts`) that starts a timeout when `status === "streaming"`. On timeout: call `stop()`, show error toast ("Response timed out — please try again"), reset streaming state.~~
 
 ---
 
@@ -493,21 +522,30 @@ R11: Portal-Based Scroll Container ← GATED on profiling results
 
 ---
 
-#### R11: Portal-Based Scroll Container (Evaluation-Gated)
+#### R11: Portal-Based Scroll Container — ❌ NOT APPLICABLE
 
 | Field | Value |
 |-------|-------|
 | **Title** | Portal-Based Scroll Container |
-| **Action** | Adapt (gated on profiling) |
-| **Confidence** | Medium |
-| **Transferability** | Direct — same Base UI ScrollArea |
-| **Effort** | 1–2 days |
-| **Impact** | Performance — prevents scroll component re-renders during streaming |
+| **Action** | ~~Adapt (gated on profiling)~~ **NOT APPLICABLE** |
+| **Confidence** | **High** (upgraded from Medium after codebase verification) |
+| **Transferability** | ~~Direct — same Base UI ScrollArea~~ Not applicable — NaW does not use ScrollArea for chat |
+| **Effort** | 0 (not needed) |
+| **Impact** | ~~Performance — prevents scroll component re-renders during streaming~~ None — the problem doesn't exist |
 | **Evidence** | WC-A5-C09, WC-A3-C03, WC-A2-C01 |
-| **Risk if wrong** | Low — if `use-stick-to-bottom` already handles this internally, the pattern is redundant |
+| **Risk if wrong** | N/A |
 | **Synergy with OWUI** | N/A — different rendering model |
 
-**Implementation:** Profile `use-stick-to-bottom` during streaming with React DevTools first. If scroll components (`ScrollAreaRoot`, `ScrollAreaScrollbar`, `ScrollAreaThumb`) appear in the profiler, implement the `createPortal` pattern: memoize the scroll shell, portal content into the viewport node.
+> **Verified Feb 15, 2026:** The portal pattern solves a problem that does not exist in NaW's codebase. Investigation findings:
+>
+> 1. **No `ScrollArea` in chat scroll path.** Zero `ScrollArea` imports found in `app/components/chat/`. The chat message list scroll is entirely `use-stick-to-bottom` (v1.1.2) wrapping plain `<div>` elements.
+> 2. **Scroll managed imperatively.** `use-stick-to-bottom` detects content growth via `ResizeObserver`, calculates new scroll position with spring animation, and sets `scrollRef.current.scrollTop` directly — no React state or re-render involved in the scroll action itself.
+> 3. **`isAtBottom` is a discrete state flip.** The library's only React state (`isAtBottom`) flips at a 70px threshold, not on every streaming token. `StickToBottom` and `StickToBottom.Content` components do not re-render per token.
+> 4. **The DOM structure is three plain divs.** `ChatContainerRoot` → `StickToBottom` (outer div) → scroll div (gets `scrollRef`) → content div (gets `contentRef`). No React scrollbar components (`ScrollAreaScrollbar`, `ScrollAreaThumb`) exist.
+>
+> **When this would become relevant:** Only if the chat scroll switched to a Base UI `ScrollArea` with React-rendered custom scrollbar components, or if profiling revealed `StickToBottom` components in the React DevTools profiler during streaming (not expected).
+
+~~**Implementation:** Profile `use-stick-to-bottom` during streaming with React DevTools first. If scroll components (`ScrollAreaRoot`, `ScrollAreaScrollbar`, `ScrollAreaThumb`) appear in the profiler, implement the `createPortal` pattern: memoize the scroll shell, portal content into the viewport node.~~
 
 ---
 
@@ -585,28 +623,32 @@ R11: Portal-Based Scroll Container ← GATED on profiling results
 
 ## Summary Matrix
 
-| ID | Recommendation | Priority | Action | Effort | Impact | Deps |
-|----|---------------|----------|--------|--------|--------|------|
-| R01 | Message Memoization | **P0** | Adopt | 1–2d | Performance | None |
-| R02 | Composer Ref Optimization | **P0** | Adapt | 1–2d | Performance | None |
-| R03 | Generation Guard Timer | **P0** | Adopt | <1d | UX Reliability | None |
-| R04 | Singleton Shiki | **P0** | Adopt | <1d | Performance | None |
-| R05 | Typography Utilities | **P0** | Adopt | <0.5d | UX | None |
-| R06 | Hook Decomposition | **P1** | Adapt | 3–5d | DX + Perf | R01, R02 |
-| R07 | Global Prompt Focus | **P1** | Adopt | <1d | UX | None |
-| R08 | Context Meter | **P1** | Adopt | 3–5d | UX | None |
-| R09 | Convention Enforcement | **P1** | Adopt | 1d | DX | None |
-| R10 | Feature Module | **P1** | Adapt | 2–3d | DX | R06 |
-| R11 | Portal Scroll Container | **P2** | Adapt | 1–2d | Performance | Profile first |
-| R12 | Pin-to-Top Scroll | **P2** | Adapt | 2–3d | UX | R08 |
-| R13 | Unified Message Component | **P2** | Adapt | 2–3d | DX | R01 |
-| R14 | cmdk Replacement | **P2** | Skip | 1–2w | DX | Evaluate later |
-| R15 | Streaming Batching | **P2** | Skip | 2–3d | Performance | Profile first |
+| ID | Recommendation | Priority | Action | Effort | Impact | Deps | Status |
+|----|---------------|----------|--------|--------|--------|------|--------|
+| R01 | Message Memoization | **P0** | ~~Adopt~~ | ~~1–2d~~ | Performance | None | **✅ DONE** |
+| R02 | Composer Ref Optimization | **P0** | ~~Adapt~~ | ~~1–2d~~ | Performance | None | **✅ DONE** |
+| R03 | Generation Guard Timer | **P0** | ~~Adopt~~ | ~~<1d~~ | UX Reliability | None | **✅ DONE** |
+| R04 | Singleton Shiki | **P0** | Adopt | <1d | Performance | None | Open |
+| R05 | Typography Utilities | **P0** | Adopt | <0.5d | UX | None | Open |
+| R06 | Hook Decomposition | **P1** | Adapt | 3–5d | DX + Perf | ~~R01, R02~~ None | Open |
+| R07 | Global Prompt Focus | **P1** | Adopt | <1d | UX | None | Open |
+| R08 | Context Meter | **P1** | Adopt | 3–5d | UX | None | Open |
+| R09 | Convention Enforcement | **P1** | Adopt | 1d | DX | None | Open |
+| R10 | Feature Module | **P1** | Adapt | 2–3d | DX | R06 | Open |
+| R11 | Portal Scroll Container | **P2** | ~~Adapt~~ | ~~1–2d~~ | ~~Performance~~ | ~~Profile first~~ | **❌ N/A** |
+| R12 | Pin-to-Top Scroll | **P2** | Adapt | 2–3d | UX | R08 | Open |
+| R13 | Unified Message Component | **P2** | Adapt | 2–3d | DX | ~~R01~~ None | Open |
+| R14 | cmdk Replacement | **P2** | Skip | 1–2w | DX | Evaluate later | Open |
+| R15 | Streaming Batching | **P2** | Skip | 2–3d | Performance | Profile first | Open |
 
-**Total effort for P0:** ~5 days
-**Total effort for P0 + P1:** ~15 days
-**Total effort for all:** ~25 days
+**Completed:** R01, R02, R03 (3 of 5 P0 items — ~4 days of effort already shipped)
+**Not applicable:** R11 (wrong scroll architecture — `use-stick-to-bottom` uses plain divs, not ScrollArea)
+**Remaining effort for P0:** ~1.5 days (R04 + R05)
+**Remaining effort for P0 + P1:** ~14 days
+**Remaining effort for all remaining items:** ~20 days
 
 ---
 
-*Research synthesis completed February 15, 2026. Based on 5 WebClaw research documents (65 coded claims), Open WebUI analysis summary (80 coded claims), and Not A Wrapper codebase on branch `am-i-in-over-my-head`.*
+*Research synthesis completed February 15, 2026. Updated February 15, 2026 after codebase verification.*
+*Based on 5 WebClaw research documents (65 coded claims), Open WebUI analysis summary (80 coded claims), and Not A Wrapper codebase on branch `am-i-in-over-my-head`.*
+*Post-analysis verified R01, R02, R03 as already implemented and R11 as not applicable to NaW's scroll architecture.*
