@@ -1,41 +1,41 @@
 "use client"
 
+import { ChatActionsMenu } from "@/app/components/layout/chat-actions-menu"
 import { useKeyShortcut } from "@/app/hooks/use-key-shortcut"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+import { useChats } from "@/lib/chat-store/chats/provider"
+import { useChatSession } from "@/lib/chat-store/session/provider"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { PencilEdit02Icon } from "@hugeicons-pro/core-stroke-rounded"
-import Link from "next/link"
+import { MoreHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded"
 import { usePathname, useRouter } from "next/navigation"
 
 export function ButtonNewChat() {
   const pathname = usePathname()
   const router = useRouter()
+  const { chatId } = useChatSession()
+  const { getChatById } = useChats()
+  const chat = chatId ? getChatById(chatId) : undefined
 
   useKeyShortcut(
     (e) => (e.key === "u" || e.key === "U") && e.metaKey && e.shiftKey,
     () => router.push("/")
   )
 
-  if (pathname === "/") return null
+  if (pathname === "/" || !chat) return null
+
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <Link
-            href="/"
-            className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
-            prefetch
-            aria-label="New chat"
-          />
-        }
-      >
-        <HugeiconsIcon icon={PencilEdit02Icon} size={24} />
-      </TooltipTrigger>
-      <TooltipContent>New chat ⌘⇧U</TooltipContent>
-    </Tooltip>
+    <ChatActionsMenu
+      chat={chat}
+      trigger={
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+          aria-label="Chat actions"
+        >
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="size-5" />
+        </button>
+      }
+      contentSide="bottom"
+      contentAlign="end"
+    />
   )
 }

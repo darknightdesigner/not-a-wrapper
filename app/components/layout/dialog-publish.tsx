@@ -18,12 +18,6 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer"
 import { Input } from "@/components/ui/input"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { APP_DOMAIN } from "@/lib/config"
 import { api } from "@/convex/_generated/api"
@@ -33,7 +27,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Tick02Icon,
   Copy01Icon,
-  GlobeIcon,
+  Share03Icon,
   Loading01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import type React from "react"
@@ -87,31 +81,19 @@ export function DialogPublish() {
   }
 
   const trigger = (
-    <TooltipProvider>
-      <Tooltip>
-        <TooltipTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
-              onClick={handlePublish}
-              disabled={isLoading}
-            />
-          }
-        >
-          {isLoading ? (
-            <HugeiconsIcon icon={Loading01Icon} size={20} className="animate-spin" />
-          ) : (
-            <HugeiconsIcon icon={GlobeIcon} size={20} />
-          )}
-          <span className="sr-only">Make public</span>
-        </TooltipTrigger>
-        <TooltipContent>
-          <p>Make public</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Button
+      variant="ghost"
+      className="text-muted-foreground hover:text-foreground hover:bg-muted bg-background rounded-full p-1.5 transition-colors"
+      onClick={handlePublish}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <HugeiconsIcon icon={Loading01Icon} size={20} className="size-5 animate-spin" />
+      ) : (
+        <HugeiconsIcon icon={Share03Icon} size={20} className="size-5" />
+      )}
+      <span>Share</span>
+    </Button>
   )
 
   const content = (

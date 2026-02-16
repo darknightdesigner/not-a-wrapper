@@ -199,7 +199,6 @@ export function MessageAssistant({
             {children}
           </MessageContent>
         )}
-
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
         {finishReason === "length" && status !== "streaming" && (

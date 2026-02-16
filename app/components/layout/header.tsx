@@ -55,7 +55,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
               </Button>
             </div>
           ) : (
-            <div className="pointer-events-auto flex flex-1 items-center justify-end gap-2">
+            <div className="pointer-events-auto flex flex-1 items-center justify-end">
               {!isMultiModelEnabled && <DialogPublish />}
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
