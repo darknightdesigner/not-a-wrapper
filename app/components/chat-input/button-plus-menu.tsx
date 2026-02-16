@@ -34,6 +34,10 @@ type ButtonPlusMenuProps = {
   enableSearch: boolean
   onToggleSearch: (enabled: boolean) => void
   isSearchDisabled: boolean
+  /** Override the default disabled tooltip for file upload */
+  fileUploadDisabledMessage?: string
+  /** Override the default disabled tooltip for web search */
+  searchDisabledMessage?: string
 }
 
 export function ButtonPlusMenu({
@@ -43,6 +47,8 @@ export function ButtonPlusMenu({
   enableSearch,
   onToggleSearch,
   isSearchDisabled,
+  fileUploadDisabledMessage,
+  searchDisabledMessage,
 }: ButtonPlusMenuProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -137,7 +143,7 @@ export function ButtonPlusMenu({
             </TooltipTrigger>
             {!isFileUploadAvailable && (
               <TooltipContent side="right" sideOffset={4}>
-                This model doesn&apos;t support file uploads
+                {fileUploadDisabledMessage ?? "This model doesn\u2019t support file uploads"}
               </TooltipContent>
             )}
           </Tooltip>
@@ -168,7 +174,7 @@ export function ButtonPlusMenu({
             </TooltipTrigger>
             {isSearchDisabled && (
               <TooltipContent side="right" sideOffset={4}>
-                This model doesn&apos;t support web search
+                {searchDisabledMessage ?? "This model doesn\u2019t support web search"}
               </TooltipContent>
             )}
           </Tooltip>

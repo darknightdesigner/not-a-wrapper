@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { StickToBottom } from "use-stick-to-bottom"
+import { ScrollButton } from "@/components/ui/scroll-button"
 
 export type ChatContainerRootProps = {
   children: React.ReactNode
@@ -25,7 +26,7 @@ function ChatContainerRoot({
 }: ChatContainerRootProps) {
   return (
     <StickToBottom
-      className={cn("flex overflow-y-auto", className)}
+      className={cn("relative flex overflow-y-auto", className)}
       resize="smooth"
       initial="instant"
       role="log"
@@ -64,4 +65,30 @@ function ChatContainerScrollAnchor({
   )
 }
 
-export { ChatContainerRoot, ChatContainerContent, ChatContainerScrollAnchor }
+type ChatContainerScrollButtonProps = {
+  className?: string
+}
+
+function ChatContainerScrollButton({
+  className,
+}: ChatContainerScrollButtonProps) {
+  return (
+    <div
+      className={cn(
+        "pointer-events-none absolute inset-x-0 bottom-6 z-10 flex items-center justify-center",
+        className
+      )}
+    >
+      <div className="pointer-events-auto">
+        <ScrollButton />
+      </div>
+    </div>
+  )
+}
+
+export {
+  ChatContainerRoot,
+  ChatContainerContent,
+  ChatContainerScrollAnchor,
+  ChatContainerScrollButton,
+}

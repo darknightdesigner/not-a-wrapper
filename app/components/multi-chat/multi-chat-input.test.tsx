@@ -18,8 +18,14 @@ vi.mock("@/app/components/suggestions/prompt-system", () => ({
   PromptSystem: () => null,
 }))
 
-vi.mock("@/app/components/chat-input/button-file-upload", () => ({
-  ButtonFileUpload: () => null,
+vi.mock("@/app/components/chat-input/button-plus-menu", () => ({
+  ButtonPlusMenu: () => null,
+}))
+
+vi.mock("@/app/components/chat-input/input-drop-zone", () => ({
+  InputDropZone: ({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
 }))
 
 vi.mock("@/app/components/chat-input/file-list", () => ({
@@ -87,7 +93,6 @@ describe("MultiChatInput primary action", () => {
           onSelectedModelIdsChange={() => {}}
           isUserAuthenticated
           fileUploadState="supported"
-          fileUploadModelId="openai/gpt-4.1-mini"
           stop={stop}
           status="streaming"
           anyLoading

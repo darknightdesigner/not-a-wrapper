@@ -14,9 +14,8 @@ vi.mock("@/components/common/model-selector/base", () => ({
   ModelSelector: () => null,
 }))
 
-vi.mock("@/components/ui/file-upload", () => ({
-  FileUpload: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  FileUploadContent: ({ children }: { children: React.ReactNode }) => (
+vi.mock("./input-drop-zone", () => ({
+  InputDropZone: ({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   ),
 }))

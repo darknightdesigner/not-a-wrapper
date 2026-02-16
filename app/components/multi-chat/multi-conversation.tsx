@@ -3,10 +3,10 @@
 import {
   ChatContainerContent,
   ChatContainerRoot,
+  ChatContainerScrollButton,
 } from "@/components/ui/chat-container"
 import { Loader } from "@/components/ui/loader"
 import type { StreamingIndicatorVariant } from "@/components/ui/loader"
-import { ScrollButton } from "@/components/ui/scroll-button"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { getModelInfo } from "@/lib/models"
 import { PROVIDERS } from "@/lib/providers"
@@ -223,10 +223,8 @@ export function MultiModelConversation({
                   </div>
                 );
               })}
-          <div className="absolute right-0 bottom-32 flex w-full max-w-3xl flex-1 items-end justify-center gap-4 pb-2 pl-6">
-            <ScrollButton className="absolute top-[-50px] left-1/2 -translate-x-1/2" />
-          </div>
         </ChatContainerContent>
+        <ChatContainerScrollButton />
       </ChatContainerRoot>
     </div>
   );

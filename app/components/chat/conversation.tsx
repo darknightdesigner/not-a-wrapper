@@ -1,10 +1,10 @@
 import {
   ChatContainerContent,
   ChatContainerRoot,
+  ChatContainerScrollButton,
 } from "@/components/ui/chat-container"
 import { Loader } from "@/components/ui/loader"
 import { Message as MessageContainer } from "@/components/ui/message"
-import { ScrollButton } from "@/components/ui/scroll-button"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
@@ -125,10 +125,8 @@ export function Conversation({
                 </div>
               </MessageContainer>
             )}
-          <div className="absolute bottom-0 flex w-full max-w-3xl flex-1 items-end justify-center gap-4 px-6 pb-2">
-            <ScrollButton className="absolute top-[-50px] left-1/2 -translate-x-1/2" />
-          </div>
         </ChatContainerContent>
+        <ChatContainerScrollButton />
       </ChatContainerRoot>
     </div>
   );

@@ -148,8 +148,6 @@ export function MultiChat() {
     [selectedModelIds.length, selectedModels]
   )
 
-  const fileUploadModelId = selectedModels[0]?.id
-
   const searchSupportState = useMemo<"supported" | "unsupported" | "no-selection">(
     () => {
       if (selectedModelIds.length === 0) return "no-selection"
@@ -657,7 +655,6 @@ export function MultiChat() {
       onSelectedModelIdsChange: setSelectedModelIds,
       isUserAuthenticated: isAuthenticated,
       fileUploadState,
-      fileUploadModelId,
       stop: handleStop,
       status: anyLoading ? ("streaming" as const) : ("ready" as const),
       anyLoading,
@@ -678,7 +675,6 @@ export function MultiChat() {
       selectedModelIds,
       isAuthenticated,
       fileUploadState,
-      fileUploadModelId,
       handleStop,
       anyLoading,
       enableSearch,
