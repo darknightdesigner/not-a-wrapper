@@ -22,6 +22,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import React, {
   createContext,
   useContext,
@@ -181,7 +183,7 @@ function PromptInputActions({
 type PromptInputActionProps = {
   className?: string
   tooltip: React.ReactNode
-  children: React.ReactNode
+  children: React.ReactElement
   side?: "top" | "bottom" | "left" | "right"
   hideArrow?: boolean
 } & React.ComponentProps<typeof Tooltip>
@@ -192,19 +194,25 @@ function PromptInputAction({
   className,
   side = "bottom",
   hideArrow = true,
-  ...props
+  ...tooltipProps
 }: PromptInputActionProps) {
   const { disabled } = usePromptInput()
+  const trigger = useRender({
+    defaultTagName: "button",
+    render: children,
+    props: mergeProps<"button">(
+      {
+        type: "button",
+        disabled,
+        onClick: (event) => event.stopPropagation(),
+      },
+      {}
+    ),
+  })
 
   return (
-    <Tooltip {...props}>
-      <TooltipTrigger
-        asChild
-        disabled={disabled}
-        onClick={(event) => event.stopPropagation()}
-      >
-        {children}
-      </TooltipTrigger>
+    <Tooltip {...tooltipProps}>
+      <TooltipTrigger render={trigger} disabled={disabled} />
       <TooltipContent side={side} hideArrow={hideArrow} className={className}>
         {tooltip}
       </TooltipContent>

@@ -1,9 +1,9 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import {
-  Children,
-  cloneElement,
   createContext,
   useCallback,
   useContext,
@@ -130,45 +130,31 @@ function FileUpload({
 }
 
 export type FileUploadTriggerProps =
-  React.ComponentPropsWithoutRef<"button"> & {
-    asChild?: boolean
-  }
+  useRender.ComponentProps<"button">
 
 function FileUploadTrigger({
-  asChild = false,
   className,
-  children,
+  render,
   ...props
 }: FileUploadTriggerProps) {
   const context = useContext(FileUploadContext)
   const handleClick = () => context?.inputRef.current?.click()
 
-  if (asChild) {
-    const child = Children.only(children) as React.ReactElement<
-      React.HTMLAttributes<HTMLElement>
-    >
-    return cloneElement(child, {
-      ...props,
-      role: "button",
-      className: cn(className, child.props.className),
-      onClick: (e: React.MouseEvent) => {
-        e.stopPropagation()
-        handleClick()
-        child.props.onClick?.(e as React.MouseEvent<HTMLElement>)
-      },
-    })
+  const defaultProps: useRender.ElementProps<"button"> = {
+    type: "button",
+    className,
+    disabled: context?.disabled,
+    onClick: (e) => {
+      e.stopPropagation()
+      handleClick()
+    },
   }
 
-  return (
-    <button
-      type="button"
-      className={className}
-      onClick={handleClick}
-      {...props}
-    >
-      {children}
-    </button>
-  )
+  return useRender({
+    defaultTagName: "button",
+    render,
+    props: mergeProps<"button">(defaultProps, props),
+  })
 }
 
 type FileUploadContentProps = React.HTMLAttributes<HTMLDivElement>

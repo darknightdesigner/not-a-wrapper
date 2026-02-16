@@ -7,9 +7,9 @@ import {
   useEffect,
   createContext,
   useContext,
-  isValidElement,
-  cloneElement,
 } from 'react';
+import { useRender } from '@base-ui/react/use-render';
+import { mergeProps } from '@base-ui/react/merge-props';
 import {
   AnimatePresence,
   MotionConfig,
@@ -106,15 +106,12 @@ function MorphingPopover({
 }
 
 export type MorphingPopoverTriggerProps = {
-  asChild?: boolean;
-  children: React.ReactNode;
   className?: string;
-} & React.ComponentProps<typeof motion.button>;
+} & useRender.ComponentProps<'button'>;
 
 function MorphingPopoverTrigger({
-  children,
   className,
-  asChild = false,
+  render,
   ...props
 }: MorphingPopoverTriggerProps) {
   const context = useContext(MorphingPopoverContext);
@@ -124,43 +121,33 @@ function MorphingPopoverTrigger({
     );
   }
 
-  // Wrap child in motion.div instead of creating dynamic motion component
-  if (asChild && isValidElement(children)) {
-    const childProps = children.props as Record<string, unknown>;
+  const defaultProps: useRender.ElementProps<'button'> = {
+    type: 'button',
+    className,
+    onClick: context.open,
+    'aria-expanded': context.isOpen,
+    'aria-controls': `popover-content-${context.uniqueId}`,
+  };
 
-    return (
-      <motion.div
-        layoutId={`popover-trigger-${context.uniqueId}`}
-        key={context.uniqueId}
-        onClick={context.open}
-        aria-expanded={context.isOpen}
-        aria-controls={`popover-content-${context.uniqueId}`}
-        className="inline-block"
-      >
-        {cloneElement(children, {
-          ...childProps,
-          className: childProps.className,
-        } as React.HTMLAttributes<HTMLElement>)}
-      </motion.div>
-    );
-  }
+  const trigger = useRender({
+    defaultTagName: 'button',
+    render:
+      render ??
+      (
+        <motion.button
+          layoutId={`popover-label-${context.uniqueId}`}
+          key={context.uniqueId}
+        />
+      ),
+    props: mergeProps<'button'>(defaultProps, props),
+  });
 
   return (
     <motion.div
       key={context.uniqueId}
       layoutId={`popover-trigger-${context.uniqueId}`}
-      onClick={context.open}
     >
-      <motion.button
-        {...props}
-        layoutId={`popover-label-${context.uniqueId}`}
-        key={context.uniqueId}
-        className={className}
-        aria-expanded={context.isOpen}
-        aria-controls={`popover-content-${context.uniqueId}`}
-      >
-        {children}
-      </motion.button>
+      {trigger}
     </motion.div>
   );
 }

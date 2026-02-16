@@ -2,11 +2,11 @@
 
 import * as React from "react"
 import { useRender } from "@base-ui/react/use-render"
+import { mergeProps } from "@base-ui/react/merge-props"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowRight01Icon, MoreHorizontalIcon } from "@hugeicons-pro/core-stroke-rounded"
 
 import { cn } from "@/lib/utils"
-import { adaptSlotAsChild } from "@/lib/as-child-adapter"
 
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />
@@ -36,22 +36,19 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 function BreadcrumbLink({
-  asChild,
   className,
-  children,
+  render,
   ...props
-}: React.ComponentProps<"a"> & {
-  asChild?: boolean
-}) {
-  const adapted = adaptSlotAsChild(asChild, children, "a")
+}: useRender.ComponentProps<"a">) {
+  const defaultProps: useRender.ElementProps<"a"> = {
+    className: cn("hover:text-foreground transition-colors", className),
+  }
+
   return useRender({
-    render: adapted.render,
-    props: {
-      "data-slot": "breadcrumb-link",
-      className: cn("hover:text-foreground transition-colors", className),
-      ...props,
-      children: adapted.children,
-    },
+    defaultTagName: "a",
+    render,
+    props: mergeProps<"a">(defaultProps, props),
+    state: { slot: "breadcrumb-link" },
   })
 }
 

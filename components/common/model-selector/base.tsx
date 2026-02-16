@@ -152,11 +152,7 @@ export function ModelSelector({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              {trigger}
-            </PopoverTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<PopoverTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>Select a model</TooltipContent>
         </Tooltip>
         <PopoverContentAuth />
@@ -173,7 +169,7 @@ export function ModelSelector({
           currentModel={selectedProModel || ""}
         />
         <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerTrigger render={trigger} />
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>Select Model</DrawerTitle>
@@ -239,9 +235,7 @@ export function ModelSelector({
             }
           }}
         >
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>Switch model ⌘⇧P</TooltipContent>
           <DropdownMenuContent
             className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"

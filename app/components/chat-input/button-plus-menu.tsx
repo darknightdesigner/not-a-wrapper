@@ -51,16 +51,22 @@ export function ButtonPlusMenu({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger render={<PopoverTrigger asChild />}>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
-              type="button"
-              aria-label="More options"
-            >
-              <HugeiconsIcon icon={Add01Icon} size={16} />
-            </Button>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border-border dark:bg-secondary size-9 rounded-full border bg-transparent"
+                    type="button"
+                    aria-label="More options"
+                  />
+                }
+              />
+            }
+          >
+            <HugeiconsIcon icon={Add01Icon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>
             More options

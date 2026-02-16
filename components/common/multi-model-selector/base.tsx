@@ -304,21 +304,25 @@ export function MultiModelSelector({
     return (
       <Popover>
         <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className={cn(
-                  "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
-                  className
-                )}
-                type="button"
-              >
-                <span>Select models</span>
-                <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
-              </Button>
-            </PopoverTrigger>
+          <TooltipTrigger
+            render={
+              <PopoverTrigger
+                render={
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className={cn(
+                      "border-border dark:bg-secondary text-accent-foreground h-9 w-auto border bg-transparent",
+                      className
+                    )}
+                    type="button"
+                  />
+                }
+              />
+            }
+          >
+            <span>Select models</span>
+            <HugeiconsIcon icon={ArrowDown01Icon} size={16} />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Select models</TooltipContent>
         </Tooltip>
@@ -336,7 +340,7 @@ export function MultiModelSelector({
           currentModel={selectedProModel || ""}
         />
         <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerTrigger asChild>{trigger}</DrawerTrigger>
+          <DrawerTrigger render={trigger} />
           <DrawerContent>
             <DrawerHeader>
               <DrawerTitle>
@@ -404,9 +408,7 @@ export function MultiModelSelector({
             }
           }}
         >
-          <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-          </TooltipTrigger>
+          <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>
             Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
           </TooltipContent>

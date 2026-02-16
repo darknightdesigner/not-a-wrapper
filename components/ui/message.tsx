@@ -20,6 +20,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
+import { mergeProps } from "@base-ui/react/merge-props"
+import { useRender } from "@base-ui/react/use-render"
 import dynamic from "next/dynamic"
 
 const Markdown = dynamic(() => import("./markdown").then((mod) => mod.Markdown))
@@ -110,7 +112,7 @@ const MessageActions = ({
 export type MessageActionProps = {
   className?: string
   tooltip: React.ReactNode
-  children: React.ReactNode
+  children: React.ReactElement
   side?: "top" | "bottom" | "left" | "right"
 } & React.ComponentProps<typeof Tooltip>
 
@@ -121,9 +123,20 @@ const MessageAction = ({
   side = "top",
   ...props
 }: MessageActionProps) => {
+  const trigger = useRender({
+    defaultTagName: "button",
+    render: children,
+    props: mergeProps<"button">(
+      {
+        type: "button",
+      },
+      {}
+    ),
+  })
+
   return (
     <Tooltip {...props}>
-      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipTrigger render={trigger} />
       <TooltipContent side={side} className={className}>
         {tooltip}
       </TooltipContent>

@@ -2,8 +2,6 @@
 
 import { Collapsible as CollapsiblePrimitive } from "@base-ui/react/collapsible"
 
-import { adaptAsChild } from "@/lib/as-child-adapter"
-
 function Collapsible({
   ...props
 }: CollapsiblePrimitive.Root.Props) {
@@ -11,19 +9,10 @@ function Collapsible({
 }
 
 function CollapsibleTrigger({
-  asChild,
-  children,
   ...props
-}: CollapsiblePrimitive.Trigger.Props & { asChild?: boolean }) {
-  const adapted = adaptAsChild(asChild, children)
+}: CollapsiblePrimitive.Trigger.Props) {
   return (
-    <CollapsiblePrimitive.Trigger
-      data-slot="collapsible-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </CollapsiblePrimitive.Trigger>
+    <CollapsiblePrimitive.Trigger data-slot="collapsible-trigger" {...props} />
   )
 }
 

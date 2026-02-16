@@ -9,18 +9,20 @@ export function CommandFooter() {
           {/* @todo: need to work on the morph effect */}
           {/* <div className="flex flex-1 items-center gap-1">
             <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className="hover:bg-accent inline-flex size-5 items-center justify-center rounded-sm transition-colors"
-                  onClick={() => {
-                    setShowPreview(!showPreview)
-                    setShowConversationPreviews(
-                      !preferences.showConversationPreviews
-                    )
-                  }}
-                >
-                  <ArrowsOutSimpleIcon className="size-4" />
-                </button>
+              <TooltipTrigger
+                render={
+                  <button
+                    className="hover:bg-accent inline-flex size-5 items-center justify-center rounded-sm transition-colors"
+                    onClick={() => {
+                      setShowPreview(!showPreview)
+                      setShowConversationPreviews(
+                        !preferences.showConversationPreviews
+                      )
+                    }}
+                  />
+                }
+              >
+                <ArrowsOutSimpleIcon className="size-4" />
               </TooltipTrigger>
               <TooltipContent>
                 <span>

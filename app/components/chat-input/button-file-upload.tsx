@@ -108,20 +108,26 @@ export function ButtonFileUpload({
       accept={ACCEPTED_FILE_PICKER_TYPES}
     >
       <Tooltip>
-        <TooltipTrigger render={<FileUploadTrigger asChild />}>
-          <Button
-            size="sm"
-            variant="secondary"
-            className={cn(
-              "border-border dark:bg-secondary size-9 rounded-full border bg-transparent",
-              !isUserAuthenticated && "opacity-50"
-            )}
-            type="button"
-            disabled={!isUserAuthenticated}
-            aria-label="Add files"
-          >
-            <HugeiconsIcon icon={AttachmentIcon} size={16} />
-          </Button>
+        <TooltipTrigger
+          render={
+            <FileUploadTrigger
+              render={
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className={cn(
+                    "border-border dark:bg-secondary size-9 rounded-full border bg-transparent",
+                    !isUserAuthenticated && "opacity-50"
+                  )}
+                  type="button"
+                  disabled={!isUserAuthenticated}
+                  aria-label="Add files"
+                />
+              }
+            />
+          }
+        >
+          <HugeiconsIcon icon={AttachmentIcon} size={16} />
         </TooltipTrigger>
         <TooltipContent side="bottom" hideArrow>Add files</TooltipContent>
       </Tooltip>

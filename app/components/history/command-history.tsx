@@ -49,7 +49,7 @@ type CommandHistoryProps = {
   chatHistory: Chats[]
   onSaveEdit: (id: string, newTitle: string) => Promise<void>
   onConfirmDelete: (id: string) => Promise<void>
-  trigger: React.ReactNode
+  trigger: React.ReactElement
   isOpen: boolean
   setIsOpen: (open: boolean) => void
   onOpenChange?: (open: boolean) => void

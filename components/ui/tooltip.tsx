@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -39,19 +38,10 @@ function Tooltip({
 }
 
 function TooltipTrigger({
-  asChild,
-  children,
   ...props
-}: TooltipPrimitive.Trigger.Props & { asChild?: boolean }) {
-  const adapted = adaptAsChild(asChild, children)
+}: TooltipPrimitive.Trigger.Props) {
   return (
-    <TooltipPrimitive.Trigger
-      data-slot="tooltip-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </TooltipPrimitive.Trigger>
+    <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
   )
 }
 

@@ -4,7 +4,6 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon } from "@hugeicons-pro/core-stroke-rounded"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -17,19 +16,10 @@ function Dialog({
 }
 
 function DialogTrigger({
-  asChild,
-  children,
   ...props
-}: DialogPrimitive.Trigger.Props & { asChild?: boolean }) {
-  const adapted = adaptAsChild(asChild, children)
+}: DialogPrimitive.Trigger.Props) {
   return (
-    <DialogPrimitive.Trigger
-      data-slot="dialog-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </DialogPrimitive.Trigger>
+    <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />
   )
 }
 

@@ -27,6 +27,7 @@ import { HugeiconsIcon } from "@hugeicons/react"
 import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
+import { AppInfoDialog, AppInfoMenuItem } from "./app-info/app-info-trigger"
 import { FeedbackMenuItem, FeedbackDialog } from "./feedback/feedback-trigger"
 import { SettingsMenuItem, SettingsDialog } from "./settings/settings-trigger"
 
@@ -42,6 +43,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
   const [isMenuOpen, setMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [appInfoOpen, setAppInfoOpen] = useState(false)
 
   if (!user) return null
 
@@ -70,6 +72,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
       <DropdownMenuSeparator />
       <SettingsMenuItem onClick={() => setSettingsOpen(true)} />
       <FeedbackMenuItem onClick={() => setFeedbackOpen(true)} />
+      <AppInfoMenuItem onClick={() => setAppInfoOpen(true)} />
       <DropdownMenuSeparator />
       <DropdownMenuItem
         onClick={handleSignOut}
@@ -86,6 +89,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
     <>
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <AppInfoDialog open={appInfoOpen} onOpenChange={setAppInfoOpen} />
     </>
   )
 

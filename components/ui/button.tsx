@@ -1,9 +1,7 @@
 "use client"
 
-import * as React from "react"
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -43,29 +41,16 @@ function Button({
   className,
   variant = "default",
   size = "default",
-  asChild = false,
-  nativeButton,
-  children,
   ...props
-}: Omit<React.ComponentProps<typeof ButtonPrimitive>, "render"> &
-  VariantProps<typeof buttonVariants> & {
-    asChild?: boolean
-  }) {
-  const adapted = adaptAsChild(asChild, children)
-  const renderedAsNativeButton = adapted.render?.type === "button"
-
+}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
   return (
     <ButtonPrimitive
       data-slot="button"
       data-variant={variant}
       data-size={size}
       className={cn(buttonVariants({ variant, size, className }))}
-      render={adapted.render}
-      nativeButton={adapted.render ? (nativeButton ?? renderedAsNativeButton) : nativeButton}
       {...props}
-    >
-      {adapted.children}
-    </ButtonPrimitive>
+    />
   )
 }
 

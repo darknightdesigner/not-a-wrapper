@@ -4,7 +4,6 @@ import * as React from "react"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { Tick02Icon, ArrowRight01Icon, CircleIcon } from "@hugeicons-pro/core-stroke-rounded"
-import { adaptAsChild } from "@/lib/as-child-adapter"
 
 import { cn } from "@/lib/utils"
 
@@ -23,20 +22,9 @@ function DropdownMenuPortal({
 }
 
 function DropdownMenuTrigger({
-  asChild,
-  children,
   ...props
-}: MenuPrimitive.Trigger.Props & { asChild?: boolean }) {
-  const adapted = adaptAsChild(asChild, children)
-  return (
-    <MenuPrimitive.Trigger
-      data-slot="dropdown-menu-trigger"
-      render={adapted.render}
-      {...props}
-    >
-      {adapted.children}
-    </MenuPrimitive.Trigger>
-  )
+}: MenuPrimitive.Trigger.Props) {
+  return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />
 }
 
 function DropdownMenuContent({
@@ -45,22 +33,12 @@ function DropdownMenuContent({
   side = "bottom",
   align = "start",
   alignOffset,
-  forceMount: _forceMount,
-  onCloseAutoFocus: _onCloseAutoFocus,
-  onInteractOutside: _onInteractOutside,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<
     MenuPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
-  > & {
-    /** @deprecated No Base UI equivalent. Accepted for backward compat. */
-    forceMount?: boolean
-    /** @deprecated No Base UI equivalent. Accepted for backward compat. */
-    onCloseAutoFocus?: (e: Event) => void
-    /** @deprecated No Base UI equivalent. Accepted for backward compat. */
-    onInteractOutside?: (e: Event) => void
-  }) {
+  >) {
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
@@ -73,9 +51,10 @@ function DropdownMenuContent({
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"
           className={cn(
-            "bg-popover text-popover-foreground data-[open]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[open]:fade-in-0 data-[closed]:zoom-out-95 data-[open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 max-h-(--available-height) min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
+            "bg-popover text-popover-foreground data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)] z-50 max-h-(--available-height) min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
             className
           )}
+          style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
           {...props}
         />
       </MenuPrimitive.Positioner>
