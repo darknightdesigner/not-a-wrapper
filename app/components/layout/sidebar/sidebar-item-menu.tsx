@@ -60,7 +60,7 @@ export function SidebarItemMenu({
         >
           <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent side="bottom" align="start" className="w-40">
+        <DropdownMenuContent side="bottom" align="start" className="w-40" animated={false}>
           <DropdownMenuItem
             className="cursor-pointer"
             onClick={(e) => {

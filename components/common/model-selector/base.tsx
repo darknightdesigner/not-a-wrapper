@@ -241,6 +241,7 @@ export function ModelSelector({
             className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
             align="start"
             sideOffset={4}
+            animated={false}
             side="top"
           >
             <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">

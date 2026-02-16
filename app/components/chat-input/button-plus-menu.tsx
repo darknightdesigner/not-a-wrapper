@@ -118,7 +118,7 @@ export function ButtonPlusMenu({
             More options
           </TooltipContent>
         </Tooltip>
-        <DropdownMenuContent side="top" align="start">
+        <DropdownMenuContent side="top" align="start" animated={false}>
           <Tooltip>
             <TooltipTrigger
               render={

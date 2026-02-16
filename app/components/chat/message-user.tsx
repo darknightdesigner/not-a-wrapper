@@ -165,7 +165,7 @@ export function MessageUser({
       ))}
       {isEditing ? (
         <div
-          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-3xl px-5 py-2.5"
+          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-3xl px-4 py-2"
           style={{
             width: contentRef.current?.offsetWidth,
           }}
@@ -195,13 +195,13 @@ export function MessageUser({
               Cancel
             </Button>
             <Button size="sm" onClick={handleSave} disabled={!editInput.trim()}>
-              Save
+              Send
             </Button>
           </div>
         </div>
       ) : (
         <MessageContent
-          className="bg-accent prose dark:prose-invert relative max-w-[70%] rounded-3xl px-5 py-2.5"
+          className="bg-accent prose dark:prose-invert relative max-w-[70%] rounded-3xl px-4 py-2"
           markdown={true}
           ref={contentRef}
           components={{
@@ -225,15 +225,15 @@ export function MessageUser({
       <MessageActions className="flex gap-0">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
             aria-label="Copy text"
             onClick={copyToClipboard}
             type="button"
           >
 {copied ? (
-              <HugeiconsIcon icon={Tick02Icon} size={16} />
+              <HugeiconsIcon icon={Tick02Icon} size={20} />
             ) : (
-              <HugeiconsIcon icon={Copy01Icon} size={16} />
+              <HugeiconsIcon icon={Copy01Icon} size={20} />
             )}
           </button>
         </MessageAction>
@@ -245,15 +245,15 @@ export function MessageUser({
             delay={0}
           >
             <button
-              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
               aria-label={isEditing ? "Cancel edit" : "Edit message"}
               onClick={isEditing ? handleEditCancel : handleEditStart}
               type="button"
             >
               {isEditing ? (
-                <HugeiconsIcon icon={PencilEdit02Icon} size={16} />
+                <HugeiconsIcon icon={PencilEdit02Icon} size={20} />
               ) : (
-                <HugeiconsIcon icon={PencilEdit01Icon} size={16} />
+                <HugeiconsIcon icon={PencilEdit01Icon} size={20} />
               )}
             </button>
           </MessageAction>

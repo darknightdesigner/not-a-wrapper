@@ -99,6 +99,12 @@ export function ChatInput({
   // Local state — ChatInput owns the displayed text to avoid re-renders in parent tree
   const [localValue, setLocalValue] = useState(defaultValue)
 
+  // Sync when parent changes defaultValue (e.g. clearing input after submit in project view).
+  // During normal typing the parent's defaultValue tracks localValue, so the set is a no-op.
+  useEffect(() => {
+    setLocalValue(defaultValue)
+  }, [defaultValue])
+
   // Register local setState so use-chat-core can imperatively update display
   // (e.g. clear on submit, hydrate from ?prompt= search param)
   useEffect(() => {

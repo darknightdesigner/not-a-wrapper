@@ -81,6 +81,19 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
   if (prev.status !== next.status) return false
   if (prev.finishReason !== next.finishReason) return false
   if (prev.hasScrollAnchor !== next.hasScrollAnchor) return false
+  if (prev.className !== next.className) return false
+  if (prev.messageGroupId !== next.messageGroupId) return false
+  if (prev.isUserAuthenticated !== next.isUserAuthenticated) return false
+
+  // Attachments: compare by count and URLs
+  const prevLen = prev.attachments?.length ?? 0
+  const nextLen = next.attachments?.length ?? 0
+  if (prevLen !== nextLen) return false
+  if (prev.attachments && next.attachments) {
+    for (let i = 0; i < prevLen; i++) {
+      if (prev.attachments[i].url !== next.attachments[i].url) return false
+    }
+  }
 
   return true
 }

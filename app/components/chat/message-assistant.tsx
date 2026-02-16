@@ -190,15 +190,15 @@ export function MessageAssistant({
               side="bottom"
             >
               <button
-                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
                 aria-label="Copy text"
                 onClick={copyToClipboard}
                 type="button"
               >
                 {copied ? (
-                  <HugeiconsIcon icon={Tick02Icon} size={16} />
+                  <HugeiconsIcon icon={Tick02Icon} size={20} />
                 ) : (
-                  <HugeiconsIcon icon={Copy01Icon} size={16} />
+                  <HugeiconsIcon icon={Copy01Icon} size={20} />
                 )}
               </button>
             </MessageAction>
@@ -209,12 +209,12 @@ export function MessageAssistant({
                 delay={0}
               >
                 <button
-                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex size-7.5 items-center justify-center rounded-full bg-transparent transition"
+                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
                   aria-label="Regenerate"
                   onClick={onReload}
                   type="button"
                 >
-                  <HugeiconsIcon icon={RefreshIcon} size={16} />
+                  <HugeiconsIcon icon={RefreshIcon} size={20} />
                 </button>
               </MessageAction>
             ) : null}

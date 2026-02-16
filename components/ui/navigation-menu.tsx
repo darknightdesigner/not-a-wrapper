@@ -109,7 +109,6 @@ function NavigationMenuContent({
 
 function NavigationMenuViewport({
   className,
-  style,
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Viewport>) {
   return (
@@ -126,7 +125,6 @@ function NavigationMenuViewport({
         )}
         style={{
           transition: "opacity 200ms ease-out, transform 200ms ease-out",
-          ...style,
         }}
       >
         <NavigationMenuPrimitive.Viewport {...props} />

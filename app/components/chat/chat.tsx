@@ -90,22 +90,21 @@ export function Chat() {
     []
   )
 
-  // Chat operations (utils + handlers) - created first
-  const { checkLimitsAndNotify, ensureChatExists, handleDelete } =
+  // Chat operations (pure async utilities) - created first
+  const { checkLimitsAndNotify, ensureChatExists } =
     useChatOperations({
       isAuthenticated,
       chatId,
-      messages: initialMessages,
       selectedModel,
       systemPrompt,
       createNewChat,
       setHasDialogAuth,
-      setMessages: () => {},
     })
 
   // Core chat functionality (initialization + state + actions)
   const {
     messages,
+    setMessages,
     inputRef,
     registerInputListener,
     status,
@@ -138,6 +137,14 @@ export function Chat() {
     bumpChat,
     deleteMessagesFromTimestamp,
   })
+
+  // Local delete handler — filters a message from the local array
+  const handleDelete = useCallback(
+    (id: string) => {
+      setMessages((prev) => prev.filter((message) => message.id !== id))
+    },
+    [setMessages]
+  )
 
   // Auto-focus chat textarea when user types a printable character anywhere
   const focusTextareaRef = useRef<(() => void) | null>(null)

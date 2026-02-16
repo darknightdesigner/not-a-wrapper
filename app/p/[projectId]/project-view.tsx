@@ -2,7 +2,6 @@
 
 import { ChatInput } from "@/app/components/chat-input/chat-input"
 import { Conversation } from "@/app/components/chat/conversation"
-import { useChatOperations } from "@/app/components/chat/use-chat-operations"
 import { useFileUpload } from "@/app/components/chat/use-file-upload"
 import { useModel } from "@/app/components/chat/use-model"
 import { ProjectChatItem } from "@/app/components/layout/sidebar/project-chat-item"
@@ -210,16 +209,25 @@ export function ProjectView({ projectId }: ProjectViewProps) {
     ]
   )
 
-  const { handleDelete, handleEdit } = useChatOperations({
-    isAuthenticated: true, // Always authenticated in project context
-    chatId: null,
-    messages,
-    selectedModel,
-    systemPrompt: SYSTEM_PROMPT_DEFAULT,
-    createNewChat,
-    setHasDialogAuth: () => {}, // Not used in project context
-    setMessages,
-  })
+  // Project context doesn't need rate-limit or chat-creation utils from
+  // useChatOperations — only local message handlers are needed here.
+  const handleDelete = useCallback(
+    (id: string) => {
+      setMessages((prev) => prev.filter((message) => message.id !== id))
+    },
+    [setMessages]
+  )
+
+  const handleEdit = useCallback(
+    (id: string, newText: string) => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === id ? { ...message, content: newText } : message
+        )
+      )
+    },
+    [setMessages]
+  )
 
   // Simple input change handler for project context (no draft saving needed)
   const handleInputChange = useCallback(
@@ -396,7 +404,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
   // Memoize the chat input props
   const chatInputProps = useMemo(
     () => ({
-      value: input,
+      defaultValue: input,
       onSuggestion: () => {},
       onValueChange: handleInputChange,
       onSend: submit,

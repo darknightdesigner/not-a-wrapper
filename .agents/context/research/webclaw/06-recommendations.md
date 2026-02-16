@@ -303,7 +303,7 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 
 **Critical path:** R06 → R10 is the longest remaining chain. All P0 performance prerequisites (R01, R02, R04) are fully landed; R05 is nearly complete.
 
-**Parallel work:** R05 (remaining scope), R07, R09 have zero dependencies and can proceed in any order alongside the refactoring chain.
+**Parallel work:** R05 (remaining scope), R09 have zero dependencies and can proceed in any order alongside the refactoring chain. R07 is now complete.
 
 ---
 
@@ -476,16 +476,19 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | Field | Value |
 |-------|-------|
 | **Title** | Global Prompt Auto-Focus |
-| **Action** | Adopt |
+| **Action** | ~~Adopt~~ |
 | **Confidence** | Medium |
 | **Transferability** | Direct — ~20 lines of vanilla JS |
-| **Effort** | < 1 day |
+| **Effort** | ~~< 1 day~~ |
 | **Impact** | UX — eliminates click-to-focus friction. Matches VS Code behavior. |
 | **Evidence** | WC-A5-C11, WC-A2-C05 |
 | **Risk if wrong** | Low — may interfere with keyboard shortcuts or accessibility (screen readers). Mitigate: exclude meta/ctrl/alt keys, editable elements, and respect `aria-` attributes. Test with VoiceOver. |
 | **Synergy with OWUI** | OWUI doesn't have this. Competitive differentiator vs all analyzed competitors. |
+| **Status** | **✅ DONE** — Implemented in `app/hooks/use-global-prompt-focus.ts`, wired in `chat.tsx` lines 143–144 |
 
 **Implementation:** Attach a global `keydown` listener in the chat layout. On printable character input (single-char keys, excluding meta/ctrl/alt): focus the prompt textarea if the event target isn't an input, textarea, or `contentEditable` element.
+
+> **Verified Feb 15, 2026:** Hook excludes meta/ctrl/alt combos, non-printable keys (`key.length !== 1`), and input/textarea/select/contentEditable targets. Focus during `keydown` lets the browser's default text-insertion route the character into the now-focused textarea. Wiring chain: `chat.tsx` → `useGlobalPromptFocus(focusTextareaRef)` + `ChatInput focusRef={focusTextareaRef}` → `textareaRef.current?.focus()`.
 
 ---
 
@@ -663,7 +666,7 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | R04 | Singleton Shiki | **P0** | ~~Adopt~~ | ~~<1d~~ | Performance | None | **✅ DONE** |
 | R05 | Typography Utilities | **P0** | Adopt | ~0.25d remaining | UX | None | **⚡ Partial** — `.prose` done |
 | R06 | Hook Decomposition | **P1** | Adapt | ~2–4d remaining | DX + Perf | ~~R01, R02~~ None | **⚡ Partial** — operations + draft extracted |
-| R07 | Global Prompt Focus | **P1** | Adopt | <1d | UX | None | Open |
+| R07 | Global Prompt Focus | **P1** | Adopt | ~~<1d~~ | UX | None | **✅ DONE** |
 | R08 | Context Meter | **P1** | Adopt | 3–5d | UX | None | Open |
 | R09 | Convention Enforcement | **P1** | Adopt | 1d | DX | None | Open |
 | R10 | Feature Module | **P1** | Adapt | 2–3d | DX | R06 | Open |
@@ -673,12 +676,12 @@ R08: Context Meter ← needs token counting from AI SDK usage object
 | R14 | cmdk Replacement | **P2** | Skip | 1–2w | DX | Evaluate later | Open |
 | R15 | Streaming Batching | **P2** | Skip | 2–3d | Performance | Profile first | Open |
 
-**Completed:** R01, R02, R03, R04 (4 of 5 P0 items fully shipped)
+**Completed:** R01, R02, R03, R04, R07 (4 of 5 P0 items + 1 P1 item fully shipped)
 **Partially implemented:** R05 (P0), R06 (P1), R13 (P2)
 **Not applicable:** R11 (wrong scroll architecture — `use-stick-to-bottom` uses plain divs, not ScrollArea)
 **Remaining effort for P0:** ~0.25 days (R05 remainder only)
-**Remaining effort for P0 + P1:** ~10–12 days (R05 remainder + R06 remainder + R07 + R08 + R09 + R10)
-**Remaining effort for all items:** ~15–18 days
+**Remaining effort for P0 + P1:** ~9–11 days (R05 remainder + R06 remainder + R08 + R09 + R10)
+**Remaining effort for all items:** ~14–17 days
 
 ---
 
