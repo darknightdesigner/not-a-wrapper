@@ -5,6 +5,7 @@ import {
   ChatContainerRoot,
 } from "@/components/ui/chat-container"
 import { Loader } from "@/components/ui/loader"
+import type { StreamingIndicatorVariant } from "@/components/ui/loader"
 import { ScrollButton } from "@/components/ui/scroll-button"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { getModelInfo } from "@/lib/models"
@@ -13,6 +14,8 @@ import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "../chat/message"
+
+const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
 
 type MessagePart = NonNullable<MessageType["parts"]>[number]
 type TextPart = Extract<MessagePart, { type: "text" }>
@@ -104,7 +107,12 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             <div className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
               assistant
             </div>
-            <Loader variant="chat" />
+            <Loader
+              variant="text-shimmer"
+              text="Generating"
+              showCaret
+              streamingIndicatorVariant={STREAMING_INDICATOR_VARIANT}
+            />
           </div>
         ) : (
           <div className="text-muted-foreground text-sm italic">

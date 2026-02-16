@@ -12,14 +12,15 @@ import {
   PromptInputTextarea,
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
+import { StopBulkRoundedIcon } from "@/lib/icons"
 import { ACCEPTED_FILE_PICKER_TYPES } from "@/lib/file-handling"
 import { getModelInfo } from "@/lib/models"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowUp02Icon,
   FileUploadIcon,
-  StopCircleIcon,
 } from "@hugeicons-pro/core-stroke-rounded"
+import { resolveComposerPrimaryActionState } from "./primary-action-state"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
 import { ButtonPlusMenu } from "./button-plus-menu"
@@ -113,41 +114,45 @@ export function ChatInput({
     [onValueChange]
   )
 
-  const handleSend = useCallback(() => {
-    if (isSubmitting) {
+  const primaryAction = useMemo(
+    () =>
+      resolveComposerPrimaryActionState({
+        isStreaming: status === "streaming",
+        isAbortable: status === "streaming",
+        canSend: !isSubmitting && !isOnlyWhitespace(localValue),
+      }),
+    [isSubmitting, localValue, status]
+  )
+
+  const handlePrimaryActionClick = useCallback(() => {
+    if (primaryAction.disabled) {
       return
     }
 
-    if (status === "streaming") {
+    if (primaryAction.intent === "stop") {
       stop()
       return
     }
 
     onSend()
-  }, [isSubmitting, onSend, status, stop])
+  }, [onSend, primaryAction.disabled, primaryAction.intent, stop])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (isSubmitting) {
-        e.preventDefault()
+      if (e.key !== "Enter" || e.shiftKey) {
         return
       }
 
-      if (e.key === "Enter" && status === "streaming") {
-        e.preventDefault()
+      if (primaryAction.mode === "stop") {
         return
       }
 
-      if (e.key === "Enter" && !e.shiftKey) {
-        if (isOnlyWhitespace(localValue)) {
-          return
-        }
-
+      if (!primaryAction.disabled) {
         e.preventDefault()
         onSend()
       }
     },
-    [isSubmitting, onSend, status, localValue]
+    [onSend, primaryAction.disabled, primaryAction.mode]
   )
 
   const handlePaste = useCallback(
@@ -263,18 +268,18 @@ export function ChatInput({
                 />
               </div>
               <PromptInputAction
-                tooltip={status === "streaming" ? "Stop" : "Send"}
+                tooltip={primaryAction.tooltip}
               >
                 <Button
                   size="sm"
                   className="size-9 rounded-full transition-all duration-300 ease-out"
-                  disabled={!localValue || isSubmitting || isOnlyWhitespace(localValue)}
+                  disabled={primaryAction.disabled}
                   type="button"
-                  onClick={handleSend}
-                  aria-label={status === "streaming" ? "Stop" : "Send message"}
+                  onClick={handlePrimaryActionClick}
+                  aria-label={primaryAction.ariaLabel}
                 >
-                  {status === "streaming" ? (
-                    <HugeiconsIcon icon={StopCircleIcon} size={16} />
+                  {primaryAction.mode === "stop" ? (
+                    <HugeiconsIcon icon={StopBulkRoundedIcon} size={16} />
                   ) : (
                     <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2.5} className="size-5" />
                   )}

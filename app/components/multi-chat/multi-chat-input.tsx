@@ -21,14 +21,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { StopBulkRoundedIcon } from "@/lib/icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   ArrowUp02Icon,
-  StopCircleIcon,
   AttachmentIcon,
   Globe02Icon,
   Tick02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
+import { resolveComposerPrimaryActionState } from "@/app/components/chat-input/primary-action-state"
 import React, { useCallback } from "react"
 
 type MultiChatInputProps = {
@@ -77,6 +78,17 @@ export function MultiChatInput({
   searchSupportState,
 }: MultiChatInputProps) {
   const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
+  const isStreaming = status === "streaming" || Boolean(anyLoading)
+
+  const primaryAction = resolveComposerPrimaryActionState({
+    isStreaming,
+    isAbortable: Boolean(anyLoading),
+    canSend:
+      !isSubmitting &&
+      !Boolean(anyLoading) &&
+      !isOnlyWhitespace(value) &&
+      selectedModelIds.length > 0,
+  })
 
   const renderFileUpload = () => {
     if (fileUploadState === "supported" && fileUploadModelId) {
@@ -174,41 +186,35 @@ export function MultiChatInput({
     )
   }
 
-  const handleSend = useCallback(() => {
-    if (isSubmitting || anyLoading) {
+  const handlePrimaryActionClick = useCallback(() => {
+    if (primaryAction.disabled) {
       return
     }
 
-    if (status === "streaming") {
+    if (primaryAction.intent === "stop") {
       stop()
       return
     }
 
     onSend()
-  }, [isSubmitting, anyLoading, onSend, status, stop])
+  }, [onSend, primaryAction.disabled, primaryAction.intent, stop])
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (isSubmitting || anyLoading) {
-        e.preventDefault()
+      if (e.key !== "Enter" || e.shiftKey) {
         return
       }
 
-      if (e.key === "Enter" && status === "streaming") {
-        e.preventDefault()
+      if (primaryAction.mode === "stop") {
         return
       }
 
-      if (e.key === "Enter" && !e.shiftKey) {
-        if (isOnlyWhitespace(value)) {
-          return
-        }
-
+      if (!primaryAction.disabled) {
         e.preventDefault()
         onSend()
       }
     },
-    [isSubmitting, anyLoading, onSend, status, value]
+    [onSend, primaryAction.disabled, primaryAction.mode]
   )
 
   return (
@@ -243,24 +249,18 @@ export function MultiChatInput({
               />
             </div>
             <PromptInputAction
-              tooltip={status === "streaming" ? "Stop" : "Send"}
+              tooltip={primaryAction.tooltip}
             >
               <Button
                 size="sm"
                 className="size-9 rounded-full transition-all duration-300 ease-out"
-                disabled={
-                  !value ||
-                  isSubmitting ||
-                  anyLoading ||
-                  isOnlyWhitespace(value) ||
-                  selectedModelIds.length === 0
-                }
+                disabled={primaryAction.disabled}
                 type="button"
-                onClick={handleSend}
-                aria-label={status === "streaming" ? "Stop" : "Send message"}
+                onClick={handlePrimaryActionClick}
+                aria-label={primaryAction.ariaLabel}
               >
-                {status === "streaming" || anyLoading ? (
-                  <HugeiconsIcon icon={StopCircleIcon} size={16} />
+                {primaryAction.mode === "stop" ? (
+                  <HugeiconsIcon icon={StopBulkRoundedIcon} size={16} />
                 ) : (
                   <HugeiconsIcon icon={ArrowUp02Icon} size={20} strokeWidth={2.5} className="size-5" />
                 )}

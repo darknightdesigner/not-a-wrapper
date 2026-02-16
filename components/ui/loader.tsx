@@ -23,6 +23,16 @@ import { cn } from "@/lib/utils"
 import { motion } from "framer-motion"
 import React from "react"
 
+export type StreamingIndicatorVariant =
+  | "none"
+  | "caret"
+  | "rotating-glyph"
+  | "wave-segment"
+  | "slide-dot-trail"
+  | "pulse-dot"
+  | "shimmer-underscore"
+  | "soft-glow-marker"
+
 export type LoaderProps = {
   variant?:
     | "circular"
@@ -40,6 +50,8 @@ export type LoaderProps = {
     | "chat"
   size?: "sm" | "md" | "lg"
   text?: string
+  showCaret?: boolean
+  streamingIndicatorVariant?: StreamingIndicatorVariant
   className?: string
 }
 
@@ -416,10 +428,14 @@ export function TextBlinkLoader({
 
 export function TextShimmerLoader({
   text = "Thinking",
+  showCaret = false,
+  streamingIndicatorVariant = "none",
   className,
   size = "md",
 }: {
   text?: string
+  showCaret?: boolean
+  streamingIndicatorVariant?: StreamingIndicatorVariant
   className?: string
   size?: "sm" | "md" | "lg"
 }) {
@@ -429,18 +445,170 @@ export function TextShimmerLoader({
     lg: "text-base",
   }
 
+  const shimmerClassName = cn(
+    "bg-[linear-gradient(to_right,var(--muted-foreground)_40%,var(--foreground)_60%,var(--muted-foreground)_80%)]",
+    "bg-size-[200%_auto] bg-clip-text font-medium text-transparent",
+    "animate-[shimmer_4s_infinite_linear]",
+    textSizes[size],
+    className
+  )
+
+  if (!showCaret) {
+    return <div className={shimmerClassName}>{text}</div>
+  }
+
   return (
-    <div
-      className={cn(
-        "bg-[linear-gradient(to_right,var(--muted-foreground)_40%,var(--foreground)_60%,var(--muted-foreground)_80%)]",
-        "bg-size-[200%_auto] bg-clip-text font-medium text-transparent",
-        "animate-[shimmer_4s_infinite_linear]",
-        textSizes[size],
-        className
-      )}
-    >
-      {text}
+    <div className="inline-flex items-center gap-1">
+      <div className={shimmerClassName}>{text}</div>
+      <StreamingCaret variant={streamingIndicatorVariant} />
     </div>
+  )
+}
+
+export function StreamingCaret({
+  visible = true,
+  variant = "none",
+  onFadeOutComplete,
+  className,
+}: {
+  visible?: boolean
+  variant?: StreamingIndicatorVariant
+  onFadeOutComplete?: () => void
+  className?: string
+}) {
+  React.useEffect(() => {
+    if (variant === "none" && !visible && onFadeOutComplete) {
+      onFadeOutComplete()
+    }
+  }, [variant, visible, onFadeOutComplete])
+
+  const animationStateClass = visible
+    ? undefined
+    : "animate-[caret-fade-out_300ms_forwards]"
+
+  const renderIndicator = () => {
+    if (variant === "none") {
+      return null
+    }
+
+    if (variant === "rotating-glyph") {
+      return (
+        <span
+          className={cn(
+            "text-foreground inline-flex h-[1em] w-[0.8em] items-center justify-center text-[0.85em] leading-none",
+            !animationStateClass &&
+              "animate-[indicator-glyph-spin_900ms_steps(4,end)_infinite]",
+            animationStateClass
+          )}
+          aria-hidden
+        >
+          ◜
+        </span>
+      )
+    }
+
+    if (variant === "wave-segment") {
+      return (
+        <span className={cn("inline-flex h-[1em] items-end gap-[2px]", animationStateClass)}>
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className={cn(
+                "bg-foreground inline-block w-[1.5px] rounded-sm",
+                !animationStateClass && "animate-[indicator-wave_700ms_ease-in-out_infinite]"
+              )}
+              style={{
+                height: `${0.45 + index * 0.2}em`,
+                animationDelay: `${index * 100}ms`,
+              }}
+              aria-hidden
+            />
+          ))}
+        </span>
+      )
+    }
+
+    if (variant === "slide-dot-trail") {
+      return (
+        <span className={cn("inline-flex h-[1em] items-center gap-[1px]", animationStateClass)}>
+          {[0, 1, 2].map((index) => (
+            <span
+              key={index}
+              className={cn(
+                "bg-foreground inline-block h-[0.22em] w-[0.22em] rounded-full",
+                !animationStateClass &&
+                  "animate-[indicator-dot-trail_900ms_ease-in-out_infinite]"
+              )}
+              style={{ animationDelay: `${index * 130}ms` }}
+              aria-hidden
+            />
+          ))}
+        </span>
+      )
+    }
+
+    if (variant === "pulse-dot") {
+      return (
+        <span
+          className={cn(
+            "bg-foreground inline-block h-[0.42em] w-[0.42em] rounded-full",
+            !animationStateClass && "animate-[indicator-pulse-dot_900ms_ease-in-out_infinite]",
+            animationStateClass
+          )}
+          aria-hidden
+        />
+      )
+    }
+
+    if (variant === "shimmer-underscore") {
+      return (
+        <span
+          className={cn(
+            "inline-block h-[2px] w-[0.85em] rounded-sm",
+            "bg-[linear-gradient(to_right,var(--muted-foreground)_30%,var(--foreground)_55%,var(--muted-foreground)_80%)]",
+            "bg-size-[200%_auto]",
+            !animationStateClass &&
+              "animate-[indicator-underscore-shimmer_1.2s_linear_infinite]",
+            animationStateClass
+          )}
+          aria-hidden
+        />
+      )
+    }
+
+    if (variant === "soft-glow-marker") {
+      return (
+        <span
+          className={cn(
+            "bg-foreground/80 inline-block h-[0.72em] w-[0.28em] rounded-[2px]",
+            !animationStateClass && "animate-[indicator-soft-glow_1.3s_ease-in-out_infinite]",
+            animationStateClass
+          )}
+          aria-hidden
+        />
+      )
+    }
+
+    return (
+      <span
+        className={cn(
+          "bg-foreground inline-block h-[1em] w-[1.5px] shrink-0",
+          !animationStateClass && "animate-[caret-blink_1s_step-end_infinite]",
+          animationStateClass
+        )}
+        aria-hidden
+      />
+    )
+  }
+
+  return (
+    <span
+      className={cn("inline-flex items-center", className)}
+      onAnimationEnd={visible ? undefined : onFadeOutComplete}
+    >
+      {renderIndicator()}
+      <span className="sr-only">Loading</span>
+    </span>
   )
 }
 
@@ -516,6 +684,8 @@ function Loader({
   variant = "circular",
   size = "md",
   text,
+  showCaret,
+  streamingIndicatorVariant,
   className,
 }: LoaderProps) {
   switch (variant) {
@@ -540,7 +710,15 @@ function Loader({
     case "text-blink":
       return <TextBlinkLoader text={text} size={size} className={className} />
     case "text-shimmer":
-      return <TextShimmerLoader text={text} size={size} className={className} />
+      return (
+        <TextShimmerLoader
+          text={text}
+          showCaret={showCaret}
+          streamingIndicatorVariant={streamingIndicatorVariant}
+          size={size}
+          className={className}
+        />
+      )
     case "loading-dots":
       return <TextDotsLoader text={text} size={size} className={className} />
     case "chat":
