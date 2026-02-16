@@ -498,7 +498,7 @@ export function ChatLoader({ className }: { className?: string }) {
   }
 
   return (
-    <div className={cn("flex items-center justify-center gap-1", className)}>
+    <div className={cn("flex items-center gap-1", className)}>
       {[0, 0.1, 0.2].map((delay, i) => (
         <motion.div
           key={i}

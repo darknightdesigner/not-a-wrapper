@@ -25,6 +25,7 @@ import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
 import { useAssistantMessageSelection } from "./useAssistantMessageSelection"
+import { useLoadingState } from "./use-loading-state"
 
 type MessageAssistantProps = {
   children: string
@@ -39,6 +40,28 @@ type MessageAssistantProps = {
   messageId: string
   onQuote?: (text: string, messageId: string) => void
   finishReason?: string
+}
+
+function formatToolProgressLabel(toolName: string): string {
+  switch (toolName) {
+    case "web_search":
+    case "google_search":
+      return "Searching the web"
+    case "imageGeneration":
+    case "image_generation":
+      return "Generating image"
+    default: {
+      const readableName = toolName
+        .replace(/_/g, " ")
+        .replace(/([a-z])([A-Z])/g, "$1 $2")
+        .trim()
+      const normalized =
+        readableName.length > 0
+          ? readableName.charAt(0).toUpperCase() + readableName.slice(1)
+          : "Running tool"
+      return `Running ${normalized}`
+    }
+  }
 }
 
 export function MessageAssistant({
@@ -59,7 +82,9 @@ export function MessageAssistant({
   const sources = getSources(parts || [])
   
   // v6: Filter tool parts using official helper
-  const toolInvocationParts = parts?.filter(isStaticToolUIPart) as ToolUIPart[] | undefined
+  const toolInvocationParts = parts?.filter((part): part is ToolUIPart =>
+    isStaticToolUIPart(part)
+  )
   
   const reasoningParts = parts?.find((part) => part.type === "reasoning")
   const contentNullOrEmpty = children === null || children === ""
@@ -82,22 +107,19 @@ export function MessageAssistant({
         return output?.content?.[0]?.results ?? []
       }) ?? []
 
-  // Show a loading indicator when streaming has started but no visible content
-  // exists yet. This covers the gap between the SDK transitioning to "streaming"
-  // (which hides the conversation-level loader) and the first text token arriving.
-  const hasVisibleReasoning = Boolean(reasoningParts && reasoningParts.text)
-  const hasVisibleTools = Boolean(
-    toolInvocationParts &&
-      toolInvocationParts.length > 0 &&
-      preferences.showToolInvocations
-  )
-  const hasVisibleImages = searchImageResults.length > 0
-  const showStreamingLoader =
-    isLastStreaming &&
-    contentNullOrEmpty &&
-    !hasVisibleReasoning &&
-    !hasVisibleTools &&
-    !hasVisibleImages
+  const {
+    showDots: showStreamingLoader,
+    showThinking,
+    showToolProgress,
+    showImageGenProgress,
+    activeToolNames,
+  } = useLoadingState({
+    status: status ?? "ready",
+    isLast: isLast ?? false,
+    parts,
+    contentNullOrEmpty,
+    showToolInvocations: preferences.showToolInvocations,
+  })
 
   const isQuoteEnabled = !preferences.multiModelEnabled
   const messageRef = useRef<HTMLDivElement>(null)
@@ -135,14 +157,33 @@ export function MessageAssistant({
           />
         )}
 
+        {showThinking && (
+          <Loader variant="loading-dots" text="Thinking" />
+        )}
+
         {toolInvocationParts &&
           toolInvocationParts.length > 0 &&
           preferences.showToolInvocations && (
             <ToolInvocation toolInvocations={toolInvocationParts} />
           )}
 
+        {showToolProgress && (
+          <Loader
+            variant="loading-dots"
+            text={
+              activeToolNames.length === 1
+                ? formatToolProgressLabel(activeToolNames[0])
+                : "Running tools"
+            }
+          />
+        )}
+
         {searchImageResults.length > 0 && (
           <SearchImages results={searchImageResults} />
+        )}
+
+        {showImageGenProgress && (
+          <Loader variant="loading-dots" text="Generating image" />
         )}
 
         {showStreamingLoader && <Loader variant="chat" />}
