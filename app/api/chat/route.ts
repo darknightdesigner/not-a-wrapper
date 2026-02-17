@@ -365,6 +365,31 @@ export async function POST(req: Request) {
       })
     }
 
+    // -----------------------------------------------------------------------
+    // Platform Tool Loading (Layer 4 — Experimental)
+    // Flowglad Pay: AI-powered purchase agent.
+    // Gated on: auth + env var presence (getPlatformTools returns empty if not configured).
+    // NOT loaded for anonymous users (has side effects — spends money).
+    //
+    // EXPERIMENTAL: This entire section can be removed to disable Flowglad Pay.
+    // See: .agents/plans/flowglad-pay-integration.md (Rollback instructions)
+    // -----------------------------------------------------------------------
+    let platformTools: ToolSet = {} as ToolSet
+    let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    if (isAuthenticated) {
+      const { currentUser } = await import("@clerk/nextjs/server")
+      const clerkUser = await currentUser()
+      const userName = clerkUser
+        ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
+        : undefined
+
+      const { getPlatformTools } = await import("@/lib/tools/platform")
+      const platformResult = await getPlatformTools({ userName: userName || undefined })
+      platformTools = platformResult.tools
+      platformToolMetadata = platformResult.metadata
+    }
+
     // Wrap MCP tools with timeout, timing, truncation, and envelope.
     // Single wrapper handles all Layer 3 concerns — follows the Exa gold
     // standard pattern (lib/tools/third-party.ts:82-119).
@@ -378,14 +403,15 @@ export async function POST(req: Request) {
       }) as ToolSet
     }
 
-    // Merge all tool layers: search (Layer 1 OR Layer 2) + MCP (Layer 3)
+    // Merge all tool layers: search (Layer 1 OR Layer 2) + platform (Layer 4) + MCP (Layer 3)
     // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
     // MCP tools are always independent and additive.
     // Spread order matters for conflict resolution:
     //   1. Built-in/third-party search tools (lowest priority)
-    //   2. MCP tools (highest priority — user-configured, namespaced)
+    //   2. Platform tools (middle priority)
+    //   3. MCP tools (highest priority — user-configured, namespaced)
     const searchTools = { ...builtInTools, ...thirdPartyTools }
-    const allTools = { ...searchTools, ...mcpTools } as ToolSet
+    const allTools = { ...searchTools, ...platformTools, ...mcpTools } as ToolSet
 
     // Dev-mode collision detection: warn when duplicate keys are found
     if (process.env.NODE_ENV !== "production") {
@@ -655,7 +681,11 @@ export async function POST(req: Request) {
     // Collect all tool metadata for prepareStep tool restriction.
     // Merge built-in + third-party metadata (MCP metadata not available here —
     // MCP tools are conservatively included in the safe list).
-    const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+    const allToolMetadata = new Map([
+      ...builtInToolMetadata,
+      ...thirdPartyToolMetadata,
+      ...platformToolMetadata,
+    ])
 
     const streamStartMs = Date.now()
     let stepCounter = 0
@@ -840,7 +870,11 @@ export async function POST(req: Request) {
             // Replaces the previous MCP-only mcp_tool_call event.
             if (steps) {
               // Combine all metadata maps for source identification
-              const allToolMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+              const allToolMetadata = new Map([
+                ...builtInToolMetadata,
+                ...thirdPartyToolMetadata,
+                ...platformToolMetadata,
+              ])
 
               for (const step of steps) {
                 if (step.toolCalls) {
@@ -964,7 +998,11 @@ export async function POST(req: Request) {
         // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
         if (convexToken && steps) {
           // Combine built-in and third-party metadata maps
-          const nonMcpMetadata = new Map([...builtInToolMetadata, ...thirdPartyToolMetadata])
+          const nonMcpMetadata = new Map([
+            ...builtInToolMetadata,
+            ...thirdPartyToolMetadata,
+            ...platformToolMetadata,
+          ])
 
           if (nonMcpMetadata.size > 0) {
             let finishStepNumber = 0

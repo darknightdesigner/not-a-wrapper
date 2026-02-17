@@ -132,6 +132,8 @@ export function MessageUser({
     })
   }, [isEditing, stopScroll, scrollRef])
 
+  const isMultiline = children.includes('\n')
+
   return (
     <MessageContainer
       className={cn(
@@ -184,7 +186,7 @@ export function MessageUser({
       ))}
       {isEditing ? (
         <div
-          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-3xl px-4 py-2"
+          className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-[18px] px-4 py-2"
           style={{
             width: contentRef.current?.offsetWidth,
           }}
@@ -219,7 +221,10 @@ export function MessageUser({
         </div>
       ) : (
         <MessageContent
-          className="bg-accent prose relative max-w-[70%] rounded-3xl px-4 py-2"
+          className={cn(
+            "bg-accent prose relative max-w-[var(--user-chat-width,70%)] rounded-[18px] px-4",
+            isMultiline ? "py-3" : "py-1.5"
+          )}
           markdown={true}
           ref={contentRef}
           components={{

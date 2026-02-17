@@ -1,10 +1,7 @@
 "use client"
 
 import { ModelSelector } from "@/components/common/model-selector/base"
-import {
-  FileUpload,
-  FileUploadContent,
-} from "@/components/ui/file-upload"
+import { InputDropZone } from "./input-drop-zone"
 import {
   PromptInput,
   PromptInputAction,
@@ -13,13 +10,9 @@ import {
 } from "@/components/ui/prompt-input"
 import { Button } from "@/components/ui/button"
 import { StopBulkRoundedIcon } from "@/lib/icons"
-import { ACCEPTED_FILE_PICKER_TYPES } from "@/lib/file-handling"
 import { getModelInfo } from "@/lib/models"
 import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  ArrowUp02Icon,
-  FileUploadIcon,
-} from "@hugeicons-pro/core-stroke-rounded"
+import { ArrowUp02Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { resolveComposerPrimaryActionState } from "./primary-action-state"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { PromptSystem } from "../suggestions/prompt-system"
@@ -226,10 +219,8 @@ export function ChatInput({
           value={localValue}
         />
       )}
-      <FileUpload
-        onFilesAdded={onFileUpload}
-        multiple
-        accept={ACCEPTED_FILE_PICKER_TYPES}
+      <InputDropZone
+        onFileUpload={onFileUpload}
         disabled={!isUserAuthenticated || !isFileUploadAvailable}
       >
         <div
@@ -261,6 +252,7 @@ export function ChatInput({
                   isSearchDisabled={isSearchDisabled}
                 />
                 <ModelSelector
+                  mode="single"
                   selectedModelId={selectedModel}
                   setSelectedModelId={onSelectModel}
                   isUserAuthenticated={isUserAuthenticated}
@@ -288,16 +280,7 @@ export function ChatInput({
             </PromptInputActions>
           </PromptInput>
         </div>
-        <FileUploadContent>
-          <div className="border-input bg-background flex flex-col items-center rounded-lg border border-dashed p-8">
-            <HugeiconsIcon icon={FileUploadIcon} size={32} className="text-muted-foreground" />
-            <span className="mt-4 mb-1 text-lg font-medium">Drop files here</span>
-            <span className="text-muted-foreground text-sm">
-              Drop files here to add them to the conversation
-            </span>
-          </div>
-        </FileUploadContent>
-      </FileUpload>
+      </InputDropZone>
     </div>
   )
 }

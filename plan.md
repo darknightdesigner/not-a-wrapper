@@ -34,46 +34,49 @@ AGENTS.md            ← Rules & permissions
 | 3 | **Prompt-kit integration** — Integrate new Prompt-kit components into chat UI | Not started | `plans/prompt-kit-component-audit.md` |
 | 4 | **Visible failure feedback** — status indicators for tool calls, RAG, context truncation | In progress | `research/open-webui-analysis/SUMMARY.md` |
 | 5 | **Security headers** — CSP, HSTS, X-Frame-Options out of the box | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 6 | **Multi-chat card in single conversations** — When multi-chat is selected and user visits a prior single-model conversation, the UI incorrectly renders multi-chat card view. Investigate and fix. | Not started | — |
+| 7 | **Missing share button on multi-chat threads** — Multi-chat conversations have no share button. Investigate why and add support. | Not started | — |
 
 ### P1 — Do Next
 
 | # | What | Status | Sources |
 |---|------|--------|---------|
-| 6 | **UX redesign: tools/thinking** — redesign tools & thinking component to match ChatGPT & Claude patterns | Not started | `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md` |
-| 7 | **UX redesign: sources** — redesign sources component to match ChatGPT & Claude patterns | Not started | `research/competitive-feature-analysis.md` |
-| 8 | **Settings page** — convert settings modal to a full settings page (Claude-style) | Not started | `research/competitive-feature-analysis.md` |
-| 9 | **Model selector simplification** — simplify popovers, surface thinking effort controls instead of model info | Not started | `research/competitive-feature-analysis.md` |
-| 10 | **Inline message controls** — edit model, toggle web search, attach/remove files per message (Cursor-like) | Not started | `research/competitive-feature-analysis.md` |
-| 11 | Message rating/feedback (thumbs up/down) | In progress | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 12 | Conversation export (Markdown + JSON) | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 13 | Template variables in prompts (`{{CURRENT_DATE}}`, `{{USER_NAME}}`) | Not started | `research/open-webui-analysis/SUMMARY.md` |
-| 14 | Task model separation — cheap model for title/tag generation | Not started | `research/open-webui-analysis/SUMMARY.md` |
-| 15 | Structured audit logging — configurable levels, Convex wrappers | In progress | `research/open-webui-analysis/SUMMARY.md` |
-| 16 | RAG pipeline — Convex vector search + API embedding + chunking | Not started | `research/open-webui-analysis/SUMMARY.md`, `context/database.md` |
-| 17 | **Keyboard shortcuts** — global shortcuts for common actions. _ChatGPT_: ⌘K search, ⇧⌘O new chat, ⇧⌘S toggle sidebar, ⇧⌘; copy last code block, ⇧↑/↓ navigate messages, ⇧⌘⌫ delete chat, ⌘U attach files, ⌘/ show shortcuts, ⇧⌘I custom instructions, focus chat input. _Claude_: ⌘K quick chat/search, ⇧⌘I incognito chat, ⌘. toggle sidebar, ⌘/ shortcuts, ⇧⌘, settings, ↵ send, ⇧↵ new line, ⇧⌘E toggle thinking, ⌘U upload, Esc stop response. _Note: users should be able to remap their own shortcuts — see Personalization (#21)_ | Not started | `research/competitive-feature-analysis.md` |
+| 8 | **UX redesign: tools/thinking** — redesign tools & thinking component to match ChatGPT & Claude patterns | Not started | `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md` |
+| 9 | **UX redesign: sources** — redesign sources component to match ChatGPT & Claude patterns | Not started | `research/competitive-feature-analysis.md` |
+| 10 | **Settings page** — convert settings modal to a full settings page (Claude-style) | Not started | `research/competitive-feature-analysis.md` |
+| 11 | **Model selector simplification** — simplify popovers, surface thinking effort controls instead of model info | Not started | `research/competitive-feature-analysis.md` |
+| 12 | **Inline message controls** — edit model, toggle web search, attach/remove files per message (Cursor-like) | Not started | `research/competitive-feature-analysis.md` |
+| 13 | Message rating/feedback (thumbs up/down) | In progress | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 14 | Conversation export (Markdown + JSON) | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 15 | Template variables in prompts (`{{CURRENT_DATE}}`, `{{USER_NAME}}`) | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 16 | Task model separation — cheap model for title/tag generation | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 17 | Structured audit logging — configurable levels, Convex wrappers | In progress | `research/open-webui-analysis/SUMMARY.md` |
+| 18 | RAG pipeline — Convex vector search + API embedding + chunking | Not started | `research/open-webui-analysis/SUMMARY.md`, `context/database.md` |
 
 ### P2 — Major Features
 
 | # | What | Status | Sources |
 |---|------|--------|---------|
-| 18 | **Image generation** in chat (DALL-E + Gemini via BYOK) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 19 | **Inline triggers** — `#` files, `/` commands, `@` models/tools | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 20 | **Cross-conversation memory** — Convex vectors + model-callable tools (search, add, replace) | Not started | `plans/cross-conversation-memory.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 21 | **Personalization** — custom instructions, rules, fonts, colors, model presets/personas | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 22 | Code execution sandbox (E2B or WebContainers) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 23 | Audio STT/TTS (OpenAI, Deepgram, ElevenLabs) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 24 | Extend replay model — preserve full provider-native tool payload per origin (consider expanding) | Done | `plans/provider-neutral-replay-compiler.md`, `plans/provider-aware-history-adaptation.md`, `research/provider-aware-history-adaptation.md` |
-| 25 | **Inline `style` override safety** — all animated UI components (`select`, `dialog`, `alert-dialog`, `sheet`, `dropdown-menu`) place `style={{ transition: ... }}` before `{...props}`. If a consumer passes a `style` prop, React replaces the entire object, silently breaking the open/close animation. Fix: merge consumer `style` with transition style across all affected components | Not started | Identified during dropdown-menu transition fix |
+| 19 | **Image generation** in chat (DALL-E + Gemini via BYOK) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 20 | **Inline triggers** — `#` files, `/` commands, `@` models/tools | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 21 | **Cross-conversation memory** — Convex vectors + model-callable tools (search, add, replace) | Not started | `plans/cross-conversation-memory.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 22 | **Personalization** — custom instructions, rules, fonts, colors, model presets/personas | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 23 | Code execution sandbox (E2B or WebContainers) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 24 | Audio STT/TTS (OpenAI, Deepgram, ElevenLabs) | Not started | `plans/phase-7-future-tool-integrations.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 25 | Extend replay model — preserve full provider-native tool payload per origin (consider expanding) | Done | `plans/provider-neutral-replay-compiler.md`, `plans/provider-aware-history-adaptation.md`, `research/provider-aware-history-adaptation.md` |
+| 26 | **Inline `style` override safety** — all animated UI components (`select`, `dialog`, `alert-dialog`, `sheet`, `dropdown-menu`) place `style={{ transition: ... }}` before `{...props}`. If a consumer passes a `style` prop, React replaces the entire object, silently breaking the open/close animation. Fix: merge consumer `style` with transition style across all affected components | Not started | Identified during dropdown-menu transition fix |
+| 27 | **Multi-chat layout redesign** — Better responsive layout: 2 chats → 50/50 split, 3+ chats → horizontally scrollable. Current card grid doesn't scale well. | Not started | — |
+| 28 | **ChatGPT-like notifications and reminders** — investigate how to implement notifications and reminders similar to ChatGPT. | Not started | — |
 
 ### P3 — Strategic
 
 | # | What | Status | Sources |
 |---|------|--------|---------|
-| 26 | Model access control ACLs | Not started | `research/open-webui-analysis/SUMMARY.md` |
-| 27 | Admin-mutable config (PersistentConfig via Convex) | Not started | `research/open-webui-analysis/SUMMARY.md` |
-| 28 | OpenTelemetry integration | Not started | `research/open-webui-analysis/SUMMARY.md` |
-| 29 | Prompt library with `/` trigger | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
-| 30 | Flowglad integration (billing, subscriptions, plan lifecycle) | Not started | `AGENTS.md` |
+| 28 | Model access control ACLs | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 29 | Admin-mutable config (PersistentConfig via Convex) | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 30 | OpenTelemetry integration | Not started | `research/open-webui-analysis/SUMMARY.md` |
+| 31 | Prompt library with `/` trigger | Not started | `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md` |
+| 32 | Flowglad integration (billing, subscriptions, plan lifecycle) | Not started | `AGENTS.md` |
 
 ### P4 — Performance & DX
 
@@ -81,16 +84,16 @@ AGENTS.md            ← Rules & permissions
 
 | # | What | Benefit | Status | Sources |
 |---|------|---------|--------|---------|
-| 31 | **Message memoization** — `React.memo` with content-based `areMessagesEqual` comparator; O(N) → O(1) re-renders per streaming chunk | Eliminates jank in long conversations; only the actively streaming message re-renders | Done | `research/webclaw/06-recommendations.md` R01 |
-| 32 | **Composer ref isolation** — move `input` from `useState` to `useRef` in composer; debounce draft persistence 500ms + `beforeunload` flush | Stops every keystroke from cascading re-renders through the entire chat tree | Done | `research/webclaw/06-recommendations.md` R02 |
-| 33 | **Singleton Shiki highlighter** — module-level `highlighterPromise` initialized once; eliminates redundant WASM init per code block | Faster code block rendering; avoids repeated ~2MB WASM load per block | Done | `research/webclaw/06-recommendations.md` R04 |
-| 34 | **Typography utilities** — `text-balance` on headings, `text-pretty` on body in markdown styles (CSS progressive enhancement, zero cost) | Polished text rendering with no performance cost; degrades gracefully | Partial — `.prose` context in `globals.css`; not yet in sidebar titles or standalone headings | `research/webclaw/06-recommendations.md` R05 |
-| 35 | **Pragmatic hook decomposition** — extract `use-chat-submit.ts` (~200 LOC) and `use-chat-edit.ts` (~170 LOC) from `use-chat-core.ts`; skip full 6-hook split until file exceeds ~1000 LOC | Makes the two most complex flows independently testable and easier to modify | In progress — `use-chat-operations.ts` (145 LOC) + `use-chat-draft.ts` extracted; core still 723 LOC | `research/webclaw/06-recommendations.md` R06 (adapted) |
-| 36 | **`type` over `interface`** — adopt for new code only; no codemod. Add ESLint rule opportunistically | Consistency across codebase; better composability with unions and utility types | Not started | `research/webclaw/06-recommendations.md` R09 |
-| 37 | **Context meter** — token usage progress bar in chat header; Phase 1: estimate from messages, Phase 2: accumulate actual `usage.promptTokens` from AI SDK. _Note: follow Cursor's approach and research how to make this work with our multi-model configuration_ | Users can see how much context window remains before hitting limits | Not started | `research/webclaw/06-recommendations.md` R08 |
-| 38 | **Global prompt auto-focus** — ~20 LOC global `keydown` listener; auto-focus textarea on printable chars (exclude meta/ctrl/alt, editable elements) | Removes click-to-focus friction; matches VS Code behavior users already expect | Not started | `research/webclaw/06-recommendations.md` R07 |
+| 33 | **Message memoization** — `React.memo` with content-based `areMessagesEqual` comparator; O(N) → O(1) re-renders per streaming chunk | Eliminates jank in long conversations; only the actively streaming message re-renders | Done | `research/webclaw/06-recommendations.md` R01 |
+| 34 | **Composer ref isolation** — move `input` from `useState` to `useRef` in composer; debounce draft persistence 500ms + `beforeunload` flush | Stops every keystroke from cascading re-renders through the entire chat tree | Done | `research/webclaw/06-recommendations.md` R02 |
+| 35 | **Singleton Shiki highlighter** — module-level `highlighterPromise` initialized once; eliminates redundant WASM init per code block | Faster code block rendering; avoids repeated ~2MB WASM load per block | Done | `research/webclaw/06-recommendations.md` R04 |
+| 36 | **Typography utilities** — `text-balance` on headings, `text-pretty` on body in markdown styles (CSS progressive enhancement, zero cost) | Polished text rendering with no performance cost; degrades gracefully | Partial — `.prose` context in `globals.css`; not yet in sidebar titles or standalone headings | `research/webclaw/06-recommendations.md` R05 |
+| 37 | **Pragmatic hook decomposition** — extract `use-chat-submit.ts` (~200 LOC) and `use-chat-edit.ts` (~170 LOC) from `use-chat-core.ts`; skip full 6-hook split until file exceeds ~1000 LOC | Makes the two most complex flows independently testable and easier to modify | In progress — `use-chat-operations.ts` (145 LOC) + `use-chat-draft.ts` extracted; core still 723 LOC | `research/webclaw/06-recommendations.md` R06 (adapted) |
+| 38 | **`type` over `interface`** — adopt for new code only; no codemod. Add ESLint rule opportunistically | Consistency across codebase; better composability with unions and utility types | Not started | `research/webclaw/06-recommendations.md` R09 |
+| 39 | **Context meter** — token usage progress bar in chat header; Phase 1: estimate from messages, Phase 2: accumulate actual `usage.promptTokens` from AI SDK. _Note: follow Cursor's approach and research how to make this work with our multi-model configuration_ | Users can see how much context window remains before hitting limits | Not started | `research/webclaw/06-recommendations.md` R08 |
+| 40 | **Global prompt auto-focus** — ~20 LOC global `keydown` listener; auto-focus textarea on printable chars (exclude meta/ctrl/alt, editable elements) | Removes click-to-focus friction; matches VS Code behavior users already expect | Not started | `research/webclaw/06-recommendations.md` R07 |
 
-> **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts` lines 184–196.
+> **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts`.
 
 ### Critical Path
 
@@ -102,10 +105,13 @@ UX Redesign → Settings Page + Model Selector (P1 chain)
 Audit Logging → OpenTelemetry
 Inline Triggers ← no deps → Prompt Library (P2, deferred)
 Memory System ← Convex vectors → RAG Pipeline (P2, shares infra)
-Message Memo (#31) ✅ → Composer Ref (#32) ✅ → Hook Decomposition (#35, in progress) (P4 perf chain)
-Shiki Singleton (#33) ✅ + Typography (#34, partial) + Auto-Focus (#38) ← no deps (P4 parallel)
-Context Meter (#37) ← needs token accumulation from AI SDK usage object
-Style Override Safety (#25) ← no deps (P2, affects select/dialog/alert-dialog/sheet/dropdown-menu)
+Multi-chat Card Bug (#6) ← no deps (investigate P0)
+Multi-chat Share Button (#7) ← no deps (investigate P0)
+Message Memo (#33) ✅ → Composer Ref (#34) ✅ → Hook Decomposition (#37, in progress) (P4 perf chain)
+Shiki Singleton (#35) ✅ + Typography (#36, partial) + Auto-Focus (#40) ← no deps (P4 parallel)
+Context Meter (#39) ← needs token accumulation from AI SDK usage object
+Style Override Safety (#26) ← no deps (P2, affects select/dialog/alert-dialog/sheet/dropdown-menu)
+Multi-chat Layout Redesign (#27) ← no deps (P2)
 ```
 
 ---

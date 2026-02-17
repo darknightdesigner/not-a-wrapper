@@ -8,7 +8,7 @@ import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
 import {
   persistWebSearchToggle,
@@ -148,8 +148,6 @@ export function MultiChat() {
     [selectedModelIds.length, selectedModels]
   )
 
-  const fileUploadModelId = selectedModels[0]?.id
-
   const searchSupportState = useMemo<"supported" | "unsupported" | "no-selection">(
     () => {
       if (selectedModelIds.length === 0) return "no-selection"
@@ -183,10 +181,13 @@ export function MultiChat() {
   }, [preferences.webSearchEnabled])
 
   useEffect(() => {
-    if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
+    if (selectedModelIds.length > 0 || messagesLoading) return
+    if (modelsFromLastGroup.length > 0) {
       setSelectedModelIds(modelsFromLastGroup)
+      return
     }
-  }, [selectedModelIds.length, modelsFromLastGroup])
+    setSelectedModelIds([MODEL_DEFAULT])
+  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup])
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
@@ -657,7 +658,6 @@ export function MultiChat() {
       onSelectedModelIdsChange: setSelectedModelIds,
       isUserAuthenticated: isAuthenticated,
       fileUploadState,
-      fileUploadModelId,
       stop: handleStop,
       status: anyLoading ? ("streaming" as const) : ("ready" as const),
       anyLoading,
@@ -678,7 +678,6 @@ export function MultiChat() {
       selectedModelIds,
       isAuthenticated,
       fileUploadState,
-      fileUploadModelId,
       handleStop,
       anyLoading,
       enableSearch,
