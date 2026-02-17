@@ -66,6 +66,7 @@ AGENTS.md            ← Rules & permissions
 | 25 | Extend replay model — preserve full provider-native tool payload per origin (consider expanding) | Done | `plans/provider-neutral-replay-compiler.md`, `plans/provider-aware-history-adaptation.md`, `research/provider-aware-history-adaptation.md` |
 | 26 | **Inline `style` override safety** — all animated UI components (`select`, `dialog`, `alert-dialog`, `sheet`, `dropdown-menu`) place `style={{ transition: ... }}` before `{...props}`. If a consumer passes a `style` prop, React replaces the entire object, silently breaking the open/close animation. Fix: merge consumer `style` with transition style across all affected components | Not started | Identified during dropdown-menu transition fix |
 | 27 | **Multi-chat layout redesign** — Better responsive layout: 2 chats → 50/50 split, 3+ chats → horizontally scrollable. Current card grid doesn't scale well. | Not started | — |
+| 28 | **ChatGPT-like notifications and reminders** — investigate how to implement notifications and reminders similar to ChatGPT. | Not started | — |
 
 ### P3 — Strategic
 

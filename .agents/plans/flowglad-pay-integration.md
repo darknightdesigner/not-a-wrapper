@@ -4,7 +4,7 @@
 > **Priority**: P2 — Experimental / Demo
 > **Scope**: Minimal demo of a Flowglad Pay tool call buying a product in chat
 > **Date**: February 16, 2026
-> **Updated**: February 16, 2026 — Trimmed for lean demo (removed unused SSE consumer, excess schemas, capability flag)
+> **Updated**: February 17, 2026 — Incorporated senior engineer review feedback (event streaming, two-phase pattern confirmed, simplified progress UX)
 > **Research**: `.agents/research/flowglad-pay/` (documents 00–06)
 > **Architecture Reference**: `.agents/plans/flowglad-pay-architecture.md`
 > **Tool Infrastructure Reference**: `.agents/plans/tool-calling-infrastructure.md`
@@ -49,14 +49,15 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 | API schema tracking | Track `main` branch of `flowglad/provisioning-agent` | Source of truth; expect breaking changes |
 | Convex changes | None | Demo scope — avoid schema churn |
 | Credential display | Return in tool result, render in chat | Simplest path; credentials are ephemeral |
-| Progress UX | REST polling every ~30 seconds | Simpler than SSE; sufficient for demo |
-| Long-running jobs | Open research question | Needs deeper analysis (see Open Questions) |
+| Progress UX | Poll or tail PayClaw events endpoint directly | PayClaw events already include natural language messages; no need to re-map (senior engineer feedback) |
+| Long-running jobs | Two-phase tool pattern (confirmed) | Tool returns immediately with "job started"; progress via PayClaw event polling/tailing (senior engineer confirmed this is the most straightforward approach) |
 | Cancellation | Not supported (no API endpoint) | Inform user; job runs until completion or 10-min expiry |
 | Partial failure | Report what succeeded + what failed in plain language | Demo-friendly; don't over-engineer error states |
 | Credential expiration | Skip enforcement | `expiresAt` stored but not enforced by PayClaw; acceptable for demo |
 | Rate limits | None known | Single-user demo; revisit if scaling |
 | Max spend control | User-configurable via tool params | Flowglad Pay enforces the limit on their side |
-| SSE consumer | Skipped | Demo uses REST polling; SSE consumer can be added later if needed |
+| Human-readable event messages | Use PayClaw's native messages | Events already contain well-formatted natural language output; no need to build our own mapping (senior engineer feedback) |
+| Event consumption | Polling via `GET /api/v1/jobs/:id/events` | Demo uses one-shot JSON polling; SSE stream available at `/events/stream` if real-time needed later |
 | `platformTools` capability flag | Skipped | Config null-check already gates the tool; avoids modifying shared `ToolCapabilities` type |
 | Collision detection | Skipped | Single known tool name (`flowglad_pay_buy`); zero collision risk in demo |
 | Schema scope | Minimal — only schemas the demo validates against | Unused schemas (shipping, credentials list, SSE events) can be added when needed |
@@ -115,35 +116,122 @@ Platform tools have lowest priority (MCP wins on collision). This is intentional
 
 ---
 
+## PayClaw Events API Reference
+
+> Source: Engineer-provided endpoint documentation (February 17, 2026). These are the two endpoints our auth proxy will call.
+
+### `GET /api/v1/jobs/:id/events` — One-shot event list
+
+Returns all events recorded for a job in a single JSON response. Use for polling.
+
+**Response (200):**
+```json
+{
+  "events": [
+    {
+      "type": "job.started",
+      "message": "Provisioning job started for example.com",
+      "timestamp": "2025-06-15T10:00:01.000Z",
+      "data": { "vendorUrl": "https://example.com", "vendorName": "example.com", "product": "Pro Plan", "buyType": "indirect" }
+    },
+    {
+      "type": "card.issued",
+      "message": "Virtual card issued for purchase",
+      "timestamp": "2025-06-15T10:00:03.000Z",
+      "data": { "last4": "4821", "limit": 1500 }
+    },
+    {
+      "type": "payment.completed",
+      "message": "Payment processed successfully",
+      "timestamp": "2025-06-15T10:00:12.000Z"
+    },
+    {
+      "type": "job.completed",
+      "message": "Provisioning completed successfully",
+      "timestamp": "2025-06-15T10:00:26.000Z",
+      "data": { "stepCount": 47, "eventCount": 10, "skillsUsed": ["signup", "payment"], "hasCredentials": true }
+    }
+  ]
+}
+```
+
+> Note: Some event types have a `data` field and some don't — `payment.completed`, `email.received`, and `verification.completed` only have `type`, `message`, and `timestamp`.
+
+**Error responses:** `401` (`UNAUTHORIZED`), `500` (`INTERNAL_ERROR`)
+
+### `GET /api/v1/jobs/:id/events/stream` — SSE stream
+
+Real-time Server-Sent Events. Polls every 250ms server-side, only sends new events since the last poll.
+
+**Headers:** `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `Connection: keep-alive`
+
+**Frame types:**
+
+| Frame | Format | When |
+|-------|--------|------|
+| Data | `data: {"type":"...","message":"...","timestamp":"...","data":{...}}` | New event recorded |
+| Keepalive | `: keepalive` | No new events on a poll cycle |
+| Done | `event: done\ndata: {"status":"completed","result":{...}}` | Job reached terminal state (`completed`, `failed`, `cancelled`) |
+| Error | `event: error\ndata: {"error":"Failed to fetch job status"}` | Infrastructure failure |
+
+**Done event `result` shape (on success):**
+```json
+{ "success": true, "credentials": "user@example.com / ****", "productObtained": "Pro Plan", "cardUsed": "4821", "skillsUsed": ["signup", "payment"] }
+```
+
+**Done event `result` shape (on failure):**
+```json
+{ "success": false, "error": "Payment declined", "skillsUsed": ["signup"] }
+```
+
+**Error responses (before stream starts):** `401` (`UNAUTHORIZED`), `404` (`NOT_FOUND`), `500` (`INTERNAL_ERROR`)
+
+### Event type reference
+
+| Event Type | Has `data`? | Data shape |
+|---|---|---|
+| `job.started` | Yes | `{ vendorUrl, vendorName, product?, buyType }` |
+| `job.progress` | Yes | `{ stage }` |
+| `card.issued` | Yes | `{ last4, limit }` |
+| `page.navigated` | Yes | `{ url }` |
+| `form.submitted` | Yes | `{ url }` |
+| `credentials.extracted` | Yes | `{ hasCredentials }` |
+| `job.completed` | Yes | `{ stepCount, eventCount, skillsUsed, hasCredentials }` |
+| `job.failed` | Yes | `{ error, stepCount, eventCount }` |
+| `payment.completed` | No | — |
+| `email.received` | No | — |
+| `verification.completed` | No | — |
+
+> **Key insight**: The `message` field on every event is already well-formatted natural language (e.g., "Navigated to signup page", "Payment processed successfully"). Display these directly in the UI — no custom mapping needed.
+
+---
+
 ## Open Questions (Requiring Further Research)
 
 ### Long-Running Job Handling
-> **Status**: Needs deeper analysis before Phase 2
+> **Status**: Resolved — Two-phase tool pattern (confirmed by senior engineer)
 
 PayClaw provisioning jobs take 2-8 minutes. Our `maxDuration = 60` in `route.ts` (Vercel function timeout) is far too short to hold an SSE connection for the full duration.
 
-**This is the critical architectural question for this integration.** We need to research how to handle long-running async tool results within the Vercel AI SDK without breaking industry standards.
+**Chosen approach: Two-phase tool pattern.** The tool returns immediately with a "job started" message; progress updates come from polling (or tailing) the PayClaw events endpoint. This was confirmed by the senior engineer as the easiest and most straightforward approach.
 
-Possible approaches to investigate:
-- **Vercel AI SDK `experimental_toolCallStreaming`** — can tools stream partial results?
-- **Two-phase tool pattern** — tool returns immediately with a "job started" message; a separate mechanism updates the chat with progress
-- **Background functions** — Vercel Background Functions or a dedicated worker process
-- **Client-side polling** — a `useEffect` hook polls a status API route every N seconds
-- **Convex real-time subscription** — if we allow a Convex table, Convex's reactivity could push updates
+**Key insight from senior engineer review**: PayClaw provides two concrete event endpoints:
+1. **Polling** — `GET /api/v1/jobs/:id/events` returns all events as JSON `{ events: [...] }`
+2. **SSE stream** — `GET /api/v1/jobs/:id/events/stream` opens an SSE connection (250ms server-side poll, sends only new events)
 
-**For the demo**: We will use a pragmatic approach — the tool creates the job and immediately returns a confirmation. Progress updates are handled via REST polling (a lightweight status API route) that the client calls every ~30 seconds. No SSE stream consumer is needed for this approach.
+If Vercel times out the SSE connection, it's not a problem — just open a new connection or fall back to polling. The events are durable on PayClaw's side.
 
-**Action item**: Research this before starting Phase 2. Write findings to `.agents/context/research/long-running-tool-calls.md`.
+**No custom research needed.** The PayClaw API already handles the hard parts. Our auth proxy (`/api/payclaw/status`) forwards these events to the client. See "PayClaw Events API Reference" section above for full endpoint contracts.
 
 ### Per-User API Key Migration
-> **Status**: Follow up with Flowglad team
+> **Status**: No decisions needed now (senior engineer feedback)
 
 PayClaw plans to migrate from a shared `API_KEY` to per-user API keys. When this happens:
 - `userEmail` parameter will be removed from all endpoints
 - User identity will be derived from the API key itself
 - We'll need to store per-user PayClaw API keys (encrypted in Convex)
 
-**Action item**: Follow up with the Flowglad team periodically as the product evolves. No specific timeline exists.
+**No action required for the demo.** This is a future concern that will be addressed when the Flowglad team ships per-user keys. No specific timeline exists.
 
 ### User Provisioning
 > **Status**: Deferred (demo uses pre-existing account)
@@ -281,13 +369,42 @@ export const jobSchema = z.object({
   result: jobResultSchema,
 })
 
-// ── Job Events Schema (returned by REST polling endpoint) ───
+// ── Event Type Enum ─────────────────────────────────────────
+// Source: PayClaw Events API Reference (engineer-provided, Feb 17 2026)
+
+export const eventTypeValues = [
+  'job.started', 'job.progress', 'job.completed', 'job.failed',
+  'card.issued', 'page.navigated', 'form.submitted',
+  'payment.completed', 'email.received', 'verification.completed',
+  'credentials.extracted',
+] as const
+
+export const eventTypeSchema = z.enum(eventTypeValues)
+
+// ── Job Event Schema ────────────────────────────────────────
+// Note: `data` is optional — some events (payment.completed,
+// email.received, verification.completed) only have type/message/timestamp.
+// The `message` field contains well-formatted natural language — display directly.
 
 export const jobEventSchema = z.object({
-  type: z.string(),
-  timestamp: z.string(),
+  type: eventTypeSchema,
   message: z.string(),
+  timestamp: z.string(),
   data: z.record(z.unknown()).optional(),
+})
+
+// ── Events List Response (GET /api/v1/jobs/:id/events) ──────
+
+export const eventsListResponseSchema = z.object({
+  events: z.array(jobEventSchema),
+})
+
+// ── SSE Stream Done Event (event: done) ─────────────────────
+// Sent when job reaches terminal state (completed, failed, cancelled)
+
+export const sseStreamDoneSchema = z.object({
+  status: jobStatusSchema,
+  result: jobResultSchema,
 })
 
 // ── API Error Schema ────────────────────────────────────────
@@ -304,7 +421,10 @@ export type PayClawToolInput = z.infer<typeof payClawToolInputSchema>
 export type CreateJobResponse = z.infer<typeof createJobResponseSchema>
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type Job = z.infer<typeof jobSchema>
+export type EventType = z.infer<typeof eventTypeSchema>
 export type JobEvent = z.infer<typeof jobEventSchema>
+export type EventsListResponse = z.infer<typeof eventsListResponseSchema>
+export type SseStreamDone = z.infer<typeof sseStreamDoneSchema>
 export type ApiError = z.infer<typeof apiErrorSchema>
 ```
 
@@ -365,6 +485,7 @@ Key behaviors:
 
 import type { PayClawConfig } from './config'
 import type { PayClawToolInput, CreateJobResponse, Job, JobEvent } from './schemas'
+import { eventsListResponseSchema } from './schemas'
 
 /** Standard headers for all PayClaw API calls */
 function makeHeaders(config: PayClawConfig): Record<string, string> {
@@ -374,23 +495,60 @@ function makeHeaders(config: PayClawConfig): Record<string, string> {
   }
 }
 
-/** Create a provisioning job. Returns { jobId, status: 'created' }. */
+/**
+ * Create a provisioning job. Returns { jobId, status: 'created' }.
+ *
+ * IMPORTANT (senior engineer note): Creating a job will by default start
+ * streaming events back to you in the response. The client should handle
+ * this gracefully — either consume the stream or work around it.
+ * This shouldn't block implementation but be aware if you encounter issues.
+ */
 export async function createJob(
   input: PayClawToolInput,
   config: PayClawConfig,
-): Promise<CreateJobResponse> { /* ... */ }
+): Promise<CreateJobResponse> { /* POST /api/v1/jobs */ }
 
 /** Get a job by ID. Returns the full Job object. */
 export async function getJob(
   jobId: string,
   config: PayClawConfig,
-): Promise<Job> { /* ... */ }
+): Promise<Job> { /* GET /api/v1/jobs/:id */ }
 
-/** Get all events for a job (REST polling endpoint). */
+/**
+ * Get all events for a job (one-shot JSON endpoint).
+ * Endpoint: GET /api/v1/jobs/:id/events
+ * Response is wrapped: { events: [...] } — this method unwraps it.
+ */
 export async function getJobEvents(
   jobId: string,
   config: PayClawConfig,
-): Promise<JobEvent[]> { /* ... */ }
+): Promise<JobEvent[]> {
+  const res = await fetch(
+    `${config.appBaseUrl}/api/v1/jobs/${jobId}/events`,
+    { headers: makeHeaders(config) },
+  )
+  if (!res.ok) { /* throw PayClawApiError */ }
+  const body = eventsListResponseSchema.parse(await res.json())
+  return body.events // unwrap the { events: [...] } envelope
+}
+
+/**
+ * Get SSE event stream URL for a job (for future SSE proxy if needed).
+ * Endpoint: GET /api/v1/jobs/:id/events/stream
+ * Returns the full URL — caller is responsible for opening the EventSource.
+ *
+ * Stream frame types:
+ *   data: {...}        — new event (same shape as jobEventSchema)
+ *   : keepalive        — no new events
+ *   event: done        — terminal state with result
+ *   event: error       — infrastructure failure
+ */
+export function getJobEventStreamUrl(
+  jobId: string,
+  config: PayClawConfig,
+): string {
+  return `${config.appBaseUrl}/api/v1/jobs/${jobId}/events/stream`
+}
 ```
 
 **Direct vs Indirect buy logic** (inside `createJob`):
@@ -465,7 +623,7 @@ rm lib/payclaw/client.ts
 
 **Goal**: A Vercel AI SDK `tool()` that the LLM can invoke to buy products via Flowglad Pay. Integrated into `app/api/chat/route.ts` as Layer 4.
 
-**Prerequisite**: Resolve the long-running job question (see Open Questions above). The implementation below assumes a **fire-and-forget** pattern where the tool returns immediately after creating the job. If the research reveals a better pattern, adjust accordingly.
+**Approach**: Uses the confirmed **two-phase tool pattern** — the tool returns immediately after creating the job, and progress is tracked by polling PayClaw's events endpoint (see Phase 3).
 
 **Context to load**:
 - `app/api/chat/route.ts` — Gold standard API route; study how Layers 1-3 are loaded and merged
@@ -656,22 +814,30 @@ bun run lint
 
 **Goal**: After the tool creates a job, provide periodic progress summaries in the chat and display credentials on completion.
 
-**Prerequisite**: The long-running job research question must be resolved before finalizing this phase. The approach below is a pragmatic starting point.
-
 **Context to load**:
 - `lib/payclaw/client.ts` (Phase 1)
 - `.agents/research/flowglad-pay/03-events-and-streaming.md` — Event taxonomy
 - `.agents/research/flowglad-pay/02-credentials-api.md` — Credential retrieval
 - `.agents/research/flowglad-pay/06-integration-contract.md` — Section 6 (Credential Retrieval Flow)
-- Research findings: `.agents/context/research/long-running-tool-calls.md` (from Open Questions)
 
-### Approach: Polling Status Route
+### Approach: Auth Proxy for PayClaw's Events Endpoints
 
-Create a lightweight API route that the client can poll for job progress. This avoids Convex changes and keeps the integration contained.
+> **Senior engineer feedback**: PayClaw's events endpoint already returns nicely formatted natural language messages for each event (in the `message` field — confirmed). Building our own `eventToProgressMessage` mapping would be reinventing the wheel. Instead, we proxy the events endpoint and forward those messages directly to the client.
+
+Our auth proxy protects the PayClaw API key from browser exposure while forwarding responses as-is.
+
+PayClaw provides two concrete event endpoints (see "PayClaw Events API Reference" above):
+
+| Mode | PayClaw Endpoint | Our Proxy | Use Case |
+|------|-----------------|-----------|----------|
+| Polling | `GET /api/v1/jobs/:id/events` | `GET /api/payclaw/status?jobId=:id` | Demo default — simple, reliable |
+| SSE stream | `GET /api/v1/jobs/:id/events/stream` | (Future: `GET /api/payclaw/stream?jobId=:id`) | Real-time — 250ms updates, keepalive frames |
+
+For the demo, **polling** is the simplest approach. If we later want real-time updates, we can add an SSE proxy route. If Vercel times out the SSE connection, it's not a problem — just open a new connection. The events are durable on PayClaw's side.
 
 #### 3.1 Create `app/api/payclaw/status/route.ts`
 
-A GET endpoint that polls PayClaw for job status and events, with human-readable progress messages.
+A thin auth proxy that calls `GET /api/v1/jobs/:id/events` (one-shot JSON) and forwards the native event messages as-is.
 
 ```typescript
 // app/api/payclaw/status/route.ts — sketch
@@ -679,38 +845,6 @@ A GET endpoint that polls PayClaw for job status and events, with human-readable
 import { auth } from "@clerk/nextjs/server"
 import { getPayClawConfig } from "@/lib/payclaw/config"
 import { getJob, getJobEvents } from "@/lib/payclaw/client"
-
-/** Map a raw event type to a human-readable progress message. */
-function eventToProgressMessage(
-  event: { type: string; message: string; data?: Record<string, unknown> },
-): string {
-  switch (event.type) {
-    case 'job.started':
-      return 'Starting provisioning...'
-    case 'job.progress':
-      return `${(event.data as { stage?: string })?.stage ?? 'Processing...'}`
-    case 'card.issued':
-      return 'Virtual card issued'
-    case 'page.navigated':
-      return `Navigating to ${(event.data as { url?: string })?.url ?? 'page'}`
-    case 'form.submitted':
-      return 'Submitting form...'
-    case 'payment.completed':
-      return 'Payment completed'
-    case 'email.received':
-      return 'Verification email received'
-    case 'verification.completed':
-      return 'Verification completed'
-    case 'credentials.extracted':
-      return 'Credentials extracted'
-    case 'job.completed':
-      return 'Provisioning complete'
-    case 'job.failed':
-      return `Provisioning failed: ${(event.data as { error?: string })?.error ?? 'unknown error'}`
-    default:
-      return event.message
-  }
-}
 
 export async function GET(req: Request) {
   const { userId } = await auth()
@@ -725,16 +859,24 @@ export async function GET(req: Request) {
 
   const job = await getJob(jobId, config)
   const events = await getJobEvents(jobId, config)
+  // getJobEvents calls GET /api/v1/jobs/:id/events
+  // and unwraps the { events: [...] } response envelope
 
   const isTerminal = ['completed', 'failed', 'cancelled'].includes(job.status)
-  const progressMessages = events.map(eventToProgressMessage)
-  const latestMessage = progressMessages.length > 0
-    ? progressMessages[progressMessages.length - 1]
+
+  // Use PayClaw's native event `message` field directly — already
+  // well-formatted natural language (e.g., "Payment processed successfully").
+  const latestMessage = events.length > 0
+    ? events[events.length - 1].message
     : 'Waiting for updates...'
 
-  return Response.json({ job, events, progressMessages, latestMessage, isTerminal })
+  return Response.json({ job, events, latestMessage, isTerminal })
 }
 ```
+
+> **Why an auth proxy?** The browser cannot call PayClaw directly — the API key must stay server-side. This route adds Clerk auth + injects the PayClaw config, then forwards the response as-is.
+>
+> **Note on Vercel timeouts**: If using SSE tailing in a future proxy and Vercel times out, it's not the end of the world — just open a new connection. The events are persisted on PayClaw's side and won't be lost.
 
 #### 3.2 Progress display strategy
 
@@ -745,7 +887,7 @@ The tool result from Phase 2 includes the `jobId`. The chat UI should:
 3. Display the `latestMessage` from the status response as a progress indicator
 4. On terminal state, display the final result (credentials or error)
 
-**For the demo**, this can be as simple as a `useEffect` in the chat message component that checks for Flowglad Pay tool results and polls accordingly. The exact UI implementation depends on how we render tool results in chat today.
+**For the demo**, this can be as simple as a `useEffect` in the chat message component that checks for Flowglad Pay tool results and polls accordingly. The exact UI implementation depends on how we render tool results in chat today. The messages from PayClaw's events are already human-readable, so we can display them directly without any transformation.
 
 #### 3.3 Credential display
 
@@ -839,8 +981,8 @@ bun run lint
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Long-running job pattern | **Research needed** | How to update chat with async tool results (industry-standard approach) |
-| Per-user API key migration | **Watch** | Follow up with Flowglad team; no timeline yet |
+| Long-running job pattern | **Resolved** | Two-phase tool pattern confirmed by senior engineer. Poll or tail PayClaw events endpoint for progress. |
+| Per-user API key migration | **No action needed** | No decisions required now (senior engineer feedback). Will address when Flowglad ships per-user keys. |
 | PayClaw API schema changes | **Watch** | Track `main` at `flowglad/provisioning-agent`; expect breaking changes |
 | `user_name` hardcoded email | **Temporary** | Replace when per-user auth lands |
 | Convex integration | **Deferred** | Add `payclawJobs` table only if demo requires persistence |
@@ -848,9 +990,10 @@ bun run lint
 | Rate limits | **Unknown** | No known limits; single-user demo scope |
 | Cancellation | **Not available** | No PayClaw cancel endpoint; jobs run until completion or 10-min expiry |
 | Production security hardening | **Deferred** | Shared API key, plaintext credentials in chat — all acceptable for demo |
-| SSE consumer | **Deferred** | Add `lib/payclaw/sse.ts` if real-time streaming is needed post-demo |
+| Event streaming / SSE | **Documented** | Two endpoints confirmed: `GET /api/v1/jobs/:id/events` (one-shot JSON) and `GET /api/v1/jobs/:id/events/stream` (SSE, 250ms poll). Events have `message` field with natural language — display directly. Demo uses polling; SSE available for future upgrade. |
 | Full schema coverage | **Deferred** | Add shipping, credentials list, SSE event schemas when those features are built |
 | `platformTools` capability flag | **Deferred** | Add to `ToolCapabilities` when platform tools need per-model gating |
+| `createJob` streams events | **Noted** | Creating a job by default starts streaming events back. Client should handle gracefully (senior engineer note). |
 
 ---
 
