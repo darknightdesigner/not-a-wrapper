@@ -35,7 +35,7 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 1. **Demo-first**: The goal is a working demo showing a Flowglad Pay tool call in chat. Not production-grade.
 2. **No Convex changes**: Avoid modifying `convex/schema.ts` or adding Convex functions. All state is ephemeral.
 3. **Follow industry standards**: The tool integrates as a standard Vercel AI SDK `tool()` call, fitting into our existing multi-tool Layer architecture (Layers 1-3 are search/MCP; this is Layer 4: Platform Tools).
-4. **Hardcoded auth**: Use the `user_name` environment variable for the PayClaw `userEmail` parameter. This is temporary and will change when per-user API keys land.
+4. **Hardcoded auth**: Use the `PAYCLAW_USER_EMAIL` environment variable for the PayClaw `userEmail` parameter. This is temporary and will change when per-user API keys land.
 5. **Expect breakage**: The PayClaw API is experimental and evolving. Our schemas track `main` as source of truth and should be easy to update.
 6. **Only build what the demo uses**: No speculative schemas, no unused SSE infrastructure, no shared type modifications. Add complexity only when the demo path requires it.
 
@@ -45,7 +45,7 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Auth model | Hardcoded `user_name` env var | Temporary — per-user keys coming later |
+| Auth model | Hardcoded `PAYCLAW_USER_EMAIL` env var | Temporary — per-user keys coming later |
 | API schema tracking | Track `main` branch of `flowglad/provisioning-agent` | Source of truth; expect breaking changes |
 | Convex changes | None | Demo scope — avoid schema churn |
 | Credential display | Return in tool result, render in chat | Simplest path; credentials are ephemeral |
@@ -70,8 +70,8 @@ Already stubbed in `.env.example` (lines 93-96):
 
 ```bash
 # Experimental Flowglad Pay API (Agentic Payments)
-# user_name=           # Email for PayClaw userEmail param (hardcoded for demo)
-# ApiKey=              # Shared PayClaw API key
+# PAYCLAW_USER_EMAIL=  # Email for PayClaw userEmail param (hardcoded for demo)
+# PAYCLAW_API_KEY=     # Shared PayClaw API key
 ```
 
 We will add two more:
@@ -236,7 +236,7 @@ PayClaw plans to migrate from a shared `API_KEY` to per-user API keys. When this
 ### User Provisioning
 > **Status**: Deferred (demo uses pre-existing account)
 
-For the demo, we assume our `user_name` email maps to an existing Better Auth account in PayClaw. If the email doesn't exist, the API returns 401. We should verify this early in Phase 1.
+For the demo, we assume our `PAYCLAW_USER_EMAIL` email maps to an existing Better Auth account in PayClaw. If the email doesn't exist, the API returns 401. We should verify this early in Phase 1.
 
 ---
 
@@ -266,10 +266,10 @@ Configuration loader for PayClaw environment variables. Follows the pattern in `
  * and breaking changes are expected. Track `main` at:
  * https://github.com/flowglad/provisioning-agent
  *
- * Auth model: Shared API key + hardcoded userEmail (from `user_name` env var).
+ * Auth model: Shared API key + hardcoded userEmail (from `PAYCLAW_USER_EMAIL` env var).
  * This will change when per-user API keys are implemented.
  *
- * TEMPORARY: The `user_name` env var is a hardcoded email for demo purposes.
+ * TEMPORARY: The `PAYCLAW_USER_EMAIL` env var is a hardcoded email for demo purposes.
  * When per-user API keys land, this will be replaced with auth-context-derived
  * user identity. See: .agents/plans/flowglad-pay-integration.md (Open Questions).
  */
@@ -288,10 +288,10 @@ export interface PayClawConfig {
  * degradation (tool simply isn't registered) rather than crashing the app.
  */
 export function getPayClawConfig(): PayClawConfig | null {
-  const apiKey = process.env.ApiKey
+  const apiKey = process.env.PAYCLAW_API_KEY
   const appBaseUrl = process.env.PAYCLAW_APP_URL
   const cardId = process.env.PAYCLAW_CARD_ID
-  const userEmail = process.env.user_name
+  const userEmail = process.env.PAYCLAW_USER_EMAIL
 
   if (!apiKey || !appBaseUrl || !cardId || !userEmail) {
     return null
@@ -306,7 +306,7 @@ export function getPayClawConfig(): PayClawConfig | null {
 }
 ```
 
-> **Note on env var names**: `ApiKey` and `user_name` are the existing variable names in `.env.example` (lines 95-96). They use non-standard casing because they match what the Flowglad team provided. We keep them as-is to avoid confusion during the experimental phase.
+> **Note on env var names**: `PAYCLAW_API_KEY` and `PAYCLAW_USER_EMAIL` follow the project's SCREAMING_SNAKE_CASE convention in `.env.example`.
 
 #### 0.2 Create `lib/payclaw/schemas.ts`
 
@@ -434,8 +434,8 @@ Add the two new env vars to the existing Flowglad Pay section.
 
 ```bash
 # Experimental Flowglad Pay API (Agentic Payments)
-# user_name=                    # Email for PayClaw userEmail param (hardcoded for demo)
-# ApiKey=                       # Shared PayClaw API key
+# PAYCLAW_USER_EMAIL=           # Email for PayClaw userEmail param (hardcoded for demo)
+# PAYCLAW_API_KEY=              # Shared PayClaw API key
 # PAYCLAW_APP_URL=              # PayClaw app base URL (e.g., https://app.payclaw.example.com)
 # PAYCLAW_CARD_ID=              # Default card ID for provisioning jobs
 ```
@@ -592,13 +592,13 @@ export class PayClawApiError extends Error {
 
 #### 1.2 Verify email passes through
 
-Before proceeding, manually test that the configured `user_name` email resolves correctly in PayClaw:
+Before proceeding, manually test that the configured `PAYCLAW_USER_EMAIL` email resolves correctly in PayClaw:
 
 ```bash
 curl -X POST "${PAYCLAW_APP_URL}/api/v1/jobs" \
-  -H "X-API-Key: ${ApiKey}" \
+  -H "X-API-Key: ${PAYCLAW_API_KEY}" \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://example.com","userEmail":"'${user_name}'","cardId":"'${PAYCLAW_CARD_ID}'","maxSpend":100}'
+  -d '{"url":"https://example.com","userEmail":"'${PAYCLAW_USER_EMAIL}'","cardId":"'${PAYCLAW_CARD_ID}'","maxSpend":100}'
 ```
 
 Expected: `201 Created` with `{ jobId, status: "created" }`.
@@ -968,7 +968,7 @@ git checkout -- app/api/chat/route.ts
 git checkout -- .env.example
 
 # 3. Remove env vars from .env.local
-# (manual: remove ApiKey, user_name, PAYCLAW_APP_URL, PAYCLAW_CARD_ID)
+# (manual: remove PAYCLAW_API_KEY, PAYCLAW_USER_EMAIL, PAYCLAW_APP_URL, PAYCLAW_CARD_ID)
 
 # 4. Verify clean state
 bun run typecheck
@@ -984,7 +984,7 @@ bun run lint
 | Long-running job pattern | **Resolved** | Two-phase tool pattern confirmed by senior engineer. Poll or tail PayClaw events endpoint for progress. |
 | Per-user API key migration | **No action needed** | No decisions required now (senior engineer feedback). Will address when Flowglad ships per-user keys. |
 | PayClaw API schema changes | **Watch** | Track `main` at `flowglad/provisioning-agent`; expect breaking changes |
-| `user_name` hardcoded email | **Temporary** | Replace when per-user auth lands |
+| `PAYCLAW_USER_EMAIL` hardcoded email | **Temporary** | Replace when per-user auth lands |
 | Convex integration | **Deferred** | Add `payclawJobs` table only if demo requires persistence |
 | Credential expiration | **Skipped** | `expiresAt` not enforced by PayClaw; acceptable for demo |
 | Rate limits | **Unknown** | No known limits; single-user demo scope |

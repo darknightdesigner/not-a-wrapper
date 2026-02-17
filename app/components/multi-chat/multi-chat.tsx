@@ -70,9 +70,7 @@ function getMessageText(message: MessageType): string {
 
 export function MultiChat() {
   const [prompt, setPrompt] = useState("")
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([
-    MODEL_DEFAULT,
-  ])
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
   const [multiChatId, setMultiChatId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -183,10 +181,13 @@ export function MultiChat() {
   }, [preferences.webSearchEnabled])
 
   useEffect(() => {
-    if (selectedModelIds.length === 0 && modelsFromLastGroup.length > 0) {
+    if (selectedModelIds.length > 0 || messagesLoading) return
+    if (modelsFromLastGroup.length > 0) {
       setSelectedModelIds(modelsFromLastGroup)
+      return
     }
-  }, [selectedModelIds.length, modelsFromLastGroup])
+    setSelectedModelIds([MODEL_DEFAULT])
+  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup])
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
