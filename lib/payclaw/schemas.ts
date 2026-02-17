@@ -102,7 +102,7 @@ export const eventTypeSchema = z.enum(eventTypeValues)
 // The `message` field contains well-formatted natural language - display directly.
 
 export const jobEventSchema = z.object({
-  type: eventTypeSchema,
+  type: z.string().min(1),
   message: z.string(),
   timestamp: z.string(),
   data: z.record(z.string(), z.unknown()).optional(),

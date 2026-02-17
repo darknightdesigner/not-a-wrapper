@@ -4,7 +4,7 @@ import { z } from "zod"
 import type { ToolMetadata } from "./types"
 import { getPayClawConfig } from "@/lib/payclaw/config"
 import { payClawToolInputSchema } from "@/lib/payclaw/schemas"
-import { createJob, getJob, getJobEvents } from "@/lib/payclaw/client"
+import { PayClawApiError, createJob, getJob, getJobEvents } from "@/lib/payclaw/client"
 
 export async function getPlatformTools(options?: { userName?: string }): Promise<{
   tools: ToolSet
@@ -91,14 +91,32 @@ export async function getPlatformTools(options?: { userName?: string }): Promise
     execute: async (input) => {
       const startMs = Date.now()
       try {
-        const [job, events] = await Promise.all([
+        const eventsPromise = getJobEvents(input.jobId, config)
+          .then((events) => ({ events, degraded: false as const }))
+          .catch((err) => {
+            if (err instanceof PayClawApiError) {
+              throw err
+            }
+
+            console.warn("[tools/platform] Flowglad Pay events could not be parsed; falling back to job status", {
+              jobId: input.jobId,
+              errorName: err instanceof Error ? err.name : "UnknownError",
+            })
+
+            return { events: [] as Awaited<ReturnType<typeof getJobEvents>>, degraded: true as const }
+          })
+
+        const [job, eventsResult] = await Promise.all([
           getJob(input.jobId, config),
-          getJobEvents(input.jobId, config),
+          eventsPromise,
         ])
+        const events = eventsResult.events
         const latestMessage =
           events.length > 0
             ? events[events.length - 1]?.message ?? "Waiting for updates..."
-            : "Waiting for updates..."
+            : eventsResult.degraded
+              ? "Status is available, but event details are temporarily unavailable."
+              : "Waiting for updates..."
         const isTerminal =
           job.status === "completed" ||
           job.status === "failed" ||

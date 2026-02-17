@@ -2,6 +2,7 @@ import type { PayClawConfig } from './config'
 import {
   apiErrorSchema,
   createJobResponseSchema,
+  eventTypeValues,
   eventsListResponseSchema,
   jobSchema,
 } from './schemas'
@@ -235,8 +236,37 @@ export async function getJobEvents(
     throw new PayClawApiError(res.status, await parseErrorBody(res))
   }
 
-  const body = eventsListResponseSchema.parse(await res.json())
-  return body.events
+  const payload: unknown = await res.json()
+  const parsed = eventsListResponseSchema.safeParse(payload)
+
+  if (!parsed.success) {
+    console.error('[payclaw] Invalid /api/v1/jobs/:id/events response shape', {
+      jobId,
+      issues: parsed.error.issues.slice(0, 5).map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      })),
+    })
+
+    throw parsed.error
+  }
+
+  const expectedEventTypes = new Set<string>(eventTypeValues)
+  const unknownEventTypeDetails = parsed.data.events
+    .map((event, index) => ({ index, type: event.type }))
+    .filter((entry) => !expectedEventTypes.has(entry.type))
+
+  if (unknownEventTypeDetails.length > 0) {
+    console.warn('[payclaw] Unknown event type(s) from /api/v1/jobs/:id/events', {
+      jobId,
+      unknownTypeCount: unknownEventTypeDetails.length,
+      totalEventCount: parsed.data.events.length,
+      unknownTypeIndexes: unknownEventTypeDetails.map((entry) => entry.index),
+      unknownTypes: [...new Set(unknownEventTypeDetails.map((entry) => entry.type))],
+    })
+  }
+
+  return parsed.data.events
 }
 
 export function getJobEventStreamUrl(
