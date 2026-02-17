@@ -116,9 +116,14 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   }, [])
 
   // Memoize computed values
+  const isCurrentChat = useMemo(
+    () => chat.id === currentChatId,
+    [chat.id, currentChatId]
+  )
+
   const isActive = useMemo(
-    () => chat.id === currentChatId || isEditing || isMenuOpen,
-    [chat.id, currentChatId, isEditing, isMenuOpen]
+    () => isCurrentChat || isEditing || isMenuOpen,
+    [isCurrentChat, isEditing, isMenuOpen]
   )
 
   const displayTitle = useMemo(
@@ -129,8 +134,11 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/chat relative w-full rounded-md",
-        isActive && "bg-accent hover:bg-accent text-foreground"
+        "group/sidebar-row relative w-full rounded-(--sidebar-history-row-radius)",
+        "text-sm text-primary",
+        "hover:bg-accent/80 hover:text-foreground",
+        "focus-within:bg-accent/80 focus-within:text-foreground",
+        isActive && "bg-accent text-foreground hover:bg-accent"
       ),
     [isActive]
   )
@@ -138,10 +146,12 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const menuClassName = useMemo(
     () =>
       cn(
-        "absolute top-0 right-1 flex h-full items-center justify-center opacity-0 group-hover/chat:opacity-100",
-        isMobile && "opacity-100 group-hover/chat:opacity-100"
+        "flex items-center justify-center transition-opacity",
+        isMobile || isMenuOpen
+          ? "opacity-100"
+          : "opacity-0 group-hover/sidebar-row:opacity-100 group-focus-within/sidebar-row:opacity-100"
       ),
-    [isMobile]
+    [isMobile, isMenuOpen]
   )
 
   return (
@@ -151,26 +161,26 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
       ref={containerRef}
     >
       {isEditing ? (
-        <div className="bg-accent flex items-center rounded-md py-1 pr-1 pl-2">
+        <div className="flex h-(--sidebar-history-row-height) items-center gap-1 rounded-(--sidebar-history-row-radius) bg-accent px-(--sidebar-history-row-padding-x)">
           <input
             ref={inputRef}
             value={editTitle}
             onChange={handleInputChange}
-            className="text-primary max-h-full w-full bg-transparent text-sm focus:outline-none"
+            className="max-h-full w-full bg-transparent text-sm leading-5 focus:outline-none"
             onKeyDown={handleKeyDown}
             autoFocus
           />
-          <div className="flex gap-0.5">
+          <div className="flex items-center gap-(--sidebar-history-row-trailing-gap)">
             <button
               onClick={handleSaveClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/70 flex h-(--sidebar-history-row-trailing-size) w-(--sidebar-history-row-trailing-size) items-center justify-center rounded-md p-1"
               type="button"
             >
               <HugeiconsIcon icon={Tick02Icon} size={16} />
             </button>
             <button
               onClick={handleCancelClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-7 items-center justify-center rounded-md p-1"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/70 flex h-(--sidebar-history-row-trailing-size) w-(--sidebar-history-row-trailing-size) items-center justify-center rounded-md p-1"
               type="button"
             >
               <HugeiconsIcon icon={Cancel01Icon} size={16} />
@@ -178,30 +188,49 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
           </div>
         </div>
       ) : (
-        <>
+        <div className="flex min-w-0 items-center gap-(--sidebar-history-row-trailing-gap) pl-(--sidebar-history-row-padding-x) pr-[calc(var(--sidebar-history-row-padding-x)-1px)]">
           <Link
             href={`/c/${chat.id}`}
-            className="block w-full"
+            className="flex h-(--sidebar-history-row-height) min-w-0 flex-1 items-center rounded-[calc(var(--sidebar-history-row-radius)-2px)]"
             prefetch
             draggable={false}
             onClick={handleLinkClick}
           >
             <div
-              className="text-primary relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-2.5 py-2 pointer-coarse:py-3 text-sm text-ellipsis whitespace-nowrap text-balance"
+              className="truncate pr-1 text-sm leading-5"
               title={displayTitle}
             >
               <span dir="auto">{displayTitle}</span>
             </div>
           </Link>
 
-          <div className={menuClassName} key={chat.id}>
-            <SidebarItemMenu
-              chat={chat}
-              onStartEditing={handleStartEditing}
-              onMenuOpenChange={handleMenuOpenChange}
-            />
+          <div
+            className={cn(
+              "flex h-(--sidebar-history-row-height) shrink-0 items-center",
+              isCurrentChat ? "gap-(--sidebar-history-row-trailing-gap)" : "gap-0"
+            )}
+            key={chat.id}
+          >
+            <div className={menuClassName}>
+              <SidebarItemMenu
+                chat={chat}
+                onStartEditing={handleStartEditing}
+                onMenuOpenChange={handleMenuOpenChange}
+              />
+            </div>
+            <div
+              className={cn(
+                "flex h-(--sidebar-history-row-trailing-size) items-center justify-center overflow-hidden transition-[width,opacity] duration-150",
+                isCurrentChat ? "w-4 opacity-100" : "w-0 opacity-0"
+              )}
+              aria-hidden="true"
+            >
+              {isCurrentChat ? (
+                <span className="bg-foreground/60 block h-1.5 w-1.5 rounded-full" />
+              ) : null}
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

@@ -24,10 +24,14 @@ export function SidebarList({
       title={title}
       defaultOpen={defaultOpen}
       storageKey={storageKey}
+      headingLevel="h2"
+      className="mb-(--sidebar-expanded-section-margin-bottom)"
     >
-      {items.map((chat) => (
-        <SidebarItem key={chat.id} chat={chat} currentChatId={currentChatId} />
-      ))}
+      <div className="space-y-0.5">
+        {items.map((chat) => (
+          <SidebarItem key={chat.id} chat={chat} currentChatId={currentChatId} />
+        ))}
+      </div>
     </CollapsibleSection>
   )
 }

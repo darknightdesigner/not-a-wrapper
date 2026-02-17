@@ -19,6 +19,8 @@ type CollapsibleSectionProps = {
   storageKey?: string
   /** Additional className for the container */
   className?: string
+  /** Semantic heading level for section title */
+  headingLevel?: "h2" | "h3" | "h4"
 }
 
 export function CollapsibleSection({
@@ -28,6 +30,7 @@ export function CollapsibleSection({
   defaultOpen = true,
   storageKey,
   className,
+  headingLevel = "h3",
 }: CollapsibleSectionProps) {
   // Initialize with defaultOpen to match SSR
   const [isOpen, setIsOpen] = React.useState(defaultOpen)
@@ -52,32 +55,35 @@ export function CollapsibleSection({
     [storageKey]
   )
 
+  const HeadingTag = headingLevel
+
   return (
     <Collapsible.Root
       open={isOpen}
       onOpenChange={handleOpenChange}
       className={cn("group/collapsible-section", className)}
     >
-      <Collapsible.Trigger
-        className={cn(
-          "flex w-full items-center gap-1 px-2 py-1.5",
-          "text-sm font-medium text-muted-foreground",
-          "hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
-        )}
-      >
-        {icon && <span className="shrink-0">{icon}</span>}
-        <span className="truncate">{title}</span>
-        <HugeiconsIcon
-          icon={ArrowRight01Icon}
-          size={12}
+      <HeadingTag className="m-0">
+        <Collapsible.Trigger
           className={cn(
-            "shrink-0 motion-safe:transition-all duration-150",
-            isOpen
-              ? "rotate-90 opacity-0 group-hover/collapsible-section:opacity-100"
-              : "opacity-100"
+            "group/collapsible-trigger flex h-(--sidebar-section-label-height) w-full items-center gap-1 rounded-md px-(--sidebar-section-label-padding-x) py-1.5 text-left",
+            "text-xs font-medium text-muted-foreground/85",
+            "hover:text-foreground/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:ring-offset-1"
           )}
-        />
-      </Collapsible.Trigger>
+        >
+          {icon && <span className="shrink-0">{icon}</span>}
+          <span className="truncate">{title}</span>
+          <HugeiconsIcon
+            icon={ArrowRight01Icon}
+            size={10}
+            className={cn(
+              "ml-auto shrink-0 opacity-45 motion-safe:transition-all duration-150",
+              "group-hover/collapsible-trigger:opacity-85 group-focus-visible/collapsible-trigger:opacity-85",
+              isOpen ? "rotate-90" : "rotate-0"
+            )}
+          />
+        </Collapsible.Trigger>
+      </HeadingTag>
 
       <Collapsible.Panel
         className={cn(
@@ -86,7 +92,7 @@ export function CollapsibleSection({
           "data-[closed]:animate-collapsible-up"
         )}
       >
-        <div className="pt-1">{children}</div>
+        <div className="pt-0.5">{children}</div>
       </Collapsible.Panel>
     </Collapsible.Root>
   )

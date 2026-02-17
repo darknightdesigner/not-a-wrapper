@@ -33,6 +33,7 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_DESKTOP_CONTAINER_ID = "app-sidebar-desktop-container"
 
 // Helper to read sidebar state from cookie (only call after mount)
 function getSidebarStateFromCookie(): boolean | undefined {
@@ -248,6 +249,7 @@ function Sidebar({
       />
       <div
         data-slot="sidebar-container"
+        id={SIDEBAR_DESKTOP_CONTAINER_ID}
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) motion-safe:transition-[left,right,width] duration-200 ease-linear md:flex",
           side === "left"
@@ -279,6 +281,10 @@ function SidebarTrigger({
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { toggleSidebar, state } = useSidebar()
+  const srLabel =
+    typeof props["aria-label"] === "string"
+      ? props["aria-label"]
+      : "Toggle sidebar"
 
   return (
     <Button
@@ -301,7 +307,7 @@ function SidebarTrigger({
       {...props}
     >
       <HugeiconsIcon icon={PanelLeft} size={20} className="size-5" />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{srLabel}</span>
     </Button>
   )
 }
@@ -748,6 +754,7 @@ function SidebarMenuSubButton({
 }
 
 export {
+  SIDEBAR_DESKTOP_CONTAINER_ID,
   Sidebar,
   SidebarContent,
   SidebarFooter,

@@ -28,6 +28,7 @@ type ChatActionsMenuProps = {
   onRename?: () => void
   onOpenChange?: (open: boolean) => void
   trigger?: React.ReactElement
+  triggerAriaLabel?: string
   contentAlign?: "start" | "center" | "end"
   contentSide?: "top" | "right" | "bottom" | "left"
 }
@@ -37,6 +38,7 @@ export function ChatActionsMenu({
   onRename,
   onOpenChange,
   trigger,
+  triggerAriaLabel = "Open conversation options",
   contentAlign = "start",
   contentSide = "bottom",
 }: ChatActionsMenuProps) {
@@ -68,9 +70,11 @@ export function ChatActionsMenu({
 
   const defaultTrigger = (
     <button
-      className="hover:bg-secondary flex size-7 items-center justify-center rounded-md p-1"
+      type="button"
+      className="text-foreground hover:bg-muted/60 data-[state=open]:bg-accent/80 focus-visible:ring-2 focus-visible:ring-ring/60 flex h-(--sidebar-history-row-trailing-size) w-(--sidebar-history-row-trailing-size) items-center justify-center rounded-md p-1"
       onClick={(e) => e.stopPropagation()}
-      aria-label="Open chat actions"
+      aria-label={triggerAriaLabel}
+      aria-haspopup="menu"
     />
   )
 
@@ -83,7 +87,7 @@ export function ChatActionsMenu({
       >
         <DropdownMenuTrigger render={trigger ?? defaultTrigger}>
           {!trigger && (
-            <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
+            <HugeiconsIcon icon={MoreHorizontalIcon} size={20} />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent

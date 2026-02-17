@@ -7,11 +7,11 @@ import { Chat } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
-  Chat01Icon,
   Tick02Icon,
   Cancel01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useCallback, useMemo, useRef, useState } from "react"
 import { SidebarItemMenu } from "./sidebar-item-menu"
 
@@ -29,6 +29,7 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
   const { updateTitle } = useChats()
   const isMobile = useBreakpoint(768)
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const pathname = usePathname()
 
   // React 19 pattern: sync during render instead of useEffect
   if (!isEditing && chat.title !== prevChatTitle) {
@@ -122,6 +123,11 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
   }, [])
 
   // Memoize computed values
+  const isCurrentChat = useMemo(
+    () => pathname.startsWith(`/c/${chat.id}`),
+    [pathname, chat.id]
+  )
+
   const displayTitle = useMemo(
     () => chat.title || "Untitled Chat",
     [chat.title]
@@ -130,19 +136,26 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "border-border hover:bg-accent/50 group/chat relative rounded-lg border",
-        isEditing || isMenuOpen ? "bg-accent/50" : ""
+        "group/sidebar-row relative w-full rounded-(--sidebar-history-row-radius)",
+        "text-sm text-primary",
+        "hover:bg-accent/80 hover:text-foreground",
+        "focus-within:bg-accent/80 focus-within:text-foreground",
+        isCurrentChat || isEditing || isMenuOpen
+          ? "bg-accent text-foreground hover:bg-accent"
+          : ""
       ),
-    [isEditing, isMenuOpen]
+    [isCurrentChat, isEditing, isMenuOpen]
   )
 
   const menuClassName = useMemo(
     () =>
       cn(
-        "absolute top-3 right-3 opacity-0 group-hover/chat:opacity-100",
-        isMobile && "opacity-100 group-hover/chat:opacity-100"
+        "flex items-center justify-center transition-opacity",
+        isMobile || isMenuOpen
+          ? "opacity-100"
+          : "opacity-0 group-hover/sidebar-row:opacity-100 group-focus-within/sidebar-row:opacity-100"
       ),
-    [isMobile]
+    [isMobile, isMenuOpen]
   )
 
   if (isEditing) {
@@ -152,34 +165,29 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
         onClick={handleContainerClick}
         ref={containerRef}
       >
-        <div className="flex items-center p-3">
-          <HugeiconsIcon
-            icon={Chat01Icon}
-            size={16}
-            className="text-muted-foreground mr-3 flex-shrink-0"
-          />
+        <div className="flex h-(--sidebar-history-row-height) items-center gap-1 rounded-(--sidebar-history-row-radius) bg-accent px-(--sidebar-history-row-padding-x)">
           <input
             ref={inputRef}
             value={editTitle}
             onChange={handleInputChange}
-            className="text-primary flex-1 bg-transparent text-sm font-medium focus:outline-none"
+            className="flex-1 bg-transparent text-sm leading-5 focus:outline-none"
             onKeyDown={handleKeyDown}
             autoFocus
           />
-          <div className="ml-2 flex gap-1">
+          <div className="flex items-center gap-(--sidebar-history-row-trailing-gap)">
             <button
               onClick={handleSaveClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/70 flex h-(--sidebar-history-row-trailing-size) w-(--sidebar-history-row-trailing-size) items-center justify-center rounded-md p-1"
               type="button"
             >
-              <HugeiconsIcon icon={Tick02Icon} size={12} />
+              <HugeiconsIcon icon={Tick02Icon} size={16} />
             </button>
             <button
               onClick={handleCancelClick}
-              className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
+              className="text-muted-foreground hover:text-foreground hover:bg-muted/70 flex h-(--sidebar-history-row-trailing-size) w-(--sidebar-history-row-trailing-size) items-center justify-center rounded-md p-1"
               type="button"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+              <HugeiconsIcon icon={Cancel01Icon} size={16} />
             </button>
           </div>
         </div>
@@ -193,16 +201,18 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
       onClick={handleContainerClick}
       ref={containerRef}
     >
-      <Link
-        href={`/c/${chat.id}`}
-        className="block p-3"
-        onClick={handleLinkClick}
-        prefetch
-      >
-        <div className="flex items-start justify-between">
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate font-medium text-balance">{displayTitle}</h3>
-            <p className="text-muted-foreground mt-1 text-sm">
+      <div className="flex min-w-0 items-center gap-(--sidebar-history-row-trailing-gap) pl-(--sidebar-history-row-padding-x) pr-[calc(var(--sidebar-history-row-padding-x)-1px)]">
+        <Link
+          href={`/c/${chat.id}`}
+          className="flex h-(--sidebar-history-row-height) min-w-0 flex-1 items-center rounded-[calc(var(--sidebar-history-row-radius)-2px)]"
+          onClick={handleLinkClick}
+          prefetch
+        >
+          <div className="flex min-w-0 grow items-center gap-2">
+            <h3 className="truncate text-sm leading-5" title={displayTitle}>
+              {displayTitle}
+            </h3>
+            <p className="text-muted-foreground ml-auto shrink-0 text-xs leading-4">
               {chat.updated_at
                 ? formatDate(chat.updated_at)
                 : chat.created_at
@@ -210,15 +220,33 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
                   : null}
             </p>
           </div>
-        </div>
-      </Link>
+        </Link>
 
-      <div className={menuClassName} key={chat.id}>
-        <SidebarItemMenu
-          chat={chat}
-          onStartEditing={handleStartEditing}
-          onMenuOpenChange={handleMenuOpenChange}
-        />
+        <div
+          className={cn(
+            "flex h-(--sidebar-history-row-height) shrink-0 items-center",
+            isCurrentChat ? "gap-(--sidebar-history-row-trailing-gap)" : "gap-0"
+          )}
+        >
+          <div className={menuClassName}>
+            <SidebarItemMenu
+              chat={chat}
+              onStartEditing={handleStartEditing}
+              onMenuOpenChange={handleMenuOpenChange}
+            />
+          </div>
+          <div
+            className={cn(
+              "flex h-(--sidebar-history-row-trailing-size) items-center justify-center overflow-hidden transition-[width,opacity] duration-150",
+              isCurrentChat ? "w-4 opacity-100" : "w-0 opacity-0"
+            )}
+            aria-hidden="true"
+          >
+            {isCurrentChat ? (
+              <span className="bg-foreground/60 block h-1.5 w-1.5 rounded-full" />
+            ) : null}
+          </div>
+        </div>
       </div>
     </div>
   )

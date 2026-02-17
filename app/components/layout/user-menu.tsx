@@ -32,7 +32,7 @@ import { FeedbackMenuItem, FeedbackDialog } from "./feedback/feedback-trigger"
 import { SettingsMenuItem, SettingsDialog } from "./settings/settings-trigger"
 
 type UserMenuProps = {
-  variant?: "header" | "sidebar"
+  variant?: "header" | "sidebar" | "sidebar-collapsed"
 }
 
 export function UserMenu({ variant = "header" }: UserMenuProps) {
@@ -48,6 +48,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
   if (!user) return null
 
   const isSidebar = variant === "sidebar"
+  const isSidebarCollapsed = variant === "sidebar-collapsed"
 
   const handleSignOut = async () => {
     try {
@@ -144,6 +145,49 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
             </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
+        {dialogs}
+      </>
+    )
+  }
+
+  if (isSidebarCollapsed) {
+    return (
+      <>
+        <DropdownMenu open={isMenuOpen} onOpenChange={setMenuOpen} modal={false}>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="mx-auto flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                      aria-haspopup="menu"
+                      aria-expanded={isMenuOpen}
+                      aria-label="Open account menu"
+                      data-sidebar-item="true"
+                    />
+                  }
+                />
+              }
+            >
+              <div className="flex items-center justify-center">
+                <Avatar className="h-6 w-6 shrink-0 bg-emerald-600">
+                  <AvatarImage src={user?.profile_image ?? undefined} alt="" />
+                  <AvatarFallback className="bg-emerald-600 text-xs text-white">
+                    {user?.display_name?.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {user?.display_name || "Account"}
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent side="right" align="end" className="w-56">
+            {menuContent}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {dialogs}
       </>
     )

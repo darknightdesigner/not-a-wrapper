@@ -5,6 +5,7 @@ import { useScrollAttributes } from "@/app/hooks/use-scroll-attributes"
 import { NawIcon } from "@/components/icons/naw"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import {
+  SIDEBAR_DESKTOP_CONTAINER_ID,
   Sidebar,
   SidebarTrigger,
   useSidebar,
@@ -17,7 +18,6 @@ import {
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 import Link from "next/link"
 import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import {
@@ -77,11 +77,13 @@ export function AppSidebar() {
         className={cn(
           "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          // Stepped easing: appear instantly at START of collapse animation (same time expanded content hides)
+          // Asymmetric stepped easing:
+          // - visible (collapsed): jump to visible at start
+          // - hidden (expanded): stay visible until end, then hide
           "motion-safe:transition-opacity motion-safe:duration-150",
           isCollapsed 
             ? "motion-safe:ease-[steps(1,start)]" 
-            : "motion-safe:ease-linear",
+            : "motion-safe:ease-[steps(1,end)]",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-auto opacity-100" 
@@ -105,8 +107,8 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Action buttons - +1px accounts for border-t on SidebarContent in expanded state */}
-        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-center gap-0">
+        {/* Action buttons */}
+        <div className="mt-(--sidebar-top-actions-offset) flex flex-col items-center gap-0">
           <CollapsedMenuItem
             icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New chat"
@@ -146,11 +148,9 @@ export function AppSidebar() {
           // by 1px and painting over the container's border-r. ChatGPT uses overflow-hidden
           // on their outer container to achieve the same result with an explicit width.
           "w-full overflow-x-clip text-clip whitespace-nowrap",
-          // Stepped easing: disappear instantly at START of collapse animation
+          // Expanded panel remains linear in both directions
           "motion-safe:transition-opacity motion-safe:duration-150",
-          isCollapsed 
-            ? "motion-safe:ease-[steps(1,start)]" 
-            : "motion-safe:ease-linear",
+          "motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-none opacity-0" 
@@ -199,7 +199,12 @@ export function AppSidebar() {
                 <Tooltip>
                   <TooltipTrigger
                     render={
-                      <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                      <SidebarTrigger
+                        className="cursor-w-resize rtl:cursor-e-resize"
+                        aria-label="Close sidebar"
+                        aria-controls={SIDEBAR_DESKTOP_CONTAINER_ID}
+                        aria-expanded={!isCollapsed}
+                      />
                     }
                   />
                   <TooltipContent side="bottom" align="center">
@@ -214,7 +219,7 @@ export function AppSidebar() {
           {/* Conditionally sticky: pinned on tall viewports, scrolls on short ones (ChatGPT pattern) */}
           <div
             className={cn(
-              "z-20 bg-sidebar px-1.5 pt-(--sidebar-section-first-margin-top)",
+              "z-20 bg-sidebar px-1.5 pt-(--sidebar-top-actions-offset)",
               "tall:sticky tall:top-(--sidebar-header-height)",
               "not-tall:relative"
             )}
@@ -270,7 +275,7 @@ export function AppSidebar() {
             {isLoading ? (
               <div className="h-full" />
             ) : hasChats ? (
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {pinnedChats.length > 0 && (
                   <SidebarList
                     key="pinned"
@@ -282,7 +287,7 @@ export function AppSidebar() {
                 )}
                 {nonPinnedChats.length > 0 && (
                   <SidebarList
-                    title="Chats"
+                    title="Your chats"
                     items={nonPinnedChats}
                     currentChatId={currentChatId}
                     storageKey="sidebar-section-your-chats"
@@ -364,7 +369,8 @@ export function AppSidebar() {
  * Shows logo by default, swaps to expand arrow on hover.
  */
 function CollapsedHeaderToggle() {
-  const { toggleSidebar } = useSidebar()
+  const { state, toggleSidebar } = useSidebar()
+  const isExpanded = state === "expanded"
 
   return (
     <Tooltip>
@@ -375,6 +381,8 @@ function CollapsedHeaderToggle() {
             onClick={toggleSidebar}
             className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             aria-label="Open sidebar"
+            aria-controls={SIDEBAR_DESKTOP_CONTAINER_ID}
+            aria-expanded={isExpanded}
           />
         }
       >
@@ -454,8 +462,6 @@ function CollapsedMenuItem({
  * 24px (h-6 w-6) matching ChatGPT's pattern.
  */
 function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_image?: string | null } | null }) {
-  const { toggleSidebar } = useSidebar()
-
   if (!user) {
     return (
       <Tooltip>
@@ -475,34 +481,6 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            aria-label={`${user.display_name} - Open profile`}
-          />
-        }
-      >
-        <div className="flex items-center justify-center">
-          {user.profile_image ? (
-            <Image
-              src={user.profile_image}
-              alt=""
-              width={24}
-              height={24}
-              className="h-6 w-6 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-medium text-white">
-              {user.display_name?.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="right">{user.display_name || "Account"}</TooltipContent>
-    </Tooltip>
+    <UserMenu variant="sidebar-collapsed" />
   )
 }

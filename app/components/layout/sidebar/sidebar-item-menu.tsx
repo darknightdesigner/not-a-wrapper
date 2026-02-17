@@ -17,6 +17,7 @@ export function SidebarItemMenu({
       chat={chat}
       onRename={onStartEditing}
       onOpenChange={onMenuOpenChange}
+      triggerAriaLabel="Open conversation options"
       contentSide="bottom"
       contentAlign="start"
     />
