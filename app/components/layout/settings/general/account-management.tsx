@@ -34,7 +34,7 @@ export function AccountManagement() {
         <p className="text-muted-foreground text-xs text-pretty">Log out on this device</p>
       </div>
       <Button
-        variant="default"
+        variant="outline"
         size="sm"
         className="flex items-center gap-2"
         onClick={handleSignOut}

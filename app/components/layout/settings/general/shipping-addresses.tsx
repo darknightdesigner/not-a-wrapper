@@ -13,19 +13,24 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
+import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/user-store/provider"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { ArrowDown01Icon, Tick02Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useMutation, useQuery } from "convex/react"
 import { useId, useState } from "react"
 
@@ -86,7 +91,6 @@ const US_STATES = [
   { value: "WY", label: "Wyoming" },
 ] as const
 // TODO: Replace with international regions when adding country support.
-
 type ShippingAddressDoc = Doc<"shippingAddresses">
 
 type ShippingAddressFormData = {
@@ -156,6 +160,76 @@ function toFormData(address: ShippingAddressDoc): ShippingAddressFormData {
   }
 }
 
+function StateCombobox({
+  id,
+  value,
+  onValueChange,
+  disabled,
+}: {
+  id: string
+  value: string
+  onValueChange: (value: string) => void
+  disabled?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const selectedState = US_STATES.find((state) => state.value === value) ?? null
+
+  const handleSelect = (stateCode: string) => {
+    onValueChange(stateCode)
+    setOpen(false)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger
+        render={
+          <Button
+            id={id}
+            type="button"
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            disabled={disabled}
+            className="w-full justify-between rounded-md font-normal"
+          />
+        }
+      >
+        <span className={cn("truncate", !selectedState && "text-muted-foreground")}>
+          {selectedState
+            ? `${selectedState.label} (${selectedState.value})`
+            : "Select state"}
+        </span>
+        <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-50" />
+      </PopoverTrigger>
+      <PopoverContent className="w-(--anchor-width) rounded-md p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Search state..." />
+          <CommandList>
+            <CommandEmpty>No state found.</CommandEmpty>
+            <CommandGroup>
+              {US_STATES.map((entry) => {
+                const isSelected = value === entry.value
+                return (
+                  <CommandItem
+                    key={entry.value}
+                    value={`${entry.label} ${entry.value}`}
+                    onSelect={() => handleSelect(entry.value)}
+                  >
+                    <span className="flex-1">
+                      {entry.label} ({entry.value})
+                    </span>
+                    {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} />}
+                  </CommandItem>
+                )
+              })}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function ShippingAddressForm({
   form,
   onFormChange,
@@ -177,15 +251,8 @@ function ShippingAddressForm({
   const formId = useId()
 
   return (
-    <Card>
+    <Card className="py-1">
       <CardContent className="space-y-4 p-4">
-        <div>
-          <h4 className="text-sm font-medium text-balance">{submitLabel}</h4>
-          <p className="text-muted-foreground mt-1 text-xs text-pretty">
-            Shipping addresses are currently US-only.
-          </p>
-        </div>
-
         <form
           id={formId}
           className="space-y-4"
@@ -252,23 +319,13 @@ function ShippingAddressForm({
             </div>
 
             <div className="space-y-2">
-              <Label>State</Label>
-              <Select
+              <Label htmlFor={`${formId}-state`}>State</Label>
+              <StateCombobox
+                id={`${formId}-state`}
                 value={form.state}
-                onValueChange={(value) => onFormChange("state", value ?? "")}
+                onValueChange={(value) => onFormChange("state", value)}
                 disabled={isSubmitting}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select state" />
-                </SelectTrigger>
-                <SelectContent>
-                  {US_STATES.map((entry) => (
-                    <SelectItem key={entry.value} value={entry.value}>
-                      {entry.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 
@@ -454,9 +511,11 @@ export function ShippingAddresses() {
             Manage where physical purchases should be delivered.
           </p>
         </div>
-        <Button size="sm" onClick={startAdd}>
-          Add address
-        </Button>
+        {editingId !== "new" && (
+          <Button variant="outline" size="sm" onClick={startAdd}>
+            Add address
+          </Button>
+        )}
       </div>
 
       {editingId === "new" && (
@@ -470,19 +529,7 @@ export function ShippingAddresses() {
         />
       )}
 
-      {addresses.length === 0 ? (
-        <div className="py-6 text-center">
-          <h4 className="text-sm font-medium text-balance">
-            No shipping addresses yet
-          </h4>
-          <p className="text-muted-foreground mt-1 text-sm text-pretty">
-            Add your first shipping address to speed up checkout.
-          </p>
-          <Button variant="outline" size="sm" className="mt-4" onClick={startAdd}>
-            Add your first address
-          </Button>
-        </div>
-      ) : (
+      {addresses.length > 0 && (
         <div className="space-y-3">
           {addresses.map((address) => {
             const isEditing = editingId === address._id
@@ -490,7 +537,7 @@ export function ShippingAddresses() {
 
             return (
               <div key={address._id} className="space-y-3">
-                <Card>
+                <Card className="py-1">
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0 flex-1">
