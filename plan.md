@@ -15,6 +15,7 @@ AGENTS.md            ← Rules & permissions
 
 ---
 
+<!-- temp: PR refresh marker -->
 ## Vision
 
 <!-- TODO: 2-3 sentences on the long-term vision -->
@@ -321,7 +322,7 @@ Tool Calling Infra → Built-in Injection → Phase 7 → Code Execution (longes
 UX Redesign → Settings Page + Model Selector (P1 chain)
 Audit Logging → OpenTelemetry
 Inline Triggers ← no deps → Prompt Library (P2, deferred)
-Memory System ← Convex vectors → RAG Pipeline (P2, shares infra)
+Memory System ← Convex vectors → RAG Pipeline (P2, shares infra) 
 Multi-chat Card Bug (#6) ← no deps (investigate P0)
 Multi-chat Share Button (#7) ← no deps (investigate P0)
 Message Memo (#33) ✅ → Composer Ref (#34) ✅ → Hook Decomposition (#37, in progress) (P4 perf chain)
@@ -362,3 +363,4 @@ Multi-chat Layout Redesign (#27) ← no deps (P2)
 | WebClaw architecture & perf | `.agents/context/research/webclaw/06-recommendations.md` |
 
 ---
+
