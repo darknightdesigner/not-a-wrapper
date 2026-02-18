@@ -31,8 +31,9 @@ const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_WIDTH_ICON = "3.25rem"
+const SIDEBAR_KEYBOARD_SHORTCUT = "s"
+const SIDEBAR_CONTAINER_ID = "sidebar-container"
 
 // Helper to read sidebar state from cookie (only call after mount)
 function getSidebarStateFromCookie(): boolean | undefined {
@@ -117,7 +118,8 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+        event.shiftKey &&
+        event.key.toLowerCase() === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
@@ -238,7 +240,8 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent motion-safe:transition-[width] duration-200 ease-linear",
+          // Slightly snappier timing mirrors ChatGPT's sidebar cadence without changing behavior.
+          "relative w-(--sidebar-width) bg-transparent motion-safe:transition-[width] motion-safe:duration-[220ms] motion-safe:ease-[cubic-bezier(.2,0,0,1)]",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -247,9 +250,10 @@ function Sidebar({
         )}
       />
       <div
+        id={SIDEBAR_CONTAINER_ID}
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) motion-safe:transition-[left,right,width] duration-200 ease-linear md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) overflow-hidden motion-safe:transition-[left,right,width,background-color] motion-safe:duration-[220ms] motion-safe:ease-[cubic-bezier(.2,0,0,1)] md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -264,7 +268,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
+          className="group-data-[variant=floating]:bg-sidebar group-data-[variant=inset]:bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
         >
           {children}
         </div>
@@ -278,7 +282,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar, state } = useSidebar()
+  const { toggleSidebar, state, open } = useSidebar()
 
   return (
     <Button
@@ -286,6 +290,8 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
+      aria-expanded={open}
+      aria-controls={SIDEBAR_CONTAINER_ID}
       className={cn(
         "size-9 rounded-lg",
         // Resize cursor indicates expandability
@@ -301,7 +307,9 @@ function SidebarTrigger({
       {...props}
     >
       <HugeiconsIcon icon={PanelLeft} size={20} className="size-5" />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">
+        {open ? "Close sidebar" : "Open sidebar"}
+      </span>
     </Button>
   )
 }
@@ -749,6 +757,7 @@ function SidebarMenuSubButton({
 
 export {
   Sidebar,
+  SIDEBAR_CONTAINER_ID,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,

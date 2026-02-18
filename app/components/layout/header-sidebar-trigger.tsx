@@ -38,7 +38,11 @@ export function HeaderSidebarTrigger({
         <HugeiconsIcon icon={SidebarLeftIcon} size={20} />
         <span className="sr-only">Toggle sidebar</span>
       </TooltipTrigger>
-      <TooltipContent>{open ? "Close sidebar" : "Open sidebar"}</TooltipContent>
+      <TooltipContent>
+        {open
+          ? "Close sidebar ⇧⌘S"
+          : "Open sidebar ⇧⌘S"}
+      </TooltipContent>
     </Tooltip>
   )
 }

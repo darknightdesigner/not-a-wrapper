@@ -210,8 +210,8 @@
 :root {
   /* Sidebar dimensions */
   --sidebar-width: 16rem;
-  --sidebar-rail-width: 3rem;
-  --sidebar-header-height: 3.5rem;
+  --sidebar-rail-width: 3.25rem;
+  --sidebar-header-height: 3.25rem;
   
   /* Sidebar spacing */
   --sidebar-section-first-margin-top: 0.5rem;

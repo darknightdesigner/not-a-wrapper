@@ -3,7 +3,7 @@
 > **Status**: Planning
 > **Priority**: P1
 > **Updated**: February 17, 2026
-> **Primary references**: `.agents/context/sidebar/chatgpt-expanded-html.md`, `.agents/context/sidebar/chatgpt-collapsed-html.md`
+> **Primary references**: `.agents/context/research/sidebar/chatgpt-expanded-html.md`, `.agents/context/research/sidebar/chatgpt-collapsed-html.md`, `.agents/context/research/sidebar/chatgpt-styles-reference.md`
 
 ---
 
@@ -40,6 +40,87 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 
 ---
 
+## Reference Dimensions & Tokens
+
+Extracted from ChatGPT's computed styles (see `chatgpt-styles-reference.md`).
+
+### Layout
+
+| Token | Value | Computed |
+|---|---|---|
+| `--sidebar-width` | `260px` | 260px |
+| `--sidebar-rail-width` | `calc(13 * var(--spacing))` | 3.25rem / 52px |
+| `--header-height` | `calc(13 * var(--spacing))` | 3.25rem / 52px |
+| `--menu-item-height` | `calc(var(--spacing) * 9)` | 2.25rem / 36px |
+| `--sidebar-section-margin-top` | `1.25rem` | 20px |
+| `--sidebar-section-first-margin-top` | `.5rem` | 8px |
+| `--sidebar-expanded-section-margin-bottom` | `1.25rem` | 20px |
+| `--sidebar-collapsed-section-margin-bottom` | `.75rem` | 12px |
+
+### Sidebar Colors (Dark Mode)
+
+All colors map to existing project design tokens in `globals.css`. ChatGPT hex values are noted for reference only.
+
+| Purpose | Project Token | ChatGPT Ref | Notes |
+|---|---|---|---|
+| Expanded sidebar bg | `--sidebar` | `#181818` | `bg-sidebar` in Tailwind |
+| Collapsed rail bg | `--background` | `#212121` | `bg-background` in Tailwind |
+| Section header text | `--sidebar-foreground` at 50% opacity | `#f0f0f080` | Use `text-sidebar-foreground/50` |
+| Chat item text | `--sidebar-foreground` | `#ededed` | `text-sidebar-foreground` in Tailwind |
+| Icon default | `--muted-foreground` | `#a4a4a4` | `text-muted-foreground` in Tailwind |
+| Intermediate surface | `--secondary` | `#2b2b2b` | `bg-secondary` in Tailwind |
+| Hover overlay | `--accent` | `#ffffff1a` | `bg-accent` in Tailwind (~10% white) |
+| Sidebar border | `--border` | `#ffffff0d` | `border-border` in Tailwind (~8% white) |
+| Scrollbar track | `--accent` | `#ffffff1a` | Reuse accent token |
+| Scrollbar track hover | `--accent` at higher opacity | `#fff3` | Consider `color-mix(in oklab, var(--accent) 200%, transparent)` or custom `--scrollbar-hover` |
+
+### Interactive States (Secondary Tier — Sidebar Items)
+
+| State | Project Token | ChatGPT Ref | Tailwind Class |
+|---|---|---|---|
+| Default | transparent | `#fff0` | `bg-transparent` |
+| Hover | `--accent` | `#ffffff1a` (~10% white) | `hover:bg-accent` |
+| Press | `--border` | `#ffffff0d` (~5% white) | `active:bg-border` |
+| Selected | `--accent` | `#ffffff1a` (same as hover) | `data-[active=true]:bg-accent` |
+
+### Typography (Likely Section Header)
+
+| Token | Size | Line Height | Weight |
+|---|---|---|---|
+| `--text-footnote-medium` | `.8125rem` (13px) | `1.25rem` | 500 |
+| `--text-body-small-regular` | `.875rem` (14px) | `1.125rem` | 400 |
+| `--text-caption-regular` | `.75rem` (12px) | `1rem` | 400 |
+
+### Easing & Spring Animations
+
+The sidebar uses **two distinct animation layers**:
+
+1. **Opacity crossfade** (rail ↔ panel): `duration-150` with `steps(1,start)`/`steps(1,end)` for rail, `ease-linear` for panel.
+2. **Width + background-color transition** (root container): Uses a spring or `--easing-common` curve at ~`.667s`.
+
+Key spring variables available in ChatGPT's CSS:
+
+| Variable | Duration | Character |
+|---|---|---|
+| `--spring-fast` | `.667s` | Quick, no overshoot |
+| `--spring-common` / `--spring-standard` | `.667s` | General-purpose |
+| `--spring-bounce` | `.833s` | Visible overshoot |
+| `--easing-spring-elegant` | `.58171s` | Refined spring (100+ stops) |
+| `--easing-common` | — | Extremely granular curve (100+ stops) |
+
+The `--default-transition-duration` is `.15s` with `cubic-bezier(.4,0,.2,1)` (ease-in-out) for non-animated property changes.
+
+### Touch Targets
+
+| Token | Value |
+|---|---|
+| `--tap-padding-pointer` | `32px` |
+| `--tap-padding-mobile` | `44px` |
+
+HTML confirms `touch:h-10 touch:w-10` (40px) on toggle buttons.
+
+---
+
 ## Scope
 
 ### In Scope
@@ -61,6 +142,71 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 
 ---
 
+## Implementation Patterns (Observed from ChatGPT Reference)
+
+These patterns are visible across the HTML and CSS references. They aren't behavior contracts but are architecture choices worth adopting for parity and maintainability.
+
+### Tailwind Group Scoping
+
+ChatGPT uses named Tailwind groups to scope hover/focus visibility of child elements:
+
+| Group Name | Scope | Drives |
+|---|---|---|
+| `group/tiny-bar` | Collapsed rail container | Rail toggle icon swap (logo ↔ arrow on hover) |
+| `group/sidebar-expando-section` | Each collapsible section wrapper | Chevron visibility on section hover |
+| `group/scrollport` | Chat history `<nav>` | Scroll shadow visibility via `data-scrolled-from-top` / `data-scrolled-from-end` |
+
+These enable child elements to react to parent hover state without JavaScript.
+
+### Data Attribute Hooks
+
+ChatGPT uses data attributes as both styling hooks and behavioral markers:
+
+| Attribute | Purpose | Used On |
+|---|---|---|
+| `data-active` | Marks the currently active chat row | `<a>` chat item |
+| `data-trailing-button` | Identifies trailing action button (ellipsis) | `<button>` in trailing pair |
+| `data-fill` | Marks items that fill available width | All sidebar items |
+| `data-sidebar-item="true"` | Generic sidebar item marker | All interactive sidebar items |
+| `data-no-spacing="true"` | Removes default heading spacing | Section `<h2>` labels |
+| `data-size="large"` | Large item variant (avatar row) | Profile menu trigger |
+| `data-state="closed"` | Radix-style popover/menu state | Tooltip/menu wrappers |
+
+### Class Abstraction Layer
+
+ChatGPT has a shared BEM-like class layer alongside Tailwind:
+
+| Class | Purpose |
+|---|---|
+| `__menu-item` | Base sidebar row — standardizes height, padding, hover behavior |
+| `__menu-item-trailing-btn` | Trailing action button inside a row |
+| `__menu-label` | Section header label (paired with `data-no-spacing`) |
+| `hoverable` | Adds hover interaction styling to any sidebar item |
+| `trailing` | Trailing slot container (right side of row) |
+| `trailing-pair` | Two-slot trailing layout (action button + indicator) |
+| `trailing highlight` | Trailing slot that shows on hover/focus |
+
+This suggests a component-level CSS layer that we should consider mapping to our own utility classes or Tailwind `@apply` rules.
+
+### Scroll Edge Shadow Pattern
+
+The sidebar uses a scroll-position-aware shadow system:
+
+1. `<nav>` has `data-scrolled-from-top` and `data-scrolled-from-end` attributes (set by JS on scroll)
+2. Sticky header uses `short:group-data-scrolled-from-top/scrollport:shadow-sharp-edge-top` to show a top shadow when scrolled
+3. A bottom spacer element uses `group-data-scrolled-from-top/scrollport:opacity-100` for a fade mask
+4. The footer separator uses `mask-image: linear-gradient(to top, transparent 25%, white 75%)` for a soft edge
+
+### Sticky Nav Behavior
+
+The primary nav (New Chat, Search, Images) uses height-aware stickiness:
+
+- `tall:sticky tall:top-header-height tall:z-20` — only sticky on tall viewports
+- `not-tall:relative` — falls back to normal flow on short viewports
+- `[--sticky-spacer:6px]` — a small spacer below the sticky area that fades in when scrolled
+
+---
+
 ## Current Gaps (Observed vs ChatGPT Reference)
 
 1. **Collapsed avatar click currently toggles sidebar** in `app-sidebar.tsx`; ChatGPT opens profile menu.
@@ -68,6 +214,7 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 3. **Transition easing mismatch**:
    - rail hidden state should use `steps(1,end)` rather than linear fade
    - expanded panel should remain linear both directions
+   - sidebar root width + background-color transition likely uses a spring/`--easing-common` curve (~.667s), not accounted for in current implementation
 4. **Chat rows use absolute overlay menu** instead of explicit trailing-pair layout.
 5. **Section headers are heavier and tighter to row styling** than ChatGPT’s subtle expando header style.
 
@@ -129,32 +276,46 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 
 ## Phase 2: Transition Timing Fidelity
 
+The sidebar has **two coordinated animation layers** that must work together:
+
+1. **Root container** (`#stage-slideover-sidebar`): animates `width` (260px ↔ 52px) and `background-color` (`--sidebar` ↔ `--background`). Uses a spring/easing curve at ~.667s duration.
+2. **Inner layers** (rail + panel): cross-fade with `opacity` at 150ms. Rail uses asymmetric `steps()` timing; panel uses `linear`.
+
 ### Files
 
 - `app/components/layout/sidebar/app-sidebar.tsx`
+- `components/ui/sidebar.tsx` (if root width transition lives here)
 
 ### Actions
 
-1. Implement asymmetrical rail timing:
-   - visible: `steps(1,start)`
-   - hidden: `steps(1,end)`
-2. Keep expanded panel fade linear in both directions.
-3. Ensure hidden layer has both:
+1. **Root width + background-color transition**:
+   - Animate `width` between `var(--sidebar-width)` and `var(--sidebar-rail-width)`
+   - Animate `background-color` between `var(--sidebar)` and `var(--background)`
+   - Use a spring-like easing curve (approximate `--easing-common` or `--spring-standard` at ~.667s). Start with `cubic-bezier(.4,0,.2,1)` at `.3s` as a practical first pass; refine toward the `linear()` spring curve if needed.
+2. **Asymmetrical rail opacity timing**:
+   - Appearing (collapse): `steps(1,start)` — rail visible instantly
+   - Disappearing (expand): `steps(1,end)` — rail hidden only at transition end
+3. **Expanded panel opacity**: `ease-linear` at 150ms in both directions.
+4. Ensure hidden layer has both:
    - `pointer-events-none`
    - `inert`
-4. Verify rapid toggle does not produce overlapping hit targets.
+5. Verify rapid toggle does not produce overlapping hit targets.
 
 ### Guardrails
 
 - No JS timing hacks; use deterministic class composition from state.
 - Do not introduce animation jitter via conflicting transition classes.
+- Width transition and opacity crossfade durations should be coordinated so the panel content fades out before the container finishes shrinking (opacity at 150ms finishes well before width at ~667ms).
 
 ### Exit Criteria
 
+- [ ] Sidebar root smoothly animates width between expanded and collapsed
+- [ ] Background color transitions between expanded (`--sidebar`) and collapsed (`--background`)
 - [ ] Rail appears instantly when collapsing
 - [ ] Rail disappears only at end of expansion
 - [ ] Expanded panel always linearly fades
 - [ ] Hidden layer cannot receive click/focus
+- [ ] No visual gap or flash during the width transition
 
 ---
 
@@ -200,23 +361,25 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 
 1. Refactor row structure to explicit trailing pair container:
    - trailing action button (ellipsis)
-   - trailing active indicator slot
-2. Keep row title truncation and clickable area stable.
-3. Make options trigger accessible:
+   - reserve structure for future indicator support, but do not implement/render an active indicator slot in this phase
+2. Target row height of `--menu-item-height` (2.25rem / 36px). Trailing pair must fit within this constraint.
+3. Keep row title truncation and clickable area stable.
+4. Make options trigger accessible:
    - clear `aria-label` (e.g. "Open conversation options")
    - menu semantics preserved from dropdown primitives
-4. Preserve inline rename mode and click-outside save/cancel behavior.
+5. Preserve inline rename mode and click-outside save/cancel behavior.
 
 ### Guardrails
 
 - Do not regress rename keyboard behavior (`Enter`, `Escape`).
 - Do not block row navigation because of trailing controls.
 - Keep mobile behavior where menu is always reachable.
+- Trailing pair layout must not exceed the 36px row height or cause vertical overflow.
 
 ### Exit Criteria
 
 - [ ] Trailing pair is visible/usable without layout overlap
-- [ ] Active row indicator appears only for active row
+- [ ] No active indicator slot is implemented in this phase
 - [ ] Rename and menu states do not conflict
 - [ ] Overflow masking still prevents text collision with trailing controls
 
@@ -233,13 +396,18 @@ If a change conflicts with these contracts, treat it as incorrect even if it "lo
 
 1. Tune header trigger spacing and typography to ChatGPT style:
    - `px-4 py-1.5`
-   - tertiary text tone
-   - lighter hierarchy than row items
-2. Ensure section label uses heading semantics where appropriate.
+   - Section header text color: `--sidebar-foreground` at 50% opacity (`text-sidebar-foreground/50`). This is distinctly lighter than body text, creating clear hierarchy.
+   - Typography: likely `--text-footnote-medium` (`.8125rem` / 13px, weight 500) or similar compact heading style.
+   - Body text reference: `--sidebar-foreground` (`text-sidebar-foreground`), icon reference: `--muted-foreground` (`text-muted-foreground`).
+2. Ensure section label uses `<h2>` heading semantics with `__menu-label` class (matches ChatGPT).
 3. Update chevron behavior:
-   - compact size
-   - hover/state-driven visibility parity
-4. Preserve localStorage persistence and animation behavior.
+   - compact size (`h-3 w-3` / 12px)
+   - collapsed sections: chevron visible on group hover (`group-hover/sidebar-expando-section:block`)
+   - expanded sections: chevron `invisible` by default, `visible` on group hover
+4. Section margin rhythm:
+   - Collapsed sections: `mb-[var(--sidebar-collapsed-section-margin-bottom)]` (0.75rem)
+   - Expanded sections: `mb-[var(--sidebar-expanded-section-margin-bottom)]` (1.25rem)
+5. Preserve localStorage persistence and animation behavior.
 
 ### Guardrails
 
@@ -287,9 +455,13 @@ Reason: semantic/state correctness first, then visual/structural refinements.
 ### Visual/Interaction
 
 - [ ] No flicker on rapid sidebar toggle
+- [ ] Sidebar width animates smoothly (no instant jump)
+- [ ] Background color transitions between states
 - [ ] No hidden hitboxes intercepting clicks
 - [ ] Title truncation does not overlap trailing controls
 - [ ] Header spacing/chevron behavior visually matches reference captures
+- [ ] Section header text uses 50%-opacity style (`text-sidebar-foreground/50`, not same weight as body text)
+- [ ] Scrollbar color uses project tokens (`--accent` default, higher opacity on hover) if visible
 
 ### Engineering
 

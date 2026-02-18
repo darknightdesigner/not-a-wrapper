@@ -459,7 +459,7 @@ export function ModelSelector(props: ModelSelectorProps) {
   const tooltipText =
     mode === "single"
       ? "Switch model ⌘⇧P"
-      : `Select models ⌘⇧M (${selectedModelIds.length}/${maxModels})`
+      : `Select models ⌘⇧M ${selectedModelIds.length}/${maxModels}`
 
   return (
     <div>

@@ -129,7 +129,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/chat relative w-full rounded-md",
+        "hover:bg-accent/80 hover:text-foreground group/chat relative w-[calc(100%-var(--spacing)*3)] rounded-md mx-1.5",
         isActive && "bg-accent hover:bg-accent text-foreground"
       ),
     [isActive]
@@ -187,7 +187,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
             onClick={handleLinkClick}
           >
             <div
-              className="text-primary relative line-clamp-1 mask-r-from-80% mask-r-to-85% px-2.5 py-2 pointer-coarse:py-3 text-sm text-ellipsis whitespace-nowrap text-balance"
+              className="text-primary relative line-clamp-1 min-h-9 mask-r-from-80% mask-r-to-85% px-2.5 py-1.5 pointer-coarse:py-3 text-sm text-ellipsis whitespace-nowrap text-balance"
               title={displayTitle}
             >
               <span dir="auto">{displayTitle}</span>

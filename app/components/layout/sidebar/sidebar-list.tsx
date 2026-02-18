@@ -24,6 +24,7 @@ export function SidebarList({
       title={title}
       defaultOpen={defaultOpen}
       storageKey={storageKey}
+      variant="sidebar"
     >
       {items.map((chat) => (
         <SidebarItem key={chat.id} chat={chat} currentChatId={currentChatId} />

@@ -154,7 +154,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
   const containerClassName = useMemo(
     () =>
       cn(
-        "hover:bg-accent/80 hover:text-foreground group/project relative w-full rounded-md",
+        "hover:bg-accent/80 hover:text-foreground group/project relative w-[calc(100%-var(--spacing)*3)] rounded-md mx-1.5",
         isActive && "bg-accent hover:bg-accent text-foreground"
       ),
     [isActive]
@@ -212,7 +212,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
             onClick={handleLinkClick}
           >
             <div
-              className="text-primary relative line-clamp-1 flex w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2 py-2 text-sm text-ellipsis whitespace-nowrap"
+              className="text-primary relative line-clamp-1 flex min-h-9 w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2.5 py-1.5 text-sm text-ellipsis whitespace-nowrap"
               title={displayName}
             >
               <HugeiconsIcon icon={Folder01Icon} size={20} />

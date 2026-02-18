@@ -3,10 +3,13 @@ import type { ToolSet } from "ai"
 import { z } from "zod"
 import type { ToolMetadata } from "./types"
 import { getPayClawConfig } from "@/lib/payclaw/config"
-import { payClawToolInputSchema } from "@/lib/payclaw/schemas"
+import { payClawToolInputSchema, type ShippingAddress } from "@/lib/payclaw/schemas"
 import { PayClawApiError, createJob, getJob, getJobEvents } from "@/lib/payclaw/client"
 
-export async function getPlatformTools(options?: { userName?: string }): Promise<{
+export async function getPlatformTools(options?: {
+  userName?: string
+  defaultShippingAddress?: ShippingAddress
+}): Promise<{
   tools: ToolSet
   metadata: Map<string, ToolMetadata>
 }> {
@@ -22,7 +25,7 @@ export async function getPlatformTools(options?: { userName?: string }): Promise
     description:
       "Buy a product or provision a service account using Flowglad Pay. " +
       "Provide the vendor URL and maximum spend in cents. " +
-      "For physical products, include the shipping address extracted from the user message. " +
+      "For physical products, use the user's stored shipping address when available; otherwise extract it from the user message. " +
       "The agent will navigate the vendor site, handle checkout, " +
       "and return credentials or order confirmation." +
       "\n\nWhen to call this tool:\n" +
@@ -38,6 +41,15 @@ export async function getPlatformTools(options?: { userName?: string }): Promise
           resolvedInput.shippingAddress = {
             ...resolvedInput.shippingAddress,
             name: options?.userName ?? config.userEmail,
+          }
+        }
+        if (!resolvedInput.shippingAddress && options?.defaultShippingAddress) {
+          resolvedInput.shippingAddress = {
+            ...options.defaultShippingAddress,
+            name:
+              options.defaultShippingAddress.name ||
+              options?.userName ||
+              config.userEmail,
           }
         }
         const result = await createJob(resolvedInput, config)

@@ -91,6 +91,22 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_provider", ["userId", "provider"]),
 
+  shippingAddresses: defineTable({
+    userId: v.id("users"),
+    label: v.string(),
+    name: v.string(),
+    line1: v.string(),
+    line2: v.optional(v.string()),
+    city: v.string(),
+    state: v.string(),
+    postalCode: v.string(),
+    country: v.string(),
+    isDefault: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_default", ["userId", "isDefault"]),
+
   feedback: defineTable({
     userId: v.id("users"),
     message: v.string(),

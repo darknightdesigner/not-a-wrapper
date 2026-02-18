@@ -19,6 +19,8 @@ type CollapsibleSectionProps = {
   storageKey?: string
   /** Additional className for the container */
   className?: string
+  /** Visual style variant */
+  variant?: "default" | "sidebar"
 }
 
 export function CollapsibleSection({
@@ -28,6 +30,7 @@ export function CollapsibleSection({
   defaultOpen = true,
   storageKey,
   className,
+  variant = "default",
 }: CollapsibleSectionProps) {
   // Initialize with defaultOpen to match SSR
   const [isOpen, setIsOpen] = React.useState(defaultOpen)
@@ -52,28 +55,45 @@ export function CollapsibleSection({
     [storageKey]
   )
 
+  const isSidebarVariant = variant === "sidebar"
+
   return (
     <Collapsible.Root
       open={isOpen}
       onOpenChange={handleOpenChange}
-      className={cn("group/collapsible-section", className)}
+      className={cn(
+        "group/collapsible-section",
+        isSidebarVariant && "group/sidebar-expando-section",
+        className
+      )}
     >
       <Collapsible.Trigger
         className={cn(
-          "flex w-full items-center gap-1 px-2 py-1.5",
-          "text-sm font-medium text-muted-foreground",
-          "hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
+          "flex items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+          isSidebarVariant
+            ? [
+                "w-full justify-start gap-0.5 px-4 py-1.5",
+                "text-sidebar-foreground/50 hover:text-sidebar-foreground/70",
+              ]
+            : [
+                "w-full gap-1 px-2 py-1.5",
+                "text-muted-foreground hover:text-foreground",
+              ]
         )}
       >
         {icon && <span className="shrink-0">{icon}</span>}
-        <span className="truncate">{title}</span>
+        {isSidebarVariant ? (
+          <span className="__menu-label truncate text-sm font-medium">{title}</span>
+        ) : (
+          <span className="truncate">{title}</span>
+        )}
         <HugeiconsIcon
           icon={ArrowRight01Icon}
           size={12}
           className={cn(
-            "shrink-0 motion-safe:transition-all duration-150",
+            "h-3 w-3 shrink-0 motion-safe:transition-all duration-150",
             isOpen
-              ? "rotate-90 opacity-0 group-hover/collapsible-section:opacity-100"
+              ? "rotate-90 opacity-0 group-hover/collapsible-section:opacity-100 group-hover/sidebar-expando-section:opacity-100"
               : "opacity-100"
           )}
         />
@@ -86,7 +106,7 @@ export function CollapsibleSection({
           "data-[closed]:animate-collapsible-up"
         )}
       >
-        <div className="pt-1">{children}</div>
+        <div className={cn(isSidebarVariant ? "pt-0.5" : "pt-1")}>{children}</div>
       </Collapsible.Panel>
     </Collapsible.Root>
   )

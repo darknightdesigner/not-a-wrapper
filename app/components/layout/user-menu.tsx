@@ -9,11 +9,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -24,7 +19,7 @@ import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useUser } from "@/lib/user-store/provider"
 import { useClerk } from "@clerk/nextjs"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
+import { Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
 import { AppInfoDialog, AppInfoMenuItem } from "./app-info/app-info-trigger"
@@ -32,7 +27,7 @@ import { FeedbackMenuItem, FeedbackDialog } from "./feedback/feedback-trigger"
 import { SettingsMenuItem, SettingsDialog } from "./settings/settings-trigger"
 
 type UserMenuProps = {
-  variant?: "header" | "sidebar"
+  variant?: "header" | "sidebar" | "sidebar-collapsed"
 }
 
 export function UserMenu({ variant = "header" }: UserMenuProps) {
@@ -48,6 +43,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
   if (!user) return null
 
   const isSidebar = variant === "sidebar"
+  const isSidebarCollapsed = variant === "sidebar-collapsed"
 
   const handleSignOut = async () => {
     try {
@@ -93,57 +89,104 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
     </>
   )
 
-  // Sidebar variant using Shadcn SidebarMenu primitives
+  // Sidebar variant: keep trigger geometry stable across collapse state changes.
   if (isSidebar) {
     return (
       <>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu
-              open={isMenuOpen}
-              onOpenChange={setMenuOpen}
-              modal={false}
-            >
-              <DropdownMenuTrigger
-                render={
-                  <SidebarMenuButton
-                    size="lg"
-                    className="w-full"
-                    tooltip={user?.display_name || "Account"}
-                  />
-                }
-              >
-                <Avatar className="size-6 bg-emerald-600">
-                  <AvatarImage src={user?.profile_image ?? undefined} />
-                  <AvatarFallback className="bg-emerald-600 text-xs text-white">
-                    {user?.display_name?.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                {/* IMPORTANT: Must explicitly hide - SidebarMenuButton only handles outer sizing */}
-                <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden motion-safe:transition-opacity">
-                  <span className="truncate font-semibold">
-                    {user?.display_name}
-                  </span>
-                  <span className="text-muted-foreground truncate text-xs">
-                    {user?.premium ? "Plus" : "Free"}
-                  </span>
-                </div>
-                <HugeiconsIcon
-                  icon={UnfoldLessIcon}
-                  size={16}
-                  className="text-muted-foreground ml-auto group-data-[collapsible=icon]:hidden"
+        <DropdownMenu
+          open={isMenuOpen}
+          onOpenChange={setMenuOpen}
+          modal={false}
+        >
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                role="button"
+                aria-label="Open profile menu"
+                aria-haspopup="menu"
+                aria-expanded={isMenuOpen}
+                data-testid="accounts-profile-button"
+                className="group/menu-item flex h-12 w-full items-center gap-2 rounded-md px-1.5 text-left text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+              />
+            }
+          >
+            <Avatar className="size-6 bg-emerald-600">
+              <AvatarImage src={user?.profile_image ?? undefined} />
+              <AvatarFallback className="bg-emerald-600 text-xs text-white">
+                {user?.display_name?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold">
+                {user?.display_name}
+              </span>
+              <span className="text-muted-foreground truncate text-xs">
+                {user?.premium ? "Plus" : "Free"}
+              </span>
+            </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            side="top"
+            align="start"
+            animated={false}
+            className="w-(--anchor-width)"
+          >
+            {menuContent}
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {dialogs}
+      </>
+    )
+  }
+
+  // Collapsed rail variant: same menu content, icon-only trigger
+  if (isSidebarCollapsed) {
+    return (
+      <>
+        <DropdownMenu
+          open={isMenuOpen}
+          onOpenChange={setMenuOpen}
+          modal={false}
+        >
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <button
+                      type="button"
+                      role="button"
+                      aria-label="Open profile menu"
+                      aria-haspopup="menu"
+                      aria-expanded={isMenuOpen}
+                      data-testid="accounts-profile-button"
+                      className="mx-auto flex h-10 w-10 items-center justify-center rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                    />
+                  }
                 />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                side="top"
-                align="start"
-                className="w-(--anchor-width)"
-              >
-                {menuContent}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+              }
+            >
+              <Avatar className="size-6 bg-emerald-600">
+                <AvatarImage src={user?.profile_image ?? undefined} />
+                <AvatarFallback className="bg-emerald-600 text-xs text-white">
+                  {user?.display_name?.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {user?.display_name || "Account"}
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent
+            side="top"
+            align="center"
+            animated={false}
+            className="w-56"
+          >
+            {menuContent}
+          </DropdownMenuContent>
+        </DropdownMenu>
         {dialogs}
       </>
     )

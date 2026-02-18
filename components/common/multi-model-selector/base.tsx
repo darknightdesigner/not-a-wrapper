@@ -410,7 +410,7 @@ export function MultiModelSelector({
         >
           <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>
-            Select models ⌘⇧M ({selectedModelIds.length}/{maxModels})
+            Select models ⌘⇧M {selectedModelIds.length}/{maxModels}
           </TooltipContent>
           <DropdownMenuContent
             className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"

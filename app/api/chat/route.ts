@@ -28,9 +28,9 @@ import {
   type ModelMessage,
 } from "ai"
 import type { ProviderOptions } from "@ai-sdk/provider-utils"
-import { fetchMutation } from "convex/nextjs"
+import { fetchMutation, fetchQuery } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
+import type { Doc, Id } from "@/convex/_generated/dataModel"
 import {
   checkServerSideUsage,
   incrementServerSideUsage,
@@ -55,6 +55,7 @@ import {
   wrapMcpTools,
   isToolResultEnvelope,
 } from "@/lib/tools/mcp-wrapper"
+import type { ShippingAddress } from "@/lib/payclaw/schemas"
 
 export const maxDuration = 60
 
@@ -119,6 +120,25 @@ function summarizeReplayWarningDetails(
     counts[subcode] = (counts[subcode] ?? 0) + 1
   }
   return counts
+}
+
+function formatAddressContext(addresses: Array<Doc<"shippingAddresses">>): string {
+  if (addresses.length === 0) return ""
+
+  const lines = addresses.map((addr) => {
+    const prefix = addr.isDefault ? "★ Default" : "•"
+    const label = addr.label ? ` (${addr.label})` : ""
+    const line2 = addr.line2 ? `, ${addr.line2}` : ""
+    return `${prefix}${label}: ${addr.name}, ${addr.line1}${line2}, ${addr.city}, ${addr.state} ${addr.postalCode}`
+  })
+
+  return [
+    "\n\n---",
+    "User's shipping addresses on file:",
+    ...lines,
+    "When the user asks to buy a physical product, use their default shipping address unless they specify otherwise.",
+    "---",
+  ].join("\n")
 }
 
 export async function POST(req: Request) {
@@ -206,6 +226,7 @@ export async function POST(req: Request) {
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
     const provider = getProviderForModel(model as SupportedModel)
+    let userAddresses: Array<Doc<"shippingAddresses">> = []
 
     let apiKey: string | undefined
     if (isAuthenticated && convexToken) {
@@ -378,14 +399,42 @@ export async function POST(req: Request) {
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
     if (isAuthenticated) {
+      if (convexToken) {
+        try {
+          userAddresses = (await fetchQuery(
+            api.shippingAddresses.list,
+            {},
+            { token: convexToken }
+          )) ?? []
+        } catch (err) {
+          console.warn("[chat] Failed to fetch shipping addresses:", err)
+        }
+      }
+
       const { currentUser } = await import("@clerk/nextjs/server")
       const clerkUser = await currentUser()
       const userName = clerkUser
         ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
         : undefined
 
+      const defaultAddress = userAddresses.find((address) => address.isDefault)
+      const cleanDefaultShippingAddress: ShippingAddress | undefined = defaultAddress
+        ? {
+            name: defaultAddress.name,
+            line1: defaultAddress.line1,
+            line2: defaultAddress.line2,
+            city: defaultAddress.city,
+            state: defaultAddress.state,
+            postalCode: defaultAddress.postalCode,
+            country: defaultAddress.country,
+          }
+        : undefined
+
       const { getPlatformTools } = await import("@/lib/tools/platform")
-      const platformResult = await getPlatformTools({ userName: userName || undefined })
+      const platformResult = await getPlatformTools({
+        userName: userName || undefined,
+        defaultShippingAddress: cleanDefaultShippingAddress,
+      })
       platformTools = platformResult.tools
       platformToolMetadata = platformResult.metadata
     }
@@ -686,13 +735,17 @@ export async function POST(req: Request) {
       ...thirdPartyToolMetadata,
       ...platformToolMetadata,
     ])
+    let enrichedSystemPrompt = effectiveSystemPrompt
+    if (isAuthenticated && userAddresses.length > 0) {
+      enrichedSystemPrompt += formatAddressContext(userAddresses)
+    }
 
     const streamStartMs = Date.now()
     let stepCounter = 0
 
     const result = streamText({
       model: aiModel,
-      system: effectiveSystemPrompt,
+      system: enrichedSystemPrompt,
       messages: modelMessages,
       tools: allTools,
       stopWhen: stepCountIs(maxSteps),
