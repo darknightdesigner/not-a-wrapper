@@ -94,7 +94,8 @@ export function AppSidebar() {
         inert={!isCollapsed ? true : undefined}
         onPointerDown={(event) => {
           if (!isCollapsed || isMobile) return
-          const target = event.target as HTMLElement
+          const target = event.target
+          if (!(target instanceof Element)) return
           if (target.closest(railInteractiveSelector)) return
           toggleSidebar()
         }}

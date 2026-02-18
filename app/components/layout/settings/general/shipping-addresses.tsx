@@ -27,6 +27,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
+import {
+  buildCreateShippingAddressPayload,
+  buildUpdateShippingAddressPayload,
+  normalizeFormValue,
+  type ShippingAddressFormData,
+} from "./shipping-addresses-payload"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/user-store/provider"
 import { HugeiconsIcon } from "@hugeicons/react"
@@ -93,16 +99,6 @@ const US_STATES = [
 // TODO: Replace with international regions when adding country support.
 type ShippingAddressDoc = Doc<"shippingAddresses">
 
-type ShippingAddressFormData = {
-  label: string
-  name: string
-  line1: string
-  line2: string
-  city: string
-  state: string
-  postalCode: string
-}
-
 const EMPTY_FORM: ShippingAddressFormData = {
   label: "",
   name: "",
@@ -111,10 +107,6 @@ const EMPTY_FORM: ShippingAddressFormData = {
   city: "",
   state: "",
   postalCode: "",
-}
-
-function normalizeFormValue(value: string) {
-  return value.trim()
 }
 
 function validateForm(form: ShippingAddressFormData) {
@@ -422,18 +414,8 @@ export function ShippingAddresses() {
 
     setIsSaving(true)
     try {
-      const payload = {
-        label: normalizeFormValue(form.label),
-        name: normalizeFormValue(form.name),
-        line1: normalizeFormValue(form.line1),
-        line2: normalizeFormValue(form.line2) || undefined,
-        city: normalizeFormValue(form.city),
-        state: normalizeFormValue(form.state),
-        postalCode: normalizeFormValue(form.postalCode),
-        country: "US",
-      }
-
       if (editingId === "new") {
+        const payload = buildCreateShippingAddressPayload(form)
         await createAddress({
           ...payload,
           isDefault: addresses.length === 0,
@@ -443,6 +425,7 @@ export function ShippingAddresses() {
           description: `${payload.label} has been saved.`,
         })
       } else if (editingAddress) {
+        const payload = buildUpdateShippingAddressPayload(form)
         await updateAddress({
           addressId: editingAddress._id as Id<"shippingAddresses">,
           ...payload,

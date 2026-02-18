@@ -83,7 +83,7 @@ export function CollapsibleSection({
       >
         {icon && <span className="shrink-0">{icon}</span>}
         {isSidebarVariant ? (
-          <h2 className="__menu-label truncate text-sm font-medium">{title}</h2>
+          <span className="__menu-label truncate text-sm font-medium">{title}</span>
         ) : (
           <span className="truncate">{title}</span>
         )}

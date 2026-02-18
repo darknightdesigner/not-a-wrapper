@@ -1,6 +1,8 @@
 import { v } from "convex/values"
 import { mutation, query } from "./_generated/server"
 import type { MutationCtx, QueryCtx } from "./_generated/server"
+import { shouldNewAddressBeDefault } from "./shippingAddressDefaulting"
+import { buildShippingAddressPatch } from "./shippingAddressPatch"
 
 async function getAuthenticatedUserOrThrow(ctx: QueryCtx | MutationCtx) {
   const identity = await ctx.auth.getUserIdentity()
@@ -70,8 +72,10 @@ export const create = mutation({
       .withIndex("by_user", (q) => q.eq("userId", user._id))
       .collect()
 
-    const shouldBeDefault =
-      existingAddresses.length === 0 ? true : (args.isDefault ?? false)
+    const shouldBeDefault = shouldNewAddressBeDefault(
+      existingAddresses,
+      args.isDefault
+    )
 
     // Single-default invariant: if this one becomes default, clear all others first.
     if (shouldBeDefault) {
@@ -104,7 +108,7 @@ export const update = mutation({
     label: v.optional(v.string()),
     name: v.optional(v.string()),
     line1: v.optional(v.string()),
-    line2: v.optional(v.string()),
+    line2: v.optional(v.union(v.string(), v.null())),
     city: v.optional(v.string()),
     state: v.optional(v.string()),
     postalCode: v.optional(v.string()),
@@ -118,15 +122,7 @@ export const update = mutation({
       throw new Error("Address not found")
     }
 
-    const patch: Record<string, string | undefined> = {}
-    if (updates.label !== undefined) patch.label = updates.label
-    if (updates.name !== undefined) patch.name = updates.name
-    if (updates.line1 !== undefined) patch.line1 = updates.line1
-    if (updates.line2 !== undefined) patch.line2 = updates.line2
-    if (updates.city !== undefined) patch.city = updates.city
-    if (updates.state !== undefined) patch.state = updates.state
-    if (updates.postalCode !== undefined) patch.postalCode = updates.postalCode
-    if (updates.country !== undefined) patch.country = updates.country
+    const patch = buildShippingAddressPatch(updates)
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(addressId, patch)
