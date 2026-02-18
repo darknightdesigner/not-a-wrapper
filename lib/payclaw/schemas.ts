@@ -65,12 +65,27 @@ export const createJobResponseSchema = z.object({
   status: jobStatusSchema,
 })
 
+export const reportedDataSchema = z
+  .object({
+    orderNumber: z.string().optional(),
+    total: z.string().optional(),
+    items: z.array(z.string()).optional(),
+    shippingMethod: z.string().optional(),
+    trackingNumber: z.string().optional(),
+    deliveryEstimate: z.string().optional(),
+    email: z.string().optional(),
+  })
+  .catchall(z.unknown())
+
 export const jobResultSchema = z
   .object({
     success: z.boolean(),
     credentials: z.string().optional(),
+    credentialIds: z.array(z.string()).optional(),
     productObtained: z.string().optional(),
+    orderNumber: z.string().optional(),
     cardUsed: z.string().optional(),
+    reportedData: reportedDataSchema.optional(),
     error: z.string().optional(),
     skillsUsed: z.array(z.string()),
   })
@@ -160,6 +175,8 @@ export type PaymentMethod = z.infer<typeof paymentMethodSchema>
 export type BrowserProvider = z.infer<typeof browserProviderSchema>
 export type CreateJobResponse = z.infer<typeof createJobResponseSchema>
 export type JobStatus = z.infer<typeof jobStatusSchema>
+export type JobResult = z.infer<typeof jobResultSchema>
+export type ReportedData = z.infer<typeof reportedDataSchema>
 export type Job = z.infer<typeof jobSchema>
 export type EventType = z.infer<typeof eventTypeSchema>
 export type JobEvent = z.infer<typeof jobEventSchema>
