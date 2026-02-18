@@ -92,7 +92,7 @@ export function AppSidebar() {
         inert={!isCollapsed ? true : undefined}
       >
         {/* Header */}
-        <div className="flex h-(--sidebar-header-height) w-full items-center">
+        <div className="flex h-(--sidebar-header-height) w-full items-center px-1.5">
           {isMobile ? (
             <button
               type="button"
@@ -106,8 +106,8 @@ export function AppSidebar() {
           )}
         </div>
 
-        {/* Action buttons - +1px accounts for border-t on SidebarContent in expanded state */}
-        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-start gap-0">
+        {/* Action buttons */}
+        <div className="mt-(--sidebar-section-first-margin-top) flex w-full flex-col items-start gap-0 px-1.5">
           <CollapsedMenuItem
             icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New chat"
@@ -371,7 +371,7 @@ function CollapsedHeaderToggle() {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="group/toggle mx-2 flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             aria-label="Open sidebar"
             aria-expanded={false}
             aria-controls={SIDEBAR_CONTAINER_ID}

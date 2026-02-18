@@ -17,6 +17,7 @@ type HistoryTriggerProps = {
   classNameTrigger?: string
   icon?: React.ReactNode
   label?: React.ReactNode | string
+  trailing?: React.ReactNode
   hasPopover?: boolean
 }
 
@@ -25,6 +26,7 @@ export function HistoryTrigger({
   classNameTrigger,
   icon,
   label,
+  trailing,
   hasPopover = true,
 }: HistoryTriggerProps) {
   const isMobile = useBreakpoint(768)
@@ -46,10 +48,12 @@ export function HistoryTrigger({
     await deleteChat(id, chatId!, () => router.push("/"))
   }
 
+  const hasCustomTriggerClass = !!classNameTrigger
   const defaultTrigger = (
     <button
       className={cn(
-        "text-muted-foreground hover:text-foreground hover:bg-muted bg-background pointer-events-auto rounded-full p-1.5",
+        !hasCustomTriggerClass &&
+          "text-muted-foreground hover:text-foreground hover:bg-muted bg-background pointer-events-auto rounded-full p-1.5",
         hasSidebar ? "hidden" : "block",
         classNameTrigger
       )}
@@ -60,6 +64,7 @@ export function HistoryTrigger({
     >
       {icon || <HugeiconsIcon icon={SearchList01Icon} size={24} />}
       {label}
+      {trailing}
     </button>
   )
 

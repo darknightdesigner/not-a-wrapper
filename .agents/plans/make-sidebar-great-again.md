@@ -361,7 +361,7 @@ The sidebar has **two coordinated animation layers** that must work together:
 
 1. Refactor row structure to explicit trailing pair container:
    - trailing action button (ellipsis)
-   - trailing active indicator slot
+   - reserve structure for future indicator support, but do not implement/render an active indicator slot in this phase
 2. Target row height of `--menu-item-height` (2.25rem / 36px). Trailing pair must fit within this constraint.
 3. Keep row title truncation and clickable area stable.
 4. Make options trigger accessible:
@@ -379,7 +379,7 @@ The sidebar has **two coordinated animation layers** that must work together:
 ### Exit Criteria
 
 - [ ] Trailing pair is visible/usable without layout overlap
-- [ ] Active row indicator appears only for active row
+- [ ] No active indicator slot is implemented in this phase
 - [ ] Rename and menu states do not conflict
 - [ ] Overflow masking still prevents text collision with trailing controls
 
