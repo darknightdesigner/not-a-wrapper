@@ -19,7 +19,7 @@ import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { useUser } from "@/lib/user-store/provider"
 import { useClerk } from "@clerk/nextjs"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { UnfoldLessIcon, Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
+import { Logout01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useState } from "react"
 import { toast } from "@/components/ui/toast"
 import { AppInfoDialog, AppInfoMenuItem } from "./app-info/app-info-trigger"
@@ -107,7 +107,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                 aria-haspopup="menu"
                 aria-expanded={isMenuOpen}
                 data-testid="accounts-profile-button"
-                className="group/menu-item flex h-12 w-full items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="group/menu-item flex h-12 w-full items-center gap-2 rounded-md px-1.5 text-left text-sm hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               />
             }
           >
@@ -125,11 +125,6 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                 {user?.premium ? "Plus" : "Free"}
               </span>
             </div>
-            <HugeiconsIcon
-              icon={UnfoldLessIcon}
-              size={16}
-              className="text-muted-foreground ml-auto"
-            />
           </DropdownMenuTrigger>
           <DropdownMenuContent
             side="top"
@@ -166,7 +161,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                       aria-haspopup="menu"
                       aria-expanded={isMenuOpen}
                       data-testid="accounts-profile-button"
-                      className="flex h-9 w-full items-center justify-start rounded-md px-2 hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                      className="mx-auto flex h-10 w-10 items-center justify-center rounded-md hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     />
                   }
                 />

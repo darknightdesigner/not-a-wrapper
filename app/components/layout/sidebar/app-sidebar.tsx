@@ -37,7 +37,7 @@ import { SidebarProject } from "./sidebar-project"
 
 export function AppSidebar() {
   const isMobile = useBreakpoint(768)
-  const { setOpenMobile, state } = useSidebar()
+  const { setOpenMobile, state, toggleSidebar } = useSidebar()
   const isCollapsed = state === "collapsed"
   const { chats, pinnedChats, isLoading } = useChats()
   const { user } = useUser()
@@ -55,6 +55,8 @@ export function AppSidebar() {
     [chats]
   )
   const hasChats = chats.length > 0
+  const railInteractiveSelector =
+    "a,button,input,textarea,select,[role='button'],[data-sidebar-item]"
 
   return (
     <Sidebar
@@ -90,6 +92,12 @@ export function AppSidebar() {
         )}
         aria-hidden={!isCollapsed}
         inert={!isCollapsed ? true : undefined}
+        onPointerDown={(event) => {
+          if (!isCollapsed || isMobile) return
+          const target = event.target as HTMLElement
+          if (target.closest(railInteractiveSelector)) return
+          toggleSidebar()
+        }}
       >
         {/* Header */}
         <div className="flex h-(--sidebar-header-height) w-full items-center justify-center">
