@@ -143,10 +143,7 @@ export function AppSidebar() {
       <div
         className={cn(
           "h-full",
-          // w-full (not w-(--sidebar-width)) to avoid overflowing the parent's content area
-          // by 1px and painting over the container's border-r. ChatGPT uses overflow-hidden
-          // on their outer container to achieve the same result with an explicit width.
-          "w-full overflow-x-clip text-clip whitespace-nowrap",
+          "w-(--sidebar-width) overflow-x-clip text-clip whitespace-nowrap",
           // Linear crossfade in both directions (ChatGPT pattern)
           "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
           // Visibility based on state

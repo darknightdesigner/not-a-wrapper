@@ -134,6 +134,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
           <DropdownMenuContent
             side="top"
             align="start"
+            animated={false}
             className="w-(--anchor-width)"
           >
             {menuContent}
@@ -183,8 +184,9 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
             </TooltipContent>
           </Tooltip>
           <DropdownMenuContent
-            side="right"
-            align="end"
+            side="top"
+            align="center"
+            animated={false}
             className="w-56"
           >
             {menuContent}

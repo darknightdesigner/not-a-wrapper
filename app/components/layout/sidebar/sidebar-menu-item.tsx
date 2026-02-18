@@ -1,15 +1,9 @@
 "use client"
 
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import Link from "next/link"
-import { forwardRef, isValidElement, type ReactNode } from "react"
+import { forwardRef, isValidElement, type ReactNode, type Ref } from "react"
 
 type SidebarMenuItemProps = {
   /** Icon component from Hugeicons, or a custom React node */
@@ -21,7 +15,7 @@ type SidebarMenuItemProps = {
   /** Click handler - used when no href (e.g., opens modal) */
   onClick?: () => void
   /** Trailing content (keyboard shortcuts, badges, etc.) */
-  trailing?: React.ReactNode
+  trailing?: ReactNode
   /** Test ID for e2e testing */
   testId?: string
   /** Additional className */
@@ -42,10 +36,6 @@ const baseClassName = cn(
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 )
 
-// Icon-only styles when sidebar is collapsed
-const collapsedClassName =
-  "group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:justify-center"
-
 /**
  * Unified sidebar menu item component.
  * 
@@ -53,7 +43,6 @@ const collapsedClassName =
  * - Icon wrapper pattern (ChatGPT style) for consistent alignment
  * - motion-safe: transitions for reduced motion support
  * - CSS variables for spacing
- * - Tooltip support when sidebar is collapsed
  */
 export const SidebarMenuItem = forwardRef<
   HTMLAnchorElement | HTMLButtonElement,
@@ -62,9 +51,6 @@ export const SidebarMenuItem = forwardRef<
   { icon, label, href, onClick, trailing, testId, className, isActive },
   ref
 ) {
-  const { state } = useSidebar()
-  const isCollapsed = state === "collapsed"
-
   // Check if icon is a React element (custom icon) vs Hugeicons IconSvgElement
   const isCustomIcon = isValidElement(icon)
 
@@ -82,13 +68,11 @@ export const SidebarMenuItem = forwardRef<
           />
         )}
       </div>
-      {/* Label - hidden when collapsed */}
-      <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap) group-data-[collapsible=icon]:hidden">
+      <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">
         <span className="truncate">{label}</span>
       </div>
-      {/* Trailing content - hidden when collapsed */}
       {trailing && (
-        <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100 group-data-[collapsible=icon]:hidden">
+        <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100">
           {trailing}
         </div>
       )}
@@ -97,14 +81,13 @@ export const SidebarMenuItem = forwardRef<
 
   const combinedClassName = cn(
     baseClassName,
-    collapsedClassName,
     isActive && "bg-accent",
     className
   )
 
   const itemElement = href ? (
     <Link
-      ref={ref as React.Ref<HTMLAnchorElement>}
+      ref={ref as Ref<HTMLAnchorElement>}
       href={href}
       className={combinedClassName}
       data-testid={testId}
@@ -115,7 +98,7 @@ export const SidebarMenuItem = forwardRef<
     </Link>
   ) : (
     <button
-      ref={ref as React.Ref<HTMLButtonElement>}
+      ref={ref as Ref<HTMLButtonElement>}
       type="button"
       onClick={onClick}
       className={combinedClassName}
@@ -125,18 +108,6 @@ export const SidebarMenuItem = forwardRef<
       {content}
     </button>
   )
-
-  // Wrap in tooltip when collapsed
-  if (isCollapsed) {
-    return (
-      <Tooltip>
-        <TooltipTrigger render={itemElement} />
-        <TooltipContent side="right" sideOffset={10}>
-          {label}
-        </TooltipContent>
-      </Tooltip>
-    )
-  }
 
   return itemElement
 })
