@@ -83,7 +83,7 @@ export function ChatActionsMenu({
       >
         <DropdownMenuTrigger render={trigger ?? defaultTrigger}>
           {!trigger && (
-            <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
+            <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="text-primary" />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent

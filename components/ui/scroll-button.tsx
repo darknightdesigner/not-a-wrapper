@@ -4,7 +4,7 @@ import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { type VariantProps } from "class-variance-authority"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
+import { ArrowDown02Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useStickToBottomContext } from "use-stick-to-bottom"
 
 export type ScrollButtonProps = {
@@ -35,7 +35,7 @@ function ScrollButton({
       onClick={() => scrollToBottom()}
       {...props}
     >
-      <HugeiconsIcon icon={ArrowDown01Icon} size={20} />
+      <HugeiconsIcon icon={ArrowDown02Icon} size={20} className="size-5" />
     </Button>
   )
 }

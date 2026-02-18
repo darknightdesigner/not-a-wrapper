@@ -92,7 +92,7 @@ export function AppSidebar() {
         inert={!isCollapsed ? true : undefined}
       >
         {/* Header */}
-        <div className="flex h-(--sidebar-header-height) w-full items-center px-1.5">
+        <div className="flex h-(--sidebar-header-height) w-full items-center justify-center">
           {isMobile ? (
             <button
               type="button"
@@ -170,7 +170,7 @@ export function AppSidebar() {
               "not-tall:group-data-[scrolled-from-top]/scrollport:shadow-[inset_0_-1px_0_0_var(--sidebar-border)]"
             )}
           >
-            <div className="px-1.5">
+            <div className="px-2">
               <div className="flex h-(--sidebar-header-height) items-center justify-between">
                 {isMobile ? (
                   <button
@@ -209,7 +209,7 @@ export function AppSidebar() {
           {/* Conditionally sticky: pinned on tall viewports, scrolls on short ones (ChatGPT pattern) */}
           <div
             className={cn(
-              "z-20 bg-sidebar px-1.5 pt-(--sidebar-section-first-margin-top)",
+              "z-20 bg-sidebar px-0 pt-(--sidebar-section-first-margin-top)",
               "tall:sticky tall:top-(--sidebar-header-height)",
               "not-tall:relative"
             )}
@@ -258,7 +258,7 @@ export function AppSidebar() {
           </div>
 
           {/* === SCROLLABLE CONTENT === */}
-          <div className="px-1.5">
+          <div className="px-0">
             {/* Project and chat lists */}
             <SidebarProject />
             {isLoading ? (
@@ -324,7 +324,7 @@ export function AppSidebar() {
           </div>
 
           {/* === STICKY FOOTER === */}
-          <div className="sticky bottom-0 z-30 bg-sidebar px-1.5 py-1.5 empty:hidden">
+          <div className="sticky bottom-0 z-30 bg-sidebar px-2 py-1.5 empty:hidden">
             {isLoggedIn ? (
               <UserMenu variant="sidebar" />
             ) : (
@@ -415,7 +415,7 @@ function CollapsedMenuItem({
   )
 
   const className = cn(
-    "flex h-9 w-9 items-center justify-center rounded-lg",
+    "flex h-9 w-10 items-center justify-center rounded-lg",
     "hover:bg-accent",
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
   )
@@ -457,7 +457,7 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
           render={
             <Link
               href="/auth/login"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border hover:bg-accent mx-auto"
+              className="flex h-9 w-10 items-center justify-center rounded-lg border border-border hover:bg-accent mx-auto"
             />
           }
         >

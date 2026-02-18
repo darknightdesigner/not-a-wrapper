@@ -25,11 +25,11 @@ type SidebarMenuItemProps = {
 }
 
 const baseClassName = cn(
-  "group/menu-item relative inline-flex w-full items-center rounded-md bg-transparent text-sm",
+  "group/menu-item relative inline-flex w-[calc(100%-var(--spacing)*3)] items-center rounded-md bg-transparent text-sm mx-1.5",
   // Explicit height for consistency with collapsed state (h-9 = 36px)
   "h-9 pointer-coarse:h-auto",
   // Spacing using CSS variables
-  "gap-(--sidebar-item-gap) px-2 py-2 pointer-coarse:py-3",
+  "gap-(--sidebar-item-gap) px-2.5 py-1.5 pointer-coarse:py-3",
   // Colors (instant hover — no transition)
   "text-primary hover:bg-accent/80 hover:text-foreground",
   // Focus states
@@ -51,6 +51,8 @@ export const SidebarMenuItem = forwardRef<
   { icon, label, href, onClick, trailing, testId, className, isActive },
   ref
 ) {
+  const hasTrailing = Boolean(trailing)
+
   // Check if icon is a React element (custom icon) vs Hugeicons IconSvgElement
   const isCustomIcon = isValidElement(icon)
 
@@ -72,7 +74,7 @@ export const SidebarMenuItem = forwardRef<
         <span className="truncate">{label}</span>
       </div>
       {trailing && (
-        <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100">
+        <div className="text-muted-foreground shrink-0 opacity-0 group-hover/menu-item:opacity-100">
           {trailing}
         </div>
       )}
@@ -81,6 +83,7 @@ export const SidebarMenuItem = forwardRef<
 
   const combinedClassName = cn(
     baseClassName,
+    hasTrailing && "justify-between gap-2",
     isActive && "bg-accent",
     className
   )

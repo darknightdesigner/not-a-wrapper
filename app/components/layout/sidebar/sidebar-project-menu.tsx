@@ -51,7 +51,7 @@ export function SidebarProjectMenu({
             />
           }
         >
-          <HugeiconsIcon icon={MoreHorizontalIcon} size={18} className="text-primary" />
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="text-primary" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           <DropdownMenuItem

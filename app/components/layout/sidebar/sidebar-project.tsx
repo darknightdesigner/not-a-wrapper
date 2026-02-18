@@ -16,11 +16,11 @@ export function SidebarProject() {
   return (
     <div className="mb-5">
       <button
-        className="hover:bg-accent/80 hover:text-foreground text-primary group/new-chat relative inline-flex w-full items-center rounded-md bg-transparent px-2 py-2 text-sm"
+        className="hover:bg-accent/80 hover:text-foreground text-primary group/new-chat relative inline-flex h-9 w-[calc(100%-var(--spacing)*3)] items-center rounded-md bg-transparent px-2.5 py-1.5 text-sm mx-1.5"
         type="button"
         onClick={() => setIsDialogOpen(true)}
       >
-        <div className="flex items-center gap-2 whitespace-nowrap">
+        <div className="flex items-center gap-(--sidebar-item-gap) whitespace-nowrap">
           <HugeiconsIcon icon={FolderAddIcon} size={20} />
           <span>New project</span>
         </div>
