@@ -180,53 +180,55 @@ function StateCombobox({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger
-        render={
-          <Button
-            id={id}
-            type="button"
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            disabled={disabled}
-            className="w-full justify-between rounded-md font-normal"
-          />
-        }
-      >
-        <span className={cn("truncate", !selectedState && "text-muted-foreground")}>
-          {selectedState
-            ? `${selectedState.label} (${selectedState.value})`
-            : "Select state"}
-        </span>
-        <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-50" />
-      </PopoverTrigger>
-      <PopoverContent className="w-(--anchor-width) rounded-md p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search state..." />
-          <CommandList>
-            <CommandEmpty>No state found.</CommandEmpty>
-            <CommandGroup>
-              {US_STATES.map((entry) => {
-                const isSelected = value === entry.value
-                return (
-                  <CommandItem
-                    key={entry.value}
-                    value={`${entry.label} ${entry.value}`}
-                    onSelect={() => handleSelect(entry.value)}
-                  >
-                    <span className="flex-1">
-                      {entry.label} ({entry.value})
-                    </span>
-                    {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} />}
-                  </CommandItem>
-                )
-              })}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <div className="w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
+            <Button
+              id={id}
+              type="button"
+              variant="outline"
+              role="combobox"
+              aria-expanded={open}
+              disabled={disabled}
+              className="w-full justify-between rounded-md font-normal"
+            />
+          }
+        >
+          <span className={cn("truncate", !selectedState && "text-muted-foreground")}>
+            {selectedState
+              ? `${selectedState.label} (${selectedState.value})`
+              : "Select state"}
+          </span>
+          <HugeiconsIcon icon={ArrowDown01Icon} size={16} className="opacity-50" />
+        </PopoverTrigger>
+        <PopoverContent className="w-(--anchor-width) rounded-md p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search state..." />
+            <CommandList>
+              <CommandEmpty>No state found.</CommandEmpty>
+              <CommandGroup>
+                {US_STATES.map((entry) => {
+                  const isSelected = value === entry.value
+                  return (
+                    <CommandItem
+                      key={entry.value}
+                      value={`${entry.label} ${entry.value}`}
+                      onSelect={() => handleSelect(entry.value)}
+                    >
+                      <span className="flex-1">
+                        {entry.label} ({entry.value})
+                      </span>
+                      {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} />}
+                    </CommandItem>
+                  )
+                })}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }
 
