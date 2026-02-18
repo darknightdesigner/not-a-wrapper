@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import {
@@ -339,7 +340,12 @@ function ShippingAddressForm({
 
             <div className="space-y-2">
               <Label htmlFor={`${formId}-country`}>Country</Label>
-              <Input id={`${formId}-country`} value="United States" disabled />
+              <Tooltip>
+                <TooltipTrigger render={<div className="w-full cursor-not-allowed" />}>
+                  <Input id={`${formId}-country`} value="United States" disabled />
+                </TooltipTrigger>
+                <TooltipContent>United States only for now.</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </form>
@@ -522,59 +528,61 @@ export function ShippingAddresses() {
 
             return (
               <div key={address._id} className="space-y-3">
-                <Card className="py-1">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <h4 className="truncate font-medium text-balance">
-                            {address.label}
-                          </h4>
-                          {address.isDefault && (
-                            <Badge variant="secondary" className="text-xs">
-                              Default
-                            </Badge>
-                          )}
+                {!isEditing && (
+                  <Card className="py-0">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex items-center gap-2">
+                            <h4 className="truncate font-medium text-balance">
+                              {address.label}
+                            </h4>
+                            {address.isDefault && (
+                              <Badge variant="secondary" className="text-xs">
+                                Default
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm">{address.name}</p>
+                          <p className="text-muted-foreground mt-1 text-sm">
+                            {formatAddressLine(address)}
+                          </p>
                         </div>
-                        <p className="text-sm">{address.name}</p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          {formatAddressLine(address)}
-                        </p>
-                      </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        {!address.isDefault && addresses.length > 1 && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          {!address.isDefault && addresses.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleSetDefault(
+                                  address._id as Id<"shippingAddresses">
+                                )
+                              }
+                              disabled={isSettingDefault}
+                            >
+                              {isSettingDefault ? "Updating..." : "Set as default"}
+                            </Button>
+                          )}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              handleSetDefault(
-                                address._id as Id<"shippingAddresses">
-                              )
-                            }
-                            disabled={isSettingDefault}
+                            onClick={() => startEdit(address)}
                           >
-                            {isSettingDefault ? "Updating..." : "Set as default"}
+                            Edit
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEdit(address)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteClick(address)}
-                        >
-                          Delete
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(address)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {isEditing && (
                   <ShippingAddressForm
