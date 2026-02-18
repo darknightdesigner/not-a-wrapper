@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   buildCreateShippingAddressPayload,
   buildUpdateShippingAddressPayload,
-} from "./shipping-addresses-payload"
+} from "@/lib/shipping-addresses/payload"
 
 const baseForm = {
   label: " Home ",

@@ -32,7 +32,7 @@ import {
   buildUpdateShippingAddressPayload,
   normalizeFormValue,
   type ShippingAddressFormData,
-} from "./shipping-addresses-payload"
+} from "@/lib/shipping-addresses/payload"
 import { cn } from "@/lib/utils"
 import { useUser } from "@/lib/user-store/provider"
 import { HugeiconsIcon } from "@hugeicons/react"

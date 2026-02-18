@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildUpdateShippingAddressPayload } from "@/app/components/layout/settings/general/shipping-addresses-payload"
+import { buildUpdateShippingAddressPayload } from "../lib/shipping-addresses/payload"
 import { buildShippingAddressPatch } from "./shippingAddressPatch"
 
 describe("shipping address client/server contract", () => {
