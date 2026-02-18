@@ -6,6 +6,7 @@ import { NawIcon } from "@/components/icons/naw"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
 import {
   Sidebar,
+  SIDEBAR_CONTAINER_ID,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
@@ -375,6 +376,8 @@ function CollapsedHeaderToggle() {
             onClick={toggleSidebar}
             className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             aria-label="Open sidebar"
+            aria-expanded={false}
+            aria-controls={SIDEBAR_CONTAINER_ID}
           />
         }
       >

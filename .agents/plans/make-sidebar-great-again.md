@@ -59,27 +59,29 @@ Extracted from ChatGPT's computed styles (see `chatgpt-styles-reference.md`).
 
 ### Sidebar Colors (Dark Mode)
 
-| Token | Value | Notes |
-|---|---|---|
-| `--bg-elevated-secondary` | `#181818` | Expanded sidebar background |
-| `--bg-primary` | `#212121` | Collapsed sidebar (rail) background |
-| `--sidebar-title-primary` | `#f0f0f080` | Section headers — 50% opacity white |
-| `--sidebar-body-primary` | `#ededed` | Chat item text |
-| `--sidebar-icon` | `#a4a4a4` | Icon default color |
-| `--sidebar-surface` | `#2b2b2b` | Intermediate surface |
-| `--surface-hover` | `#ffffff26` | Hover overlay (15% white) |
-| `--border-light` | `#ffffff0d` | Sidebar right border |
-| `--scrollbar-color` | `#ffffff1a` | Scrollbar track |
-| `--scrollbar-color-hover` | `#fff3` | Scrollbar track on hover |
+All colors map to existing project design tokens in `globals.css`. ChatGPT hex values are noted for reference only.
+
+| Purpose | Project Token | ChatGPT Ref | Notes |
+|---|---|---|---|
+| Expanded sidebar bg | `--sidebar` | `#181818` | `bg-sidebar` in Tailwind |
+| Collapsed rail bg | `--background` | `#212121` | `bg-background` in Tailwind |
+| Section header text | `--sidebar-foreground` at 50% opacity | `#f0f0f080` | Use `text-sidebar-foreground/50` |
+| Chat item text | `--sidebar-foreground` | `#ededed` | `text-sidebar-foreground` in Tailwind |
+| Icon default | `--muted-foreground` | `#a4a4a4` | `text-muted-foreground` in Tailwind |
+| Intermediate surface | `--secondary` | `#2b2b2b` | `bg-secondary` in Tailwind |
+| Hover overlay | `--accent` | `#ffffff1a` | `bg-accent` in Tailwind (~10% white) |
+| Sidebar border | `--border` | `#ffffff0d` | `border-border` in Tailwind (~8% white) |
+| Scrollbar track | `--accent` | `#ffffff1a` | Reuse accent token |
+| Scrollbar track hover | `--accent` at higher opacity | `#fff3` | Consider `color-mix(in oklab, var(--accent) 200%, transparent)` or custom `--scrollbar-hover` |
 
 ### Interactive States (Secondary Tier — Sidebar Items)
 
-| State | Background |
-|---|---|
-| Default | `#fff0` (transparent) |
-| Hover | `#ffffff1a` (10% white) |
-| Press | `#ffffff0d` (5% white) |
-| Selected | `#ffffff1a` (same as hover) |
+| State | Project Token | ChatGPT Ref | Tailwind Class |
+|---|---|---|---|
+| Default | transparent | `#fff0` | `bg-transparent` |
+| Hover | `--accent` | `#ffffff1a` (~10% white) | `hover:bg-accent` |
+| Press | `--border` | `#ffffff0d` (~5% white) | `active:bg-border` |
+| Selected | `--accent` | `#ffffff1a` (same as hover) | `data-[active=true]:bg-accent` |
 
 ### Typography (Likely Section Header)
 
@@ -276,7 +278,7 @@ The primary nav (New Chat, Search, Images) uses height-aware stickiness:
 
 The sidebar has **two coordinated animation layers** that must work together:
 
-1. **Root container** (`#stage-slideover-sidebar`): animates `width` (260px ↔ 52px) and `background-color` (#181818 ↔ #212121). Uses a spring/easing curve at ~.667s duration.
+1. **Root container** (`#stage-slideover-sidebar`): animates `width` (260px ↔ 52px) and `background-color` (`--sidebar` ↔ `--background`). Uses a spring/easing curve at ~.667s duration.
 2. **Inner layers** (rail + panel): cross-fade with `opacity` at 150ms. Rail uses asymmetric `steps()` timing; panel uses `linear`.
 
 ### Files
@@ -288,7 +290,7 @@ The sidebar has **two coordinated animation layers** that must work together:
 
 1. **Root width + background-color transition**:
    - Animate `width` between `var(--sidebar-width)` and `var(--sidebar-rail-width)`
-   - Animate `background-color` between `var(--bg-elevated-secondary)` and `var(--bg-primary)`
+   - Animate `background-color` between `var(--sidebar)` and `var(--background)`
    - Use a spring-like easing curve (approximate `--easing-common` or `--spring-standard` at ~.667s). Start with `cubic-bezier(.4,0,.2,1)` at `.3s` as a practical first pass; refine toward the `linear()` spring curve if needed.
 2. **Asymmetrical rail opacity timing**:
    - Appearing (collapse): `steps(1,start)` — rail visible instantly
@@ -308,7 +310,7 @@ The sidebar has **two coordinated animation layers** that must work together:
 ### Exit Criteria
 
 - [ ] Sidebar root smoothly animates width between expanded and collapsed
-- [ ] Background color transitions between expanded (#181818) and collapsed (#212121)
+- [ ] Background color transitions between expanded (`--sidebar`) and collapsed (`--background`)
 - [ ] Rail appears instantly when collapsing
 - [ ] Rail disappears only at end of expansion
 - [ ] Expanded panel always linearly fades
@@ -394,9 +396,9 @@ The sidebar has **two coordinated animation layers** that must work together:
 
 1. Tune header trigger spacing and typography to ChatGPT style:
    - `px-4 py-1.5`
-   - Section header text color: `--sidebar-title-primary` (`#f0f0f080` — 50% opacity white). This is distinctly lighter than body text, creating clear hierarchy.
+   - Section header text color: `--sidebar-foreground` at 50% opacity (`text-sidebar-foreground/50`). This is distinctly lighter than body text, creating clear hierarchy.
    - Typography: likely `--text-footnote-medium` (`.8125rem` / 13px, weight 500) or similar compact heading style.
-   - Body text reference: `--sidebar-body-primary` (`#ededed`), icon reference: `--sidebar-icon` (`#a4a4a4`).
+   - Body text reference: `--sidebar-foreground` (`text-sidebar-foreground`), icon reference: `--muted-foreground` (`text-muted-foreground`).
 2. Ensure section label uses `<h2>` heading semantics with `__menu-label` class (matches ChatGPT).
 3. Update chevron behavior:
    - compact size (`h-3 w-3` / 12px)
@@ -458,8 +460,8 @@ Reason: semantic/state correctness first, then visual/structural refinements.
 - [ ] No hidden hitboxes intercepting clicks
 - [ ] Title truncation does not overlap trailing controls
 - [ ] Header spacing/chevron behavior visually matches reference captures
-- [ ] Section header text uses 50%-opacity style (not same weight as body text)
-- [ ] Scrollbar color matches reference (`#ffffff1a` default, `#fff3` hover) if visible
+- [ ] Section header text uses 50%-opacity style (`text-sidebar-foreground/50`, not same weight as body text)
+- [ ] Scrollbar color uses project tokens (`--accent` default, higher opacity on hover) if visible
 
 ### Engineering
 

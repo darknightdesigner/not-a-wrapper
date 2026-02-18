@@ -33,6 +33,7 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_CONTAINER_ID = "sidebar-container"
 
 // Helper to read sidebar state from cookie (only call after mount)
 function getSidebarStateFromCookie(): boolean | undefined {
@@ -247,6 +248,7 @@ function Sidebar({
         )}
       />
       <div
+        id={SIDEBAR_CONTAINER_ID}
         data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) motion-safe:transition-[left,right,width] duration-200 ease-linear md:flex",
@@ -278,7 +280,7 @@ function SidebarTrigger({
   onClick,
   ...props
 }: React.ComponentProps<typeof Button>) {
-  const { toggleSidebar, state } = useSidebar()
+  const { toggleSidebar, state, open } = useSidebar()
 
   return (
     <Button
@@ -286,6 +288,8 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
+      aria-expanded={open}
+      aria-controls={SIDEBAR_CONTAINER_ID}
       className={cn(
         "size-9 rounded-lg",
         // Resize cursor indicates expandability
@@ -301,7 +305,9 @@ function SidebarTrigger({
       {...props}
     >
       <HugeiconsIcon icon={PanelLeft} size={20} className="size-5" />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">
+        {open ? "Close sidebar" : "Open sidebar"}
+      </span>
     </Button>
   )
 }
@@ -749,6 +755,7 @@ function SidebarMenuSubButton({
 
 export {
   Sidebar,
+  SIDEBAR_CONTAINER_ID,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
