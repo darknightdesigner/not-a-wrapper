@@ -198,7 +198,7 @@ export function AppSidebar() {
                     }
                   />
                   <TooltipContent side="bottom" align="center">
-                    Close sidebar
+                    Close sidebar ⇧⌘S
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -230,18 +230,17 @@ export function AppSidebar() {
               />
               <HistoryTrigger
                 hasSidebar={false}
-                classNameTrigger="group/menu-item hover:bg-accent/80 hover:text-foreground text-primary relative inline-flex h-9 w-full items-center gap-(--sidebar-item-gap) rounded-md bg-transparent px-2 py-2 text-sm"
-                icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
-                label={
-                  <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">
-                    <span className="truncate">Search</span>
-                    <div className="text-muted-foreground ml-auto opacity-0 group-hover/menu-item:opacity-100">
+                trigger={
+                  <SidebarMenuItem
+                    icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
+                    label="Search"
+                    trailing={
                       <KbdGroup>
                         <Kbd label="Command">⌘</Kbd>
                         <Kbd>K</Kbd>
                       </KbdGroup>
-                    </div>
-                  </div>
+                    }
+                  />
                 }
                 hasPopover={false}
               />
@@ -384,7 +383,7 @@ function CollapsedHeaderToggle() {
           className="hidden group-hover/toggle:block group-focus-visible/toggle:block"
         />
       </TooltipTrigger>
-      <TooltipContent side="right">Open sidebar</TooltipContent>
+      <TooltipContent side="right">Open sidebar ⇧⌘S</TooltipContent>
     </Tooltip>
   )
 }
@@ -421,7 +420,7 @@ function CollapsedMenuItem({
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
   )
 
-  const tooltipContent = shortcut ? `${label} (${shortcut})` : label
+  const tooltipContent = shortcut ? `${label} ${shortcut}` : label
 
   return (
     <Tooltip>

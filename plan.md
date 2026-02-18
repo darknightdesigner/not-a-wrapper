@@ -36,6 +36,7 @@ AGENTS.md            ← Rules & permissions
 | 5 | **Security headers** — CSP, HSTS, X-Frame-Options out of the box | Not started | `research/open-webui-analysis/SUMMARY.md` |
 | 6 | **Multi-chat card in single conversations** — When multi-chat is selected and user visits a prior single-model conversation, the UI incorrectly renders multi-chat card view. Investigate and fix. | Not started | — |
 | 7 | **Missing share button on multi-chat threads** — Multi-chat conversations have no share button. Investigate why and add support. | Not started | — |
+| 8 | **OS-conditional shortcut labels in tooltips** — Detect user platform and render Mac (`⌘`) vs Windows/Linux (`Ctrl`) shortcut labels dynamically across shortcut tooltips (starting with sidebar toggle). | Not started | Sidebar shortcut update discussion (2026-02-18) |
 
 ### P1 — Do Next
 

@@ -32,7 +32,7 @@ const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const SIDEBAR_KEYBOARD_SHORTCUT = "s"
 const SIDEBAR_CONTAINER_ID = "sidebar-container"
 
 // Helper to read sidebar state from cookie (only call after mount)
@@ -118,7 +118,8 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
+        event.shiftKey &&
+        event.key.toLowerCase() === SIDEBAR_KEYBOARD_SHORTCUT &&
         (event.metaKey || event.ctrlKey)
       ) {
         event.preventDefault()
@@ -239,7 +240,8 @@ function Sidebar({
       <div
         data-slot="sidebar-gap"
         className={cn(
-          "relative w-(--sidebar-width) bg-transparent motion-safe:transition-[width] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.4,0,.2,1)]",
+          // Slightly snappier timing mirrors ChatGPT's sidebar cadence without changing behavior.
+          "relative w-(--sidebar-width) bg-transparent motion-safe:transition-[width] motion-safe:duration-[220ms] motion-safe:ease-[cubic-bezier(.2,0,0,1)]",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
           variant === "floating" || variant === "inset"
@@ -251,7 +253,7 @@ function Sidebar({
         id={SIDEBAR_CONTAINER_ID}
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) overflow-hidden motion-safe:transition-[left,right,width,background-color] motion-safe:duration-300 motion-safe:ease-[cubic-bezier(.4,0,.2,1)] md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) overflow-hidden motion-safe:transition-[left,right,width,background-color] motion-safe:duration-[220ms] motion-safe:ease-[cubic-bezier(.2,0,0,1)] md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
