@@ -18,7 +18,6 @@ import {
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 import Link from "next/link"
 import { HugeiconsIcon, IconSvgElement } from "@hugeicons/react"
 import {
@@ -76,13 +75,14 @@ export function AppSidebar() {
       {/* === COLLAPSED RAIL === */}
       <div
         className={cn(
-          "absolute inset-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-center",
+          "absolute inset-y-0 left-0 z-10 flex h-full w-(--sidebar-rail-width) flex-col items-start",
           "cursor-e-resize bg-transparent pb-1.5 rtl:cursor-w-resize",
-          // Stepped easing: appear instantly at START of collapse animation (same time expanded content hides)
+          // Rail easing: steps(1,start) snaps visible instantly when collapsing;
+          // steps(1,end) stays visible until the end when expanding (hidden by panel fade-in)
           "motion-safe:transition-opacity motion-safe:duration-150",
           isCollapsed 
             ? "motion-safe:ease-[steps(1,start)]" 
-            : "motion-safe:ease-linear",
+            : "motion-safe:ease-[steps(1,end)]",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-auto opacity-100" 
@@ -92,7 +92,7 @@ export function AppSidebar() {
         inert={!isCollapsed ? true : undefined}
       >
         {/* Header */}
-        <div className="flex h-(--sidebar-header-height) w-full items-center justify-center">
+        <div className="flex h-(--sidebar-header-height) w-full items-center">
           {isMobile ? (
             <button
               type="button"
@@ -107,7 +107,7 @@ export function AppSidebar() {
         </div>
 
         {/* Action buttons - +1px accounts for border-t on SidebarContent in expanded state */}
-        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-center gap-0">
+        <div className="mt-[calc(var(--sidebar-section-first-margin-top)+1px)] flex flex-col items-start gap-0">
           <CollapsedMenuItem
             icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
             label="New chat"
@@ -147,11 +147,8 @@ export function AppSidebar() {
           // by 1px and painting over the container's border-r. ChatGPT uses overflow-hidden
           // on their outer container to achieve the same result with an explicit width.
           "w-full overflow-x-clip text-clip whitespace-nowrap",
-          // Stepped easing: disappear instantly at START of collapse animation
-          "motion-safe:transition-opacity motion-safe:duration-150",
-          isCollapsed 
-            ? "motion-safe:ease-[steps(1,start)]" 
-            : "motion-safe:ease-linear",
+          // Linear crossfade in both directions (ChatGPT pattern)
+          "motion-safe:transition-opacity motion-safe:duration-150 motion-safe:ease-linear",
           // Visibility based on state
           isCollapsed 
             ? "pointer-events-none opacity-0" 
@@ -374,7 +371,7 @@ function CollapsedHeaderToggle() {
           <button
             type="button"
             onClick={toggleSidebar}
-            className="group/toggle flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+            className="group/toggle mx-2 flex h-9 w-9 items-center justify-center rounded-lg cursor-e-resize rtl:cursor-w-resize hover:bg-accent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             aria-label="Open sidebar"
             aria-expanded={false}
             aria-controls={SIDEBAR_CONTAINER_ID}
@@ -457,8 +454,6 @@ function CollapsedMenuItem({
  * 24px (h-6 w-6) matching ChatGPT's pattern.
  */
 function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_image?: string | null } | null }) {
-  const { toggleSidebar } = useSidebar()
-
   if (!user) {
     return (
       <Tooltip>
@@ -478,34 +473,6 @@ function CollapsedUserAvatar({ user }: { user: { display_name?: string; profile_
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent mx-auto focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
-            aria-label={`${user.display_name} - Open profile`}
-          />
-        }
-      >
-        <div className="flex items-center justify-center">
-          {user.profile_image ? (
-            <Image
-              src={user.profile_image}
-              alt=""
-              width={24}
-              height={24}
-              className="h-6 w-6 shrink-0 rounded-full object-cover"
-            />
-          ) : (
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-xs font-medium text-white">
-              {user.display_name?.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-        </div>
-      </TooltipTrigger>
-      <TooltipContent side="right">{user.display_name || "Account"}</TooltipContent>
-    </Tooltip>
+    <UserMenu variant="sidebar-collapsed" />
   )
 }
