@@ -205,20 +205,26 @@ export async function createJob(
   input: PayClawToolInput,
   config: PayClawConfig,
 ): Promise<CreateJobResponse> {
+  const paymentMethod = input.paymentMethod ?? (
+    config.defaultCardId
+      ? { type: 'brex', cardId: config.defaultCardId }
+      : undefined
+  )
+
   const body: CreateJobRequestBody = input.product
     ? {
         vendor: new URL(input.url).origin,
         product: input.product,
         maxSpend: input.maxSpend,
         ...(input.shippingAddress && { shippingAddress: input.shippingAddress }),
-        ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
+        ...(paymentMethod && { paymentMethod }),
         ...(input.browserProvider && { browserProvider: input.browserProvider }),
       }
     : {
         url: input.url,
         maxSpend: input.maxSpend,
         ...(input.shippingAddress && { shippingAddress: input.shippingAddress }),
-        ...(input.paymentMethod && { paymentMethod: input.paymentMethod }),
+        ...(paymentMethod && { paymentMethod }),
         ...(input.browserProvider && { browserProvider: input.browserProvider }),
       }
 

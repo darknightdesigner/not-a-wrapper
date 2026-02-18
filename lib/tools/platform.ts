@@ -26,6 +26,7 @@ export async function getPlatformTools(options?: {
       "Buy a product or provision a service account using Flowglad Pay. " +
       "Provide the vendor URL and maximum spend in cents. " +
       "For physical products, use the user's stored shipping address when available; otherwise extract it from the user message. " +
+      "If PAYCLAW_CARD_ID is configured server-side, it is used as the default payment card unless paymentMethod is explicitly provided. " +
       "The agent will navigate the vendor site, handle checkout, " +
       "and return credentials or order confirmation." +
       "\n\nWhen to call this tool:\n" +

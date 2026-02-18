@@ -7,8 +7,13 @@ const BASE_CONFIG: PayClawConfig = {
   appBaseUrl: "https://payclaw.example.com",
 }
 
-function mockCreatedResponse() {
-  return new Response(JSON.stringify({ jobId: "job_123", status: "created" }), {
+const BASE_CONFIG_WITH_DEFAULT_CARD: PayClawConfig = {
+  ...BASE_CONFIG,
+  defaultCardId: "card_default_123",
+}
+
+function mockCreatedResponse(status: "created" | "retry" | "active" | "completed" | "failed" | "cancelled" = "created") {
+  return new Response(JSON.stringify({ jobId: "job_123", status }), {
     status: 201,
     headers: { "Content-Type": "application/json" },
   })
@@ -87,6 +92,47 @@ describe("createJob request mapping", () => {
     expect(body).not.toHaveProperty("userEmail")
     expect(body).not.toHaveProperty("cardId")
   })
+
+  it("injects default payment method when PAYCLAW_CARD_ID is configured", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockCreatedResponse())
+    vi.stubGlobal("fetch", fetchMock)
+
+    await createJob(
+      {
+        url: "https://example.com/product/123",
+        maxSpend: 1500,
+      },
+      BASE_CONFIG_WITH_DEFAULT_CARD
+    )
+
+    const body = getRequestBody(fetchMock)
+    expect(body).toMatchObject({
+      url: "https://example.com/product/123",
+      maxSpend: 1500,
+      paymentMethod: { type: "brex", cardId: "card_default_123" },
+    })
+  })
+
+  it("prefers explicit paymentMethod over default card", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockCreatedResponse())
+    vi.stubGlobal("fetch", fetchMock)
+
+    await createJob(
+      {
+        url: "https://example.com/product/123",
+        maxSpend: 1500,
+        paymentMethod: { type: "wex" },
+      },
+      BASE_CONFIG_WITH_DEFAULT_CARD
+    )
+
+    const body = getRequestBody(fetchMock)
+    expect(body).toMatchObject({
+      url: "https://example.com/product/123",
+      maxSpend: 1500,
+      paymentMethod: { type: "wex" },
+    })
+  })
 })
 
 describe("createJob error handling", () => {
@@ -113,5 +159,22 @@ describe("createJob error handling", () => {
       code: "UNAUTHORIZED",
       message: "Invalid API key",
     } satisfies Partial<PayClawApiError>)
+  })
+})
+
+describe("createJob response parsing", () => {
+  it("accepts non-created valid upstream job statuses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockCreatedResponse("active"))
+    vi.stubGlobal("fetch", fetchMock)
+
+    await expect(
+      createJob(
+        {
+          url: "https://example.com/product/123",
+          maxSpend: 1000,
+        },
+        BASE_CONFIG
+      )
+    ).resolves.toEqual({ jobId: "job_123", status: "active" })
   })
 })

@@ -6,6 +6,8 @@ Synthesis of research documents 01–05 into a concrete integration specificatio
 **Date**: 2026-02-16
 **Contract baseline**: `.agents/research/flowglad-pay/07-jobs-api-contract-baseline.md` (last verified 2026-02-18)
 
+> **Important contract note (2026-02-18)**: For Jobs API create requests (`POST /api/v1/jobs`), top-level `userEmail` and `cardId` are legacy and invalid. Canonical request shapes are direct (`url`) or indirect (`vendor` + `product`) plus common optional fields.
+
 ---
 
 ## Table of Contents

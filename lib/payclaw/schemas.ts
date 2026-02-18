@@ -48,11 +48,6 @@ export const payClawToolInputSchema = z.object({
 
 // -- API Response Schemas --------------------------------------
 
-export const createJobResponseSchema = z.object({
-  jobId: z.string(),
-  status: z.literal('created'),
-})
-
 export const jobStatusValues = [
   'created',
   'retry',
@@ -63,6 +58,12 @@ export const jobStatusValues = [
 ] as const
 
 export const jobStatusSchema = z.enum(jobStatusValues)
+
+export const createJobResponseSchema = z.object({
+  jobId: z.string(),
+  // Upstream currently returns "created", but accept any known job status to reduce drift breakage.
+  status: jobStatusSchema,
+})
 
 export const jobResultSchema = z
   .object({
