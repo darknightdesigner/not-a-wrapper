@@ -3,17 +3,27 @@ import { z } from 'zod'
 // -- Tool Input Schema (what the LLM fills in) ----------------
 
 export const shippingAddressSchema = z.object({
-  name: z
-    .string()
-    .optional()
-    .describe('Full name of the recipient. If omitted, defaults to the signed-in user\'s name.'),
+  name: z.string().min(1).describe('Full name of the recipient.'),
   line1: z.string().describe('Street address line 1'),
   line2: z.string().optional().describe('Street address line 2 (apt, suite, floor)'),
   city: z.string().describe('City'),
   state: z.string().describe('State or province code (e.g., NY, CA)'),
   postalCode: z.string().describe('Postal/ZIP code'),
   country: z.string().default('US').describe('ISO country code (default: US)'),
+  phone: z.string().optional().describe('Recipient phone number.'),
+  email: z.string().email().optional().describe('Recipient email for delivery updates.'),
 })
+
+export const paymentMethodSchema = z
+  .discriminatedUnion('type', [
+    z.object({ type: z.literal('brex'), cardId: z.string().min(1) }),
+    z.object({ type: z.literal('wex') }),
+  ])
+  .describe('Optional payment rail override supported by PayClaw.')
+
+export const browserProviderSchema = z
+  .enum(['local', 'kernel', 'anchor', 'self_hosted'])
+  .describe('Optional browser runtime override for job execution.')
 
 export const payClawToolInputSchema = z.object({
   url: z.string().url().describe(
@@ -32,6 +42,8 @@ export const payClawToolInputSchema = z.object({
     'Shipping address for physical products. Required when the product needs delivery. ' +
       'Extract all fields from the user message. Use 2-letter state codes and ISO country codes.'
   ),
+  paymentMethod: paymentMethodSchema.optional(),
+  browserProvider: browserProviderSchema.optional(),
 })
 
 // -- API Response Schemas --------------------------------------
@@ -75,6 +87,15 @@ export const jobSchema = z.object({
   product: z.string().optional(),
   maxSpend: z.number(),
   result: jobResultSchema,
+  steps: z
+    .array(
+      z.object({
+        type: z.enum(['thinking', 'tool_call', 'tool_result', 'error', 'skill_injection']),
+        content: z.string(),
+        timestamp: z.string(),
+      })
+    )
+    .optional(),
 })
 
 // -- Event Type Enum -------------------------------------------
@@ -134,6 +155,8 @@ export const apiErrorSchema = z.object({
 
 export type PayClawToolInput = z.infer<typeof payClawToolInputSchema>
 export type ShippingAddress = z.infer<typeof shippingAddressSchema>
+export type PaymentMethod = z.infer<typeof paymentMethodSchema>
+export type BrowserProvider = z.infer<typeof browserProviderSchema>
 export type CreateJobResponse = z.infer<typeof createJobResponseSchema>
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type Job = z.infer<typeof jobSchema>

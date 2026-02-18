@@ -4,6 +4,7 @@ Synthesis of research documents 01–05 into a concrete integration specificatio
 
 **Source repo**: `https://github.com/flowglad/provisioning-agent.git`
 **Date**: 2026-02-16
+**Contract baseline**: `.agents/research/flowglad-pay/07-jobs-api-contract-baseline.md` (last verified 2026-02-18)
 
 ---
 
@@ -39,9 +40,9 @@ The `createJobSchema` is now a **Zod discriminated union** with two shapes:
 
 The old flat schema (`vendorUrl`, `vendorName`, `mode`) is replaced. The server infers `BuyRequest.type` from which fields are present.
 
-### Changed: `cardId` is Now Required
+### Changed: Legacy Client Fields Removed
 
-Previously optional, `cardId` is now a **required** field (`z.string().min(1)`) in both direct and indirect shapes. The CLI also requires it (`--card-id` flag or `CARD_ID` env var).
+`POST /api/v1/jobs` no longer validates legacy client-supplied identity/payment fields at the route boundary. The canonical request shapes are direct/indirect buy with common fields (`maxSpend`, optional `shippingAddress`, optional `paymentMethod`, optional `browserProvider`).
 
 ### Changed: `mode` Field Removed
 
@@ -72,7 +73,7 @@ The server auto-populates `shippingAddress` from the user's profile (Better Auth
 
 - SSE streaming endpoint, wire format, and event taxonomy — identical to doc 03.
 - Credentials API — identical to doc 02.
-- Auth model (shared API key + userEmail) — identical to doc 04.
+- API key auth header format (`X-API-Key` / Bearer fallback) — identical to doc 04.
 - pg-boss queue config (10min expiry, 1 retry) — identical to doc 01.
 
 ---
@@ -125,22 +126,26 @@ const payClawToolSchema = z.object({
 // Direct buy: specific product page URL
 const directBuySchema = z.object({
   url: z.string().url(),
-  userEmail: z.string().email(),
-  cardId: z.string().min(1),
   maxSpend: z.number().int().positive(),
   shippingAddress: shippingAddressSchema.optional(),
-  useStaticCard: z.boolean().optional(),
+  paymentMethod: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('brex'), cardId: z.string().min(1) }),
+    z.object({ type: z.literal('wex') }),
+  ]).optional(),
+  browserProvider: z.enum(['local', 'kernel', 'anchor', 'self_hosted']).optional(),
 })
 
 // Indirect buy: vendor origin + product search
 const indirectBuySchema = z.object({
   vendor: z.string().url(),
   product: z.string().min(1),
-  userEmail: z.string().email(),
-  cardId: z.string().min(1),
   maxSpend: z.number().int().positive(),
   shippingAddress: shippingAddressSchema.optional(),
-  useStaticCard: z.boolean().optional(),
+  paymentMethod: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('brex'), cardId: z.string().min(1) }),
+    z.object({ type: z.literal('wex') }),
+  ]).optional(),
+  browserProvider: z.enum(['local', 'kernel', 'anchor', 'self_hosted']).optional(),
 })
 
 // The actual API accepts either shape
@@ -263,13 +268,11 @@ User prompt: "Sign up for Supabase and get me API keys"
     │
     ▼
 2. Our tool handler:
-   a. Extract Clerk user email from auth context
-   b. Resolve cardId from config (PAYCLAW_CARD_ID env var)
-   c. Determine buy type: no `product` field → direct buy
+   a. Determine buy type: no `product` field → direct buy
+   b. Build canonical payload from tool input
    d. POST /api/v1/jobs
       X-API-Key: <PAYCLAW_API_KEY>
-      Body: { url: "https://supabase.com", userEmail: "user@example.com",
-              cardId: "card_123", maxSpend: 1500 }
+      Body: { url: "https://supabase.com", maxSpend: 1500 }
     │
     ▼
 3. Receive: { jobId: "550e8400-...", status: "created" }
@@ -312,8 +315,7 @@ LLM invokes: { url: "https://notion.so", product: "Pro plan", maxSpend: 2000 }
     │
     ▼
 Tool sends: POST /api/v1/jobs
-  Body: { vendor: "https://notion.so", product: "Pro plan",
-          userEmail: "...", cardId: "...", maxSpend: 2000 }
+  Body: { vendor: "https://notion.so", product: "Pro plan", maxSpend: 2000 }
     │
     ▼
 (same streaming + credential flow)
@@ -329,7 +331,6 @@ Tool sends: POST /api/v1/jobs
 interface PayClawConfig {
   apiKey: string        // PAYCLAW_API_KEY env var
   appBaseUrl: string    // PAYCLAW_APP_URL — Next.js app (jobs, credentials)
-  cardId: string        // PAYCLAW_CARD_ID — default card for provisioning
 }
 ```
 
@@ -738,16 +739,6 @@ PAYCLAW_API_KEY=sk_...
 
 # PayClaw app base URL — Next.js app serving the REST API
 PAYCLAW_APP_URL=https://app.payclaw.example.com
-
-# Default card ID for provisioning jobs
-PAYCLAW_CARD_ID=card_...
-```
-
-### Optional Environment Variables
-
-```bash
-# Override for static card usage (set to "true" to use static card)
-PAYCLAW_USE_STATIC_CARD=false
 ```
 
 ### Configuration Resolution in Our Tool
@@ -760,13 +751,9 @@ function getPayClawConfig(): PayClawConfig {
   const appBaseUrl = process.env.PAYCLAW_APP_URL
   if (!appBaseUrl) throw new Error('PAYCLAW_APP_URL not configured')
 
-  const cardId = process.env.PAYCLAW_CARD_ID
-  if (!cardId) throw new Error('PAYCLAW_CARD_ID not configured')
-
   return {
     apiKey,
     appBaseUrl: appBaseUrl.replace(/\/$/, ''),
-    cardId,
   }
 }
 ```
@@ -781,8 +768,6 @@ function getPayClawConfig(): PayClawConfig {
 
 - If `product` is provided → indirect buy (`vendor` = URL origin, `product` = search term)
 - If `product` is omitted → direct buy (`url` = full URL)
-
-We add `userEmail` (from Clerk) and `cardId` (from env config) server-side — the LLM never sees these.
 
 ### Q2: What is the minimal happy-path flow?
 
@@ -929,9 +914,7 @@ In the current architecture, both are served by the same Next.js app, but the CL
 ### Authentication Flow
 
 ```
-Clerk session → extract user email → pass as userEmail parameter
 PAYCLAW_API_KEY env var → pass as X-API-Key header
-PAYCLAW_CARD_ID env var → pass as cardId in request body
 ```
 
 ---

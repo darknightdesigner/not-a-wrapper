@@ -5,7 +5,9 @@
 > **Scope**: Minimal demo of a Flowglad Pay tool call buying a product in chat
 > **Date**: February 16, 2026
 > **Updated**: February 17, 2026 — Incorporated senior engineer review feedback (event streaming, two-phase pattern confirmed, simplified progress UX)
+> **Updated**: February 18, 2026 — Jobs API contract refreshed (legacy `userEmail`/`cardId` request fields removed)
 > **Research**: `.agents/research/flowglad-pay/` (documents 00–06)
+> **Canonical contract baseline**: `.agents/research/flowglad-pay/07-jobs-api-contract-baseline.md`
 > **Architecture Reference**: `.agents/plans/flowglad-pay-architecture.md`
 > **Tool Infrastructure Reference**: `.agents/plans/tool-calling-infrastructure.md`
 > **Gold Standard**: `app/api/chat/route.ts`, `lib/tools/third-party.ts`
@@ -35,7 +37,7 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 1. **Demo-first**: The goal is a working demo showing a Flowglad Pay tool call in chat. Not production-grade.
 2. **No Convex changes**: Avoid modifying `convex/schema.ts` or adding Convex functions. All state is ephemeral.
 3. **Follow industry standards**: The tool integrates as a standard Vercel AI SDK `tool()` call, fitting into our existing multi-tool Layer architecture (Layers 1-3 are search/MCP; this is Layer 4: Platform Tools).
-4. **Hardcoded auth**: Use the `PAYCLAW_USER_EMAIL` environment variable for the PayClaw `userEmail` parameter. This is temporary and will change when per-user API keys land.
+4. **API key auth only**: Use `PAYCLAW_API_KEY` header auth. Do not send legacy `userEmail`/`cardId` top-level fields in `POST /api/v1/jobs`.
 5. **Expect breakage**: The PayClaw API is experimental and evolving. Our schemas track `main` as source of truth and should be easy to update.
 6. **Only build what the demo uses**: No speculative schemas, no unused SSE infrastructure, no shared type modifications. Add complexity only when the demo path requires it.
 
@@ -45,7 +47,7 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Auth model | Hardcoded `PAYCLAW_USER_EMAIL` env var | Temporary — per-user keys coming later |
+| Auth model | API key auth (`X-API-Key`) | User identity derived by upstream key validation |
 | API schema tracking | Track `main` branch of `flowglad/provisioning-agent` | Source of truth; expect breaking changes |
 | Convex changes | None | Demo scope — avoid schema churn |
 | Credential display | Return in tool result, render in chat | Simplest path; credentials are ephemeral |
@@ -66,19 +68,12 @@ Phases must be executed in order (0 → 1 → 2 → 3). Each phase is independen
 
 ## Environment Variables
 
-Already stubbed in `.env.example` (lines 93-96):
+Current `.env.example` entries for this integration:
 
 ```bash
 # Experimental Flowglad Pay API (Agentic Payments)
-# PAYCLAW_USER_EMAIL=  # Email for PayClaw userEmail param (hardcoded for demo)
 # PAYCLAW_API_KEY=     # Shared PayClaw API key
-```
-
-We will add two more:
-
-```bash
 # PAYCLAW_APP_URL=     # PayClaw app base URL (e.g., https://app.payclaw.example.com)
-# PAYCLAW_CARD_ID=     # Default card ID for provisioning jobs (required by API)
 ```
 
 > **Rollback**: Remove the env vars from `.env.local` and revert any `.env.example` additions.
@@ -206,6 +201,20 @@ Real-time Server-Sent Events. Polls every 250ms server-side, only sends new even
 
 ---
 
+## Contract Correction (2026-02-18)
+
+Any legacy examples in this document that include top-level `userEmail` and `cardId` in the jobs create payload are superseded by:
+
+- `.agents/research/flowglad-pay/07-jobs-api-contract-baseline.md`
+- Upstream `packages/app/app/api/v1/jobs/route.ts`
+
+Current payloads are:
+
+- direct: `{ url, maxSpend, shippingAddress?, paymentMethod?, browserProvider? }`
+- indirect: `{ vendor, product, maxSpend, shippingAddress?, paymentMethod?, browserProvider? }`
+
+---
+
 ## Open Questions (Requiring Further Research)
 
 ### Long-Running Job Handling
@@ -236,7 +245,7 @@ PayClaw plans to migrate from a shared `API_KEY` to per-user API keys. When this
 ### User Provisioning
 > **Status**: Deferred (demo uses pre-existing account)
 
-For the demo, we assume our `PAYCLAW_USER_EMAIL` email maps to an existing Better Auth account in PayClaw. If the email doesn't exist, the API returns 401. We should verify this early in Phase 1.
+For the demo, we assume the configured API key maps to a valid PayClaw user context. If key validation fails, the API returns 401 and we should verify key provisioning early in Phase 1.
 
 ---
 

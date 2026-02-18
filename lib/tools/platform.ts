@@ -37,21 +37,21 @@ export async function getPlatformTools(options?: {
       const startMs = Date.now()
       try {
         const resolvedInput = { ...input }
-        if (resolvedInput.shippingAddress && !resolvedInput.shippingAddress.name) {
-          resolvedInput.shippingAddress = {
-            ...resolvedInput.shippingAddress,
-            name: options?.userName ?? config.userEmail,
-          }
-        }
+
         if (!resolvedInput.shippingAddress && options?.defaultShippingAddress) {
           resolvedInput.shippingAddress = {
             ...options.defaultShippingAddress,
-            name:
-              options.defaultShippingAddress.name ||
-              options?.userName ||
-              config.userEmail,
+            name: options.defaultShippingAddress.name || options?.userName || "Recipient",
           }
         }
+
+        if (resolvedInput.shippingAddress && !resolvedInput.shippingAddress.name) {
+          resolvedInput.shippingAddress = {
+            ...resolvedInput.shippingAddress,
+            name: options?.userName || "Recipient",
+          }
+        }
+
         const result = await createJob(resolvedInput, config)
         return {
           ok: true,
