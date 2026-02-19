@@ -28,14 +28,14 @@ AGENTS.md            ← Rules & permissions
 
 ### P0 — Do Now
 
-- [ ] **#1 Bug fixes** (`In progress`)  
+- [ ] **#1 Bug fixes** (`In progress` — 4/6 complete, 1 needs QA)
   Sources: `plans/base-ui-pattern-fixes.md`, `plans/provider-neutral-replay-compiler.md`
   - [ ] List unresolved regressions from Base UI migration and map each to owner/file.
-  - [x] Fix text loading animation shift and verify no layout jump in streaming states.
-  - [x] Fix stop-streaming button behavior and ensure stream cancellation is immediate.
-  - [x] Prevent streaming from continuing after exit/navigation.
-  - [x] Fix model persistence so selected model is restored reliably.
-  - [ ] Remove link text formatting artifacts (`()` rendering issues).
+  - [x] Fix text loading animation shift and verify no layout jump in streaming states. ✅ `TextShimmerLoader` with proper gap handling
+  - [x] Fix stop-streaming button behavior and ensure stream cancellation is immediate. ✅ `ChatInput` stop handler + AI SDK integration
+  - [x] Prevent streaming from continuing after exit/navigation. ✅ `useEffect` cleanup + 120s timeout guard in `use-chat-core.ts`
+  - [x] Fix model persistence so selected model is restored reliably. ✅ `useModel` hook with DB/context persistence
+  - [ ] Remove link text formatting artifacts (`()` rendering issues). ⚠️ `LinkMarkdown` component exists, needs QA verification
 
 - [x] **#2 Tool calling infra** (`Done`)  
   Sources: `plans/tool-calling-infrastructure.md`, `plans/tool-calling-hardening.md`, `research/multi-tool-calling-system-design.md`, `research/tool-calling-infrastructure.md`
@@ -43,49 +43,53 @@ AGENTS.md            ← Rules & permissions
   - [x] Implement and validate dual-gate injection logic.
   - [x] Document hardening outcomes and known limitations.
 
-- [ ] **#3 Prompt-kit integration** (`Not started`)  
+- [ ] **#3 Prompt-kit integration** (`Not started` — audit complete, implementation blocked)
   Sources: `plans/prompt-kit-component-audit.md`
-  - [ ] Audit Prompt-kit components and map them to current chat UI surfaces.
-  - [ ] Implement highest-priority component swaps with visual parity checks.
+  - [x] Audit Prompt-kit components and map them to current chat UI surfaces. ✅ Comprehensive 256-line audit complete
+  - [ ] Implement highest-priority component swaps with visual parity checks. (Priority: `ThinkingBar`, `SystemMessage`)
   - [ ] Validate keyboard/ARIA behavior and interaction regressions.
   - [ ] Update docs/examples for new component usage.
 
-- [ ] **#4 Visible failure feedback** (`In progress`)  
+- [ ] **#4 Visible failure feedback** (`In progress` — tool status done, RAG missing)
   Sources: `research/open-webui-analysis/SUMMARY.md`
-  - [ ] Define a shared status model for tool calls, RAG, and truncation events.
-  - [ ] Add inline/badge indicators for active, partial, failed, and recovered states.
-  - [ ] Add user-facing error copy with actionable next steps.
-  - [ ] Verify behavior across streaming + retry flows.
+  - [ ] Define a shared status model for tool calls, RAG, and truncation events. ⚠️ Tool status exists (`ToolPart` with 4 states), RAG model missing
+  - [ ] Add inline/badge indicators for active, partial, failed, and recovered states. ✅ Tool badges complete, ❌ RAG indicators missing
+  - [ ] Add user-facing error copy with actionable next steps. ⚠️ Length limit has copy, tool errors show raw text, RAG has none
+  - [ ] Verify behavior across streaming + retry flows. ❌ Streaming error transitions not implemented
 
-- [ ] **#5 Security headers** (`Not started`)  
-  Sources: `research/open-webui-analysis/SUMMARY.md`
-  - [ ] Add baseline CSP with least-privilege defaults and required exceptions.
+- [ ] **#5 Security headers** (`Not started` — templates exist in docs)
+  Sources: `research/open-webui-analysis/SUMMARY.md`, `.agents/context/deployment.md`, `.agents/skills/base-ui-csp-provider/`
+  - [ ] Add baseline CSP with least-privilege defaults and required exceptions. (Reference: `.agents/context/deployment.md:248-271`)
   - [ ] Add HSTS (with rollout-safe max-age strategy).
   - [ ] Add `X-Frame-Options` and validate embed behavior expectations.
   - [ ] Validate headers in local, preview, and production deployments.
 
-- [ ] **#6 Multi-chat card in single conversations** (`Not started`)  
-  Sources: —
-  - [ ] Reproduce by opening prior single-model thread while multi-chat mode is selected.
-  - [ ] Identify state source causing incorrect card-view rendering.
-  - [ ] Fix mode/thread reconciliation logic.
+- [ ] **#6 Multi-chat card in single conversations** (`Identified` — root cause confirmed)
+  Sources: `app/components/chat/chat-container.tsx`, `app/components/multi-chat/multi-conversation.tsx`
+  - [x] Reproduce by opening prior single-model thread while multi-chat mode is selected. ✅ Bug confirmed present
+  - [x] Identify state source causing incorrect card-view rendering. ✅ `multiModelEnabled` preference flag + `groupResponses` state mismatch
+  - [ ] Fix mode/thread reconciliation logic. (Fix location: `chat-container.tsx:11-15`, `multi-conversation.tsx:131-149`)
   - [ ] Add regression test for single-thread render fallback.
 
-- [ ] **#7 Missing share button on multi-chat threads** (`Not started`)  
-  Sources: —
-  - [ ] Trace share-button visibility conditions for single vs multi-chat routes.
-  - [ ] Implement share action + UI state for multi-chat threads.
-  - [ ] Verify permissions, URL generation, and copied-link behavior.
+- [ ] **#7 Missing share button on multi-chat threads** (`Identified` — gated behind mode check)
+  Sources: `app/components/layout/header.tsx`, `app/components/layout/dialog-publish.tsx`
+  - [x] Trace share-button visibility conditions for single vs multi-chat routes. ✅ Gated: `{!isMultiModelEnabled && <DialogPublish />}` at `header.tsx:59`
+  - [ ] Implement share action + UI state for multi-chat threads. (Underlying `DialogPublish` is functional, just needs gate removed)
+  - [ ] Verify permissions, URL generation, and copied-link behavior. (`/share/${chatId}` format works for both modes)
   - [ ] Add regression test for multi-chat share affordance.
 
-- [ ] **#8 OS-conditional shortcut labels in tooltips** (`Not started`)  
+- [ ] **#8 OS-conditional shortcut labels in tooltips** (`Not started` — needs verification)
   Sources: Sidebar shortcut update discussion (2026-02-18)
-  - [ ] Add platform detection utility (`Mac` vs `Windows/Linux`) for shortcut rendering.
+  - [ ] Add platform detection utility (`Mac` vs `Windows/Linux`) for shortcut rendering. (Check `lib/utils` or create new)
   - [ ] Replace hardcoded shortcut labels in sidebar toggle tooltip.
   - [ ] Roll out shared shortcut label component for other tooltips.
   - [ ] Add unit test coverage for platform-specific output.
 
 ### P1 — Do Next
+
+- [ ] **Fix create project chats** (`Not started`)  
+  Sources: —
+  - [ ] Investigate and fix project chat creation flow.
 
 - [ ] **#8 UX redesign: tools/thinking** (`Not started`)  
   Sources: `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md`

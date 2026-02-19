@@ -6,7 +6,15 @@ import {
   eventsListResponseSchema,
   jobSchema,
 } from './schemas'
-import type { ApiError, CreateJobResponse, Job, JobEvent, PayClawToolInput } from './schemas'
+import type {
+  ApiError,
+  BrowserProvider,
+  CreateJobResponse,
+  Job,
+  JobEvent,
+  PayClawToolInput,
+  PaymentMethod,
+} from './schemas'
 
 function makeHeaders(config: PayClawConfig): Record<string, string> {
   return {
@@ -175,25 +183,49 @@ async function parseCreateJobResponse(res: Response): Promise<CreateJobResponse>
   throw new Error('Invalid create job response payload')
 }
 
+type CreateJobCommonFields = {
+  maxSpend: number
+  shippingAddress?: PayClawToolInput['shippingAddress']
+  paymentMethod?: PaymentMethod
+  browserProvider?: BrowserProvider
+}
+
+type CreateJobDirectBody = {
+  url: string
+} & CreateJobCommonFields
+
+type CreateJobIndirectBody = {
+  vendor: string
+  product: string
+} & CreateJobCommonFields
+
+type CreateJobRequestBody = CreateJobDirectBody | CreateJobIndirectBody
+
 export async function createJob(
   input: PayClawToolInput,
   config: PayClawConfig,
 ): Promise<CreateJobResponse> {
-  const body = input.product
+  const paymentMethod = input.paymentMethod ?? (
+    config.defaultCardId
+      ? { type: 'brex', cardId: config.defaultCardId }
+      : undefined
+  )
+
+  const body: CreateJobRequestBody = input.product
     ? {
         vendor: new URL(input.url).origin,
         product: input.product,
-        userEmail: config.userEmail,
-        cardId: config.cardId,
         maxSpend: input.maxSpend,
         ...(input.shippingAddress && { shippingAddress: input.shippingAddress }),
+        ...(paymentMethod && { paymentMethod }),
+        ...(input.browserProvider && { browserProvider: input.browserProvider }),
       }
     : {
         url: input.url,
-        userEmail: config.userEmail,
-        cardId: config.cardId,
         maxSpend: input.maxSpend,
         ...(input.shippingAddress && { shippingAddress: input.shippingAddress }),
+        ...(paymentMethod && { paymentMethod }),
+        ...(input.browserProvider && { browserProvider: input.browserProvider }),
       }
 
   const res = await fetch(`${config.appBaseUrl}/api/v1/jobs`, {

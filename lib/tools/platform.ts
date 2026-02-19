@@ -25,9 +25,17 @@ export async function getPlatformTools(options?: {
     description:
       "Buy a product or provision a service account using Flowglad Pay. " +
       "Provide the vendor URL and maximum spend in cents. " +
-      "For physical products, use the user's stored shipping address when available; otherwise extract it from the user message. " +
       "The agent will navigate the vendor site, handle checkout, " +
       "and return credentials or order confirmation." +
+      "\n\nBudget rules:\n" +
+      "- maxSpend is in cents (e.g. 1500 = $15.00) with ZERO tolerance for overages.\n" +
+      "- The virtual card is hard-capped at maxSpend — if tax + shipping pushes the total over, the card is DECLINED.\n" +
+      "- For physical products, ALWAYS pad maxSpend by 20–30% above the listed price to cover tax and shipping.\n" +
+      "  Example: product listed at $14.99 → set maxSpend to at least 2200 (i.e. $22.00).\n" +
+      "\n\nShipping address rules:\n" +
+      "- Required for physical products. If missing, the job fails partway through checkout (not upfront).\n" +
+      "- Use the user's stored shipping address when available; otherwise extract it from the user message.\n" +
+      "- ALWAYS extract phone number and email when the user provides them — many checkouts fail without both.\n" +
       "\n\nWhen to call this tool:\n" +
       "- The user asks to buy, purchase, order, or subscribe to something.\n" +
       "- Do NOT call this tool to check on an existing job — use flowglad_pay_status instead.\n" +
@@ -37,21 +45,49 @@ export async function getPlatformTools(options?: {
       const startMs = Date.now()
       try {
         const resolvedInput = { ...input }
-        if (resolvedInput.shippingAddress && !resolvedInput.shippingAddress.name) {
-          resolvedInput.shippingAddress = {
-            ...resolvedInput.shippingAddress,
-            name: options?.userName ?? config.userEmail,
-          }
-        }
+
         if (!resolvedInput.shippingAddress && options?.defaultShippingAddress) {
           resolvedInput.shippingAddress = {
             ...options.defaultShippingAddress,
-            name:
-              options.defaultShippingAddress.name ||
-              options?.userName ||
-              config.userEmail,
+            name: options.defaultShippingAddress.name || options?.userName || "Recipient",
           }
         }
+
+        if (resolvedInput.shippingAddress && !resolvedInput.shippingAddress.name) {
+          resolvedInput.shippingAddress = {
+            ...resolvedInput.shippingAddress,
+            name: options?.userName || "Recipient",
+          }
+        }
+
+        const hasPaymentMethod = resolvedInput.paymentMethod || config.defaultCardId
+        if (!hasPaymentMethod) {
+          return {
+            ok: false,
+            data: null,
+            error: "No payment method available. Provide a paymentMethod in the request or configure PAYCLAW_CARD_ID.",
+            meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
+          }
+        }
+
+        const isLikelyPhysical = resolvedInput.shippingAddress !== undefined
+        if (isLikelyPhysical) {
+          const addr = resolvedInput.shippingAddress!
+          if (!addr.phone) {
+            return {
+              ok: false,
+              data: null,
+              error:
+                "Shipping address is missing a phone number, which most vendor checkouts require. " +
+                "Ask the user for their phone number and include it in the shippingAddress.",
+              meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
+            }
+          }
+          if (!addr.email) {
+            console.warn("[tools/platform] Shipping address missing email — some checkouts may require it")
+          }
+        }
+
         const result = await createJob(resolvedInput, config)
         return {
           ok: true,

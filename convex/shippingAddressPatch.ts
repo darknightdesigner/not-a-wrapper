@@ -3,6 +3,8 @@ import type { Doc } from "./_generated/dataModel"
 export type ShippingAddressUpdateInput = {
   label?: string
   name?: string
+  email?: string | null
+  phone?: string | null
   line1?: string
   line2?: string | null
   city?: string
@@ -24,6 +26,18 @@ export function buildShippingAddressPatch(
     patch.line2 = undefined
   } else if (updates.line2 !== undefined) {
     patch.line2 = updates.line2
+  }
+
+  if (updates.email === null) {
+    patch.email = undefined
+  } else if (updates.email !== undefined) {
+    patch.email = updates.email
+  }
+
+  if (updates.phone === null) {
+    patch.phone = undefined
+  } else if (updates.phone !== undefined) {
+    patch.phone = updates.phone
   }
 
   if (updates.city !== undefined) patch.city = updates.city

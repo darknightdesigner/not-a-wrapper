@@ -3,7 +3,10 @@ import nextConfig from "eslint-config-next"
 const eslintConfig = [
   ...nextConfig,
   {
-    ignores: ["convex/_generated/**"],
+    ignores: [
+      "convex/_generated/**",
+      "lib/payclaw.ts", // Auto-synced from provisioning-agent — upstream code style
+    ],
   },
   {
     // Icon system enforcement: Use HugeIcons (@hugeicons/react + @hugeicons-pro/core-stroke-rounded)

@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { toast } from "@/components/ui/toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { api } from "@/convex/_generated/api"
 import type { Doc, Id } from "@/convex/_generated/dataModel"
 import {
@@ -102,6 +103,8 @@ type ShippingAddressDoc = Doc<"shippingAddresses">
 const EMPTY_FORM: ShippingAddressFormData = {
   label: "",
   name: "",
+  email: "",
+  phone: "",
   line1: "",
   line2: "",
   city: "",
@@ -112,6 +115,8 @@ const EMPTY_FORM: ShippingAddressFormData = {
 function validateForm(form: ShippingAddressFormData) {
   const label = normalizeFormValue(form.label)
   const name = normalizeFormValue(form.name)
+  const email = normalizeFormValue(form.email)
+  const phone = normalizeFormValue(form.phone)
   const line1 = normalizeFormValue(form.line1)
   const city = normalizeFormValue(form.city)
   const state = normalizeFormValue(form.state)
@@ -122,6 +127,15 @@ function validateForm(form: ShippingAddressFormData) {
     return `Label must be ${MAX_LABEL_LENGTH} characters or fewer.`
   }
   if (!name) return "Recipient name is required."
+  if (!email) return "Email is required."
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return "Please enter a valid email address."
+  }
+  if (!phone) return "Phone number is required."
+  const phoneDigits = phone.replace(/[^\d+]/g, "").replace(/\+/g, "")
+  if (phoneDigits.length < 7 || phoneDigits.length > 15) {
+    return "Please enter a valid phone number."
+  }
   if (!line1) return "Address line 1 is required."
   if (!city) return "City is required."
   if (!state) return "State is required."
@@ -135,15 +149,21 @@ function validateForm(form: ShippingAddressFormData) {
   return null
 }
 
-function formatAddressLine(address: ShippingAddressDoc) {
-  const line2 = address.line2 ? `, ${address.line2}` : ""
-  return `${address.line1}${line2}, ${address.city}, ${address.state} ${address.postalCode}`
+function formatAddressLines(address: ShippingAddressDoc) {
+  const lines = [address.line1]
+  if (address.line2) {
+    lines.push(address.line2)
+  }
+  lines.push(`${address.city}, ${address.state} ${address.postalCode}`)
+  return lines.map((line) => line.trim()).filter(Boolean)
 }
 
 function toFormData(address: ShippingAddressDoc): ShippingAddressFormData {
   return {
     label: address.label,
     name: address.name,
+    email: address.email ?? "",
+    phone: address.phone ?? "",
     line1: address.line1,
     line2: address.line2 ?? "",
     city: address.city,
@@ -279,6 +299,31 @@ function ShippingAddressForm({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor={`${formId}-email`}>Email *</Label>
+            <Input
+              id={`${formId}-email`}
+              type="email"
+              placeholder="jane@example.com"
+              value={form.email}
+              onChange={(event) => onFormChange("email", event.target.value)}
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={`${formId}-phone`}>Phone</Label>
+            <Input
+              id={`${formId}-phone`}
+              type="tel"
+              placeholder="+1 (555) 123-4567"
+              value={form.phone}
+              onChange={(event) => onFormChange("phone", event.target.value)}
+              disabled={isSubmitting}
+            />
+            <p className="text-muted-foreground text-xs">Required for deliveries</p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor={`${formId}-line1`}>Address line 1</Label>
             <Input
               id={`${formId}-line1`}
@@ -339,7 +384,12 @@ function ShippingAddressForm({
 
             <div className="space-y-2">
               <Label htmlFor={`${formId}-country`}>Country</Label>
-              <Input id={`${formId}-country`} value="United States" disabled />
+              <Tooltip>
+                <TooltipTrigger render={<div className="w-full cursor-not-allowed" />}>
+                  <Input id={`${formId}-country`} value="United States" disabled />
+                </TooltipTrigger>
+                <TooltipContent>United States only for now.</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </form>
@@ -385,6 +435,7 @@ export function ShippingAddresses() {
     setForm({
       ...EMPTY_FORM,
       name: user?.display_name ?? "",
+      email: user?.email ?? "",
     })
   }
 
@@ -519,62 +570,65 @@ export function ShippingAddresses() {
           {addresses.map((address) => {
             const isEditing = editingId === address._id
             const isSettingDefault = pendingDefaultId === address._id
-
             return (
               <div key={address._id} className="space-y-3">
-                <Card className="py-1">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="mb-1 flex items-center gap-2">
-                          <h4 className="truncate font-medium text-balance">
-                            {address.label}
-                          </h4>
-                          {address.isDefault && (
-                            <Badge variant="secondary" className="text-xs">
-                              Default
-                            </Badge>
-                          )}
+                {!isEditing && (
+                  <Card className="py-0 shadow-none">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1 flex items-center gap-2">
+                            <h4 className="truncate font-medium text-balance">
+                              {address.label}
+                            </h4>
+                            {address.isDefault && (
+                              <Badge variant="secondary" className="text-xs">
+                                Default
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm">{address.name}</p>
+                          <div className="mt-1 space-y-0.5 text-muted-foreground text-sm">
+                            {formatAddressLines(address).map((line, index) => (
+                              <p key={`${address._id}-${index}`}>{line}</p>
+                            ))}
+                          </div>
                         </div>
-                        <p className="text-sm">{address.name}</p>
-                        <p className="text-muted-foreground mt-1 text-sm">
-                          {formatAddressLine(address)}
-                        </p>
-                      </div>
 
-                      <div className="flex shrink-0 items-center gap-2">
-                        {!address.isDefault && addresses.length > 1 && (
+                        <div className="flex shrink-0 items-center gap-2">
+                          {!address.isDefault && addresses.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                handleSetDefault(
+                                  address._id as Id<"shippingAddresses">
+                                )
+                              }
+                              disabled={isSettingDefault}
+                            >
+                              {isSettingDefault ? "Updating..." : "Set as default"}
+                            </Button>
+                          )}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              handleSetDefault(
-                                address._id as Id<"shippingAddresses">
-                              )
-                            }
-                            disabled={isSettingDefault}
+                            onClick={() => startEdit(address)}
                           >
-                            {isSettingDefault ? "Updating..." : "Set as default"}
+                            Edit
                           </Button>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEdit(address)}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteClick(address)}
-                        >
-                          Delete
-                        </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteClick(address)}
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {isEditing && (
                   <ShippingAddressForm

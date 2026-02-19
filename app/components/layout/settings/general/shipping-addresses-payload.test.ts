@@ -7,6 +7,8 @@ import {
 const baseForm = {
   label: " Home ",
   name: " Jane Doe ",
+  email: " jane@example.com ",
+  phone: " +1 (555) 123-4567 ",
   line1: " 123 Main St ",
   city: " New York ",
   state: " NY ",
@@ -23,6 +25,8 @@ describe("shipping-addresses payload builders", () => {
     expect(payload).toEqual({
       label: "Home",
       name: "Jane Doe",
+      email: "jane@example.com",
+      phone: "+1 (555) 123-4567",
       line1: "123 Main St",
       city: "New York",
       state: "NY",
@@ -41,6 +45,8 @@ describe("shipping-addresses payload builders", () => {
     expect(payload).toEqual({
       label: "Home",
       name: "Jane Doe",
+      email: "jane@example.com",
+      phone: "+1 (555) 123-4567",
       line1: "123 Main St",
       city: "New York",
       state: "NY",
