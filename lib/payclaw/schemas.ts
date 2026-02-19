@@ -42,7 +42,9 @@ export const payClawToolInputSchema = z.object({
     'Shipping address for physical products. Required when the product needs delivery. ' +
       'Extract all fields from the user message. Use 2-letter state codes and ISO country codes.'
   ),
-  paymentMethod: paymentMethodSchema.optional(),
+  paymentMethod: paymentMethodSchema.optional().describe(
+    'Payment method override. Omit this field — a default payment card is applied automatically.'
+  ),
   browserProvider: browserProviderSchema.optional(),
 })
 

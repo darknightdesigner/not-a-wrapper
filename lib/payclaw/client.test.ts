@@ -113,6 +113,22 @@ describe("createJob request mapping", () => {
     })
   })
 
+  it("sends no paymentMethod when neither input nor config provides one", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockCreatedResponse())
+    vi.stubGlobal("fetch", fetchMock)
+
+    await createJob(
+      {
+        url: "https://example.com/product/123",
+        maxSpend: 1500,
+      },
+      BASE_CONFIG
+    )
+
+    const body = getRequestBody(fetchMock)
+    expect(body).not.toHaveProperty("paymentMethod")
+  })
+
   it("prefers explicit paymentMethod over default card", async () => {
     const fetchMock = vi.fn().mockResolvedValue(mockCreatedResponse())
     vi.stubGlobal("fetch", fetchMock)

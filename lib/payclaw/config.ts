@@ -18,8 +18,9 @@ export type PayClawConfig = {
  * Returns null if any required variable is missing — allows graceful
  * degradation (tool simply isn't registered) rather than crashing the app.
  *
- * TODO(flowglad-pay): Replace PAYCLAW_CARD_ID env fallback with a user-provided
- * default card setting (per-user), so payment defaults are not shared globally.
+ * TODO(flowglad-pay): Per-user card plumbing is in place (users.payClawCardId →
+ * route.ts → platform.ts). Still needs: UI for card management, admin tooling,
+ * and validation that card IDs are real. PAYCLAW_CARD_ID remains the global fallback.
  */
 export function getPayClawConfig(): PayClawConfig | null {
   const apiKey = process.env.PAYCLAW_API_KEY

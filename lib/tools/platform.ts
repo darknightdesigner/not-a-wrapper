@@ -9,6 +9,7 @@ import { PayClawApiError, createJob, getJob, getJobEvents } from "@/lib/payclaw/
 export async function getPlatformTools(options?: {
   userName?: string
   defaultShippingAddress?: ShippingAddress
+  defaultCardId?: string
 }): Promise<{
   tools: ToolSet
   metadata: Map<string, ToolMetadata>
@@ -60,12 +61,16 @@ export async function getPlatformTools(options?: {
           }
         }
 
+        if (!resolvedInput.paymentMethod && options?.defaultCardId) {
+          resolvedInput.paymentMethod = { type: 'brex', cardId: options.defaultCardId }
+        }
+
         const hasPaymentMethod = resolvedInput.paymentMethod || config.defaultCardId
         if (!hasPaymentMethod) {
           return {
             ok: false,
             data: null,
-            error: "No payment method available. Provide a paymentMethod in the request or configure PAYCLAW_CARD_ID.",
+            error: "No payment method available. Add a default card in settings or configure PAYCLAW_CARD_ID.",
             meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
           }
         }

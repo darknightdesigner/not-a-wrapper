@@ -400,6 +400,7 @@ export async function POST(req: Request) {
     let platformTools: ToolSet = {} as ToolSet
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
+    let userCardId: string | undefined
     if (isAuthenticated) {
       if (convexToken) {
         try {
@@ -410,6 +411,17 @@ export async function POST(req: Request) {
           )) ?? []
         } catch (err) {
           console.warn("[chat] Failed to fetch shipping addresses:", err)
+        }
+
+        try {
+          const userDoc = await fetchQuery(
+            api.users.getByClerkId,
+            { clerkId: authUserId! },
+            { token: convexToken }
+          )
+          userCardId = userDoc?.payClawCardId ?? undefined
+        } catch (err) {
+          console.warn("[chat] Failed to fetch user card ID:", err)
         }
       }
 
@@ -446,6 +458,7 @@ export async function POST(req: Request) {
       const platformResult = await getPlatformTools({
         userName: userName || undefined,
         defaultShippingAddress: cleanDefaultShippingAddress,
+        defaultCardId: userCardId,
       })
       platformTools = platformResult.tools
       platformToolMetadata = platformResult.metadata
