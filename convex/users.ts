@@ -160,3 +160,34 @@ export const updateProfile = mutation({
     return { success: true }
   },
 })
+
+/**
+ * Set or clear the user's default PayClaw card ID.
+ * Pass a string to set, null to clear.
+ */
+export const setPayClawCardId = mutation({
+  args: {
+    cardId: v.union(v.string(), v.null()),
+  },
+  handler: async (ctx, { cardId }) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new Error("Not authenticated")
+    }
+
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .unique()
+
+    if (!user) {
+      throw new Error("User not found")
+    }
+
+    await ctx.db.patch(user._id, {
+      payClawCardId: cardId ?? undefined,
+    })
+
+    return { success: true }
+  },
+})

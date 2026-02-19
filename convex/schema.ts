@@ -28,6 +28,9 @@ export default defineSchema({
     // Preferences stored directly on user
     favoriteModels: v.optional(v.array(v.string())),
     systemPrompt: v.optional(v.string()),
+
+    // PayClaw — per-user default card ID (plaintext, no encryption)
+    payClawCardId: v.optional(v.string()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"]),
