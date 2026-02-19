@@ -105,7 +105,7 @@ export function FileItem({ file, onRemove }: FileItemProps) {
               />
             )}
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={12} />
+            <HugeiconsIcon icon={Cancel01Icon} size={12} className="size-3" />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>Remove file</TooltipContent>
         </Tooltip>

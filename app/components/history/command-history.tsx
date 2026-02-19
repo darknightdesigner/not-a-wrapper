@@ -259,9 +259,9 @@ function CommandItemRow({
               }
             >
               {chat.pinned ? (
-                <HugeiconsIcon icon={PinOff} size={12} className="group-hover/edit:text-primary" />
+                <HugeiconsIcon icon={PinOff} size={12} className="size-3 group-hover/edit:text-primary" />
               ) : (
-                <HugeiconsIcon icon={Pin} size={12} className="group-hover/edit:text-primary" />
+                <HugeiconsIcon icon={Pin} size={12} className="size-3 group-hover/edit:text-primary" />
               )}
             </TooltipTrigger>
             <TooltipContent>{chat.pinned ? "Unpin" : "Pin"}</TooltipContent>
@@ -626,7 +626,7 @@ export function CommandHistory({
                 <CommandGroup
                   heading={
                     <div className="flex items-center gap-1 font-semibold break-all">
-                      <HugeiconsIcon icon={Pin} size={12} />
+                      <HugeiconsIcon icon={Pin} size={12} className="size-3" />
                       Pinned
                     </div>
                   }

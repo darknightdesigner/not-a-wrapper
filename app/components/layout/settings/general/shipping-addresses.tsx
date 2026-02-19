@@ -231,7 +231,7 @@ function StateCombobox({
                       <span className="flex-1">
                         {entry.label} ({entry.value})
                       </span>
-                      {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} />}
+                      {isSelected && <HugeiconsIcon icon={Tick02Icon} size={14} className="size-3.5" />}
                     </CommandItem>
                   )
                 })}

@@ -308,7 +308,7 @@ export function DrawerHistory({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <HugeiconsIcon icon={Search01Icon} size={14} className="absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 transform text-gray-400" />
+              <HugeiconsIcon icon={Search01Icon} size={14} className="size-3.5 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 transform text-gray-400" />
             </div>
           </div>
 
@@ -328,7 +328,7 @@ export function DrawerHistory({
                   {pinnedChats.length > 0 && (
                     <div className="space-y-0.5">
                       <h3 className="text-muted-foreground flex items-center gap-1 pl-2 text-sm font-medium">
-                        <HugeiconsIcon icon={Pin} size={12} />
+                        <HugeiconsIcon icon={Pin} size={12} className="size-3" />
                         Pinned
                       </h3>
                       <div className="space-y-2">

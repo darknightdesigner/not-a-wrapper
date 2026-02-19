@@ -33,7 +33,7 @@ export function ButtonSearch({
             />
           }
         >
-          <HugeiconsIcon icon={GlobeIcon} size={20} />
+          <HugeiconsIcon icon={GlobeIcon} size={20} className="size-5" />
           Search
         </PopoverTrigger>
         <PopoverContentAuth />
@@ -51,7 +51,7 @@ export function ButtonSearch({
       )}
       onClick={handleClick}
     >
-      <HugeiconsIcon icon={GlobeIcon} size={20} />
+      <HugeiconsIcon icon={GlobeIcon} size={20} className="size-5" />
       <span className="hidden md:block">Search</span>
     </Button>
   )

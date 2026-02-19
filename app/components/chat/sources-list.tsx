@@ -115,7 +115,7 @@ export function SourcesList({ sources, className }: SourcesListProps) {
                             />
                           )}
                           <span className="truncate">{source.title}</span>
-                          <HugeiconsIcon icon={Link01Icon} size={12} className="inline h-3 w-3 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
+                          <HugeiconsIcon icon={Link01Icon} size={12} className="size-3 inline h-3 w-3 flex-shrink-0 opacity-70 transition-opacity group-hover:opacity-100" />
                         </a>
                         <div className="text-muted-foreground line-clamp-1 text-xs">
                           {formatUrl(source.url)}

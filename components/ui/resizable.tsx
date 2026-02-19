@@ -47,7 +47,7 @@ function ResizableHandle({
     >
       {withHandle && (
         <div className="bg-border z-10 flex h-4 w-3 items-center justify-center rounded-xs border">
-          <HugeiconsIcon icon={GripVertical} size={10} />
+          <HugeiconsIcon icon={GripVertical} size={10} className="size-2.5" />
         </div>
       )}
     </Separator>

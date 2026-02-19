@@ -56,7 +56,7 @@ export function FeedbackBar({
             className="text-muted-foreground hover:text-foreground flex items-center justify-center rounded-md p-3"
             aria-label="Close"
           >
-            <HugeiconsIcon icon={Cancel01Icon} size={20} />
+            <HugeiconsIcon icon={Cancel01Icon} size={20} className="size-5" />
           </button>
         </div>
       </div>

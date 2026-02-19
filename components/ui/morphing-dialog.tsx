@@ -411,7 +411,7 @@ function MorphingDialogClose({
       exit='exit'
       variants={variants}
     >
-      {children || <HugeiconsIcon icon={Cancel01Icon} size={24} />}
+      {children || <HugeiconsIcon icon={Cancel01Icon} size={24} className="size-6" />}
     </motion.button>
   );
 }

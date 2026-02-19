@@ -168,7 +168,7 @@ export function ModelSelector(props: ModelSelectorProps) {
           </div>
           {isLocked && (
             <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-              <HugeiconsIcon icon={StarIcon} size={8} />
+              <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
               <span>Locked</span>
             </div>
           )}
@@ -205,7 +205,7 @@ export function ModelSelector(props: ModelSelectorProps) {
         <div className="flex items-center gap-2">
           {isLocked && (
             <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-              <HugeiconsIcon icon={StarIcon} size={8} />
+              <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
               <span>Locked</span>
             </div>
           )}
@@ -548,7 +548,7 @@ export function ModelSelector(props: ModelSelectorProps) {
                       {mode === "single" ? (
                         isLocked ? (
                           <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                            <HugeiconsIcon icon={StarIcon} size={8} />
+                            <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
                             <span>Locked</span>
                           </div>
                         ) : null
@@ -559,7 +559,7 @@ export function ModelSelector(props: ModelSelectorProps) {
                           )}
                           {isLocked && (
                             <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                              <HugeiconsIcon icon={StarIcon} size={8} />
+                              <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
                               <span>Locked</span>
                             </div>
                           )}

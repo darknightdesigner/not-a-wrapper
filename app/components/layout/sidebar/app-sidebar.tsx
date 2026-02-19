@@ -108,7 +108,7 @@ export function AppSidebar() {
               onClick={() => setOpenMobile(false)}
               className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={24} />
+              <HugeiconsIcon icon={Cancel01Icon} size={24} className="size-6" />
             </button>
           ) : (
             <CollapsedHeaderToggle />
@@ -118,7 +118,7 @@ export function AppSidebar() {
         {/* Action buttons */}
         <div className="mt-(--sidebar-section-first-margin-top) flex w-full flex-col items-start gap-0 px-1.5">
           <CollapsedMenuItem
-            icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
+            icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} className="size-5" />}
             label="New chat"
             href="/"
             shortcut="⇧⌘O"
@@ -187,7 +187,7 @@ export function AppSidebar() {
                     onClick={() => setOpenMobile(false)}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={24} />
+                    <HugeiconsIcon icon={Cancel01Icon} size={24} className="size-6" />
                   </button>
                 ) : (
                   <Link
@@ -225,7 +225,7 @@ export function AppSidebar() {
           >
             <div className="flex w-full flex-col items-start gap-0">
               <SidebarMenuItem
-                icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} />}
+                icon={<HugeiconsIcon icon={PencilEdit02Icon} size={20} className="size-5" />}
                 label="New chat"
                 href="/"
                 testId="new-chat-button"
@@ -241,7 +241,7 @@ export function AppSidebar() {
                 hasSidebar={false}
                 trigger={
                   <SidebarMenuItem
-                    icon={<HugeiconsIcon icon={Search01Icon} size={20} />}
+                    icon={<HugeiconsIcon icon={Search01Icon} size={20} className="size-5" />}
                     label="Search"
                     trailing={
                       <KbdGroup>
@@ -419,7 +419,7 @@ function CollapsedMenuItem({
 
   const content = (
     <div className="flex items-center justify-center">
-      {isCustomIcon ? icon : <HugeiconsIcon icon={icon as IconSvgElement} size={20} />}
+      {isCustomIcon ? icon : <HugeiconsIcon icon={icon as IconSvgElement} size={20} className="size-5" />}
     </div>
   )
 

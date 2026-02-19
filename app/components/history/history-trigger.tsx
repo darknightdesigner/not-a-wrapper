@@ -88,7 +88,7 @@ export function HistoryTrigger({
         aria-label="Search"
         tabIndex={isMobile ? -1 : 0}
       >
-        {icon || <HugeiconsIcon icon={SearchList01Icon} size={24} />}
+        {icon || <HugeiconsIcon icon={SearchList01Icon} size={24} className="size-6" />}
         {label}
         {trailing}
       </button>

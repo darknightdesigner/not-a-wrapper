@@ -81,7 +81,7 @@ export function FeedbackForm({ authUserId, onClose }: FeedbackFormProps) {
             transition={TRANSITION_CONTENT}
           >
             <div className="rounded-full bg-green-500/10 p-1">
-              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={24} className="text-green-500" />
+              <HugeiconsIcon icon={CheckmarkBadge01Icon} size={24} className="size-6 text-green-500" />
             </div>
             <p className="text-foreground mt-3 mb-1 text-center text-sm font-medium">
               Thank you for your time!

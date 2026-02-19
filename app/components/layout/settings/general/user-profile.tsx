@@ -21,7 +21,7 @@ export function UserProfile() {
               <AvatarFallback>{user?.display_name?.charAt(0)}</AvatarFallback>
             </Avatar>
           ) : (
-            <HugeiconsIcon icon={User02Icon} size={48} className="text-muted-foreground" />
+            <HugeiconsIcon icon={User02Icon} size={48} className="size-12 text-muted-foreground" />
           )}
         </div>
         <div>

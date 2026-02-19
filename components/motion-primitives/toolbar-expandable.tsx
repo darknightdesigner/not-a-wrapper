@@ -18,7 +18,7 @@ const ITEMS = [
   {
     id: 1,
     label: 'User',
-    title: <HugeiconsIcon icon={User02Icon} size={20} />,
+    title: <HugeiconsIcon icon={User02Icon} size={20} className="size-5" />,
     content: (
       <div className='flex flex-col space-y-4'>
         <div className='flex flex-col space-y-1 text-zinc-700'>
@@ -37,7 +37,7 @@ const ITEMS = [
   {
     id: 2,
     label: 'Messages',
-    title: <HugeiconsIcon icon={Chat01Icon} size={20} />,
+    title: <HugeiconsIcon icon={Chat01Icon} size={20} className="size-5" />,
     content: (
       <div className='flex flex-col space-y-4'>
         <div className='text-zinc-700'>You have 3 new messages.</div>

@@ -137,7 +137,7 @@ function ErrorState({
     <div className="flex h-full items-center justify-center p-4">
       <div className="text-muted-foreground max-w-[300px] space-y-3 text-center">
         <div className="flex justify-center">
-          <HugeiconsIcon icon={AlertCircleIcon} size={32} className="text-muted-foreground/50 h-8 w-8" />
+          <HugeiconsIcon icon={AlertCircleIcon} size={32} className="size-8 text-muted-foreground/50 h-8 w-8" />
         </div>
         <div className="space-y-1">
           <p className="text-sm font-medium">Failed to load preview</p>
@@ -150,7 +150,7 @@ function ErrorState({
             onClick={onRetry}
             className="h-8 text-xs"
           >
-            <HugeiconsIcon icon={RefreshIcon} size={12} className="mr-1 h-3 w-3" />
+            <HugeiconsIcon icon={RefreshIcon} size={12} className="size-3 mr-1 h-3 w-3" />
             Try again
           </Button>
         )}

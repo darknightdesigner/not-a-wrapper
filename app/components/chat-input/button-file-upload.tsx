@@ -133,7 +133,7 @@ export function ButtonFileUpload({
       </Tooltip>
       <FileUploadContent>
         <div className="border-input bg-background flex flex-col items-center rounded-lg border border-dashed p-8">
-          <HugeiconsIcon icon={FileUploadIcon} size={32} className="text-muted-foreground" />
+          <HugeiconsIcon icon={FileUploadIcon} size={32} className="size-8 text-muted-foreground" />
           <span className="mt-4 mb-1 text-lg font-medium">Drop files here</span>
           <span className="text-muted-foreground text-sm">
             Drop files here to add them to the conversation

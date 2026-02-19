@@ -201,7 +201,7 @@ function ContextMenuRadioItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <ContextMenuPrimitive.RadioItemIndicator>
-          <HugeiconsIcon icon={CircleIcon} size={8} className="fill-current" />
+          <HugeiconsIcon icon={CircleIcon} size={8} className="size-2 fill-current" />
         </ContextMenuPrimitive.RadioItemIndicator>
       </span>
       {children}

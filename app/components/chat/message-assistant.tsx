@@ -275,9 +275,9 @@ export function MessageAssistant({
                 type="button"
               >
                 {copied ? (
-                  <HugeiconsIcon icon={Tick02Icon} size={20} />
+                  <HugeiconsIcon icon={Tick02Icon} size={20} className="size-5" />
                 ) : (
-                  <HugeiconsIcon icon={Copy01Icon} size={20} />
+                  <HugeiconsIcon icon={Copy01Icon} size={20} className="size-5" />
                 )}
               </button>
             </MessageAction>
@@ -293,7 +293,7 @@ export function MessageAssistant({
                   onClick={onReload}
                   type="button"
                 >
-                  <HugeiconsIcon icon={RefreshIcon} size={20} />
+                  <HugeiconsIcon icon={RefreshIcon} size={20} className="size-5" />
                 </button>
               </MessageAction>
             ) : null}
