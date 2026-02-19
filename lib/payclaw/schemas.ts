@@ -74,6 +74,7 @@ export const jobResultSchema = z
     cardUsed: z.string().optional(),
     skillsUsed: z.array(z.string()),
   })
+  .passthrough()
   .optional()
 
 export const jobSchema = z.object({
@@ -127,7 +128,7 @@ export const jobEventSchema = z.object({
   timestamp: z.string(),
   message: z.string(),
   data: z.record(z.string(), z.unknown()).optional(),
-})
+}).passthrough()
 
 // -- Events List Response (GET /api/v1/jobs/:id/events) --------
 
