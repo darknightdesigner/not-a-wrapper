@@ -20,6 +20,7 @@ type MessageProps = {
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => Promise<void> | void
   onReload: () => void
+  onStop?: () => void
   hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
@@ -64,6 +65,12 @@ function getToolSignature(parts: MessageType["parts"] | undefined): string {
 function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
   if (prev.variant !== next.variant) return false
   if (prev.id !== next.id) return false
+
+  // Streaming messages mutate deeply (reasoning/text deltas). Skip
+  // content-level diffing while the message is actively being built —
+  // the structuredClone in the AI SDK creates new objects, but React
+  // Compiler memoization can retain stale references for nested parts.
+  if (next.status === "streaming" && next.isLast) return false
 
   // Content comparisons via parts
   if (getTextContent(prev.parts) !== getTextContent(next.parts)) return false
@@ -110,6 +117,7 @@ function MessageInner({
   isLast,
   onEdit,
   onReload,
+  onStop,
   hasScrollAnchor,
   parts,
   status,
@@ -152,6 +160,7 @@ function MessageInner({
         copied={copied}
         copyToClipboard={copyToClipboard}
         onReload={onReload}
+        onStop={onStop}
         isLast={isLast}
         hasScrollAnchor={hasScrollAnchor}
         parts={parts}

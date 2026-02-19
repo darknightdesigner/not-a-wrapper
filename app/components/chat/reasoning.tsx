@@ -17,13 +17,7 @@ const TRANSITION = {
 } as const
 
 export function Reasoning({ reasoning, isStreaming }: ReasoningProps) {
-  const [wasStreaming, setWasStreaming] = useState(isStreaming ?? false)
   const [isExpanded, setIsExpanded] = useState(() => isStreaming ?? true)
-
-  if (wasStreaming && isStreaming === false) {
-    setWasStreaming(false)
-    setIsExpanded(false)
-  }
 
   return (
     <div>

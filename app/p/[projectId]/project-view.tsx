@@ -409,8 +409,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       onDelete: handleDelete,
       onEdit: handleEdit,
       onReload: handleReload,
+      onStop: stop,
     }),
-    [messages, status, handleDelete, handleEdit, handleReload]
+    [messages, status, handleDelete, handleEdit, handleReload, stop]
   )
 
   // Memoize the chat input props

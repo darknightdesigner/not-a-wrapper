@@ -55,7 +55,6 @@ export function SidebarProjectMenu({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           <DropdownMenuItem
-            className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation()
               onStartEditing()
@@ -65,7 +64,6 @@ export function SidebarProjectMenu({
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-destructive"
             variant="destructive"
             onClick={(e) => {
               e.stopPropagation()

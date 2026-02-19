@@ -9,6 +9,8 @@ import {
   MessageActions,
   MessageContent,
 } from "@/components/ui/message"
+import { SystemMessage } from "@/components/ui/system-message"
+import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
@@ -19,7 +21,6 @@ import {
   RefreshIcon,
   Tick02Icon,
   Copy01Icon,
-  Alert02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useCallback, useRef, useState } from "react"
 import { getSources } from "./get-sources"
@@ -38,6 +39,7 @@ type MessageAssistantProps = {
   copied?: boolean
   copyToClipboard?: () => void
   onReload?: () => void
+  onStop?: () => void
   parts?: MessageAISDK["parts"]
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
@@ -46,7 +48,7 @@ type MessageAssistantProps = {
   finishReason?: string
 }
 
-const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
+const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "caret"
 
 function formatToolProgressLabel(toolName: string): string {
   switch (toolName) {
@@ -77,6 +79,7 @@ export function MessageAssistant({
   copied,
   copyToClipboard,
   onReload,
+  onStop,
   parts,
   status,
   className,
@@ -178,15 +181,15 @@ export function MessageAssistant({
         )}
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
+        {isLastStreaming && reasoningParts && contentNullOrEmpty && (
+          <ThinkingBar text="Thinking" onStop={onStop} />
+        )}
+
         {reasoningParts && reasoningParts.text && (
           <Reasoning
             reasoning={reasoningParts.text}
             isStreaming={status === "streaming"}
           />
-        )}
-
-        {showThinking && (
-          <Loader variant="loading-dots" text="Thinking" />
         )}
 
         {toolInvocationParts &&
@@ -246,21 +249,13 @@ export function MessageAssistant({
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
         {finishReason === "length" && status !== "streaming" && (
-          <div className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
-            <HugeiconsIcon icon={Alert02Icon} size={14} className="text-amber-500 dark:text-amber-400" />
-            <span>
-              Response may be incomplete due to output length limits.
-              {onReload && (
-                <button
-                  type="button"
-                  onClick={onReload}
-                  className="text-primary ml-1 underline underline-offset-2 hover:no-underline"
-                >
-                  Regenerate
-                </button>
-              )}
-            </span>
-          </div>
+          <SystemMessage
+            variant="warning"
+            fill
+            cta={onReload ? { label: "Regenerate", onClick: onReload } : undefined}
+          >
+            Response may be incomplete due to output length limits.
+          </SystemMessage>
         )}
 
         {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
