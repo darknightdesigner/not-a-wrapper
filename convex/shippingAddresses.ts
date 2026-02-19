@@ -56,7 +56,7 @@ export const create = mutation({
   args: {
     label: v.string(),
     name: v.string(),
-    email: v.optional(v.string()),
+    email: v.string(),
     phone: v.optional(v.string()),
     line1: v.string(),
     line2: v.optional(v.string()),
@@ -78,6 +78,10 @@ export const create = mutation({
       existingAddresses,
       args.isDefault
     )
+
+    if (!args.email.trim()) {
+      throw new Error("Email is required for new addresses")
+    }
 
     if (args.phone !== undefined && args.phone.trim().length === 0) {
       throw new Error("Phone number is required for new addresses")

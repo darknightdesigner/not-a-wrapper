@@ -127,7 +127,8 @@ function validateForm(form: ShippingAddressFormData) {
     return `Label must be ${MAX_LABEL_LENGTH} characters or fewer.`
   }
   if (!name) return "Recipient name is required."
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email) return "Email is required."
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return "Please enter a valid email address."
   }
   if (!phone) return "Phone number is required."
@@ -298,7 +299,7 @@ function ShippingAddressForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor={`${formId}-email`}>Email</Label>
+            <Label htmlFor={`${formId}-email`}>Email *</Label>
             <Input
               id={`${formId}-email`}
               type="email"

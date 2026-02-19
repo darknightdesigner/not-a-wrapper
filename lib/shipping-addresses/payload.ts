@@ -22,9 +22,8 @@ type ShippingAddressBasePayload = {
   country: "US"
 }
 
-export type CreateShippingAddressPayload = Omit<ShippingAddressBasePayload, "email"> & {
+export type CreateShippingAddressPayload = ShippingAddressBasePayload & {
   line2?: string
-  email?: string
 }
 
 export type UpdateShippingAddressPayload = Omit<
@@ -58,11 +57,9 @@ export function buildCreateShippingAddressPayload(
   form: ShippingAddressFormData
 ): CreateShippingAddressPayload {
   const line2 = normalizeFormValue(form.line2)
-  const email = normalizeFormValue(form.email)
   return {
     ...buildBasePayload(form),
     line2: line2 || undefined,
-    email: email || undefined,
   }
 }
 
