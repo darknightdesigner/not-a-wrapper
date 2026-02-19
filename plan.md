@@ -87,6 +87,10 @@ AGENTS.md            ← Rules & permissions
 
 ### P1 — Do Next
 
+- [ ] **Fix create project chats** (`Not started`)  
+  Sources: —
+  - [ ] Investigate and fix project chat creation flow.
+
 - [ ] **#8 UX redesign: tools/thinking** (`Not started`)  
   Sources: `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md`
   - [ ] Document UX target states (loading, running tool, tool complete, thinking).

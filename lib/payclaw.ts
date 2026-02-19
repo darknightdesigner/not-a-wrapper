@@ -1,21 +1,21 @@
 /**
- * PayClaw API client — zero dependencies, pure TypeScript.
+ * Flowglad Pay API client — zero dependencies, pure TypeScript.
  *
  * ```ts
- * import { createPayclawClient } from './payclaw'
+ * import { createFgpClient } from './fgp'
  *
- * const payclaw = createPayclawClient({
- *   endpoint: 'https://app.payclaw.com/api',
+ * const fgp = createFgpClient({
+ *   endpoint: 'https://app.flowgladpay.com/api',
  *   apiKey: 'pk_...',
  * })
  *
- * const { jobId } = await payclaw.submitJob({
+ * const { jobId } = await fgp.submitJob({
  *   url: 'https://example.com/pricing',
  *   maxSpend: 1500,
  *   paymentMethod: { type: 'brex', cardId: 'card_...' },
  * })
  *
- * for await (const event of payclaw.streamEvents(jobId)) {
+ * for await (const event of fgp.streamEvents(jobId)) {
  *   console.log(event.type, event.message)
  * }
  * ```
@@ -30,14 +30,14 @@ import https from 'node:https'
 // Types
 // ---------------------------------------------------------------------------
 
-export type PayclawClientConfig = {
-  /** Base URL of the PayClaw API (e.g. `https://app.payclaw.com/api`). */
+export interface FgpClientConfig {
+  /** Base URL of the Flowglad Pay API (e.g. `https://app.flowgladpay.com/api`). */
   endpoint: string
-  /** Per-user API key from the PayClaw dashboard. */
+  /** Per-user API key from the Flowglad Pay dashboard. */
   apiKey: string
 }
 
-export type ShippingAddress = {
+export interface ShippingAddress {
   name: string
   line1: string
   line2?: string
@@ -50,12 +50,12 @@ export type ShippingAddress = {
   email?: string
 }
 
-export type PaymentMethod = {
+export interface PaymentMethod {
   type: 'brex'
   cardId: string
 }
 
-export type SubmitJobOptions = {
+export interface SubmitJobOptions {
   /** Vendor URL to purchase from (direct buy). */
   url?: string
   /** Vendor origin for product search (indirect buy — use with `product`). */
@@ -69,14 +69,14 @@ export type SubmitJobOptions = {
   browserProvider?: 'local' | 'kernel' | 'anchor' | 'self_hosted'
 }
 
-export type SubmitJobResult = {
+export interface SubmitJobResult {
   jobId: string
   status: string
 }
 
 export type JobStatus = 'created' | 'retry' | 'active' | 'completed' | 'failed' | 'cancelled'
 
-export type JobResult = {
+export interface JobResult {
   success: boolean
   credentials?: string
   productObtained?: string
@@ -85,13 +85,13 @@ export type JobResult = {
   skillsUsed: string[]
 }
 
-export type AgentStep = {
+export interface AgentStep {
   type: 'thinking' | 'tool_call' | 'tool_result' | 'error' | 'skill_injection'
   content: string
   timestamp: string
 }
 
-export type Job = {
+export interface Job {
   id: string
   status: JobStatus
   createdAt: string
@@ -111,19 +111,19 @@ export type Job = {
   steps: AgentStep[]
 }
 
-export type JobEvent = {
+export interface JobEvent {
   type: string
   timestamp: string
   message: string
   data?: Record<string, unknown>
 }
 
-export type JobDonePayload = {
+export interface JobDonePayload {
   status: string
   result?: Record<string, unknown>
 }
 
-export type Credential = {
+export interface Credential {
   id: string
   userId: string
   jobId?: string
@@ -137,7 +137,7 @@ export type Credential = {
   revokedAt?: string
 }
 
-export type CredentialWithValue = Credential & {
+export interface CredentialWithValue extends Credential {
   value: string
 }
 
@@ -145,13 +145,13 @@ export type CredentialWithValue = Credential & {
 // Errors
 // ---------------------------------------------------------------------------
 
-export class PayclawApiError extends Error {
+export class FgpApiError extends Error {
   readonly status: number
   readonly code?: string
 
   constructor(message: string, status: number, code?: string) {
     super(message)
-    this.name = 'PayclawApiError'
+    this.name = 'FgpApiError'
     this.status = status
     this.code = code
   }
@@ -161,7 +161,7 @@ export class PayclawApiError extends Error {
 // Client
 // ---------------------------------------------------------------------------
 
-export type PayclawClient = {
+export interface FgpClient {
   /** Submit a provisioning job. Returns the job ID. */
   submitJob(options: SubmitJobOptions): Promise<SubmitJobResult>
 
@@ -192,7 +192,7 @@ export type PayclawClient = {
   getCredential(credentialId: string): Promise<CredentialWithValue>
 }
 
-export function createPayclawClient(config: PayclawClientConfig): PayclawClient {
+export function createFgpClient(config: FgpClientConfig): FgpClient {
   const endpoint = config.endpoint.replace(/\/$/, '')
   const { apiKey } = config
 
@@ -215,7 +215,7 @@ export function createPayclawClient(config: PayclawClientConfig): PayclawClient 
     try {
       response = await fetch(url, init)
     } catch (err) {
-      throw new PayclawApiError(err instanceof Error ? err.message : 'Network request failed', 0)
+      throw new FgpApiError(err instanceof Error ? err.message : 'Network request failed', 0)
     }
 
     let data: unknown
@@ -223,9 +223,9 @@ export function createPayclawClient(config: PayclawClientConfig): PayclawClient 
       data = await response.json()
     } catch {
       if (!response.ok) {
-        throw new PayclawApiError(`HTTP ${response.status}`, response.status)
+        throw new FgpApiError(`HTTP ${response.status}`, response.status)
       }
-      throw new PayclawApiError('Failed to parse response JSON', response.status)
+      throw new FgpApiError('Failed to parse response JSON', response.status)
     }
 
     if (!response.ok) {
@@ -238,7 +238,7 @@ export function createPayclawClient(config: PayclawClientConfig): PayclawClient 
               'message' in errData.error
             ? String((errData.error as { message: unknown }).message)
             : `HTTP ${response.status}`
-      throw new PayclawApiError(message, response.status, errData.code)
+      throw new FgpApiError(message, response.status, errData.code)
     }
 
     return data as T
@@ -287,7 +287,7 @@ export function createPayclawClient(config: PayclawClientConfig): PayclawClient 
 
             if (incoming.statusCode !== 200) {
               push(
-                new PayclawApiError(
+                new FgpApiError(
                   `SSE stream returned HTTP ${incoming.statusCode}`,
                   incoming.statusCode ?? 0
                 )
@@ -408,7 +408,7 @@ export function createPayclawClient(config: PayclawClientConfig): PayclawClient 
       } else if (options.url) {
         body.url = options.url
       } else {
-        throw new PayclawApiError(
+        throw new FgpApiError(
           'Either `url` (direct buy) or `vendor` + `product` (indirect buy) is required.',
           0
         )

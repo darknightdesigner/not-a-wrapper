@@ -572,7 +572,7 @@ export function ShippingAddresses() {
             return (
               <div key={address._id} className="space-y-3">
                 {!isEditing && (
-                  <Card className="py-0">
+                  <Card className="py-0 shadow-none">
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">

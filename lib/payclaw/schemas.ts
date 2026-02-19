@@ -15,11 +15,11 @@ export const shippingAddressSchema = z.object({
 })
 
 export const paymentMethodSchema = z
-  .discriminatedUnion('type', [
-    z.object({ type: z.literal('brex'), cardId: z.string().min(1) }),
-    z.object({ type: z.literal('wex') }),
-  ])
-  .describe('Optional payment rail override supported by PayClaw.')
+  .object({
+    type: z.literal('brex'),
+    cardId: z.string().min(1),
+  })
+  .describe('Payment rail override supported by PayClaw.')
 
 export const browserProviderSchema = z
   .enum(['local', 'kernel', 'anchor', 'self_hosted'])
@@ -63,33 +63,17 @@ export const createJobResponseSchema = z.object({
   jobId: z.string(),
   // Upstream currently returns "created", but accept any known job status to reduce drift breakage.
   status: jobStatusSchema,
-})
-
-export const reportedDataSchema = z
-  .object({
-    orderNumber: z.string().optional(),
-    total: z.string().optional(),
-    items: z.array(z.string()).optional(),
-    shippingMethod: z.string().optional(),
-    trackingNumber: z.string().optional(),
-    deliveryEstimate: z.string().optional(),
-    email: z.string().optional(),
-  })
-  .catchall(z.unknown())
+}).passthrough()
 
 export const jobResultSchema = z
   .object({
     success: z.boolean(),
     credentials: z.string().optional(),
-    credentialIds: z.array(z.string()).optional(),
     productObtained: z.string().optional(),
-    orderNumber: z.string().optional(),
-    cardUsed: z.string().optional(),
-    reportedData: reportedDataSchema.optional(),
     error: z.string().optional(),
+    cardUsed: z.string().optional(),
     skillsUsed: z.array(z.string()),
   })
-  .nullable()
   .optional()
 
 export const jobSchema = z.object({
@@ -112,7 +96,7 @@ export const jobSchema = z.object({
       })
     )
     .optional(),
-})
+}).passthrough()
 
 // -- Event Type Enum -------------------------------------------
 // Source: PayClaw Events API Reference (engineer-provided, Feb 17 2026)
@@ -140,8 +124,8 @@ export const eventTypeSchema = z.enum(eventTypeValues)
 
 export const jobEventSchema = z.object({
   type: z.string().min(1),
-  message: z.string(),
   timestamp: z.string(),
+  message: z.string(),
   data: z.record(z.string(), z.unknown()).optional(),
 })
 
@@ -149,7 +133,7 @@ export const jobEventSchema = z.object({
 
 export const eventsListResponseSchema = z.object({
   events: z.array(jobEventSchema),
-})
+}).passthrough()
 
 // -- SSE Stream Done Event (event: done) -----------------------
 // Sent when job reaches terminal state (completed, failed, cancelled)
@@ -157,7 +141,7 @@ export const eventsListResponseSchema = z.object({
 export const sseStreamDoneSchema = z.object({
   status: jobStatusSchema,
   result: jobResultSchema,
-})
+}).passthrough()
 
 // -- API Error Schema ------------------------------------------
 
@@ -176,7 +160,6 @@ export type BrowserProvider = z.infer<typeof browserProviderSchema>
 export type CreateJobResponse = z.infer<typeof createJobResponseSchema>
 export type JobStatus = z.infer<typeof jobStatusSchema>
 export type JobResult = z.infer<typeof jobResultSchema>
-export type ReportedData = z.infer<typeof reportedDataSchema>
 export type Job = z.infer<typeof jobSchema>
 export type EventType = z.infer<typeof eventTypeSchema>
 export type JobEvent = z.infer<typeof jobEventSchema>

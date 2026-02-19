@@ -121,7 +121,7 @@ describe("createJob request mapping", () => {
       {
         url: "https://example.com/product/123",
         maxSpend: 1500,
-        paymentMethod: { type: "wex" },
+        paymentMethod: { type: "brex", cardId: "card_explicit_456" },
       },
       BASE_CONFIG_WITH_DEFAULT_CARD
     )
@@ -130,7 +130,7 @@ describe("createJob request mapping", () => {
     expect(body).toMatchObject({
       url: "https://example.com/product/123",
       maxSpend: 1500,
-      paymentMethod: { type: "wex" },
+      paymentMethod: { type: "brex", cardId: "card_explicit_456" },
     })
   })
 })

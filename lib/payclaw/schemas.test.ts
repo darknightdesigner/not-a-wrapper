@@ -5,7 +5,6 @@ import {
   browserProviderSchema,
   paymentMethodSchema,
   jobResultSchema,
-  reportedDataSchema,
 } from "./schemas"
 
 describe("payclaw schemas", () => {
@@ -45,10 +44,6 @@ describe("payclaw schemas", () => {
     ).toBe(true)
   })
 
-  it("accepts paymentMethod wex", () => {
-    expect(paymentMethodSchema.safeParse({ type: "wex" }).success).toBe(true)
-  })
-
   it("rejects invalid browserProvider", () => {
     expect(browserProviderSchema.safeParse("invalid").success).toBe(false)
   })
@@ -67,7 +62,7 @@ describe("payclaw schemas", () => {
       url: "https://example.com",
       product: "Pro Plan",
       maxSpend: 2500,
-      paymentMethod: { type: "wex" },
+      paymentMethod: { type: "brex", cardId: "card_456" },
       browserProvider: "anchor",
     })
 
@@ -76,58 +71,30 @@ describe("payclaw schemas", () => {
 })
 
 describe("jobResultSchema", () => {
-  it("parses a successful physical product result with reportedData", () => {
+  it("parses a successful physical product result", () => {
     const result = jobResultSchema.safeParse({
       success: true,
       productObtained: "Blue Widget",
-      orderNumber: "ORD-12345",
       cardUsed: "4242",
-      reportedData: {
-        orderNumber: "ORD-12345",
-        total: "$18.99",
-        items: ["Blue Widget x1"],
-        shippingMethod: "Standard",
-        trackingNumber: "1Z999AA10123456784",
-        deliveryEstimate: "Feb 25, 2026",
-        email: "jane@example.com",
-      },
       skillsUsed: ["shopify_checkout"],
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.reportedData?.trackingNumber).toBe("1Z999AA10123456784")
+    expect(result.data?.productObtained).toBe("Blue Widget")
   })
 
   it("parses a SaaS result with credentials", () => {
     const result = jobResultSchema.safeParse({
       success: true,
       credentials: "sk-abc123",
-      credentialIds: ["cred_001", "cred_002"],
       skillsUsed: ["saas_signup"],
     })
 
     expect(result.success).toBe(true)
-    expect(result.data?.credentialIds).toEqual(["cred_001", "cred_002"])
-  })
-
-  it("accepts null result", () => {
-    expect(jobResultSchema.safeParse(null).success).toBe(true)
+    expect(result.data?.credentials).toBe("sk-abc123")
   })
 
   it("accepts undefined result", () => {
     expect(jobResultSchema.safeParse(undefined).success).toBe(true)
-  })
-})
-
-describe("reportedDataSchema", () => {
-  it("allows unknown extra fields via catchall", () => {
-    const result = reportedDataSchema.safeParse({
-      orderNumber: "ORD-999",
-      customVendorField: "some-value",
-    })
-
-    expect(result.success).toBe(true)
-    expect(result.data?.orderNumber).toBe("ORD-999")
-    expect((result.data as Record<string, unknown>)["customVendorField"]).toBe("some-value")
   })
 })
