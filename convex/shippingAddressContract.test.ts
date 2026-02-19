@@ -7,6 +7,8 @@ describe("shipping address client/server contract", () => {
     const updatePayload = buildUpdateShippingAddressPayload({
       label: "Home",
       name: "Jane Doe",
+      email: "jane@example.com",
+      phone: "+1 (555) 123-4567",
       line1: "123 Main St",
       line2: "   ",
       city: "New York",

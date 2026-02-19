@@ -73,13 +73,18 @@ export async function getPlatformTools(options?: {
         const isLikelyPhysical = resolvedInput.shippingAddress !== undefined
         if (isLikelyPhysical) {
           const addr = resolvedInput.shippingAddress!
-          const missing: string[] = []
-          if (!addr.phone) missing.push("phone")
-          if (!addr.email) missing.push("email")
-          if (missing.length > 0) {
-            console.warn(
-              `[tools/platform] Shipping address missing ${missing.join(", ")} — many vendor checkouts require these fields`,
-            )
+          if (!addr.phone) {
+            return {
+              ok: false,
+              data: null,
+              error:
+                "Shipping address is missing a phone number, which most vendor checkouts require. " +
+                "Ask the user for their phone number and include it in the shippingAddress.",
+              meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
+            }
+          }
+          if (!addr.email) {
+            console.warn("[tools/platform] Shipping address missing email — some checkouts may require it")
           }
         }
 

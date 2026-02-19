@@ -129,7 +129,9 @@ function formatAddressContext(addresses: Array<Doc<"shippingAddresses">>): strin
     const prefix = addr.isDefault ? "★ Default" : "•"
     const label = addr.label ? ` (${addr.label})` : ""
     const line2 = addr.line2 ? `, ${addr.line2}` : ""
-    return `${prefix}${label}: ${addr.name}, ${addr.line1}${line2}, ${addr.city}, ${addr.state} ${addr.postalCode}`
+    const contactInfo = [addr.email, addr.phone].filter(Boolean).join(", ")
+    const contactSuffix = contactInfo ? ` [${contactInfo}]` : ""
+    return `${prefix}${label}: ${addr.name}, ${addr.line1}${line2}, ${addr.city}, ${addr.state} ${addr.postalCode}${contactSuffix}`
   })
 
   return [
@@ -418,8 +420,8 @@ export async function POST(req: Request) {
         : undefined
 
       const defaultAddress = userAddresses.find((address) => address.isDefault)
-      const cleanDefaultShippingAddress: ShippingAddress | undefined = defaultAddress
-        ? {
+      let cleanDefaultShippingAddress: ShippingAddress | undefined = defaultAddress
+        ? ({
             name: defaultAddress.name,
             line1: defaultAddress.line1,
             line2: defaultAddress.line2,
@@ -427,8 +429,18 @@ export async function POST(req: Request) {
             state: defaultAddress.state,
             postalCode: defaultAddress.postalCode,
             country: defaultAddress.country,
-          }
+            phone: defaultAddress.phone,
+            email: defaultAddress.email,
+          } satisfies ShippingAddress)
         : undefined
+
+      if (
+        cleanDefaultShippingAddress &&
+        !cleanDefaultShippingAddress.email &&
+        clerkUser?.primaryEmailAddress?.emailAddress
+      ) {
+        cleanDefaultShippingAddress.email = clerkUser.primaryEmailAddress.emailAddress
+      }
 
       const { getPlatformTools } = await import("@/lib/tools/platform")
       const platformResult = await getPlatformTools({

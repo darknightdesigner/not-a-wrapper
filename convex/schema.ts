@@ -95,6 +95,8 @@ export default defineSchema({
     userId: v.id("users"),
     label: v.string(),
     name: v.string(),
+    email: v.optional(v.string()),
+    phone: v.optional(v.string()),
     line1: v.string(),
     line2: v.optional(v.string()),
     city: v.string(),
