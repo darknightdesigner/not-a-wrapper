@@ -1,19 +1,122 @@
 ---
 name: chrome-devtools-mcp
-description: Use the chrome-devtools-mcp MCP server (by Google) for full browser DevTools access — JavaScript execution, console messages, network inspection, performance tracing, page automation, and emulation. Use when debugging web apps, profiling performance, inspecting network traffic, or running custom JS to extract data from pages.
+description: Guide for browser-based design inspection using two tools — Claude Code's built-in /chrome for signed-in pages (primary), and chrome-devtools-mcp for performance profiling, network throttling, and localhost debugging (secondary). Use when extracting design tokens, analyzing competitor UIs, debugging layout, profiling performance, or inspecting network traffic.
 ---
 
-# Chrome DevTools MCP
+# Browser Inspection & Design Token Extraction
 
-Use this skill when you need full Chrome DevTools capabilities: execute JavaScript in page context, read console messages, inspect network requests, run performance traces, automate page interactions, or emulate devices/network conditions.
+This skill covers two browser inspection tools used together:
 
-## Prerequisites
+1. **Claude `/chrome`** (primary) — Connects to your real Chrome browser with all login sessions. Use for signed-in page inspection, design analysis, and token extraction.
+2. **`chrome-devtools-mcp`** (secondary) — Launches a separate Chrome instance via DevTools Protocol. Use for performance profiling, network/CPU throttling, and localhost debugging.
 
-- [ ] `chrome-devtools-mcp` MCP server is installed (`claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`)
-- [ ] Tools are prefixed with `mcp__chrome-devtools__` in the tool list
-- [ ] Chrome or Chromium installed (Node.js v20.19+)
+## When to Use Which Tool
 
-## Quick Reference
+| Task | Use `/chrome` | Use `chrome-devtools-mcp` |
+|------|:---:|:---:|
+| Inspect signed-in pages (ChatGPT, competitors) | **Yes** | No (can't sign in — Google OAuth blocked) |
+| Extract design tokens from authenticated UIs | **Yes** | No |
+| Inspect your own localhost/staging app | Yes | **Yes** |
+| Performance profiling (LCP, CLS, INP) | No | **Yes** |
+| Network throttling (3G, 4G, Offline) | No | **Yes** |
+| CPU throttling (simulate slow devices) | No | **Yes** |
+| Geolocation emulation | No | **Yes** |
+| Multi-tab inspection | No | **Yes** |
+
+**Rule**: Default to `/chrome` for all design inspection. Only reach for `chrome-devtools-mcp` when you need performance, throttling, or multi-tab capabilities.
+
+---
+
+## Part 1: Claude `/chrome` (Primary — Signed-In Inspection)
+
+### Prerequisites
+
+- [ ] "Claude in Chrome" extension installed from Chrome Web Store (v1.0.36+)
+- [ ] Claude Code v2.0.73+
+- [ ] Direct Anthropic plan (Pro, Max, Teams, Enterprise)
+
+### Setup
+
+```bash
+# Launch Claude Code with Chrome access
+claude --chrome
+
+# Or enable mid-session
+/chrome
+
+# To enable by default
+# Run /chrome → select "Enabled by default"
+```
+
+### How It Works
+
+`/chrome` connects to your **actual running Chrome browser** via the extension. This means:
+- All your login sessions work (Google, GitHub, ChatGPT, etc.)
+- No bot detection issues — the site sees your real browser
+- Your extensions, cookies, and localStorage are all available
+- You see the exact same page a real user sees
+
+### Available Tools (via /chrome)
+
+When `/chrome` is enabled, Claude Code gains access to Chrome DevTools Protocol tools on your real browser:
+- `take_snapshot` — Accessibility tree with element UIDs
+- `take_screenshot` — Visual capture
+- `evaluate_script` — Run arbitrary JS in page context
+- `click`, `fill`, `hover`, `press_key` — Interact with elements
+- `list_console_messages` — Console errors/warnings
+- `list_network_requests` — HTTP traffic
+- `navigate_page` — Navigate to URLs
+
+### Core Workflow: Design Token Extraction (Signed-In)
+
+```
+Step 1: Sign into the target site in your regular Chrome browser
+
+Step 2: Ask Claude to navigate and extract
+  "Navigate to chatgpt.com and extract all design tokens —
+   typography, colors, spacing, CSS variables. Save to markdown."
+
+Step 3: Claude uses /chrome tools to:
+  - navigate_page → load the authenticated page
+  - take_snapshot → get page structure with UIDs
+  - evaluate_script → extract CSS custom properties, computed styles, colors
+  - take_screenshot → visual reference
+
+Step 4: Results saved to .agents/context/research/design-tokens-[site].md
+```
+
+### Why Not chrome-devtools-mcp for Signed-In Pages?
+
+Google **blocks OAuth sign-in** from Chrome instances launched with remote debugging flags (`--remote-debugging-*`). Since `chrome-devtools-mcp` launches a new Chrome with these flags, you cannot:
+- Sign in via Google OAuth
+- Access any Google-authenticated session
+- Use "Sign in with Google" on any third-party site
+
+This is a deliberate Google security measure, not a bug.
+
+---
+
+## Part 2: chrome-devtools-mcp (Secondary — Performance & Localhost)
+
+### Prerequisites
+
+- [ ] MCP server installed: `claude mcp add chrome-devtools --scope user npx chrome-devtools-mcp@latest`
+- [ ] Node.js v20.19+, Chrome installed
+- [ ] Tools prefixed with `mcp__chrome-devtools__` in tool list
+
+### When to Use
+
+Use `chrome-devtools-mcp` when you need capabilities `/chrome` doesn't provide:
+
+1. **Performance profiling** — Core Web Vitals, traces, LCP breakdown
+2. **Network throttling** — Simulate Slow 3G, Fast 4G, Offline
+3. **CPU throttling** — Simulate 4x-20x slower devices
+4. **Geolocation emulation** — Test location-based features
+5. **Multi-tab management** — Open/switch/close multiple pages
+6. **Localhost/staging inspection** — No authentication needed
+7. **Dialog handling** — Accept/dismiss browser alerts
+
+### Quick Reference
 
 | Category | Tools | Purpose |
 |----------|-------|---------|
@@ -24,145 +127,10 @@ Use this skill when you need full Chrome DevTools capabilities: execute JavaScri
 | Performance | `performance_start_trace`, `performance_stop_trace`, `performance_analyze_insight` | Core Web Vitals, traces |
 | Emulation | `emulate`, `resize_page` | Device, network, geolocation, color scheme |
 
-## Key Advantage Over Web Inspector
-
-Chrome DevTools MCP provides capabilities that web-inspector does not:
-
-- **Multi-page support** — open, switch between, and close multiple tabs
-- **Performance tracing** — record and analyze Core Web Vitals, LCP, CLS, INP
-- **Network throttling** — simulate Slow 3G, Fast 4G, Offline
-- **CPU throttling** — simulate slow devices
-- **Geolocation emulation** — test location-based features
-- **Dialog handling** — accept/dismiss browser alerts, confirms, prompts
-- **`evaluate_script` with element arguments** — pass DOM element references from snapshots directly into JS functions
-- **Source-mapped console messages** — console errors include original source locations
-
-## Core Workflows
-
-### Workflow 1: Navigate and Inspect Page
+### Workflow: Performance Profiling
 
 ```
-1. navigate_page({ type: "url", url: "https://example.com" })
-2. take_snapshot({})                                    # A11y-tree text snapshot of page
-3. take_screenshot({})                                  # Visual capture
-```
-
-`take_snapshot` returns a structured accessibility tree with unique `uid` identifiers for every element. These `uid` values are used by all interaction and inspection tools.
-
-### Workflow 2: Execute Custom JavaScript
-
-`evaluate_script` is the most powerful tool — it runs arbitrary JS in the page context.
-
-```
-# Extract all CSS custom properties
-evaluate_script({
-  function: `() => {
-    const styles = getComputedStyle(document.documentElement);
-    const tokens = {};
-    for (const sheet of document.styleSheets) {
-      try {
-        for (const rule of sheet.cssRules) {
-          if (rule.selectorText === ':root') {
-            for (const prop of rule.style) {
-              if (prop.startsWith('--')) {
-                tokens[prop] = styles.getPropertyValue(prop).trim();
-              }
-            }
-          }
-        }
-      } catch(e) {}
-    }
-    return tokens;
-  }`
-})
-
-# Extract computed styles for an element (pass uid from snapshot)
-evaluate_script({
-  function: `(el) => {
-    const s = getComputedStyle(el);
-    return {
-      fontFamily: s.fontFamily,
-      fontSize: s.fontSize,
-      fontWeight: s.fontWeight,
-      lineHeight: s.lineHeight,
-      color: s.color,
-      backgroundColor: s.backgroundColor,
-      padding: s.padding,
-      margin: s.margin,
-      borderRadius: s.borderRadius
-    };
-  }`,
-  args: [{ uid: "e45" }]
-})
-
-# Get all colors used on the page
-evaluate_script({
-  function: `() => {
-    const colors = new Set();
-    document.querySelectorAll('*').forEach(el => {
-      const s = getComputedStyle(el);
-      colors.add(s.color);
-      colors.add(s.backgroundColor);
-      if (s.borderColor !== s.color) colors.add(s.borderColor);
-    });
-    return [...colors].filter(c => c !== 'rgba(0, 0, 0, 0)').sort();
-  }`
-})
-```
-
-**Key details about `evaluate_script`:**
-- The `function` parameter must be a **function declaration** (not a statement): `() => { ... }` or `(el) => { ... }`
-- The `args` parameter passes element references by `uid` (from `take_snapshot`)
-- Return values must be **JSON-serializable** (no DOM nodes, functions, or circular refs)
-- Runs in page context — has access to `document`, `window`, `fetch`, etc.
-- Can be `async`: `async () => { return await fetch(...) }`
-
-### Workflow 3: Console Debugging
-
-```
-1. navigate_page({ type: "url", url: "https://example.com" })
-2. list_console_messages({})                            # All messages since navigation
-3. list_console_messages({ types: ["error", "warn"] })  # Errors and warnings only
-4. get_console_message({ msgid: 5 })                    # Full detail for specific message
-```
-
-Console message filtering:
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `types` | string[] | Filter: `log`, `debug`, `info`, `error`, `warn`, `dir`, `table`, `trace`, `assert`, `verbose`, `issue` |
-| `pageSize` | number | Max messages per page |
-| `pageIdx` | number | Page number (0-based) |
-| `includePreservedMessages` | boolean | Include messages from last 3 navigations |
-
-### Workflow 4: Network Inspection
-
-```
-1. navigate_page({ type: "url", url: "https://example.com" })
-2. click({ uid: "e23" })                                # Trigger API call
-3. wait_for({ text: "Results" })                         # Wait for response
-4. list_network_requests({})                             # All requests
-5. list_network_requests({ resourceTypes: ["fetch", "xhr"] })  # API calls only
-6. get_network_request({ reqid: 12 })                    # Full headers + body
-7. get_network_request({ reqid: 12, responseFilePath: "./response.json" })  # Save to file
-```
-
-Network request filtering:
-
-| `resourceTypes` value | Matches |
-|----------------------|---------|
-| `fetch`, `xhr` | API calls |
-| `document` | HTML pages |
-| `script` | JavaScript files |
-| `stylesheet` | CSS files |
-| `image`, `font`, `media` | Assets |
-| `websocket` | WebSocket connections |
-
-### Workflow 5: Performance Profiling
-
-```
-# Auto-record: reload page, trace until load complete, analyze
-1. navigate_page({ type: "url", url: "https://example.com" })
+1. navigate_page({ type: "url", url: "http://localhost:3000" })
 2. performance_start_trace({ reload: true, autoStop: true })
    # Returns: CWV scores (LCP, CLS, INP) + available insight sets
 
@@ -171,43 +139,28 @@ Network request filtering:
      insightName: "LCPBreakdown"
    })
 
-# Manual recording for user interactions
-1. performance_start_trace({ reload: false, autoStop: false })
-2. click({ uid: "e45" })                                # User interaction
-3. wait_for({ text: "Done" })
-4. performance_stop_trace({ filePath: "./trace.json.gz" })
+# Save raw trace for external analysis
+4. performance_start_trace({
+     reload: true,
+     autoStop: true,
+     filePath: "./trace.json.gz"
+   })
 ```
 
-Available insight names: `DocumentLatency`, `LCPBreakdown`, `CLSContributors`, `RenderBlocking`, `ThirdParties`, `SlowCSS`, `LongTasks`, and more.
+Available insight names: `DocumentLatency`, `LCPBreakdown`, `CLSContributors`, `RenderBlocking`, `ThirdParties`, `SlowCSS`, `LongTasks`.
 
-### Workflow 6: Device & Network Emulation
+### Workflow: Device & Network Emulation
 
 ```
-# Emulate mobile device
+# Emulate mobile + slow network
 emulate({
-  viewport: {
-    width: 390,
-    height: 844,
-    deviceScaleFactor: 3,
-    isMobile: true,
-    hasTouch: true
-  },
-  userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)..."
+  viewport: { width: 390, height: 844, deviceScaleFactor: 3, isMobile: true, hasTouch: true },
+  networkConditions: "Slow 3G",
+  cpuThrottlingRate: 4,
+  colorScheme: "dark"
 })
 
-# Simulate slow network
-emulate({ networkConditions: "Slow 3G" })
-
-# Simulate slow CPU
-emulate({ cpuThrottlingRate: 4 })          # 4x slower
-
-# Dark mode
-emulate({ colorScheme: "dark" })
-
-# Geolocation
-emulate({ geolocation: { latitude: 40.7128, longitude: -74.006 } })
-
-# Reset all
+# Reset all emulation
 emulate({
   viewport: null,
   userAgent: null,
@@ -218,44 +171,116 @@ emulate({
 })
 ```
 
-Network condition presets: `No emulation`, `Offline`, `Slow 3G`, `Fast 3G`, `Slow 4G`, `Fast 4G`.
+Network presets: `No emulation`, `Offline`, `Slow 3G`, `Fast 3G`, `Slow 4G`, `Fast 4G`.
 
-### Workflow 7: Multi-Page Management
-
-```
-1. navigate_page({ type: "url", url: "https://example.com" })
-2. new_page({ url: "https://example.com/settings", background: true })
-3. list_pages({})                                       # See all open pages with IDs
-4. select_page({ pageId: 1, bringToFront: true })       # Switch to page
-5. take_snapshot({})                                     # Inspect selected page
-6. close_page({ pageId: 1 })                            # Close when done
-```
-
-### Workflow 8: Form Automation
+### Workflow: Design Token Extraction (Unauthenticated / Localhost)
 
 ```
-# Fill multiple fields at once
-fill_form({
-  elements: [
-    { uid: "e10", value: "john@example.com" },
-    { uid: "e11", value: "secretpassword" },
-    { uid: "e12", value: "John Doe" }
-  ]
-})
+1. navigate_page({ type: "url", url: "http://localhost:3000" })
+2. take_snapshot({})
 
-# Handle browser dialogs (alert, confirm, prompt)
-click({ uid: "e20" })                                   # Triggers dialog
-handle_dialog({ action: "accept", promptText: "yes" })
+3. Extract CSS custom properties:
+   evaluate_script({
+     function: `() => {
+       const root = getComputedStyle(document.documentElement);
+       const tokens = {};
+       for (const sheet of document.styleSheets) {
+         try {
+           for (const rule of sheet.cssRules) {
+             if (rule.selectorText && rule.selectorText.includes(':root')) {
+               for (const prop of rule.style) {
+                 if (prop.startsWith('--')) {
+                   tokens[prop] = root.getPropertyValue(prop).trim();
+                 }
+               }
+             }
+           }
+         } catch(e) {}
+       }
+       return tokens;
+     }`
+   })
+
+4. Extract computed styles per element:
+   evaluate_script({
+     function: `() => {
+       const selectors = { h1:'h1', h2:'h2', body:'body', button:'button', input:'input' };
+       const props = ['fontFamily','fontSize','fontWeight','lineHeight','letterSpacing','color','backgroundColor'];
+       const result = {};
+       for (const [name, sel] of Object.entries(selectors)) {
+         const el = document.querySelector(sel);
+         if (!el) continue;
+         const s = getComputedStyle(el);
+         result[name] = {};
+         for (const p of props) result[name][p] = s[p];
+       }
+       return result;
+     }`
+   })
+
+5. Extract all unique colors:
+   evaluate_script({
+     function: `() => {
+       const colors = new Set();
+       document.querySelectorAll('*').forEach(el => {
+         const s = getComputedStyle(el);
+         colors.add(s.color);
+         colors.add(s.backgroundColor);
+         if (s.borderColor !== s.color) colors.add(s.borderColor);
+       });
+       return [...colors].filter(c => c !== 'rgba(0, 0, 0, 0)').sort();
+     }`
+   })
+
+6. Test dark mode:
+   emulate({ colorScheme: "dark" })
+   # Re-run steps 3-5
+
+7. Save to .agents/context/research/design-tokens-[site].md
 ```
 
-## Tool Details
+### Workflow: Network & Console Debugging
 
-### evaluate_script
+```
+1. navigate_page({ type: "url", url: "http://localhost:3000" })
+2. list_console_messages({ types: ["error", "warn"] })
+3. get_console_message({ msgid: 5 })              # Source-mapped stack trace
+
+4. click({ uid: "e23" })                           # Trigger API call
+5. wait_for({ text: "Results" })
+6. list_network_requests({ resourceTypes: ["fetch", "xhr"] })
+7. get_network_request({ reqid: 12 })              # Headers + body + response
+8. get_network_request({ reqid: 12, responseFilePath: "./api-response.json" })
+```
+
+### Workflow: Multi-Page Comparison
+
+```
+1. navigate_page({ type: "url", url: "http://localhost:3000/page-a" })
+2. new_page({ url: "http://localhost:3000/page-b", background: true })
+3. list_pages({})
+4. select_page({ pageId: 1, bringToFront: true })
+5. take_snapshot({})
+6. close_page({ pageId: 1 })
+```
+
+---
+
+## Tool Reference (chrome-devtools-mcp)
+
+### evaluate_script — MOST POWERFUL TOOL
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `function` | string | Yes | JS function declaration: `() => { ... }` or `(el) => { ... }` |
 | `args` | array | No | Element references: `[{ uid: "e45" }]` |
+
+**Key details:**
+- Must be a **function declaration**, not a statement
+- `args` passes element references by `uid` (from `take_snapshot`)
+- Return values must be **JSON-serializable** (no DOM nodes, functions, circular refs)
+- Runs in page context — access to `document`, `window`, `fetch`
+- Supports `async`: `async () => { return await fetch(...) }`
 
 ### navigate_page
 
@@ -265,7 +290,7 @@ handle_dialog({ action: "accept", promptText: "yes" })
 | `url` | string | No | — | Target URL (only for `type: "url"`) |
 | `timeout` | number | No | — | Max wait time in ms |
 | `ignoreCache` | boolean | No | — | Ignore cache on reload |
-| `initScript` | string | No | — | JS to execute before page scripts on next navigation |
+| `initScript` | string | No | — | JS to execute before page scripts on next nav |
 
 ### take_snapshot
 
@@ -274,7 +299,7 @@ handle_dialog({ action: "accept", promptText: "yes" })
 | `verbose` | boolean | No | `false` | Include full a11y tree info |
 | `filePath` | string | No | — | Save snapshot to file |
 
-Returns a text representation of the page's accessibility tree. Each element has a `uid` used by interaction tools.
+Returns accessibility tree with `uid` identifiers. **Always use latest snapshot** — UIDs change after DOM mutations.
 
 ### emulate
 
@@ -287,37 +312,49 @@ Returns a text representation of the page's accessibility tree. Each element has
 | `geolocation` | object/null | `{ latitude, longitude }`. `null` to clear. |
 | `userAgent` | string/null | Custom user agent. `null` to clear. |
 
-### list_network_requests
-
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `resourceTypes` | string[] | all | Filter: `document`, `stylesheet`, `image`, `media`, `font`, `script`, `xhr`, `fetch`, `websocket`, `preflight`, etc. |
-| `pageSize` | number | all | Max requests per page |
-| `pageIdx` | number | `0` | Pagination |
-| `includePreservedRequests` | boolean | `false` | Include requests from last 3 navigations |
-
-### get_network_request
+### performance_start_trace
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `reqid` | number | No | Request ID. Omit for currently selected request in DevTools. |
-| `requestFilePath` | string | No | Save request body to file |
-| `responseFilePath` | string | No | Save response body to file |
+| `reload` | boolean | Yes | Reload page after starting trace |
+| `autoStop` | boolean | Yes | Auto-stop after page load |
+| `filePath` | string | No | Save raw trace (`.json.gz` or `.json`) |
 
-### performance_start_trace
-
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `reload` | boolean | Yes | — | Reload page after starting trace |
-| `autoStop` | boolean | Yes | — | Auto-stop after page load |
-| `filePath` | string | No | — | Save raw trace (`.json.gz` or `.json`) |
+Navigate to target URL BEFORE starting trace if `reload` or `autoStop` is true.
 
 ### performance_analyze_insight
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `insightSetId` | string | Yes | From trace results (e.g., `"navigation-1"`) |
-| `insightName` | string | Yes | Insight type (e.g., `"LCPBreakdown"`, `"CLSContributors"`) |
+| `insightName` | string | Yes | e.g., `"LCPBreakdown"`, `"CLSContributors"` |
+
+### list_network_requests
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `resourceTypes` | string[] | all | `document`, `stylesheet`, `image`, `font`, `script`, `xhr`, `fetch`, `websocket`, etc. |
+| `pageSize` | number | all | Max requests per page |
+| `pageIdx` | number | `0` | Pagination |
+
+### get_network_request
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `reqid` | number | No | Request ID. Omit for currently selected in DevTools. |
+| `requestFilePath` | string | No | Save request body to file |
+| `responseFilePath` | string | No | Save response body to file |
+
+### list_console_messages
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `types` | string[] | all | `log`, `error`, `warn`, `info`, `debug`, `trace`, `assert`, `verbose` |
+| `pageSize` | number | all | Max messages |
+| `pageIdx` | number | `0` | Pagination |
+| `includePreservedMessages` | boolean | `false` | Include last 3 navigations |
+
+---
 
 ## Configuration
 
@@ -325,80 +362,79 @@ Returns a text representation of the page's accessibility tree. Each element has
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--headless` | off | Run without visible browser window |
+| `--headless` | off | No visible browser window |
 | `--no-performance-crux` | off | Don't send trace URLs to Google CrUX API |
-| `--no-usage-statistics` | off | Disable anonymous usage statistics |
+| `--no-usage-statistics` | off | Disable anonymous usage stats |
 
-### MCP Configuration
+### Privacy-Conscious MCP Config
 
 ```json
 {
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest", "--headless", "--no-usage-statistics"]
+      "args": ["-y", "chrome-devtools-mcp@latest", "--no-performance-crux", "--no-usage-statistics"]
     }
   }
 }
 ```
 
-## Decision Guide: When to Use Chrome DevTools vs Web Inspector
-
-| I want to... | Use Chrome DevTools | Use Web Inspector |
-|--------------|--------------------|--------------------|
-| Run custom JS in page context | `evaluate_script` (pass element refs via uid) | `evaluate` (simpler, no element args) |
-| Extract computed CSS by category | Use `evaluate_script` with `getComputedStyle` | `get_computed_styles` (built-in, categorized) |
-| Measure box model | Use `evaluate_script` | `measure_element` (visual output) |
-| Profile performance / CWV | `performance_start_trace` | Not available |
-| Throttle network/CPU | `emulate` | Not available |
-| Emulate geolocation | `emulate` | Not available |
-| Work with multiple tabs | `new_page` / `select_page` | Not available (single page) |
-| Handle browser dialogs | `handle_dialog` | Not available |
-| Debug console with source maps | `list_console_messages` | `get_console_logs` (simpler) |
-| Inspect layout hierarchy | `evaluate_script` (manual) | `inspect_dom` / `inspect_ancestors` (built-in) |
-| Compare element alignment | `evaluate_script` (manual) | `compare_element_alignment` (built-in) |
-| Save network response to file | `get_network_request({ responseFilePath })` | `get_request_details` + `confirm_output` |
-
-### Recommended Pairing
-
-Use **both servers together** for maximum coverage:
-
-1. **Chrome DevTools** for: `evaluate_script` (custom JS + element refs), `performance_*` (profiling), `emulate` (network/CPU/geo), multi-tab workflows, dialog handling
-2. **Web Inspector** for: `inspect_dom` (structured layout), `get_computed_styles` (categorized CSS), `measure_element` (box model), `inspect_ancestors` (constraint debugging), `compare_element_alignment`
-
-### Design Token Extraction Pipeline (Both Servers)
-
-```
-# 1. Navigate with Chrome DevTools (supports initScript)
-chrome-devtools: navigate_page({ type: "url", url: "https://target.com" })
-
-# 2. Survey structure with Web Inspector (better DOM tools)
-web-inspector: inspect_dom({})
-
-# 3. Extract typography with Web Inspector (categorized output)
-web-inspector: get_computed_styles({ selector: "h1", properties: "font-family,font-size,font-weight,line-height,color" })
-
-# 4. Extract CSS variables with Chrome DevTools (powerful JS execution)
-chrome-devtools: evaluate_script({ function: "() => { /* extract --vars */ }" })
-
-# 5. Test dark mode
-chrome-devtools: emulate({ colorScheme: "dark" })
-web-inspector: get_computed_styles({ selector: "body", properties: "background-color,color" })
-
-# 6. Profile performance
-chrome-devtools: performance_start_trace({ reload: true, autoStop: true })
-chrome-devtools: performance_analyze_insight({ insightSetId: "navigation-1", insightName: "LCPBreakdown" })
-
-# 7. Save results to markdown
-Write extracted data to .agents/context/research/design-tokens-[site].md
-```
-
 ## Limitations
 
-- **Chrome only** — no Firefox/WebKit support (unlike web-inspector which supports all three)
-- **No built-in CSS inspection tools** — must use `evaluate_script` with `getComputedStyle()` for CSS values
-- **No built-in layout debugging** — no equivalent to `inspect_dom`, `measure_element`, `inspect_ancestors`
-- **CrUX API calls by default** — performance traces send URLs to Google unless `--no-performance-crux` is set
-- **Usage statistics enabled by default** — opt out with `--no-usage-statistics`
-- **Snapshot-based element references** — `uid` values from `take_snapshot` may become stale after DOM mutations; re-snapshot after interactions
-- **No session persistence config** — unlike web-inspector, no built-in persistent login sessions
+### `/chrome` Limitations
+- No performance tracing
+- No network/CPU throttling
+- No geolocation emulation
+- No multi-tab management
+- Requires direct Anthropic plan (not Bedrock/Vertex)
+- Beta — may have connection stability issues in long sessions
+
+### chrome-devtools-mcp Limitations
+- **Cannot sign into Google OAuth** — blocked by Google security on debugging-flagged Chrome
+- **No built-in CSS inspection tools** — must use `evaluate_script` with custom JS
+- **Snapshot UIDs are ephemeral** — change after any DOM mutation; re-snapshot after interactions
+- **CrUX API calls by default** — use `--no-performance-crux` to disable
+- **Usage statistics on by default** — use `--no-usage-statistics` to disable
+- **Separate browser instance** — does not share sessions with your regular Chrome
+
+## Output Format: Design Token Markdown
+
+When extracting tokens, save in this format to `.agents/context/research/`:
+
+```markdown
+# Design Tokens — [Site Name]
+Extracted: [date] | URL: [url] | Auth: signed-in/anonymous
+
+## Colors
+| Token | Light | Dark | Usage |
+|-------|-------|------|-------|
+| Background | #ffffff | #212121 | Body bg |
+| Text Primary | #111827 | #ffffff | Main text |
+| Accent | #3b82f6 | #60a5fa | Buttons, links |
+
+## Typography
+| Element | Font | Size | Weight | Line Height | Letter Spacing |
+|---------|------|------|--------|-------------|----------------|
+| h1 | Inter | 28px | 400 | 34px | 0.38px |
+| body | Inter | 16px | 400 | 24px | normal |
+| button | Inter | 14px | 500 | 20px | normal |
+
+## Spacing & Layout
+| Component | Padding | Border Radius | Height |
+|-----------|---------|---------------|--------|
+| Header | 8px | 0 | 52px |
+| Button (primary) | 0 12px | pill | 36px |
+| Input area | 0 0 16px | 0 | auto |
+
+## CSS Custom Properties
+| Variable | Value |
+|----------|-------|
+| --spring-fast-duration | .667s |
+| --cot-shimmer-duration | 2s |
+
+## Animation Tokens
+| Token | Duration | Curve Type |
+|-------|----------|------------|
+| --spring-fast | 0.667s | Linear spring approximation |
+| --spring-bounce | 0.833s | Spring with overshoot |
+```
