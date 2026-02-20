@@ -9,8 +9,12 @@ import {
   MessageActions,
   MessageContent,
 } from "@/components/ui/message"
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningLabel,
+} from "@/components/ui/reasoning"
 import { SystemMessage } from "@/components/ui/system-message"
-import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
@@ -25,7 +29,7 @@ import {
 import { useCallback, useRef, useState } from "react"
 import { getSources } from "./get-sources"
 import { QuoteButton } from "./quote-button"
-import { Reasoning } from "./reasoning"
+import { useReasoningPhase } from "./use-reasoning-phase"
 import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
@@ -41,6 +45,7 @@ type MessageAssistantProps = {
   onReload?: () => void
   onStop?: () => void
   parts?: MessageAISDK["parts"]
+  metadata?: Record<string, unknown>
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   messageId: string
@@ -81,6 +86,7 @@ export function MessageAssistant({
   onReload,
   onStop,
   parts,
+  metadata,
   status,
   className,
   messageId,
@@ -89,20 +95,32 @@ export function MessageAssistant({
 }: MessageAssistantProps) {
   const { preferences } = useUserPreferences()
   const sources = getSources(parts || [])
-  
+
   // v6: Filter tool parts using official helper
   const toolInvocationParts = parts?.filter((part): part is ToolUIPart =>
     isStaticToolUIPart(part)
   )
-  
-  const reasoningParts = parts?.find((part) => part.type === "reasoning")
+
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
   const hasContent = !contentNullOrEmpty
-  
+
+  // Unified reasoning phase hook
+  const persistedDurationMs =
+    typeof metadata?.reasoningDurationMs === "number"
+      ? metadata.reasoningDurationMs
+      : undefined
+  const { phase: reasoningPhase, reasoningText, durationSeconds, isReasoningStreaming } =
+    useReasoningPhase({
+      parts,
+      status: status ?? "ready",
+      isLast: isLast ?? false,
+      persistedDurationMs,
+    })
+
   // Type for image search results
   type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
-  
+
   // v6: Use flat properties and official helper for tool name
   const searchImageResults: ImageResult[] =
     parts
@@ -119,7 +137,6 @@ export function MessageAssistant({
 
   const {
     showDots: showStreamingLoader,
-    showThinking,
     showToolProgress,
     showImageGenProgress,
     activeToolNames,
@@ -181,15 +198,17 @@ export function MessageAssistant({
         )}
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
-        {isLastStreaming && reasoningParts && contentNullOrEmpty && (
-          <ThinkingBar text="Thinking" onStop={onStop} />
-        )}
-
-        {reasoningParts && reasoningParts.text && (
+        {reasoningPhase !== "idle" && (
           <Reasoning
-            reasoning={reasoningParts.text}
-            isStreaming={status === "streaming"}
-          />
+            isStreaming={isReasoningStreaming}
+            phase={reasoningPhase}
+            durationSeconds={durationSeconds}
+          >
+            <ReasoningLabel />
+            <ReasoningContent markdown>
+              {reasoningText}
+            </ReasoningContent>
+          </Reasoning>
         )}
 
         {toolInvocationParts &&

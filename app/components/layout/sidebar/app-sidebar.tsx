@@ -123,14 +123,16 @@ export function AppSidebar() {
             href="/"
             shortcut="⇧⌘O"
           />
-          <CollapsedMenuItem
-            icon={Search01Icon}
-            label="Search"
-            shortcut="⌘K"
-            onClick={() => {
-              // Trigger search dialog
-              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
-            }}
+          <HistoryTrigger
+            hasSidebar={false}
+            trigger={
+              <CollapsedMenuItem
+                icon={Search01Icon}
+                label="Search"
+                shortcut="⌘K"
+              />
+            }
+            hasPopover={false}
           />
         </div>
 

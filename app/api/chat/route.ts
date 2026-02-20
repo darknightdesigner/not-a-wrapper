@@ -768,6 +768,12 @@ export async function POST(req: Request) {
     const streamStartMs = Date.now()
     let stepCounter = 0
 
+    // Track reasoning timing for messageMetadata persistence.
+    // The first reasoning chunk records a start timestamp; when text-delta
+    // arrives (reasoning is done) or onFinish fires, we compute elapsed ms.
+    let reasoningStartMs: number | null = null
+    let reasoningDurationMs: number | null = null
+
     const result = streamText({
       model: aiModel,
       system: enrichedSystemPrompt,
@@ -844,6 +850,20 @@ export async function POST(req: Request) {
       ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
       ...(Object.keys(requestHeaders).length > 0 && { headers: requestHeaders }),
 
+      onChunk: ({ chunk }) => {
+        if (chunk.type === "reasoning-delta" && reasoningStartMs === null) {
+          reasoningStartMs = Date.now()
+        }
+        // When text-delta arrives after reasoning, reasoning is done
+        if (
+          chunk.type === "text-delta" &&
+          reasoningStartMs !== null &&
+          reasoningDurationMs === null
+        ) {
+          reasoningDurationMs = Date.now() - reasoningStartMs
+        }
+      },
+
       onError: (err: unknown) => {
         console.error("Streaming error occurred:", err)
         const errorMessage = extractErrorMessage(err)
@@ -888,6 +908,12 @@ export async function POST(req: Request) {
       },
 
       onFinish: ({ text, usage, steps, finishReason }) => {
+        // Freeze reasoning duration if it wasn't already frozen by text-delta
+        // (e.g. reasoning-only responses with no text output, or errors)
+        if (reasoningStartMs !== null && reasoningDurationMs === null) {
+          reasoningDurationMs = Date.now() - reasoningStartMs
+        }
+
         // ---------------------------------------------------------------
         // Finish reason observability
         // Log when the response was truncated (finishReason: "length")
@@ -1150,6 +1176,12 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse({
       sendReasoning: true,
       sendSources: true,
+      messageMetadata: ({ part }) => {
+        if (part.type === "finish" && reasoningDurationMs !== null) {
+          return { reasoningDurationMs }
+        }
+        return {}
+      },
       onError: (error: unknown) => {
         console.error("Error forwarded to client:", error)
         return extractErrorMessage(error)

@@ -115,6 +115,20 @@ convex/               # Convex DB schema & functions
 | Context Provider | `lib/chat-store/chats/provider.tsx` |
 | Component | `app/components/chat/chat.tsx` |
 
+## Implementation Philosophy
+
+**Prefer well-researched, industry-standard solutions over quick fixes.**
+
+When implementing features or fixing bugs:
+
+1. **Research first** — Understand the problem domain and established solutions before writing code
+2. **Use proven patterns** — Prefer battle-tested approaches (design patterns, established libraries, documented techniques) over novel or ad-hoc solutions
+3. **Optimize for maintainability** — Long-term code health over short-term velocity
+4. **Extend existing conventions** — Follow and build upon the codebase's established patterns
+5. **Evaluate trade-offs** — When multiple approaches exist, analyze pros/cons before committing
+
+> When unsure, consult `.agents/context/research/` for prior analysis or create a new research document before implementing.
+
 ## Critical Patterns
 
 ### Streaming Responses (MUST)

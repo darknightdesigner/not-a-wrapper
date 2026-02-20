@@ -99,6 +99,7 @@ export function Conversation({
                 onStop={isLast && status === "streaming" ? onStop : undefined}
                 hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
+                metadata={message.metadata as Record<string, unknown> | undefined}
                 status={status}
                 onQuote={onQuote}
                 messageGroupId={

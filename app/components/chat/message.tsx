@@ -23,6 +23,7 @@ type MessageProps = {
   onStop?: () => void
   hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
+  metadata?: Record<string, unknown>
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   onQuote?: (text: string, messageId: string) => void
@@ -86,6 +87,7 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
 
   if (prev.isLast !== next.isLast) return false
   if (prev.status !== next.status) return false
+  if (prev.metadata !== next.metadata) return false
   if (prev.finishReason !== next.finishReason) return false
   if (prev.hasScrollAnchor !== next.hasScrollAnchor) return false
   if (prev.className !== next.className) return false
@@ -120,6 +122,7 @@ function MessageInner({
   onStop,
   hasScrollAnchor,
   parts,
+  metadata,
   status,
   className,
   onQuote,
@@ -164,6 +167,7 @@ function MessageInner({
         isLast={isLast}
         hasScrollAnchor={hasScrollAnchor}
         parts={parts}
+        metadata={metadata}
         status={status}
         className={className}
         messageId={id}
