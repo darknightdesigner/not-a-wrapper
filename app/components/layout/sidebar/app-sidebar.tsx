@@ -97,6 +97,7 @@ export function AppSidebar() {
           const target = event.target
           if (!(target instanceof Element)) return
           if (target.closest(railInteractiveSelector)) return
+          if (document.querySelector('[role="dialog"]:not([hidden])')) return
           toggleSidebar()
         }}
       >

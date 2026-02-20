@@ -30,8 +30,10 @@ export function useLoadingState({
   return useMemo(() => {
     const isLastStreaming = status === "streaming" && isLast
 
-    // Check if reasoning is active (used to suppress dots during reasoning)
-    const hasAnyReasoning = parts?.some((part) => part.type === "reasoning") ?? false
+    // Suppress generating dots only when reasoning has visible text.
+    const hasVisibleReasoning =
+      parts?.some((part) => part.type === "reasoning" && part.text.trim().length > 0) ??
+      false
 
     const toolInvocationParts =
       parts?.filter((part): part is ToolUIPart => isStaticToolUIPart(part)) ?? []
@@ -76,7 +78,7 @@ export function useLoadingState({
     const showDots =
       isLastStreaming &&
       contentNullOrEmpty &&
-      !hasAnyReasoning &&
+      !hasVisibleReasoning &&
       !hasVisibleTools &&
       !hasVisibleImages &&
       !showToolProgress &&

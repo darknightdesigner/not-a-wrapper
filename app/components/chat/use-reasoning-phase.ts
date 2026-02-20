@@ -34,6 +34,14 @@ export function useReasoningPhase({
     }
 
     const text = reasoningParts.map((p) => p.text).join("\n\n")
+    const hasVisibleTextContent =
+      parts?.some((p) => p.type === "text" && p.text.trim().length > 0) ?? false
+
+    // If response text has started but reasoning never produced visible content,
+    // treat reasoning as absent so the thinking UI disappears.
+    if (!text.trim() && hasVisibleTextContent) {
+      return { phase: "idle" as const, reasoningText: "" }
+    }
 
     // Check if any reasoning part is actively streaming
     const isAnyStreaming = reasoningParts.some(
