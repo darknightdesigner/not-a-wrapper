@@ -262,6 +262,20 @@ AGENTS.md            ← Rules & permissions
   - [ ] Implement checkout, upgrade/downgrade, and cancellation flows.
   - [ ] Add webhook handling for plan state synchronization.
 
+- [ ] **Audio experience roadmap (music + SFX)** (`Not started`)  
+  Sources: `research/open-webui-analysis/SUMMARY.md`, `research/competitive-feature-analysis.md`
+  - [ ] Continue investigating performant approaches for in-app music and sound effects.
+  - [ ] Define event taxonomy (send, complete, error, tool-state) and mapping to audio cues.
+  - [ ] Define caching/loading strategy (lazy load, prewarm, cache headers, fallback formats).
+  - [ ] Define user controls (mute, per-channel volume, accessibility-safe defaults).
+
+- [ ] **Character animation exploration with Rive + PixelLab** (`Not started`)  
+  Sources: `https://rive.app/`, `https://www.pixellab.ai/`
+  - [ ] Explore `rive.app` for interactive character animation workflows suitable for chat UX.
+  - [ ] Investigate `pixellab.ai` for AI-assisted character/sprite animation capabilities and fit for product direction.
+  - [ ] Evaluate runtime performance, bundle impact, and authoring complexity.
+  - [ ] Identify one pilot surface (e.g., loading/thinking state) for a prototype.
+
 ### P4 — Performance & DX
 
 > Sources: `.agents/context/research/webclaw/06-recommendations.md` (Sections 1, 2, 4)
@@ -322,6 +336,11 @@ AGENTS.md            ← Rules & permissions
   - [ ] Add global printable-key listener and focus guardrails.
   - [ ] Exclude editable/interactive targets and modifier-key combos.
   - [ ] Validate behavior across routes/modals/platforms.
+
+- [ ] **Evaluate how to initiate new chats via text like OpenClaw** (`Not started`)  
+  - [ ] Research OpenClaw's text-triggered new chat initiation UX and interaction model.
+  - [ ] Evaluate feasible implementation patterns in NaW chat flow/composer.
+  - [ ] Propose recommended approach with trade-offs and rollout scope.
 
 > **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts`.
 

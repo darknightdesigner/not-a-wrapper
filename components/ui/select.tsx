@@ -83,13 +83,13 @@ function SelectContent({
           data-slot="select-content"
           className={cn(
             "bg-popover text-popover-foreground relative z-50 max-h-(--available-height) min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border shadow-md",
-            "data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)]",
-            "data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
+            "data-[starting-style]:opacity-0",
+            "data-[ending-style]:opacity-0",
             !alignItemWithTrigger &&
               "data-[side=bottom]:translate-y-1 data-[side=left]:-translate-x-1 data-[side=right]:translate-x-1 data-[side=top]:-translate-y-1",
             className
           )}
-          style={{ transition: "opacity 150ms ease-out, transform 150ms ease-out" }}
+          style={{ transition: "opacity 100ms ease-out" }}
           {...props}
         >
           <SelectScrollUpButton />

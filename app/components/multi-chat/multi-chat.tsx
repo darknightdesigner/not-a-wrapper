@@ -75,7 +75,7 @@ export function MultiChat() {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { user } = useUser()
-  const { models } = useModel()
+  const { models, lastUsedModel, setLastUsedModel } = useModel()
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
     resolveWebSearchEnabled(preferences.webSearchEnabled)
@@ -176,6 +176,16 @@ export function MultiChat() {
     [setWebSearchEnabled]
   )
 
+  const handleSelectedModelIdsChange = useCallback(
+    (ids: string[]) => {
+      setSelectedModelIds(ids)
+      if (ids.length > 0) {
+        setLastUsedModel(ids[0])
+      }
+    },
+    [setLastUsedModel]
+  )
+
   useEffect(() => {
     setEnableSearchState(resolveWebSearchEnabled(preferences.webSearchEnabled))
   }, [preferences.webSearchEnabled])
@@ -186,8 +196,8 @@ export function MultiChat() {
       setSelectedModelIds(modelsFromLastGroup)
       return
     }
-    setSelectedModelIds([MODEL_DEFAULT])
-  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup])
+    setSelectedModelIds([lastUsedModel || MODEL_DEFAULT])
+  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup, lastUsedModel])
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
@@ -655,7 +665,7 @@ export function MultiChat() {
       onFileUpload: handleFileUpload,
       onFileRemove: handleFileRemove,
       selectedModelIds,
-      onSelectedModelIdsChange: setSelectedModelIds,
+      onSelectedModelIdsChange: handleSelectedModelIdsChange,
       isUserAuthenticated: isAuthenticated,
       fileUploadState,
       stop: handleStop,
@@ -676,6 +686,7 @@ export function MultiChat() {
       handleFileUpload,
       handleFileRemove,
       selectedModelIds,
+      handleSelectedModelIdsChange,
       isAuthenticated,
       fileUploadState,
       handleStop,
