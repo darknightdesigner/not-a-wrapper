@@ -15,6 +15,53 @@ After upgrading to `eslint-config-next@16`, new strict React 19 rules from the R
 
 ---
 
+## React Compiler + External Mutable State
+
+The React Compiler assumes props, state, and context are **immutable snapshots**. If an object is `===` between renders, the Compiler may skip the component entirely — even when nested properties were mutated in place. Unlike manual `React.memo`, the developer has no visibility into what the Compiler decides to memoize.
+
+### When This Breaks
+
+| Scenario | Root Cause |
+|----------|-----------|
+| Streaming pipelines (AI SDK) | `pushMessage` appends to an existing message object without cloning; `replaceMessage` deep-clones (see `@ai-sdk/react` source, line 53) |
+| WebSocket / event handlers | Callback mutates an object already held in React state |
+| Imperative libraries | External lib retains and mutates a reference passed via ref or state |
+
+The AI SDK's `pushMessage` / `replaceMessage` asymmetry is the canonical example in this codebase: during streaming, the message reference stays identical while its `parts` array grows, so the Compiler (and any `React.memo` comparator trusting `===`) silently skips re-renders.
+
+### Defensive Patterns
+
+```tsx
+// (a) Clone at the boundary before setState
+setMessages((prev) => [...prev.slice(0, -1), structuredClone(prev.at(-1)!)])
+
+// (b) In React.memo comparators, check status flags first — never trust
+//     content equality during streaming
+const areEqual = (prev, next) => {
+  if (prev.status !== next.status) return false   // always re-render on status change
+  if (prev.status === 'streaming') return false    // never skip during streaming
+  return prev.id === next.id && prev.parts === next.parts
+}
+
+// (c) useSyncExternalStore: getSnapshot must return a new reference when data changes
+const getSnapshot = () => store.getMessages()  // must !== prev when content changes
+```
+
+### Diagnosing Stale Renders
+
+If a component isn't re-rendering when expected, add a temporary identity check:
+
+```tsx
+const areEqual = (prev, next) => {
+  console.log('same ref?', Object.is(prev.message, next.message))  // true = mutation
+  return /* ... */
+}
+```
+
+If `prev` and `next` are the same reference but content has changed, the data source is mutating in place — clone at the boundary.
+
+---
+
 ## Issue Summary
 
 | Rule | Count | Severity |

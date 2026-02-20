@@ -237,7 +237,12 @@ export function MessageUser({
             h5: ({ children }) => <p>{children}</p>,
             h6: ({ children }) => <p>{children}</p>,
             p: ({ children }) => <p>{children}</p>,
-            li: ({ children }) => <p>- {children}</p>,
+            li: ({ children }) => (
+              <div className="flex gap-2">
+                <span className="shrink-0">-</span>
+                <div className="min-w-0">{children}</div>
+              </div>
+            ),
             ul: ({ children }) => <React.Fragment>{children}</React.Fragment>,
             ol: ({ children }) => <React.Fragment>{children}</React.Fragment>,
           }}
@@ -254,9 +259,9 @@ export function MessageUser({
             type="button"
           >
 {copied ? (
-              <HugeiconsIcon icon={Tick02Icon} size={20} />
+              <HugeiconsIcon icon={Tick02Icon} size={20} className="size-5" />
             ) : (
-              <HugeiconsIcon icon={Copy01Icon} size={20} />
+              <HugeiconsIcon icon={Copy01Icon} size={20} className="size-5" />
             )}
           </button>
         </MessageAction>
@@ -274,9 +279,9 @@ export function MessageUser({
               type="button"
             >
               {isEditing ? (
-                <HugeiconsIcon icon={PencilEdit02Icon} size={20} />
+                <HugeiconsIcon icon={PencilEdit02Icon} size={20} className="size-5" />
               ) : (
-                <HugeiconsIcon icon={PencilEdit01Icon} size={20} />
+                <HugeiconsIcon icon={PencilEdit01Icon} size={20} className="size-5" />
               )}
             </button>
           </MessageAction>

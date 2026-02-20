@@ -60,7 +60,7 @@ export const ChainOfThoughtTrigger = ({
         </span>
       ) : (
         <span className="relative inline-flex size-4 items-center justify-center">
-          <HugeiconsIcon icon={CircleIcon} size={8} className="fill-current" />
+          <HugeiconsIcon icon={CircleIcon} size={8} className="size-2 fill-current" />
         </span>
       )}
       <span>{children}</span>

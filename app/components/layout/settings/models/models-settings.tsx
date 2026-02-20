@@ -195,7 +195,7 @@ export function ModelsSettings() {
               className="border-border text-muted-foreground flex h-32 items-center justify-center rounded-lg border-2 border-dashed"
             >
               <div className="text-center">
-                <HugeiconsIcon icon={StarIcon} size={32} className="mx-auto mb-2 opacity-50" />
+                <HugeiconsIcon icon={StarIcon} size={32} className="size-8 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">No favorite models yet</p>
                 <p className="text-xs">Add models from the list below</p>
               </div>

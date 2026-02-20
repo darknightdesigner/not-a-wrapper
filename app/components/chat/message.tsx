@@ -20,8 +20,10 @@ type MessageProps = {
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => Promise<void> | void
   onReload: () => void
+  onStop?: () => void
   hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
+  metadata?: Record<string, unknown>
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   onQuote?: (text: string, messageId: string) => void
@@ -65,6 +67,12 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
   if (prev.variant !== next.variant) return false
   if (prev.id !== next.id) return false
 
+  // Streaming messages mutate deeply (reasoning/text deltas). Skip
+  // content-level diffing while the message is actively being built —
+  // the structuredClone in the AI SDK creates new objects, but React
+  // Compiler memoization can retain stale references for nested parts.
+  if (next.status === "streaming" && next.isLast) return false
+
   // Content comparisons via parts
   if (getTextContent(prev.parts) !== getTextContent(next.parts)) return false
   if (getReasoningContent(prev.parts) !== getReasoningContent(next.parts)) return false
@@ -79,6 +87,7 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
 
   if (prev.isLast !== next.isLast) return false
   if (prev.status !== next.status) return false
+  if (prev.metadata !== next.metadata) return false
   if (prev.finishReason !== next.finishReason) return false
   if (prev.hasScrollAnchor !== next.hasScrollAnchor) return false
   if (prev.className !== next.className) return false
@@ -110,8 +119,10 @@ function MessageInner({
   isLast,
   onEdit,
   onReload,
+  onStop,
   hasScrollAnchor,
   parts,
+  metadata,
   status,
   className,
   onQuote,
@@ -152,9 +163,11 @@ function MessageInner({
         copied={copied}
         copyToClipboard={copyToClipboard}
         onReload={onReload}
+        onStop={onStop}
         isLast={isLast}
         hasScrollAnchor={hasScrollAnchor}
         parts={parts}
+        metadata={metadata}
         status={status}
         className={className}
         messageId={id}

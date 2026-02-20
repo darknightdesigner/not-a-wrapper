@@ -9,6 +9,12 @@ import {
   MessageActions,
   MessageContent,
 } from "@/components/ui/message"
+import {
+  Reasoning,
+  ReasoningContent,
+  ReasoningLabel,
+} from "@/components/ui/reasoning"
+import { SystemMessage } from "@/components/ui/system-message"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { cn } from "@/lib/utils"
 import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
@@ -19,12 +25,11 @@ import {
   RefreshIcon,
   Tick02Icon,
   Copy01Icon,
-  Alert02Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useCallback, useRef, useState } from "react"
 import { getSources } from "./get-sources"
 import { QuoteButton } from "./quote-button"
-import { Reasoning } from "./reasoning"
+import { useReasoningPhase } from "./use-reasoning-phase"
 import { SearchImages } from "./search-images"
 import { SourcesList } from "./sources-list"
 import { ToolInvocation } from "./tool-invocation"
@@ -38,7 +43,9 @@ type MessageAssistantProps = {
   copied?: boolean
   copyToClipboard?: () => void
   onReload?: () => void
+  onStop?: () => void
   parts?: MessageAISDK["parts"]
+  metadata?: Record<string, unknown>
   status?: "streaming" | "ready" | "submitted" | "error"
   className?: string
   messageId: string
@@ -46,7 +53,7 @@ type MessageAssistantProps = {
   finishReason?: string
 }
 
-const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
+const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "caret"
 
 function formatToolProgressLabel(toolName: string): string {
   switch (toolName) {
@@ -77,7 +84,9 @@ export function MessageAssistant({
   copied,
   copyToClipboard,
   onReload,
+  onStop,
   parts,
+  metadata,
   status,
   className,
   messageId,
@@ -86,20 +95,32 @@ export function MessageAssistant({
 }: MessageAssistantProps) {
   const { preferences } = useUserPreferences()
   const sources = getSources(parts || [])
-  
+
   // v6: Filter tool parts using official helper
   const toolInvocationParts = parts?.filter((part): part is ToolUIPart =>
     isStaticToolUIPart(part)
   )
-  
-  const reasoningParts = parts?.find((part) => part.type === "reasoning")
+
   const contentNullOrEmpty = children === null || children === ""
   const isLastStreaming = status === "streaming" && isLast
   const hasContent = !contentNullOrEmpty
-  
+
+  // Unified reasoning phase hook
+  const persistedDurationMs =
+    typeof metadata?.reasoningDurationMs === "number"
+      ? metadata.reasoningDurationMs
+      : undefined
+  const { phase: reasoningPhase, reasoningText, durationSeconds, isReasoningStreaming } =
+    useReasoningPhase({
+      parts,
+      status: status ?? "ready",
+      isLast: isLast ?? false,
+      persistedDurationMs,
+    })
+
   // Type for image search results
   type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
-  
+
   // v6: Use flat properties and official helper for tool name
   const searchImageResults: ImageResult[] =
     parts
@@ -116,7 +137,6 @@ export function MessageAssistant({
 
   const {
     showDots: showStreamingLoader,
-    showThinking,
     showToolProgress,
     showImageGenProgress,
     activeToolNames,
@@ -178,15 +198,17 @@ export function MessageAssistant({
         )}
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
-        {reasoningParts && reasoningParts.text && (
+        {reasoningPhase !== "idle" && (
           <Reasoning
-            reasoning={reasoningParts.text}
-            isStreaming={status === "streaming"}
-          />
-        )}
-
-        {showThinking && (
-          <Loader variant="loading-dots" text="Thinking" />
+            isStreaming={isReasoningStreaming}
+            phase={reasoningPhase}
+            durationSeconds={durationSeconds}
+          >
+            <ReasoningLabel />
+            <ReasoningContent markdown>
+              {reasoningText}
+            </ReasoningContent>
+          </Reasoning>
         )}
 
         {toolInvocationParts &&
@@ -246,21 +268,13 @@ export function MessageAssistant({
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
         {finishReason === "length" && status !== "streaming" && (
-          <div className="text-muted-foreground mt-2 flex items-center gap-1.5 text-xs">
-            <HugeiconsIcon icon={Alert02Icon} size={14} className="text-amber-500 dark:text-amber-400" />
-            <span>
-              Response may be incomplete due to output length limits.
-              {onReload && (
-                <button
-                  type="button"
-                  onClick={onReload}
-                  className="text-primary ml-1 underline underline-offset-2 hover:no-underline"
-                >
-                  Regenerate
-                </button>
-              )}
-            </span>
-          </div>
+          <SystemMessage
+            variant="warning"
+            fill
+            cta={onReload ? { label: "Regenerate", onClick: onReload } : undefined}
+          >
+            Response may be incomplete due to output length limits.
+          </SystemMessage>
         )}
 
         {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
@@ -280,9 +294,9 @@ export function MessageAssistant({
                 type="button"
               >
                 {copied ? (
-                  <HugeiconsIcon icon={Tick02Icon} size={20} />
+                  <HugeiconsIcon icon={Tick02Icon} size={20} className="size-5" />
                 ) : (
-                  <HugeiconsIcon icon={Copy01Icon} size={20} />
+                  <HugeiconsIcon icon={Copy01Icon} size={20} className="size-5" />
                 )}
               </button>
             </MessageAction>
@@ -298,7 +312,7 @@ export function MessageAssistant({
                   onClick={onReload}
                   type="button"
                 >
-                  <HugeiconsIcon icon={RefreshIcon} size={20} />
+                  <HugeiconsIcon icon={RefreshIcon} size={20} className="size-5" />
                 </button>
               </MessageAction>
             ) : null}

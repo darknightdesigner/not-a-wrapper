@@ -3,15 +3,12 @@ import {
   ChatContainerRoot,
   ChatContainerScrollButton,
 } from "@/components/ui/chat-container"
-import { Loader } from "@/components/ui/loader"
 import { Message as MessageContainer } from "@/components/ui/message"
+import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { useState } from "react"
 import { Message } from "./message"
-import type { StreamingIndicatorVariant } from "@/components/ui/loader"
-
-const STREAMING_INDICATOR_VARIANT: StreamingIndicatorVariant = "none"
 
 // v6 helper: Extract text content from all text parts in order.
 // Tool-enabled responses can interleave multiple assistant text parts across
@@ -47,6 +44,7 @@ type ConversationProps = {
   onDelete: (id: string) => void
   onEdit: (id: string, newText: string) => void
   onReload: () => void
+  onStop?: () => void
   onQuote?: (text: string, messageId: string) => void
   isUserAuthenticated?: boolean
   lastFinishReason?: string
@@ -58,6 +56,7 @@ export function Conversation({
   onDelete,
   onEdit,
   onReload,
+  onStop,
   onQuote,
   isUserAuthenticated,
   lastFinishReason,
@@ -97,8 +96,10 @@ export function Conversation({
                 onDelete={onDelete}
                 onEdit={onEdit}
                 onReload={onReload}
+                onStop={isLast && status === "streaming" ? onStop : undefined}
                 hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
+                metadata={message.metadata as Record<string, unknown> | undefined}
                 status={status}
                 onQuote={onQuote}
                 messageGroupId={
@@ -116,12 +117,7 @@ export function Conversation({
             messages[messages.length - 1].role === "user" && (
               <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2 min-h-scroll-anchor">
                 <div className="relative flex min-w-full flex-col gap-2">
-                  <Loader
-                    variant="text-shimmer"
-                    text="Generating"
-                    showCaret
-                    streamingIndicatorVariant={STREAMING_INDICATOR_VARIANT}
-                  />
+                  <ThinkingBar text="Generating" onStop={onStop} />
                 </div>
               </MessageContainer>
             )}

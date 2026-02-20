@@ -78,7 +78,7 @@ function getStatusBadge(status: KeyStatus) {
     case "user-key":
       return (
         <span className="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
-          <HugeiconsIcon icon={Key01Icon} size={12} />
+          <HugeiconsIcon icon={Key01Icon} size={12} className="size-3" />
           Your key
         </span>
       )
@@ -304,7 +304,7 @@ export function ToolKeys() {
                 rel="noopener noreferrer"
                 className="text-muted-foreground mt-1 inline-flex items-center gap-1 text-xs hover:underline"
               >
-                <HugeiconsIcon icon={LinkSquare01Icon} size={12} />
+                <HugeiconsIcon icon={LinkSquare01Icon} size={12} className="size-3" />
                 Get API key
               </a>
               <div className="flex gap-2">

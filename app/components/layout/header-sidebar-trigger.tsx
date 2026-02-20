@@ -35,7 +35,7 @@ export function HeaderSidebarTrigger({
           />
         }
       >
-        <HugeiconsIcon icon={SidebarLeftIcon} size={20} />
+        <HugeiconsIcon icon={SidebarLeftIcon} size={20} className="size-5" />
         <span className="sr-only">Toggle sidebar</span>
       </TooltipTrigger>
       <TooltipContent>

@@ -51,11 +51,10 @@ export function SidebarProjectMenu({
             />
           }
         >
-          <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="text-primary" />
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="size-5 text-primary" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-40">
           <DropdownMenuItem
-            className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation()
               onStartEditing()
@@ -65,7 +64,6 @@ export function SidebarProjectMenu({
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-destructive"
             variant="destructive"
             onClick={(e) => {
               e.stopPropagation()

@@ -172,14 +172,14 @@ export function ProjectChatItem({ chat, formatDate }: ProjectChatItemProps) {
               className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <HugeiconsIcon icon={Tick02Icon} size={12} />
+              <HugeiconsIcon icon={Tick02Icon} size={12} className="size-3" />
             </button>
             <button
               onClick={handleCancelClick}
               className="hover:bg-secondary text-muted-foreground hover:text-primary flex size-6 items-center justify-center rounded-md p-1"
               type="button"
             >
-              <HugeiconsIcon icon={Cancel01Icon} size={12} />
+              <HugeiconsIcon icon={Cancel01Icon} size={12} className="size-3" />
             </button>
           </div>
         </div>

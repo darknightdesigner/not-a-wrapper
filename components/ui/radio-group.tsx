@@ -38,7 +38,7 @@ function RadioGroupItem({
         data-slot="radio-group-indicator"
         className="relative flex items-center justify-center"
       >
-        <HugeiconsIcon icon={CircleIcon} size={8} className="fill-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+        <HugeiconsIcon icon={CircleIcon} size={8} className="size-2 fill-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
       </RadioPrimitive.Indicator>
     </RadioPrimitive.Root>
   )

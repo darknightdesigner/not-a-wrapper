@@ -150,6 +150,26 @@ layout/
     └── models/
 ```
 
+## Gotchas
+
+### React.memo comparators assume immutable props
+
+If `prev` and `next` props share object references to mutable data (e.g., streaming message parts from the AI SDK), the comparator sees the **mutated** value on both sides. Deep equality checks don't help — both point to the same object. The AI SDK's streaming pipeline mutates part objects in place (`reasoningPart.text += chunk`), and `pushMessage` doesn't clone them. See `message.tsx` `areMessagesEqual` (line ~65) for the canonical example. Refer to `.cursor/skills/ai-sdk-v6/SKILL.md` for details on the mutation behavior.
+
+### Always bypass content comparison for actively-streaming messages
+
+The workaround for the mutable-props problem above:
+
+```typescript
+if (next.status === "streaming" && next.isLast) return false
+```
+
+This unconditionally re-renders the last streaming message, trading precision for correctness. The minor cost of extra re-renders during streaming is negligible compared to a frozen UI where reasoning text never appears.
+
+### External mutable state requires defensive snapshotting
+
+When integrating with any external system that mutates objects in place (AI SDK streaming, WebSocket handlers, imperative libraries), either **clone data at the boundary** before setting React state, or use `useRef` to snapshot values at render time for comparison. Without this, any `React.memo`, `useMemo`, or `useEffect` dependency check that relies on referential or value equality will silently break.
+
 ## Notes
 
 <!-- TODO: Document multi-chat comparison patterns -->

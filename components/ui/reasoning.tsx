@@ -8,23 +8,28 @@
  *   - Upstream: `useEffect(() => { if (isStreaming...) }, [isStreaming])`
  *   - This project: Syncs state during render to avoid extra render cycle
  *   - This follows React 19 best practices for derived state patterns
- *   - This project also has a simpler version at `app/components/chat/reasoning.tsx`
+ *   - Added phase-aware ReasoningLabel with shimmer, duration, and chevron
+ *   - Extended context with phase and durationSeconds for unified thinking UX
+ *   - The simpler version at `app/components/chat/reasoning.tsx` has been removed;
+ *     this is now the single reasoning component used throughout the app
+ *   - ReasoningContent uses CSS grid 0fr/1fr animation instead of JS scrollHeight measurement
+ *     (fixes content cutoff bug caused by stale max-height values during streaming)
  * @upgradeNotes
  *   - Do NOT revert to useEffect pattern for isStreaming state sync
  *   - Preserve the `if (isStreaming !== prevIsStreaming)` render-sync block
  *   - This pattern reduces render cycles and effect cleanup overhead
+ *   - Do NOT revert ReasoningContent to scrollHeight/max-height pattern — the CSS grid
+ *     approach is inherently correct and avoids measurement race conditions
  */
 "use client"
 
+import { TextShimmer } from "@/components/ui/text-shimmer"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowDown01Icon } from "@hugeicons-pro/core-stroke-rounded"
 import React, {
   createContext,
   useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
   useState,
 } from "react"
 import { Markdown } from "./markdown"
@@ -32,6 +37,8 @@ import { Markdown } from "./markdown"
 type ReasoningContextType = {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
+  phase: "idle" | "thinking" | "complete"
+  durationSeconds: number | undefined
 }
 
 const ReasoningContext = createContext<ReasoningContextType | undefined>(
@@ -48,12 +55,21 @@ function useReasoningContext() {
   return context
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}m ${secs}s`
+}
+
 export type ReasoningProps = {
   children: React.ReactNode
   className?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
   isStreaming?: boolean
+  phase?: "idle" | "thinking" | "complete"
+  durationSeconds?: number
 }
 function Reasoning({
   children,
@@ -61,10 +77,15 @@ function Reasoning({
   open,
   onOpenChange,
   isStreaming,
+  phase: phaseProp,
+  durationSeconds,
 }: ReasoningProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [wasAutoOpened, setWasAutoOpened] = useState(false)
   const [prevIsStreaming, setPrevIsStreaming] = useState(isStreaming)
+
+  // Derive phase from prop, falling back to isStreaming for backward compat
+  const phase = phaseProp ?? (isStreaming ? "thinking" : "complete")
 
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
@@ -94,6 +115,8 @@ function Reasoning({
       value={{
         isOpen,
         onOpenChange: handleOpenChange,
+        phase,
+        durationSeconds,
       }}
     >
       <div className={className}>{children}</div>
@@ -132,6 +155,58 @@ function ReasoningTrigger({
   )
 }
 
+export type ReasoningLabelProps = {
+  className?: string
+}
+
+function ReasoningLabel({ className }: ReasoningLabelProps) {
+  const { isOpen, onOpenChange, phase, durationSeconds } =
+    useReasoningContext()
+
+  if (phase === "idle") return null
+
+  const labelText =
+    phase === "thinking" ? (
+      <>
+        <TextShimmer duration={2} spread={15} className="text-sm font-medium">
+          Thinking
+        </TextShimmer>
+        {durationSeconds !== undefined && durationSeconds > 0 && (
+          <span className="text-muted-foreground ml-1 text-sm font-normal">
+            {formatDuration(durationSeconds)}
+          </span>
+        )}
+      </>
+    ) : (
+      <span className="text-muted-foreground font-medium">
+        {durationSeconds !== undefined
+          ? `Thought for ${formatDuration(durationSeconds)}`
+          : "Reasoned"}
+      </span>
+    )
+
+  return (
+    <button
+      type="button"
+      className={cn(
+        "flex cursor-pointer items-center gap-1.5 text-sm transition-colors",
+        className
+      )}
+      onClick={() => onOpenChange(!isOpen)}
+    >
+      {labelText}
+      <div
+        className={cn(
+          "text-muted-foreground transform transition-transform",
+          isOpen ? "rotate-180" : ""
+        )}
+      >
+        <HugeiconsIcon icon={ArrowDown01Icon} size={14} />
+      </div>
+    </button>
+  )
+}
+
 export type ReasoningContentProps = {
   children: React.ReactNode
   className?: string
@@ -146,30 +221,7 @@ function ReasoningContent({
   markdown = false,
   ...props
 }: ReasoningContentProps) {
-  const contentRef = useRef<HTMLDivElement>(null)
-  const innerRef = useRef<HTMLDivElement>(null)
   const { isOpen } = useReasoningContext()
-  const [contentHeight, setContentHeight] = useState(0)
-
-  // Use useLayoutEffect to measure height before paint
-  useLayoutEffect(() => {
-    if (!innerRef.current) return
-
-    const updateHeight = () => {
-      if (innerRef.current) {
-        setContentHeight(innerRef.current.scrollHeight)
-      }
-    }
-
-    // Initial measurement
-    updateHeight()
-
-    // Observe for content changes
-    const observer = new ResizeObserver(updateHeight)
-    observer.observe(innerRef.current)
-
-    return () => observer.disconnect()
-  }, [children])
 
   const content = markdown ? (
     <Markdown>{children as string}</Markdown>
@@ -179,20 +231,16 @@ function ReasoningContent({
 
   return (
     <div
-      ref={contentRef}
       className={cn(
-        "overflow-hidden transition-[max-height] duration-150 ease-out",
+        "grid transition-[grid-template-rows] duration-150 ease-out",
+        isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         className
       )}
-      style={{
-        maxHeight: isOpen ? `${contentHeight}px` : "0px",
-      }}
       {...props}
     >
       <div
-        ref={innerRef}
         className={cn(
-          "text-muted-foreground prose prose-sm",
+          "text-muted-foreground prose prose-sm overflow-hidden",
           contentClassName
         )}
       >
@@ -202,4 +250,4 @@ function ReasoningContent({
   )
 }
 
-export { Reasoning, ReasoningTrigger, ReasoningContent }
+export { Reasoning, ReasoningTrigger, ReasoningContent, ReasoningLabel }

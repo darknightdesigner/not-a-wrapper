@@ -34,7 +34,7 @@ AGENTS.md            ← Rules & permissions
   - [x] Fix text loading animation shift and verify no layout jump in streaming states. ✅ `TextShimmerLoader` with proper gap handling
   - [x] Fix stop-streaming button behavior and ensure stream cancellation is immediate. ✅ `ChatInput` stop handler + AI SDK integration
   - [x] Prevent streaming from continuing after exit/navigation. ✅ `useEffect` cleanup + 120s timeout guard in `use-chat-core.ts`
-  - [x] Fix model persistence so selected model is restored reliably. ✅ `useModel` hook with DB/context persistence
+  - [ ] Fix model persistence so selected model is restored reliably. ✅ `useModel` hook with DB/context persistence
   - [ ] Remove link text formatting artifacts (`()` rendering issues). ⚠️ `LinkMarkdown` component exists, needs QA verification
 
 - [x] **#2 Tool calling infra** (`Done`)  
@@ -216,7 +216,15 @@ AGENTS.md            ← Rules & permissions
   - [ ] Implement 3+ chat horizontal scrolling layout.
   - [ ] Validate responsive breakpoints and minimum card widths.
 
-- [ ] **#28 ChatGPT-like notifications and reminders** (`Not started`)  
+- [ ] **#28 Evaluate unused SDK features** (`Not started`)  
+  Sources: `research/skill-gap-analysis-2026-02.md` (Section 2: SDK Features NaW Doesn't Use Yet)
+  - [ ] Evaluate middleware (`wrapLanguageModel`) for logging, caching, guardrails, RAG augmentation.
+  - [ ] Evaluate provider registry (`createProviderRegistry`) as potential replacement for custom `openproviders`.
+  - [ ] Evaluate telemetry (`experimental_telemetry`) for OpenTelemetry-based observability.
+  - [ ] Evaluate message metadata, data parts, and resume stream for production resilience.
+  - [ ] Prioritize adoption candidates and create implementation tickets.
+
+- [ ] **#29 ChatGPT-like notifications and reminders** (`Not started`)  
   Sources: —
   - [ ] Research product requirements and expected reminder/notification flows.
   - [ ] Define reminder data model and scheduling mechanism.
@@ -224,31 +232,31 @@ AGENTS.md            ← Rules & permissions
 
 ### P3 — Strategic
 
-- [ ] **#28 Model access control ACLs** (`Not started`)  
+- [ ] **#30 Model access control ACLs** (`Not started`)  
   Sources: `research/open-webui-analysis/SUMMARY.md`
   - [ ] Define ACL policy model (role, org, workspace, model scope).
   - [ ] Enforce ACL checks in model selection and API dispatch.
   - [ ] Add admin UI for policy management and audits.
 
-- [ ] **#29 Admin-mutable config (PersistentConfig via Convex)** (`Not started`)  
+- [ ] **#31 Admin-mutable config (PersistentConfig via Convex)** (`Not started`)  
   Sources: `research/open-webui-analysis/SUMMARY.md`
   - [ ] Define typed config schema with validation and defaults.
   - [ ] Implement Convex-backed CRUD with auth/ownership controls.
   - [ ] Add admin controls for live config updates.
 
-- [ ] **#30 OpenTelemetry integration** (`Not started`)  
+- [ ] **#32 OpenTelemetry integration** (`Not started`)  
   Sources: `research/open-webui-analysis/SUMMARY.md`
   - [ ] Define telemetry coverage map (API, model calls, UI events).
   - [ ] Integrate tracing/metrics exporters for target environments.
   - [ ] Add sampling + privacy controls for sensitive payloads.
 
-- [ ] **#31 Prompt library with `/` trigger** (`Not started`)  
+- [ ] **#33 Prompt library with `/` trigger** (`Not started`)  
   Sources: `research/competitive-feature-analysis.md`, `research/open-webui-analysis/SUMMARY.md`
   - [ ] Design prompt template storage schema and sharing model.
   - [ ] Integrate `/` trigger command palette for prompt insertion.
   - [ ] Add CRUD UI and usage analytics for prompt library entries.
 
-- [ ] **#32 Flowglad integration** (`Not started`)  
+- [ ] **#34 Flowglad integration** (`Not started`)  
   Sources: `AGENTS.md`
   - [ ] Define billing entities and subscription lifecycle mapping.
   - [ ] Implement checkout, upgrade/downgrade, and cancellation flows.
@@ -258,35 +266,35 @@ AGENTS.md            ← Rules & permissions
 
 > Sources: `.agents/context/research/webclaw/06-recommendations.md` (Sections 1, 2, 4)
 
-- [x] **#33 Message memoization** (`Done`)  
+- [x] **#35 Message memoization** (`Done`)  
   Benefit: Eliminate long-thread streaming jank by restricting re-renders to active message.  
   Sources: `research/webclaw/06-recommendations.md` R01
   - [x] Add `React.memo` guard and content-based equality comparator.
   - [x] Validate rendering complexity change (O(N) -> O(1) per chunk).
   - [x] Confirm no regression in edited/retried messages.
 
-- [x] **#34 Composer ref isolation** (`Done`)  
+- [x] **#36 Composer ref isolation** (`Done`)  
   Benefit: Stop per-keystroke cascading re-renders through chat tree.  
   Sources: `research/webclaw/06-recommendations.md` R02
   - [x] Move input state tracking to `useRef`.
   - [x] Add 500ms draft persistence debounce.
   - [x] Add `beforeunload` flush for draft reliability.
 
-- [x] **#35 Singleton Shiki highlighter** (`Done`)  
+- [x] **#37 Singleton Shiki highlighter** (`Done`)  
   Benefit: Prevent repeated WASM initialization and improve code block latency.  
   Sources: `research/webclaw/06-recommendations.md` R04
   - [x] Create module-level singleton `highlighterPromise`.
   - [x] Reuse singleton across all markdown/code renders.
   - [x] Validate no duplicate highlighter bootstrapping.
 
-- [ ] **#36 Typography utilities** (`Partial`)  
+- [ ] **#38 Typography utilities** (`Partial`)  
   Benefit: Improve text readability with near-zero runtime cost.  
   Sources: `research/webclaw/06-recommendations.md` R05
   - [x] Apply `text-balance`/`text-pretty` in `.prose` markdown context.
   - [ ] Extend utility classes to sidebar titles.
   - [ ] Extend utility classes to standalone headings/components.
 
-- [ ] **#37 Pragmatic hook decomposition** (`In progress`)  
+- [ ] **#39 Pragmatic hook decomposition** (`In progress`)  
   Benefit: Improve maintainability/testability of complex chat flows.  
   Sources: `research/webclaw/06-recommendations.md` R06 (adapted)
   - [x] Extract `use-chat-operations.ts` and `use-chat-draft.ts`.
@@ -294,21 +302,21 @@ AGENTS.md            ← Rules & permissions
   - [ ] Extract `use-chat-edit.ts` from `use-chat-core.ts`.
   - [ ] Add focused tests for extracted hooks.
 
-- [ ] **#38 `type` over `interface`** (`Not started`)  
+- [ ] **#40 `type` over `interface`** (`Not started`)  
   Benefit: Consistent type composition with unions/utilities.  
   Sources: `research/webclaw/06-recommendations.md` R09
   - [ ] Add lint preference/rule for new files only.
   - [ ] Document migration policy (no codemod, opportunistic adoption).
   - [ ] Track adoption in new/changed modules.
 
-- [ ] **#39 Context meter** (`Not started`)  
+- [ ] **#41 Context meter** (`Not started`)  
   Benefit: Show remaining context window before limit hits.  
   Sources: `research/webclaw/06-recommendations.md` R08
   - [ ] Implement phase 1 estimate from visible message history.
   - [ ] Implement phase 2 with accumulated `usage.promptTokens`.
   - [ ] Normalize across multi-model conversations with differing limits.
 
-- [ ] **#40 Global prompt auto-focus** (`Not started`)  
+- [ ] **#42 Global prompt auto-focus** (`Not started`)  
   Benefit: Remove click-to-focus friction in composer.  
   Sources: `research/webclaw/06-recommendations.md` R07
   - [ ] Add global printable-key listener and focus guardrails.
@@ -329,11 +337,12 @@ Inline Triggers ← no deps → Prompt Library (P2, deferred)
 Memory System ← Convex vectors → RAG Pipeline (P2, shares infra) 
 Multi-chat Card Bug (#6) ← no deps (investigate P0)
 Multi-chat Share Button (#7) ← no deps (investigate P0)
-Message Memo (#33) ✅ → Composer Ref (#34) ✅ → Hook Decomposition (#37, in progress) (P4 perf chain)
-Shiki Singleton (#35) ✅ + Typography (#36, partial) + Auto-Focus (#40) ← no deps (P4 parallel)
-Context Meter (#39) ← needs token accumulation from AI SDK usage object
+Message Memo (#35) ✅ → Composer Ref (#36) ✅ → Hook Decomposition (#39, in progress) (P4 perf chain)
+Shiki Singleton (#37) ✅ + Typography (#38, partial) + Auto-Focus (#42) ← no deps (P4 parallel)
+Context Meter (#41) ← needs token accumulation from AI SDK usage object
 Style Override Safety (#26) ← no deps (P2, affects select/dialog/alert-dialog/sheet/dropdown-menu)
 Multi-chat Layout Redesign (#27) ← no deps (P2)
+Evaluate Unused SDK Features (#28) ← no deps (P2, informs middleware/registry/telemetry adoption)
 ```
 
 ---

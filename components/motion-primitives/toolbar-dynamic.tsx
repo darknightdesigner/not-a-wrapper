@@ -58,19 +58,19 @@ export default function ToolbarDynamic() {
               {!isOpen ? (
                 <div className='flex space-x-2'>
                   <Button disabled ariaLabel='User profile'>
-                    <HugeiconsIcon icon={User02Icon} size={20} />
+                    <HugeiconsIcon icon={User02Icon} size={20} className="size-5" />
                   </Button>
                   <Button
                     onClick={() => setIsOpen(true)}
                     ariaLabel='Search notes'
                   >
-                    <HugeiconsIcon icon={Search01Icon} size={20} />
+                    <HugeiconsIcon icon={Search01Icon} size={20} className="size-5" />
                   </Button>
                 </div>
               ) : (
                 <div className='flex space-x-2'>
                   <Button onClick={() => setIsOpen(false)} ariaLabel='Back'>
-                    <HugeiconsIcon icon={ArrowLeft01Icon} size={20} />
+                    <HugeiconsIcon icon={ArrowLeft01Icon} size={20} className="size-5" />
                   </Button>
                   <div className='relative w-full'>
                     <input

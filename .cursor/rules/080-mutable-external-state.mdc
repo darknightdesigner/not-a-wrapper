@@ -1,0 +1,42 @@
+---
+description: "Prevent bugs from mutable external state in React components"
+globs: ["app/components/**/*.tsx", "app/components/**/*.ts"]
+alwaysApply: false
+---
+
+# Mutable External State in React Components
+
+External systems (AI SDK streaming, WebSocket handlers, imperative libraries, shared stores) can mutate objects that React holds by reference. This silently breaks memoization because `prev` and `next` point to the same mutated object.
+
+## React.memo Comparators
+
+When editing `React.memo` comparators, check whether props include data from external mutable sources. Never rely solely on deep content equality for actively-updating data — check status flags first and bail early.
+
+Canonical pattern (`app/components/chat/message.tsx` line 73):
+
+```typescript
+if (next.status === "streaming" && next.isLast) return false
+```
+
+Always place the streaming bail-out **before** any content equality checks.
+
+## AI SDK Message Parts Are Mutable During Streaming
+
+The `parts` array and nested objects (`reasoningPart.text`, `textPart.text`, `toolPart.state`) are mutated in place during streaming. The first `write()` call uses `pushMessage` (no clone), so the mutable object leaks into React state. Always assume parts content is **unstable** during `status === "streaming"`.
+
+## Creating New Memoized Streaming Components
+
+Default to `React.memo(Component)` **without** a custom comparator — let React's shallow equality handle it. Only add a custom comparator if profiling shows a measurable performance problem, and always include the streaming bail-out:
+
+```typescript
+const MyComponent = React.memo(function MyComponent(props: Props) {
+  // ...
+}, (prev, next) => {
+  if (next.status === "streaming" && next.isLast) return false
+  // ... other checks only after the bail-out
+})
+```
+
+## Diagnostic Hint
+
+If a memoized component isn't re-rendering when expected during streaming, check `Object.is(prev.parts, next.parts)` in the comparator. If `true`, the data source is mutating in place — the reference never changed. See `.agents/context/troubleshooting/streaming-ui-rendering.md` for the full diagnostic flow.

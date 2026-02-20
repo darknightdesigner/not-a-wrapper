@@ -144,12 +144,36 @@ For long sessions, Claude should:
 
 ## Quality Enforcement
 
-**This project prioritizes strict quality over quick fixes.** When facing lint or type errors:
+**This project prioritizes well-researched, industry-standard solutions over quick fixes.** See `AGENTS.md` > Implementation Philosophy for the universal principles.
 
-### Hierarchy of Solutions
+### Implementation Decision Framework
 
-1. **Fix the code** — Always the first choice
-2. **Refactor the pattern** — If the code is fundamentally incompatible
+Before writing code, follow this sequence:
+
+1. **Research the domain** — Search for established patterns, prior art, and industry conventions for the problem at hand
+2. **Check for existing solutions** — Look in `.agents/context/research/` for prior analysis; check if the codebase already solves a similar problem
+3. **Evaluate approaches** — When multiple solutions exist, compare trade-offs (performance, maintainability, complexity, ecosystem alignment)
+4. **Align with the codebase** — Ensure the chosen approach extends existing conventions rather than introducing a parallel pattern
+5. **Implement and verify** — Build incrementally, verifying each step against the gold standard examples in `AGENTS.md`
+
+### When You're Uncertain
+
+```markdown
+✅ DO: Research the problem first — "Let me check how this is typically handled in Next.js App Router..."
+✅ DO: Reference prior art — "React's documentation recommends this pattern for..."
+✅ DO: Document your reasoning — Create a research doc in .agents/context/research/ for non-trivial decisions
+✅ DO: Propose options — "There are two established approaches here. Option A... Option B... I recommend B because..."
+
+❌ DON'T: Jump to the first solution that works
+❌ DON'T: Invent custom patterns when standard ones exist
+❌ DON'T: Optimize for fewer lines of code over clarity and maintainability
+❌ DON'T: Skip research for unfamiliar problem domains
+```
+
+### Hierarchy of Solutions (Errors & Issues)
+
+1. **Fix the code properly** — Always the first choice
+2. **Refactor the pattern** — If the code is fundamentally incompatible with the correct approach
 3. **Document exception** — Only with explicit user approval and clear reason
 4. **Never**: Disable rules, add ignore comments, or downgrade deps without approval
 
@@ -160,21 +184,11 @@ For long sessions, Claude should:
 - Adding `eslint-disable` comments without documented reason
 - Suggesting "we can disable this check" as a solution
 - Downgrading packages to avoid type/lint errors
-
-### When You Encounter Errors
-
-```markdown
-✅ DO: "This error is because X. Here's how to fix the code properly..."
-✅ DO: "This pattern violates React 19's ref rules. The correct pattern is..."
-✅ DO: "I'll consult .agents/workflows/react-19-lint-fixes.md for the recommended fix."
-
-❌ DON'T: "We can disable this rule in eslint.config.mjs..."
-❌ DON'T: "Let me add // @ts-ignore to suppress this..."
-❌ DON'T: "Should I turn off this check?"
-```
+- Implementing ad-hoc workarounds when a well-documented solution exists
 
 ### Reference for Fixes
 
+- `.agents/context/research/` — Prior research and analysis
 - `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
 - `.agents/context/conventions.md` — Quality gates and acceptable exceptions
 - Gold standard examples in `AGENTS.md`

@@ -83,7 +83,7 @@ export function ChatActionsMenu({
       >
         <DropdownMenuTrigger render={trigger ?? defaultTrigger}>
           {!trigger && (
-            <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="text-primary" />
+            <HugeiconsIcon icon={MoreHorizontalIcon} size={20} className="size-5 text-primary" />
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -93,7 +93,6 @@ export function ChatActionsMenu({
           animated={false}
         >
           <DropdownMenuItem
-            className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation()
               togglePinned(chat.id, !chat.pinned)
@@ -107,7 +106,6 @@ export function ChatActionsMenu({
             {chat.pinned ? "Unpin" : "Pin"}
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="cursor-pointer"
             onClick={(e) => {
               e.stopPropagation()
               handleRename()
@@ -117,7 +115,6 @@ export function ChatActionsMenu({
             Rename
           </DropdownMenuItem>
           <DropdownMenuItem
-            className="text-destructive"
             variant="destructive"
             onClick={(e) => {
               e.stopPropagation()

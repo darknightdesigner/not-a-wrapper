@@ -59,6 +59,45 @@ Use this skill when adding or updating AI SDK v6 usage in `app/api/` routes or c
 - [ ] For manual stream parsing, use `readUIMessageStream(...)`.
 - [ ] Match the server’s stream protocol and message parts.
 
+## Client Streaming Internals (Gotchas)
+
+The AI SDK v6 streaming pipeline mutates message part objects **in place** during streaming. This creates a subtle React memoization trap.
+
+### Mutation Flow
+
+Inside `processUIMessageStream`, each delta chunk mutates the part object that was already pushed into `state.message.parts` by reference:
+
+```typescript
+// reasoning-delta (same pattern for text-delta)
+reasoningPart.text += chunk.delta  // mutates the object already in parts[]
+write()                            // flushes to React state
+```
+
+### pushMessage vs replaceMessage Asymmetry
+
+| Call | When | Clone behavior |
+|------|------|----------------|
+| `pushMessage(message)` | First `write()` — streaming message ID not yet in state | **No clone** — uses `.concat(message)`, leaks the mutable working object |
+| `replaceMessage(message)` | Subsequent `write()` calls — ID matches last message | **structuredClone** — deep clone for React Compiler compatibility |
+
+The first `pushMessage` leaks the SDK’s mutable working object into React state. Subsequent stream mutations retroactively modify the object already held as “previous props” by React.
+
+### Impact on React.memo / React Compiler
+
+Any comparator reading `prev.parts[N].text` sees the **already-mutated** value (identical to `next.parts[N].text`) because both references point to the same object. The comparison always returns `true` (equal), so React skips re-renders during streaming.
+
+### Safe Patterns
+
+- [ ] **Bail out for streaming messages** — return `false` from memo comparators when the message is actively streaming. Canonical example:
+
+```typescript
+// app/components/chat/message.tsx line 73
+if (next.status === "streaming" && next.isLast) return false
+```
+
+- [ ] **Snapshot via useRef** — capture part values at render time into a ref if you need stable “previous” values for diffing.
+- [ ] **Never rely on deep content equality for parts during streaming** — only compare parts content after the message reaches a terminal status (`"ready"`, `"error"`, `"stopped"`).
+
 ## Do / Don’t (Repo-Specific)
 
 **Do**

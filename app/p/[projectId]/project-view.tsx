@@ -409,8 +409,9 @@ export function ProjectView({ projectId }: ProjectViewProps) {
       onDelete: handleDelete,
       onEdit: handleEdit,
       onReload: handleReload,
+      onStop: stop,
     }),
-    [messages, status, handleDelete, handleEdit, handleReload]
+    [messages, status, handleDelete, handleEdit, handleReload, stop]
   )
 
   // Memoize the chat input props
@@ -482,7 +483,7 @@ export function ProjectView({ projectId }: ProjectViewProps) {
             }}
           >
             <div className="mb-6 flex items-center justify-center gap-2">
-              <HugeiconsIcon icon={Chat01Icon} size={24} className="text-muted-foreground" />
+              <HugeiconsIcon icon={Chat01Icon} size={24} className="size-6 text-muted-foreground" />
               <h1 className="text-center text-3xl font-medium tracking-tight text-balance">
                 {project?.name || ""}
               </h1>

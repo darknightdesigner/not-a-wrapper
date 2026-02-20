@@ -167,7 +167,7 @@ function MenubarRadioItem({
     >
       <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
         <MenuPrimitive.RadioItemIndicator>
-          <HugeiconsIcon icon={CircleIcon} size={8} className="fill-current" />
+          <HugeiconsIcon icon={CircleIcon} size={8} className="size-2 fill-current" />
         </MenuPrimitive.RadioItemIndicator>
       </span>
       {children}

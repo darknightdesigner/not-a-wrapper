@@ -72,7 +72,7 @@ export function ButtonPlusMenu({
               />
             }
           >
-            <HugeiconsIcon icon={Add01Icon} size={16} />
+            <HugeiconsIcon icon={Add01Icon} size={20} className="size-5" />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>
             More options
@@ -118,7 +118,7 @@ export function ButtonPlusMenu({
               />
             }
           >
-            <HugeiconsIcon icon={Add01Icon} size={16} />
+            <HugeiconsIcon icon={Add01Icon} size={20} className="size-5" />
           </TooltipTrigger>
           <TooltipContent side="bottom" hideArrow>
             More options

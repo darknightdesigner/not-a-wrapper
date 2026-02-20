@@ -31,10 +31,13 @@ type ThinkingBarProps = {
 export function ThinkingBar({
   className,
   text = "Thinking",
-  onStop,
+  // Keep `onStop` in the API for compatibility; we may restore a stop CTA later.
+  onStop: _onStop,
   stopLabel = "Answer now",
   onClick,
 }: ThinkingBarProps) {
+  // TODO: Potentially re-add a stop/answer CTA after clarifying UX semantics.
+  void stopLabel
   return (
     <div className={cn("flex w-full items-center justify-between", className)}>
       {onClick ? (
@@ -49,15 +52,6 @@ export function ThinkingBar({
       ) : (
         <TextShimmer className="cursor-default font-medium">{text}</TextShimmer>
       )}
-      {onStop ? (
-        <button
-          onClick={onStop}
-          type="button"
-          className="text-muted-foreground hover:text-foreground border-muted-foreground/50 hover:border-foreground border-b border-dotted text-sm transition-colors"
-        >
-          {stopLabel}
-        </button>
-      ) : null}
     </div>
   )
 }

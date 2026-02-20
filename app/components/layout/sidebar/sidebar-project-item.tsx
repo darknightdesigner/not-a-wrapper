@@ -177,7 +177,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
     >
       {isEditing ? (
         <div className="bg-accent flex items-center rounded-md py-1 pr-1 pl-2">
-          <HugeiconsIcon icon={Folder01Icon} size={20} className="text-primary mr-2 flex-shrink-0" />
+          <HugeiconsIcon icon={Folder01Icon} size={20} className="size-5 text-primary mr-2 flex-shrink-0" />
           <input
             ref={inputRef}
             value={editName}
@@ -215,7 +215,7 @@ export function SidebarProjectItem({ project }: SidebarProjectItemProps) {
               className="text-primary relative line-clamp-1 flex min-h-9 w-full items-center gap-2 mask-r-from-80% mask-r-to-85% px-2.5 py-1.5 text-sm text-ellipsis whitespace-nowrap"
               title={displayName}
             >
-              <HugeiconsIcon icon={Folder01Icon} size={20} />
+              <HugeiconsIcon icon={Folder01Icon} size={20} className="size-5" />
               {displayName}
             </div>
           </Link>

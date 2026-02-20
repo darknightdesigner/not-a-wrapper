@@ -13,7 +13,6 @@ type LoadingStateInput = {
 
 type LoadingStateOutput = {
   showDots: boolean
-  showThinking: boolean
   showToolProgress: boolean
   showImageGenProgress: boolean
   activeToolNames: string[]
@@ -31,10 +30,14 @@ export function useLoadingState({
   return useMemo(() => {
     const isLastStreaming = status === "streaming" && isLast
 
-    const reasoningParts = parts?.find((part) => part.type === "reasoning")
-    const hasVisibleReasoning = Boolean(reasoningParts?.text?.trim())
-    const showThinking =
-      isLastStreaming && Boolean(reasoningParts) && !hasVisibleReasoning
+    // Suppress generating dots only when reasoning has visible text.
+    const hasVisibleReasoning =
+      parts?.some(
+        (part) =>
+          part.type === "reasoning" &&
+          typeof part.text === "string" &&
+          part.text.trim().length > 0
+      ) ?? false
 
     const toolInvocationParts =
       parts?.filter((part): part is ToolUIPart => isStaticToolUIPart(part)) ?? []
@@ -79,7 +82,6 @@ export function useLoadingState({
     const showDots =
       isLastStreaming &&
       contentNullOrEmpty &&
-      !showThinking &&
       !hasVisibleReasoning &&
       !hasVisibleTools &&
       !hasVisibleImages &&
@@ -88,7 +90,6 @@ export function useLoadingState({
 
     return {
       showDots,
-      showThinking,
       showToolProgress,
       showImageGenProgress,
       activeToolNames,
