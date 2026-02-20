@@ -113,6 +113,41 @@ Extracted CSS custom properties and computed styles relevant to the ChatGPT prom
     --drop-shadow-xl: 0 9px 7px #0000001a;
     --drop-shadow-2xl: 0 25px 25px #00000026;
 
+/* --- Tailwind shadow internals ---------------------------------------- */
+
+    --tw-shadow: 0 0 transparent;
+    --tw-shadow-alpha: 100%;
+    --tw-inset-shadow: 0 0 transparent;
+    --tw-inset-shadow-alpha: 100%;
+    --tw-ring-shadow: 0 0 transparent;
+    --tw-ring-offset-shadow: 0 0 transparent;
+    --tw-inset-ring-shadow: 0 0 transparent;
+    --tw-drop-shadow-alpha: 100%;
+    --tw-text-shadow-alpha: 100%;
+
+/* ★ shadow-short — the primary COMPOSER SURFACE shadow
+   Two-layer composite:
+     Layer 1: 0 4px 4px 0 #0000000a  — soft ambient spread (~4% black)
+     Layer 2: 0 0 1px 0 #0000009e    — tight 1px outline ring (~62% black)
+   The outline layer replaces a traditional border, giving a crisp edge
+   without the layout cost of a border-width.
+
+   DARK MODE OVERRIDE:
+   Selector: .shadow-short:where(.dark,.dark *):not(:where(.dark .light,.dark .light *))
+   Overrides --shadow-color-1 and --shadow-color-2 with dark-appropriate values.
+   TODO: capture full computed box-shadow values for dark mode. */
+.shadow-short {
+    --tw-shadow: 0px 4px 4px 0px var(--tw-shadow-color, var(--shadow-color-1, #0000000a)),
+                 0px 0px 1px 0px var(--tw-shadow-color, var(--shadow-color-2, #0000009e));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
+                var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+/* Dark variant selector (override values TBD): */
+.shadow-short:where(.dark,.dark *):not(:where(.dark .light,.dark .light *)) {
+    /* --shadow-color-1: ???; */
+    /* --shadow-color-2: ???; */
+}
+
     --ease-in: cubic-bezier(.4,0,1,1);
     --ease-out: cubic-bezier(0,0,.2,1);
     --ease-in-out: cubic-bezier(.4,0,.2,1);
@@ -649,9 +684,9 @@ Extracted CSS custom properties and computed styles relevant to the ChatGPT prom
    =================================================================== */
 
     --utility-scrollbar: #0000000a;
-    --sharp-edge-top-shadow: 0 1px 0 var(--border-sharp);
+    --sharp-edge-top-shadow: 0 1px 0 #0000000d;
     --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
-    --sharp-edge-bottom-shadow: 0 -1px 0 var(--border-sharp);
+    --sharp-edge-bottom-shadow: 0 -1px 0 #0000000d;
     --sharp-edge-bottom-shadow-placeholder: 0 -1px 0 transparent;
     --swiper-theme-color: #007aff;
     --cot-shimmer-duration: 1400ms;
@@ -676,5 +711,57 @@ Extracted CSS custom properties and computed styles relevant to the ChatGPT prom
     flex-basis: auto;
     flex-direction: column;
     border-color: #0000;
+    box-shadow: none;
+    text-shadow: none;
     padding-top: calc(var(--spacing)*0);
+
+/* ===================================================================
+   ★ COMPOSER SURFACE — VERIFIED COMPUTED STYLES
+   div[data-composer-surface="true"]
+   Confirmed via Chrome DevTools, 2026-02-20.
+   =================================================================== */
+
+/* --- Light mode --------------------------------------------------- */
+
+    background-clip: padding-box;                   /* .bg-clip-padding */
+    border-bottom-left-radius: 28px;                /* element.style */
+    border-bottom-right-radius: 28px;
+    border-top-left-radius: 28px;
+    border-top-right-radius: 28px;
+    border-bottom-color: rgba(13, 13, 13, 0.05);   /* set for transitions */
+    border-left-color: rgba(13, 13, 13, 0.05);
+    border-right-color: rgba(13, 13, 13, 0.05);
+    border-top-color: rgba(13, 13, 13, 0.05);
+    border-bottom-width: 0px;                       /* ← NOT rendered */
+    border-left-width: 0px;
+    border-right-width: 0px;
+    border-top-width: 0px;
+    border-style: solid;                            /* all sides */
+    border-image-width: 1;
+    box-sizing: border-box;
+    padding: 10px;                                  /* p-2.5 */
+    transition-property: color, background-color, border-color,
+        outline-color, -webkit-text-decoration-color,
+        text-decoration-color, fill, stroke,
+        --tw-gradient-from, --tw-gradient-via, --tw-gradient-to;
+                                                    /* motion-safe:transition-colors */
+
+/* --- Dark mode ---------------------------------------------------- */
+
+    border-bottom-color: rgba(255, 255, 255, 0.05); /* inverted from light */
+    border-left-color: rgba(255, 255, 255, 0.05);
+    border-right-color: rgba(255, 255, 255, 0.05);
+    border-top-color: rgba(255, 255, 255, 0.05);
+    border-*-width: 0px;                            /* still NOT rendered */
+    /* background-color: #303030 (hardcoded dark:bg-[#303030]) */
+    /* box-shadow: uses .shadow-short dark variant — full values TBD */
+
+/* --- Key takeaways ------------------------------------------------ */
+/* 1. Border-width is 0 in both modes — edge definition is 100% shadow
+   2. Border-color IS set (for transition-colors animation smoothness)
+   3. Light border-color: rgba(13,13,13,0.05) = #0d0d0d at 5%
+   4. Dark border-color: rgba(255,255,255,0.05) = white at 5%
+   5. border-radius: 28px on all corners (via element.style)
+   6. padding: 10px uniform
+   7. background-clip: padding-box prevents bg bleeding past border area */
 ```

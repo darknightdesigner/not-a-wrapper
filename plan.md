@@ -167,6 +167,13 @@ AGENTS.md            ← Rules & permissions
   - [ ] Integrate Convex vector search retrieval into chat flow.
   - [ ] Evaluate retrieval quality with representative datasets.
 
+- [ ] **#43 Motion preference respect** (`Not started`)  
+  Sources: ChatGPT prompt input research (`research/prompt-input/`), [MDN prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)
+  - [ ] Audit all Motion/Framer animations and add `useReducedMotion()` guards. (Files: `app/components/chat-input/file-list.tsx`, `app/components/chat-input/suggestions.tsx`, `components/motion-primitives/`)
+  - [ ] Add `motion-safe:` Tailwind prefix to CSS transitions. (Files: `components/ui/prompt-input.tsx`, `app/components/chat-input/chat-input.tsx`)
+  - [ ] Verify reduced-motion behavior across composer, suggestions, file list, and streaming animations.
+  - [ ] Test with macOS "Reduce motion" accessibility setting and `prefers-reduced-motion: reduce` emulation in DevTools.
+
 ### P2 — Major Features
 
 - [ ] **#19 Image generation in chat** (`Not started`)  
@@ -236,6 +243,16 @@ AGENTS.md            ← Rules & permissions
   - [ ] Research product requirements and expected reminder/notification flows.
   - [ ] Define reminder data model and scheduling mechanism.
   - [ ] Prototype notification delivery UX and permission handling.
+
+- [ ] **#44 Rich-text composer (ProseMirror/TipTap)** (`Not started`)  
+  Sources: ChatGPT prompt input research (`research/prompt-input/`), [TipTap](https://tiptap.dev/), [ProseMirror](https://prosemirror.net/), [Lexical](https://lexical.dev/)
+  - [ ] Evaluate TipTap vs Lexical vs raw ProseMirror for bundle size, React 19 compat, and extension ecosystem.
+  - [ ] Prototype replacement of `PromptInputTextarea` (`components/ui/prompt-input.tsx:117-166`) with rich-text editor.
+  - [ ] Preserve existing auto-resize, keyboard handling (`chat-input.tsx:133-149`), paste behavior (`chat-input.tsx:151-188`), and `PromptInput` context API (`components/ui/prompt-input.tsx:35-55`).
+  - [ ] Migrate `ChatInput` integration (`app/components/chat-input/chat-input.tsx`) to use new editor surface.
+  - [ ] Add extension points for `#`, `/`, `@` inline triggers (connects to #20 Inline triggers).
+  - [ ] Validate accessibility (keyboard navigation, screen reader, ARIA) and mobile virtual keyboard behavior.
+  - [ ] Benchmark bundle size delta and first-input latency vs current `<textarea>` baseline.
 
 ### P3 — Strategic
 
@@ -349,6 +366,25 @@ AGENTS.md            ← Rules & permissions
   - [ ] Evaluate feasible implementation patterns in NaW chat flow/composer.
   - [ ] Propose recommended approach with trade-offs and rollout scope.
 
+- [ ] **#45 Voice/dictation controls** (`Not started`)  
+  Benefit: Enable speech-to-text input in the composer, matching ChatGPT's dictation UX.  
+  Sources: ChatGPT prompt input research (`research/prompt-input/`), [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), see also P2 #24 Audio STT/TTS
+  - [ ] Add dictation button to composer trailing actions. (File: `app/components/chat-input/chat-input.tsx:244-280`)
+  - [ ] Implement Web Speech API `SpeechRecognition` with start/stop/interim-result states.
+  - [ ] Handle browser support detection and graceful fallback (hide button when unsupported).
+  - [ ] Stream recognized text into `PromptInputTextarea` value. (Integration: `components/ui/prompt-input.tsx`)
+  - [ ] Add visual feedback (pulsing mic icon, waveform indicator) during active dictation.
+  - [ ] Coordinate with P2 #24 Audio STT/TTS for provider-based dictation (Whisper, Gemini) as a future upgrade path.
+
+- [ ] **#46 Mobile-specific file inputs** (`Not started`)  
+  Benefit: Expose camera capture and photo gallery picker on mobile, matching ChatGPT's mobile composer.  
+  Sources: ChatGPT prompt input mobile research (`research/prompt-input/chatgpt-prompt-input-mobile-html.md`)
+  - [ ] Add hidden camera input (`accept="image/*" capture="environment"`). (Ref: ChatGPT `#upload-camera`)
+  - [ ] Add hidden gallery input (`accept="image/*" multiple`). (Ref: ChatGPT `#upload-photos`)
+  - [ ] Add "Take photo" and "Choose from gallery" items to `ButtonPlusMenu`. (File: `app/components/chat-input/button-plus-menu.tsx:127-181`)
+  - [ ] Gate camera/gallery items to mobile user-agents or touch-capable devices.
+  - [ ] Validate iOS Safari and Android Chrome capture behavior.
+
 > **Skipped from WebClaw research** (premature for current team size/stage): full screen-based feature modules (R10), portal-based scroll container (R11 — not applicable, NaW uses `use-stick-to-bottom` with plain divs), pin-to-top scroll (R12, ship behind toggle if ever), unified message component (R13 — shared primitives already in `components/ui/message.tsx`, final unification deferred), cmdk replacement (R14), streaming batching (R15). Revisit when team scales or profiling justifies. Generation guard timer (R03) already implemented in `use-chat-core.ts`.
 
 ### Critical Path
@@ -370,6 +406,10 @@ Context Meter (#41) ← needs token accumulation from AI SDK usage object
 Style Override Safety (#26) ← no deps (P2, affects select/dialog/alert-dialog/sheet/dropdown-menu)
 Multi-chat Layout Redesign (#27) ← no deps (P2)
 Evaluate Unused SDK Features (#28) ← no deps (P2, informs middleware/registry/telemetry adoption)
+Motion Preference (#43) ← no deps (P1, accessibility)
+Rich-text Composer (#44) → Inline Triggers (#20) (P2, enables rich input features)
+Voice/Dictation (#45) → Audio STT/TTS (#24) (P4→P2, progressive enhancement)
+Mobile File Inputs (#46) ← no deps (P4, mobile UX)
 ```
 
 ---
