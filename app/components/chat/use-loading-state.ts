@@ -32,8 +32,12 @@ export function useLoadingState({
 
     // Suppress generating dots only when reasoning has visible text.
     const hasVisibleReasoning =
-      parts?.some((part) => part.type === "reasoning" && part.text.trim().length > 0) ??
-      false
+      parts?.some(
+        (part) =>
+          part.type === "reasoning" &&
+          typeof part.text === "string" &&
+          part.text.trim().length > 0
+      ) ?? false
 
     const toolInvocationParts =
       parts?.filter((part): part is ToolUIPart => isStaticToolUIPart(part)) ?? []
