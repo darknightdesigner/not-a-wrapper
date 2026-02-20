@@ -110,13 +110,18 @@ export function MessageAssistant({
     typeof metadata?.reasoningDurationMs === "number"
       ? metadata.reasoningDurationMs
       : undefined
-  const { phase: reasoningPhase, reasoningText, durationSeconds, isReasoningStreaming } =
-    useReasoningPhase({
-      parts,
-      status: status ?? "ready",
-      isLast: isLast ?? false,
-      persistedDurationMs,
-    })
+  const {
+    phase: reasoningPhase,
+    reasoningText,
+    durationSeconds,
+    isReasoningStreaming,
+    isOpaqueReasoning,
+  } = useReasoningPhase({
+    parts,
+    status: status ?? "ready",
+    isLast: isLast ?? false,
+    persistedDurationMs,
+  })
 
   // Type for image search results
   type ImageResult = { title: string; imageUrl: string; sourceUrl: string }
@@ -203,11 +208,14 @@ export function MessageAssistant({
             isStreaming={isReasoningStreaming}
             phase={reasoningPhase}
             durationSeconds={durationSeconds}
+            opaque={isOpaqueReasoning}
           >
             <ReasoningLabel />
-            <ReasoningContent markdown>
-              {reasoningText}
-            </ReasoningContent>
+            {!isOpaqueReasoning && (
+              <ReasoningContent markdown>
+                {reasoningText}
+              </ReasoningContent>
+            )}
           </Reasoning>
         )}
 

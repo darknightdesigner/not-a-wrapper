@@ -23,6 +23,11 @@ This file contains Claude-specific behaviors, preferences, and context for the N
 
 ## Project-Specific Behaviors
 
+### Prompt Delivery Default
+- When the user asks to "create a prompt" (or similar), return the prompt directly in chat
+- Do not create a markdown file unless the user explicitly asks for a file
+- If ambiguous, prefer chat output
+
 ### When Working on Chat Features
 - Reference `app/components/chat/use-chat-core.ts` for hook patterns
 - Follow optimistic update pattern from `lib/chat-store/chats/provider.tsx`

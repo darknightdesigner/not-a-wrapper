@@ -727,6 +727,7 @@ export async function POST(req: Request) {
       } else if (provider === "openai") {
         providerOptions.openai = {
           reasoningEffort: "medium",
+          reasoningSummary: "auto",
         }
       } else if (provider === "xai") {
         providerOptions.xai = {

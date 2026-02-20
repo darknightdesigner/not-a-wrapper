@@ -129,6 +129,12 @@ When implementing features or fixing bugs:
 
 > When unsure, consult `.agents/context/research/` for prior analysis or create a new research document before implementing.
 
+## Prompt Delivery Default
+
+When the user asks to "create a prompt" (or similar), return the prompt directly in chat.
+Do not create a markdown file unless the user explicitly asks for a file.
+If ambiguous, prefer chat output.
+
 ## Critical Patterns
 
 ### Streaming Responses (MUST)

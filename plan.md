@@ -78,7 +78,14 @@ AGENTS.md            ← Rules & permissions
   - [ ] Verify permissions, URL generation, and copied-link behavior. (`/share/${chatId}` format works for both modes)
   - [ ] Add regression test for multi-chat share affordance.
 
-- [ ] **#8 OS-conditional shortcut labels in tooltips** (`Not started` — needs verification)
+- [ ] **#8 Edit/resend message bug** (`Identified` — messages disappear on edit)
+  Sources: —
+  - [ ] Investigate: editing and resending messages causes an error; sent messages disappear after resend.
+  - [ ] Identify root cause in message edit/resend flow (`use-chat-core.ts`, `use-chat-edit.ts`).
+  - [ ] Fix and verify messages persist correctly after edit/resend across providers.
+  - [ ] Add regression test for edit/resend message lifecycle.
+
+- [ ] **#9 OS-conditional shortcut labels in tooltips** (`Not started` — needs verification)
   Sources: Sidebar shortcut update discussion (2026-02-18)
   - [ ] Add platform detection utility (`Mac` vs `Windows/Linux`) for shortcut rendering. (Check `lib/utils` or create new)
   - [ ] Replace hardcoded shortcut labels in sidebar toggle tooltip.
@@ -91,7 +98,7 @@ AGENTS.md            ← Rules & permissions
   Sources: —
   - [ ] Investigate and fix project chat creation flow.
 
-- [ ] **#8 UX redesign: tools/thinking** (`Not started`)  
+- [ ] **#10 UX redesign: tools/thinking** (`Not started`)  
   Sources: `plans/prompt-kit-component-audit.md`, `research/competitive-feature-analysis.md`
   - [ ] Document UX target states (loading, running tool, tool complete, thinking).
   - [ ] Implement revised layout and hierarchy to match competitive patterns.
@@ -356,6 +363,7 @@ Inline Triggers ← no deps → Prompt Library (P2, deferred)
 Memory System ← Convex vectors → RAG Pipeline (P2, shares infra) 
 Multi-chat Card Bug (#6) ← no deps (investigate P0)
 Multi-chat Share Button (#7) ← no deps (investigate P0)
+Edit/Resend Bug (#8) ← no deps (investigate P0)
 Message Memo (#35) ✅ → Composer Ref (#36) ✅ → Hook Decomposition (#39, in progress) (P4 perf chain)
 Shiki Singleton (#37) ✅ + Typography (#38, partial) + Auto-Focus (#42) ← no deps (P4 parallel)
 Context Meter (#41) ← needs token accumulation from AI SDK usage object

@@ -19,7 +19,7 @@ Use this skill when configuring, debugging, or extending reasoning/thinking supp
 |----------|-------------------|--------------|--------|
 | Anthropic | `anthropic.thinking` | `{ type: "adaptive" }` or `{ type: "enabled", budgetTokens }` | Opus 4.6 (adaptive), Sonnet 4.5, Haiku 3.5 (enabled) |
 | Google | `google.thinkingConfig` | `{ includeThoughts: true }` | Gemini 2.5 Pro, Gemini 2.5 Flash |
-| OpenAI | `openai.reasoningEffort` | `"medium"` | GPT-5.2, o3, o4-mini |
+| OpenAI | `openai.reasoningEffort` + `openai.reasoningSummary` | `"medium"` + `"auto"` | GPT-5.2, o3, o4-mini |
 | xAI | `xai.reasoningEffort` | `"medium"` | Grok 2 |
 
 ## Reasoning Data Flow
@@ -148,11 +148,14 @@ Simple boolean toggle. Google models with thinking support (Gemini 2.5 Pro/Flash
 if (provider === "openai") {
   providerOptions.openai = {
     reasoningEffort: "medium",
+    reasoningSummary: "auto",
   }
 }
 ```
 
-Values: `"low"`, `"medium"`, `"high"`. Controls how much reasoning the model produces. `"medium"` balances quality with speed.
+`reasoningEffort` values: `"low"`, `"medium"`, `"high"`. Controls how much reasoning the model produces. `"medium"` balances quality with speed.
+
+`reasoningSummary` values: `"auto"`, `"detailed"`. Controls whether the model returns visible reasoning text. `"auto"` returns a condensed summary; `"detailed"` returns comprehensive reasoning. Without this option, reasoning parts arrive with empty text (the model reasons internally but the API doesn't expose it). Requires the Responses API (default in AI SDK v5+).
 
 ### xAI (Grok)
 
@@ -178,6 +181,7 @@ type ReasoningPhase = {
   reasoningText: string
   durationSeconds: number | undefined
   isReasoningStreaming: boolean
+  isOpaqueReasoning: boolean
 }
 ```
 
@@ -186,6 +190,8 @@ type ReasoningPhase = {
 | `idle` | No reasoning parts | Nothing rendered |
 | `thinking` | Reasoning part with `state === "streaming"` or no text yet | Shimmer label, live timer, open collapsible |
 | `complete` | Reasoning part with `state === "done"` or terminal status | Frozen timer, closed collapsible |
+
+`isOpaqueReasoning` is `true` when reasoning parts exist but the concatenated text is empty. This happens when a model reasons internally without returning visible text (e.g., OpenAI without `reasoningSummary`). When opaque, the Reasoning component renders a non-expandable label without the toggle chevron or content area.
 
 The hook:
 1. Filters parts for `type === "reasoning"`
@@ -289,6 +295,9 @@ Different models have different capabilities. Opus (16K budget) benefits from de
 **Why reasoningEffort is "medium" for OpenAI/xAI:**
 Balances quality with latency. Users don't currently have a UI to configure this, so "medium" is a safe default.
 
+**Why reasoningSummary is "auto" for OpenAI:**
+Without `reasoningSummary`, OpenAI reasoning models produce `reasoning-delta` stream events with empty text — the model reasons internally but doesn't expose it. The `"auto"` setting returns a condensed summary. The UI has a fallback ("opaque reasoning") that handles empty text gracefully, but `"auto"` provides actual content users can inspect.
+
 **Why the search workaround exists:**
 This is an SDK limitation (not an Anthropic API limitation). When the SDK receives `stop_reason: "pause_turn"`, it doesn't continue the conversation, resulting in truncated responses. The workaround avoids the `pause_turn` entirely by using fixed-budget thinking.
 
@@ -302,11 +311,13 @@ This is an SDK limitation (not an Anthropic API limitation). When the SDK receiv
 6. **Reasoning part `state` field** — Can be `"streaming"`, `"done"`, or `undefined`. The hook handles all three cases.
 7. **Budget doesn't reduce for search** — Anthropic web search results count as INPUT tokens, not output. The `budgetTokens` doesn't need reduction when search is active.
 8. **`thinkingMode: undefined`** — For backward compatibility, models without an explicit `thinkingMode` still get reasoning if `reasoningText: true`. They fall into the legacy "enabled" path with model-name-based budget sizing.
+9. **OpenAI `reasoningSummary` is Responses API only** — The `reasoningSummary` option requires the Responses API (default in AI SDK v5+). It has no effect if the model is created via `openai.chat()` instead of `openai()` or `openai.responses()`.
 
 ## Do / Don't
 
 **Do**
 - Set `reasoningText: true` in model config for all reasoning-capable models
+- Set `reasoningSummary: "auto"` in providerOptions for OpenAI reasoning models
 - Set `thinkingMode: "adaptive"` for Anthropic models that support it (Opus 4.6+)
 - Test reasoning with and without search tools enabled (especially Anthropic)
 - Check the `phase` from `useReasoningPhase()` for rendering decisions
@@ -315,6 +326,7 @@ This is an SDK limitation (not an Anthropic API limitation). When the SDK receiv
 - Set `budgetTokens` higher than the model's `maxOutput` (causes API errors)
 - Remove the `shouldInjectSearch` workaround without verifying SDK `pause_turn` handling
 - Add `reasoningText: true` without adding the provider to the `providerOptions` chain
+- Set OpenAI `reasoningEffort` without `reasoningSummary` (produces empty reasoning parts)
 - Assume reasoning parts exist during streaming — always check `phase !== "idle"`
 
 ## Internal References
