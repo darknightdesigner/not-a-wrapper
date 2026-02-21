@@ -127,6 +127,10 @@ When the user asks to "create a prompt" (or similar), return the prompt directly
 Do not create a markdown file unless the user explicitly asks for a file.
 If ambiguous, prefer chat output.
 
+## No Timeline Estimates
+
+**Never include time estimates, durations, or effort assessments** in plans, summaries, or implementation outputs. This includes phrases like "~30 minutes", "2-3 hours", "Phase 1 (Day 1)", "Quick win", or any similar timeline/effort language. AI-generated timeline estimates are unreliable and misleading. Only include timeline or effort information if the user explicitly requests it.
+
 ## Critical Patterns
 
 ### Streaming Responses (MUST)
@@ -180,6 +184,7 @@ catch { if (previous) setState(previous) }
 
 ### 🚫 Forbidden
 
+- **Creating git branches** — NEVER create new branches unless the user explicitly asks for a branch to be created. Implementation plans, feature work, and all other tasks must be done on the current branch. Branch creation requires explicit user instruction.
 - Read/write `.env*` files
 - Force push or commit secrets
 - `// @ts-ignore` (never acceptable)

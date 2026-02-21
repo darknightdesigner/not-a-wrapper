@@ -15,6 +15,7 @@ This file contains Claude-specific behaviors, preferences, and context for the N
 - Be concise; avoid over-explaining obvious code
 - Use code references (`startLine:endLine:filepath`) when discussing existing code
 - Prefer showing small, focused diffs over full file rewrites
+- **Never include timeline or effort estimates** (e.g., "~30 min", "2 hours", "Day 1") unless the user explicitly asks for them — AI time estimates are unreliable
 
 ### Tool Usage
 - **Maximize parallel tool calls** when operations are independent
@@ -184,6 +185,7 @@ Before writing code, follow this sequence:
 
 ### Forbidden Actions
 
+- **Creating git branches** — NEVER create new branches unless the user explicitly asks for a branch to be created. Implementation plans, feature work, and all other tasks must be done on the current branch. Branch creation requires explicit user instruction.
 - Setting ESLint rules to `"off"` or `"warn"` to bypass errors
 - Adding `// @ts-ignore` (never acceptable)
 - Adding `eslint-disable` comments without documented reason
