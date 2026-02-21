@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { SidebarProvider } from "@/components/ui/sidebar"
@@ -26,6 +26,12 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 })
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+}
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_DOMAIN),
@@ -55,6 +61,12 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased isolate`}
       >
+        <a
+          href="#main-content"
+          className="fixed inset-x-0 top-0 z-[100] mx-auto mt-4 w-fit rounded-2xl bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg ring-1 ring-border focus:outline-none not-focus:sr-only"
+        >
+          Skip to content
+        </a>
         <Providers>
           <TanstackQueryProvider>
             <LayoutClient />
@@ -86,6 +98,20 @@ export default async function RootLayout({
             </UserProvider>
           </TanstackQueryProvider>
         </Providers>
+        <div
+          id="live-region-assertive"
+          role="status"
+          aria-live="assertive"
+          aria-atomic="true"
+          className="sr-only"
+        />
+        <div
+          id="live-region-polite"
+          role="log"
+          aria-live="polite"
+          aria-atomic="true"
+          className="sr-only"
+        />
       </body>
     </html>
   )

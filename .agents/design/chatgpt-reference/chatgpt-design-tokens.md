@@ -1,6 +1,6 @@
 # Design Tokens — ChatGPT (chatgpt.com)
 
-Extracted: 2026-02-20 | URL: https://chatgpt.com | Viewport: Desktop (default)
+Extracted: 2026-02-21 | URL: https://chatgpt.com | Viewport: Desktop (default)
 
 ---
 
@@ -173,6 +173,7 @@ ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color E
 | `--interactive-label-primary` | `#fff` | `#fff` | `#fff` |
 | `--interactive-label-secondary` | `#0d0d0d` | `#0d0d0de5` | `#0d0d0dcc` |
 | `--interactive-label-tertiary` | `#5d5d5d` | `#5d5d5d` | `#5d5d5d` |
+| `--interactive-label-tertiary-default` | `#5d5d5d` | `#5d5d5d` | `#5d5d5d` |
 | `--interactive-border-focus` | `#0d0d0d` | — | — |
 
 ### Dark Mode (`.dark`)
@@ -208,7 +209,29 @@ ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color E
 | `--interactive-label-primary` | `#0d0d0d` | `#0d0d0d` | `#0d0d0d` |
 | `--interactive-label-secondary` | `#f3f3f3` | `#ffffffe5` | `#fffc` |
 | `--interactive-label-tertiary` | `#cdcdcd` | `#cdcdcd` | `#cdcdcd` |
+| `--interactive-label-tertiary-default` | `#cdcdcd` | `#cdcdcd` | `#cdcdcd` |
 | `--interactive-border-focus` | `#fff` | — | — |
+
+---
+
+## Key CSS Token Classes (Raw HTML Mapping)
+
+> Extracted from raw `<body>` HTML. These are class-level aliases to semantic tokens.
+
+| Class | Likely Token Mapping | Usage |
+|-------|----------------------|-------|
+| `text-token-text-primary` | `--text-primary` | Primary text/icons |
+| `text-token-text-secondary` | `--text-secondary` | Secondary labels/metadata |
+| `text-token-text-tertiary` | `--text-tertiary` | Tertiary labels |
+| `bg-token-main-surface-primary` | `transparent` (`rgba(0,0,0,0)` in both modes) | Header + sticky floating surfaces |
+| `bg-token-bg-primary` | `--bg-primary` | Composer/code areas |
+| `bg-token-bg-secondary` | `--bg-secondary` | Hoverable action surfaces |
+| `bg-token-bg-tertiary` | `--bg-tertiary` | Tertiary surfaces |
+| `bg-token-bg-elevated-secondary` | `--bg-elevated-secondary` | Elevated panels |
+| `bg-token-surface-hover` | `transparent` at rest (`rgba(0,0,0,0)` both modes; activates on hover) | Hover surface state |
+| `border-token-border-default` | `--border-default` | Standard borders |
+| `border-token-border-light` | `--border-light` | Light borders |
+| `bg-token-border-sharp` | `--border-sharp` (Light: `#0000000d` / Dark: `#ffffff0d`) | 1px sharp separators |
 
 ---
 
@@ -253,6 +276,32 @@ ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color E
 | `px-2.5` | 10px |
 | `px-4` | 16px |
 | `mx-2` | 8px |
+
+### Container Queries + Dynamic Layout Vars
+
+| Pattern | Value / Observation | Notes |
+|--------|----------------------|-------|
+| `@container/main` | Container query root | Main content container |
+| `@w-sm/main:[--thread-content-margin:--spacing(6)]` | 6 spacing units | Small container override |
+| `@w-lg/main:[--thread-content-margin:--spacing(16)]` | 16 spacing units | Large container override |
+| `[--thread-content-margin:--spacing(4)]` | 4 spacing units | Base thread margin |
+| `[--thread-content-max-width:40rem]` | 40rem | Base thread max width |
+| `@w-lg/main:[--thread-content-max-width:48rem]` | 48rem | Large thread max width |
+| `--sticky-padding-bottom` | `134px` (desktop + mobile light), `88px` (mobile dark) | Composer/viewport-dependent offset |
+| `scroll-pt-(--header-height)` | uses `--header-height` | Sticky header scroll anchoring |
+| `h-header-height` | custom utility | Header row height utility |
+
+### View Transition Variables
+
+| Variable | Usage |
+|----------|-------|
+| `--vt-page-header` | Header view transition name |
+| `--vt-thread-model-switcher` | Model switcher transition |
+| `--vt_share_chat_wide_button` | Desktop share button transition |
+| `--vt_share_chat_compact_button` | Mobile share button transition |
+| `--vt-composer` | Composer transition |
+| `--vt-composer-speech-button` | Composer speech/voice control transition |
+| `--vt-disclaimer` | Footer disclaimer transition |
 
 ---
 
@@ -345,6 +394,18 @@ This is more physically natural than a solid CSS border, creating a card-like de
 var(--sharp-edge-top-shadow): 0 1px 0 var(--border-sharp)
 ```
 
+```css
+/* Light mode */
+var(--sharp-edge-top-shadow-placeholder): 0 1px 0 transparent
+var(--sharp-edge-bottom-shadow): 0 -1px 0 #0000000d
+var(--border-sharp): #0000000d
+
+/* Dark mode */
+var(--sharp-edge-top-shadow-placeholder): 0 1px 0 transparent
+var(--sharp-edge-bottom-shadow): 0 -1px 0 #ffffff0d
+var(--border-sharp): #ffffff0d
+```
+
 ---
 
 ## Component Specifications
@@ -405,6 +466,38 @@ var(--sharp-edge-top-shadow): 0 1px 0 var(--border-sharp)
 | Link border radius | 10px |
 | Link height | 36px |
 | Link font | 14px / 400 |
+
+### Additional Custom Utilities (Observed In Raw HTML)
+
+| Utility/Class | Purpose | Status |
+|---------------|---------|--------|
+| `user-message-bubble-color` | User bubble background token alias | Light: `rgba(233,233,233,0.5)` / Dark: `rgba(50,50,50,0.85)` |
+| `composer-btn` | Composer action button base style | height: 36px, borderRadius: pill (`1.68e+07px`), bg: transparent |
+| `composer-submit-btn` | Submit/send button base style | (not resolved at runtime — element not found in DOM) |
+| `composer-submit-button-color` | Submit button color token alias | Light: bg `#000` color `#fff` / Dark: bg `#fff` color `#000` |
+| `text-submit-btn-text` | Submit button label/icon color alias | Light: `#fff` / Dark: `#000` |
+| `markdown-new-styling` | New markdown renderer style namespace | 16px/28px, system font stack (ui-sans-serif, -apple-system, …) |
+| `icon-xs` | Icon sizing — extra small | 12×12px |
+| `icon-sm` | Icon sizing — small | 16×16px |
+| `icon` | Icon sizing — default | 20×20px |
+| `icon-md` | Icon sizing — medium | 20×20px |
+| `icon-lg` | Icon sizing — large | 24×24px |
+| `interactive-bg-secondary` | Interactive background utility | Maps to `--interactive-bg-secondary-default` (transparent in both modes) |
+| `interactive-label-secondary` | Interactive label utility | Maps to `--interactive-label-secondary-default` (Light: `#0d0d0d` / Dark: `#f3f3f3`) |
+| `behavior-btn` | Shared button behavior utility | cursor: pointer, display: block, user-select: none |
+
+---
+
+## Hardcoded Color Values (Needs Tokenization)
+
+> Found in raw `<body>` HTML as literal values rather than semantic tokens.
+
+| Value | Context | Status |
+|-------|---------|--------|
+| `#F4F4F4` | Citation pill light background | No CSS custom property found — truly hardcoded |
+| `#303030` | Dark citation/composer backgrounds | Maps to `--bg-secondary` (dark), `--bg-elevated-primary` (dark), `--black-theme-interactive-bg-accent-hover` |
+| `#8F8F8F` | Citation pill text | Maps to `--text-tertiary` (light), `--icon-tertiary` (light), `--black-theme-interactive-label-accent` |
+| `#f4f4f4` | Disabled voice/send text variant | No CSS custom property found — truly hardcoded (lowercase alias of `#F4F4F4`) |
 
 ---
 
@@ -475,3 +568,5 @@ ChatGPT supports multiple accent color themes (visible in "mini" mode):
 6. **Pill buttons** — CTAs use extreme border-radius (`1.67772e+07px` / effectively `9999px`) for pill shape
 7. **Mode-aware shadow edges** — Composer uses an inverted edge strategy: light mode has an **outer** dark 1px shadow (62% black) as a border substitute; dark mode has an **inset** white 1px glow (20% white). No CSS `border` is used. The drop shadow also scales between modes (4px/4% light vs 12px/10% dark). Defined via custom `shadow-short` Tailwind utility.
 8. **Tailwind 4** — Uses Tailwind CSS v4 with CSS-based configuration and `var()` references in utility classes
+9. **Token-class indirection** — Many surfaces/text styles are applied via `*-token-*` classes that alias semantic tokens rather than using raw utility colors directly.
+10. **Work-in-progress token mapping** — Some production aliases and view-transition/shadow variables are intentionally left as `TODO` placeholders pending direct CSS extraction from runtime stylesheets.

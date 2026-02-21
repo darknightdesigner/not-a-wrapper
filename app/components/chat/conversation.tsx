@@ -67,12 +67,17 @@ export function Conversation({
     <div className="relative flex h-full w-full flex-col items-center overflow-x-hidden overflow-y-auto">
       <ChatContainerRoot className="relative w-full">
         <ChatContainerContent
-          className="flex w-full flex-col items-center pt-4 pb-4"
+          className="relative flex w-full flex-col items-center pt-4 pb-4"
           style={{
             scrollbarGutter: "stable both-edges",
             scrollbarWidth: "none",
           }}
         >
+          <div
+            aria-hidden="true"
+            data-edge="top"
+            className="pointer-events-none absolute top-0 h-px w-px"
+          />
           {messages?.map((message, index) => {
             const isLast =
               index === messages.length - 1 && status !== "submitted"
@@ -105,12 +110,17 @@ export function Conversation({
           {status === "submitted" &&
             messages.length > 0 &&
             messages[messages.length - 1].role === "user" && (
-              <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2">
+              <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2">
                 <div className="relative flex min-w-full flex-col gap-2">
-                  <ThinkingBar text="Generating" onStop={onStop} />
+                  <ThinkingBar text="Thinking" onStop={onStop} />
                 </div>
               </MessageContainer>
             )}
+          <div
+            aria-hidden="true"
+            data-edge="bottom"
+            className="pointer-events-none absolute bottom-0 h-px w-px"
+          />
         </ChatContainerContent>
         <ChatContainerScrollButton />
       </ChatContainerRoot>

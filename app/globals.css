@@ -320,6 +320,12 @@
   }
 }
 
+/* Thread content width tokens — shared by messages, composer, and thread-bottom */
+.\@container\/main {
+  --thread-content-max-width: 48rem;
+  --thread-content-margin: 1.5rem;
+}
+
 @layer utilities {
   .shadow-composer {
     box-shadow:

@@ -188,16 +188,21 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-        "group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
+        "group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2",
         className
       )}
+      data-turn="assistant"
+      data-message-id={messageId}
+      tabIndex={-1}
     >
+      <span className="sr-only">Assistant said:</span>
       <div
         ref={messageRef}
         className={cn(
           "relative flex min-w-full flex-col gap-2",
           isLast && "pb-8"
         )}
+        // Inner data-message-id for quote selection — closest() finds this before the outer article
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
         {reasoningPhase !== "idle" && (
@@ -285,7 +290,21 @@ export function MessageAssistant({
         {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
           <MessageActions
             className={cn(
-              "-ml-2 flex gap-0"
+              "-ml-2 flex gap-0",
+              "pointer-events-none",
+              "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+              "[mask-size:300%_100%]",
+              "[mask-position:100%_0%]",
+              "motion-safe:transition-[mask-position]",
+              "duration-[1.5s]",
+              "group-hover/message:pointer-events-auto",
+              "group-hover/message:[mask-position:0_0]",
+              "group-focus-within/message:pointer-events-auto",
+              "group-focus-within/message:[mask-position:0_0]",
+              "has-[[data-state=open]]:pointer-events-auto",
+              "has-[[data-state=open]]:[mask-position:0_0]",
+              "pointer-coarse:pointer-events-auto",
+              "pointer-coarse:[mask-image:none]"
             )}
           >
             <MessageAction

@@ -15,7 +15,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
         {hasSidebar && <AppSidebar />}
         <main className="@container/main relative flex h-svh w-0 flex-shrink flex-grow flex-col overflow-hidden">
           <Header hasSidebar={hasSidebar} />
-          <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div id="main-content" className="relative min-h-0 flex-1 overflow-hidden">
             {children}
           </div>
         </main>

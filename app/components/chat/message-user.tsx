@@ -135,10 +135,14 @@ export function MessageUser({
   return (
     <MessageContainer
       className={cn(
-        "group flex w-full max-w-3xl flex-col items-end gap-0.5 px-6 pb-2",
+        "group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1.5rem)] pb-2",
         className
       )}
+      data-turn="user"
+      data-message-id={id}
+      tabIndex={-1}
     >
+      <span className="sr-only">You said:</span>
       {attachments?.map((attachment, index) => (
         <div
           className="flex flex-row gap-2"
@@ -247,7 +251,7 @@ export function MessageUser({
           {children}
         </MessageContent>
       )}
-      <MessageActions className="invisible flex gap-0 opacity-0 transition-opacity group-hover:visible group-hover:opacity-100">
+      <MessageActions className="invisible flex gap-0 opacity-0 transition-opacity group-hover/message:visible group-hover/message:opacity-100">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
             className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
