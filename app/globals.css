@@ -254,6 +254,13 @@
   --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
+
+  /* Composer surface — ChatGPT-aligned shadow tokens */
+  --composer-shadow-drop: rgba(0, 0, 0, 0.04);
+  --composer-shadow-edge: rgba(0, 0, 0, 0.62);
+  --composer-shadow-drop-offset: 0px 4px 4px 0px;
+  --composer-shadow-edge-offset: 0px 0px 1px 0px;
+  --composer-bg: var(--background);
 }
 
 .dark {
@@ -289,6 +296,13 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.705 0.015 286.067);
+
+  /* Composer surface — dark mode shadow tokens */
+  --composer-shadow-drop: rgba(0, 0, 0, 0.1);
+  --composer-shadow-edge: rgba(255, 255, 255, 0.2);
+  --composer-shadow-drop-offset: 0px 4px 12px 0px;
+  --composer-shadow-edge-offset: inset 0px 0px 1px 0px;
+  --composer-bg: oklch(24.56% 0 0);
 }
 
 @layer base {
@@ -297,6 +311,14 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .shadow-composer {
+    box-shadow:
+      var(--composer-shadow-drop-offset) var(--composer-shadow-drop),
+      var(--composer-shadow-edge-offset) var(--composer-shadow-edge);
   }
 }
 
