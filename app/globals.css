@@ -47,7 +47,7 @@
 
 @theme {
   --font-mono: var(--font-geist-mono);
-  --spacing-app-header: 56px;
+  --spacing-app-header: 52px;
   --spacing-input-area: 134px;
   --animate-collapsible-down: collapsible-down 200ms ease-out;
   --animate-collapsible-up: collapsible-up 200ms ease-out;
@@ -200,7 +200,7 @@
   --radius-xl: calc(var(--radius) + 4px);
 
   --spacing-scroll-area: calc(
-    -1 * (var(--spacing-input-area) + var(--spacing-app-header))
+    -1 * var(--spacing-input-area)
   );
   --spacing-scroll-anchor-offset: 140px;
   --spacing-scroll-anchor: calc(
@@ -220,6 +220,12 @@
   --sidebar-collapsed-section-margin-bottom: 0.25rem;
   --sidebar-expanded-section-margin-bottom: 0.5rem;
   --sidebar-item-gap: 0.375rem;
+
+  /* Sticky header z-index */
+  --header-z-index: 20;
+
+  /* Scroll padding (no longer need fixed header compensation) */
+  --spacing-scroll-padding-top: 0px;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
