@@ -43,7 +43,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
 
         {/* CENTER SECTION - flex-1 to fill remaining space */}
         <div className="pointer-events-auto flex flex-1 items-center">
-          {isLoggedIn && !isMultiModelEnabled && <ModelSelectorHeader />}
+          {isLoggedIn && <ModelSelectorHeader />}
         </div>
 
         {/* RIGHT SECTION - natural width, not flex-1 */}
