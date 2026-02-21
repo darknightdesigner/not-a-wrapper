@@ -2,43 +2,56 @@
 
 import { ModelSelector } from "@/components/common/model-selector/base"
 import { MODEL_DEFAULT } from "@/lib/config"
+import { useMultiModelSelection } from "@/lib/model-store/multi-model-provider"
 import { useModel } from "@/lib/model-store/provider"
+import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import { useCallback, useMemo } from "react"
 
 /**
- * Header-level model selector for single-model mode.
+ * Header-level model selector that adapts to single or multi-model mode.
  *
- * Displays the currently-selected model and allows switching via the shared
- * `ModelSelector` dropdown. Unlike the chat-input selector, this component
- * operates outside of a chat context — it reads/writes `lastUsedModel` from
- * the global `ModelProvider` rather than persisting to a specific chat record.
+ * - Single-model mode: Selects one active model via `lastUsedModel`.
+ * - Multi-model mode: Selects multiple models via shared
+ *   `MultiModelSelectionProvider`, keeping the header and input area in sync.
  */
 export function ModelSelectorHeader() {
   const { lastUsedModel, setLastUsedModel, favoriteModels } = useModel()
   const { user } = useUser()
+  const { preferences } = useUserPreferences()
+  const isMultiModelEnabled = preferences.multiModelEnabled
+  const { selectedModelIds, setSelectedModelIds } = useMultiModelSelection()
 
   const isAuthenticated = !!user?.id
 
-  // Effective model follows the same priority as use-model.ts but without
-  // chat-level override: lastUsedModel > first favorite > default.
   const effectiveModel = useMemo(
     () => lastUsedModel || favoriteModels[0] || MODEL_DEFAULT,
     [lastUsedModel, favoriteModels]
   )
 
-  const handleModelChange = useCallback(
+  const handleSingleModelChange = useCallback(
     (modelId: string) => {
       setLastUsedModel(modelId)
     },
     [setLastUsedModel]
   )
 
+  if (isMultiModelEnabled) {
+    return (
+      <ModelSelector
+        mode="multi"
+        selectedModelIds={selectedModelIds}
+        setSelectedModelIds={setSelectedModelIds}
+        isUserAuthenticated={isAuthenticated}
+      />
+    )
+  }
+
   return (
     <ModelSelector
       mode="single"
       selectedModelId={effectiveModel}
-      setSelectedModelId={handleModelChange}
+      setSelectedModelId={handleSingleModelChange}
       isUserAuthenticated={isAuthenticated}
     />
   )
