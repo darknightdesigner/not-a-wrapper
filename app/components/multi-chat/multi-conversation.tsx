@@ -153,7 +153,7 @@ export function MultiModelConversation({
     <div className="relative flex h-full w-full flex-col items-center overflow-y-auto">
       <ChatContainerRoot className="relative w-full">
         <ChatContainerContent
-          className="flex w-full flex-col items-center pt-20 pb-[134px]"
+          className="flex w-full flex-col items-center pt-4 pb-[134px]"
           style={{
             scrollbarGutter: "stable both-edges",
             scrollbarWidth: "none",
