@@ -23,7 +23,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isLoggedIn = !!user
 
   return (
-    <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header">
+    <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0">
       <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2">
         {/* LEFT SECTION */}
         <div className="flex flex-1 items-center gap-2">
@@ -42,7 +42,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         </div>
 
         {/* CENTER SECTION */}
-        <div className="pointer-events-auto flex flex-1 items-center justify-center">
+        <div className="pointer-events-auto flex flex-1 items-center justify-start">
           {isLoggedIn && !isMultiModelEnabled && <ModelSelectorHeader />}
         </div>
 
