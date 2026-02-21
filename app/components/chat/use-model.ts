@@ -27,19 +27,32 @@ export function useModel({
   updateChatModel,
   chatId,
 }: UseModelProps) {
-  // Get favorite models from ModelProvider (properly refreshes after updates)
-  const { favoriteModels } = useModelProvider()
+  // Get favorite models and last-used model from ModelProvider
+  const { favoriteModels, lastUsedModel, setLastUsedModel } =
+    useModelProvider()
 
-  // Calculate the effective model based on priority: chat model > first favorite model > default
+  // Calculate the effective model based on priority: chat model > last used > first favorite > default
   const getEffectiveModel = useCallback(() => {
     const firstFavoriteModel = favoriteModels[0]
-    return currentChat?.model || firstFavoriteModel || MODEL_DEFAULT
-  }, [currentChat?.model, favoriteModels])
+    return (
+      currentChat?.model || lastUsedModel || firstFavoriteModel || MODEL_DEFAULT
+    )
+  }, [currentChat?.model, lastUsedModel, favoriteModels])
 
   // Use local state only for temporary overrides, derive base value from props
   const [localSelectedModel, setLocalSelectedModel] = useState<string | null>(
     null
   )
+
+  // Clear local override on chat navigation to prevent model bleed between chats.
+  // Tracks previous chatId as state (React 19 recommended pattern for adjusting
+  // state when a prop changes — avoids both useEffect cascading renders and
+  // ref access during render, both flagged by the React Compiler).
+  const [prevChatId, setPrevChatId] = useState(chatId)
+  if (prevChatId !== chatId) {
+    setPrevChatId(chatId)
+    setLocalSelectedModel(null)
+  }
 
   // The actual selected model: local override or computed effective model
   const selectedModel = localSelectedModel || getEffectiveModel()
@@ -47,6 +60,9 @@ export function useModel({
   // Function to handle model changes with proper validation and error handling
   const handleModelChange = useCallback(
     async (newModel: string) => {
+      // Persist as the user's last-used model (survives new chats and sessions)
+      setLastUsedModel(newModel)
+
       // For authenticated users without a chat, we can't persist yet
       // but we still allow the model selection for when they create a chat
       if (!user?.id && !chatId) {
@@ -80,7 +96,7 @@ export function useModel({
         setLocalSelectedModel(newModel)
       }
     },
-    [chatId, updateChatModel, user?.id]
+    [chatId, updateChatModel, user?.id, setLastUsedModel]
   )
 
   return {

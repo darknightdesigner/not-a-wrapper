@@ -555,10 +555,10 @@ For each of these files, find and remove or update Ollama/self-hosting/Docker me
 
 - `.agents/context/architecture.md` — remove Ollama from architecture diagram
 - `.agents/context/glossary.md` — remove Ollama model references
-- `.agents/context/decisions/002-vercel-ai-sdk.md` — remove Ollama from supported providers list
-- `.agents/context/decisions/004-exa-vs-tavily.md` — remove "self-hosters" references
-- `.agents/context/research/competitive-feature-analysis.md` — remove self-hosting as competitive advantage
-- `.agents/context/research/tool-calling-infrastructure.md` — remove Ollama mentions
+- `.agents/research/tech-stack-evaluation.md` — remove Ollama from supported providers list
+- `.agents/research/tool-calling-infrastructure.md` — remove "self-hosters" references
+- `.agents/research/competitive-feature-analysis.md` — remove self-hosting as competitive advantage
+- `.agents/research/tool-calling-infrastructure.md` — remove Ollama mentions
 - `.agents/plans/thinking-reasoning-configuration.md` — remove `ollama.ts` file references
 - `.agents/plans/tool-calling-infrastructure.md` — remove Ollama mentions
 - `.agents/plans/mcp-integration-plan.md` — remove `ollama-section.tsx` references
@@ -665,10 +665,10 @@ After all priorities are complete:
 | `components/icons/README.md` | Remove OllamaIcon entry |
 | `.agents/context/architecture.md` | Remove Ollama from diagram |
 | `.agents/context/glossary.md` | Remove Ollama references |
-| `.agents/context/decisions/002-vercel-ai-sdk.md` | Remove Ollama provider |
-| `.agents/context/decisions/004-exa-vs-tavily.md` | Remove self-hoster references |
-| `.agents/context/research/competitive-feature-analysis.md` | Remove self-hosting mention |
-| `.agents/context/research/tool-calling-infrastructure.md` | Remove Ollama mentions |
+| `.agents/research/tech-stack-evaluation.md` | Remove Ollama provider |
+| `.agents/research/tool-calling-infrastructure.md` | Remove self-hoster references |
+| `.agents/research/competitive-feature-analysis.md` | Remove self-hosting mention |
+| `.agents/research/tool-calling-infrastructure.md` | Remove Ollama mentions |
 | `.agents/plans/thinking-reasoning-configuration.md` | Remove ollama.ts references |
 | `.agents/plans/tool-calling-infrastructure.md` | Remove Ollama mentions |
 | `.agents/plans/mcp-integration-plan.md` | Remove ollama-section.tsx references |

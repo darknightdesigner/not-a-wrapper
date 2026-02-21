@@ -41,7 +41,7 @@ function AlertDialogOverlay({
         "data-[ending-style]:opacity-0",
         className
       )}
-      style={{ transition: "opacity 200ms ease-out" }}
+      style={{ transition: "opacity 100ms ease-out" }}
       {...props}
     />
   )
@@ -58,11 +58,11 @@ function AlertDialogContent({
         data-slot="alert-dialog-content"
         className={cn(
           "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg",
-          "data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)]",
-          "data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
+          "data-[starting-style]:opacity-0",
+          "data-[ending-style]:opacity-0",
           className
         )}
-        style={{ transition: "opacity 200ms ease-out, transform 200ms ease-out" }}
+        style={{ transition: "opacity 100ms ease-out" }}
         {...props}
       />
     </AlertDialogPortal>

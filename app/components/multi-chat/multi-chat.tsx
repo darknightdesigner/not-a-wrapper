@@ -16,6 +16,7 @@ import {
 } from "@/lib/user-preference-store/web-search"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
+import { useMultiModelSelection } from "@/lib/model-store/multi-model-provider"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { AnimatePresence, motion } from "motion/react"
@@ -70,12 +71,12 @@ function getMessageText(message: MessageType): string {
 
 export function MultiChat() {
   const [prompt, setPrompt] = useState("")
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([])
+  const { selectedModelIds, setSelectedModelIds } = useMultiModelSelection()
   const [multiChatId, setMultiChatId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { user } = useUser()
-  const { models } = useModel()
+  const { models, lastUsedModel } = useModel()
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
     resolveWebSearchEnabled(preferences.webSearchEnabled)
@@ -186,8 +187,8 @@ export function MultiChat() {
       setSelectedModelIds(modelsFromLastGroup)
       return
     }
-    setSelectedModelIds([MODEL_DEFAULT])
-  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup])
+    setSelectedModelIds([lastUsedModel || MODEL_DEFAULT])
+  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup, lastUsedModel, setSelectedModelIds])
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
@@ -655,7 +656,6 @@ export function MultiChat() {
       onFileUpload: handleFileUpload,
       onFileRemove: handleFileRemove,
       selectedModelIds,
-      onSelectedModelIdsChange: setSelectedModelIds,
       isUserAuthenticated: isAuthenticated,
       fileUploadState,
       stop: handleStop,

@@ -4,8 +4,8 @@
 > **Priority**: P0 — Critical
 > **Timeline**: 3–4 weeks (7 phases)
 > **Date**: February 11, 2026
-> **Research**: `.agents/context/research/tool-calling-infrastructure.md`
-> **Decision**: `.agents/context/decisions/004-exa-vs-tavily.md`
+> **Research**: `.agents/research/tool-calling-infrastructure.md`
+> **Decision**: `.agents/research/tool-calling-infrastructure.md`
 > **AI SDK**: v6.0.78 (`ai`), v3.0.26 (`@ai-sdk/openai`), v3.0.41 (`@ai-sdk/anthropic`), v3.0.24 (`@ai-sdk/google`)
 
 ---

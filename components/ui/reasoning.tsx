@@ -39,6 +39,7 @@ type ReasoningContextType = {
   onOpenChange: (open: boolean) => void
   phase: "idle" | "thinking" | "complete"
   durationSeconds: number | undefined
+  opaque: boolean
 }
 
 const ReasoningContext = createContext<ReasoningContextType | undefined>(
@@ -70,6 +71,7 @@ export type ReasoningProps = {
   isStreaming?: boolean
   phase?: "idle" | "thinking" | "complete"
   durationSeconds?: number
+  opaque?: boolean
 }
 function Reasoning({
   children,
@@ -79,6 +81,7 @@ function Reasoning({
   isStreaming,
   phase: phaseProp,
   durationSeconds,
+  opaque = false,
 }: ReasoningProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [wasAutoOpened, setWasAutoOpened] = useState(false)
@@ -88,22 +91,25 @@ function Reasoning({
   const phase = phaseProp ?? (isStreaming ? "thinking" : "complete")
 
   const isControlled = open !== undefined
-  const isOpen = isControlled ? open : internalOpen
+  const isOpen = opaque ? false : isControlled ? open : internalOpen
 
   // React 19 pattern: sync during render instead of useEffect
   if (isStreaming !== prevIsStreaming) {
     setPrevIsStreaming(isStreaming)
-    if (isStreaming && !wasAutoOpened) {
-      if (!isControlled) setInternalOpen(true)
-      setWasAutoOpened(true)
-    }
-    if (!isStreaming && wasAutoOpened) {
-      if (!isControlled) setInternalOpen(false)
-      setWasAutoOpened(false)
+    if (!opaque) {
+      if (isStreaming && !wasAutoOpened) {
+        if (!isControlled) setInternalOpen(true)
+        setWasAutoOpened(true)
+      }
+      if (!isStreaming && wasAutoOpened) {
+        if (!isControlled) setInternalOpen(false)
+        setWasAutoOpened(false)
+      }
     }
   }
 
   const handleOpenChange = (newOpen: boolean) => {
+    if (opaque) return
     if (!isControlled) {
       setInternalOpen(newOpen)
     }
@@ -117,6 +123,7 @@ function Reasoning({
         onOpenChange: handleOpenChange,
         phase,
         durationSeconds,
+        opaque,
       }}
     >
       <div className={className}>{children}</div>
@@ -160,7 +167,7 @@ export type ReasoningLabelProps = {
 }
 
 function ReasoningLabel({ className }: ReasoningLabelProps) {
-  const { isOpen, onOpenChange, phase, durationSeconds } =
+  const { isOpen, onOpenChange, phase, durationSeconds, opaque } =
     useReasoningContext()
 
   if (phase === "idle") return null
@@ -184,6 +191,14 @@ function ReasoningLabel({ className }: ReasoningLabelProps) {
           : "Reasoned"}
       </span>
     )
+
+  if (opaque) {
+    return (
+      <div className={cn("flex items-center gap-1.5 text-sm", className)}>
+        {labelText}
+      </div>
+    )
+  }
 
   return (
     <button

@@ -39,4 +39,4 @@ const MyComponent = React.memo(function MyComponent(props: Props) {
 
 ## Diagnostic Hint
 
-If a memoized component isn't re-rendering when expected during streaming, check `Object.is(prev.parts, next.parts)` in the comparator. If `true`, the data source is mutating in place — the reference never changed. See `.agents/context/troubleshooting/streaming-ui-rendering.md` for the full diagnostic flow.
+If a memoized component isn't re-rendering when expected during streaming, check `Object.is(prev.parts, next.parts)` in the comparator. If `true`, the data source is mutating in place — the reference never changed. See `.agents/troubleshooting/streaming-ui-rendering.md` for the full diagnostic flow.

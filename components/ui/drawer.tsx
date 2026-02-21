@@ -46,7 +46,7 @@ function DrawerOverlay({
         "data-[ending-style]:opacity-0",
         className
       )}
-      style={{ transition: "opacity 200ms ease-out" }}
+      style={{ transition: "opacity 100ms ease-out" }}
       {...props}
     />
   )

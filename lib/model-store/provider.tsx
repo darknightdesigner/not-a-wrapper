@@ -38,6 +38,8 @@ type ModelContextType = {
   models: ModelConfig[]
   userKeyStatus: UserKeyStatus
   favoriteModels: string[]
+  lastUsedModel: string | null
+  setLastUsedModel: (model: string) => void
   isLoading: boolean
   refreshModels: () => Promise<void>
   refreshUserKeyStatus: () => Promise<void>
@@ -50,8 +52,31 @@ const ModelContext = createContext<ModelContextType | undefined>(undefined)
 
 export function ModelProvider({ children }: { children: React.ReactNode }) {
   const [rawModels, setRawModels] = useState<ModelConfig[]>([])
-  const [favoriteModels, setFavoriteModels] = useState<string[]>([])
+  const [favoriteModels, setFavoriteModels] = useState<string[]>(() => {
+    if (typeof window === "undefined") return []
+    try {
+      const cached = localStorage.getItem("cachedFavoriteModels")
+      return cached ? JSON.parse(cached) : []
+    } catch {
+      return []
+    }
+  })
+  const [lastUsedModel, setLastUsedModelState] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null
+    try {
+      return localStorage.getItem("lastUsedModel")
+    } catch {
+      return null
+    }
+  })
   const [isLoading, setIsLoading] = useState(true)
+
+  const setLastUsedModel = useCallback((model: string) => {
+    setLastUsedModelState(model)
+    try {
+      localStorage.setItem("lastUsedModel", model)
+    } catch {}
+  }, [])
 
   // Fetch provider status from Convex (reactive query)
   // Uses getProviderStatus which returns only provider identifiers, not encrypted key material
@@ -107,6 +132,12 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setFavoriteModels(data.favorite_models || [])
+        try {
+          localStorage.setItem(
+            "cachedFavoriteModels",
+            JSON.stringify(data.favorite_models || [])
+          )
+        } catch {}
       }
     } catch (error) {
       console.error("Failed to fetch favorite models:", error)
@@ -179,6 +210,8 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
         models,
         userKeyStatus,
         favoriteModels,
+        lastUsedModel,
+        setLastUsedModel,
         isLoading,
         refreshModels,
         refreshUserKeyStatus,

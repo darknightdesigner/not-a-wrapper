@@ -40,7 +40,7 @@ function SheetOverlay({
         "fixed inset-0 z-50 bg-black/50 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
         className
       )}
-      style={{ transition: "opacity 250ms ease-in-out" }}
+      style={{ transition: "opacity 100ms ease-out" }}
       {...props}
     />
   )
@@ -71,7 +71,7 @@ function SheetContent({
             "inset-x-0 bottom-0 h-auto border-t data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
           className
         )}
-        style={{ transition: "translate 250ms ease-in-out, opacity 250ms ease-in-out" }}
+        style={{ transition: "translate 100ms ease-out, opacity 100ms ease-out" }}
         {...props}
       >
         {children}

@@ -13,10 +13,10 @@ globs: "**/*.md"
 
 | Content Type | Target Directory | Naming Convention |
 |-------------|-----------------|-------------------|
-| Research, analysis, evaluation | `.agents/context/research/` | `[topic]-[type].md` (e.g., `tech-stack-evaluation.md`) |
-| Architecture Decision Record | `.agents/context/decisions/` | `NNN-[topic].md` (e.g., `004-caching-strategy.md`) |
+| Research, analysis, evaluation | `.agents/research/` | `[topic]-[type].md` (e.g., `tech-stack-evaluation.md`) |
 | Domain reference docs | `.agents/context/` | `[topic].md` (e.g., `api.md`, `database.md`) |
-| Troubleshooting guides | `.agents/context/troubleshooting/` | `[topic].md` |
+| Troubleshooting guides | `.agents/troubleshooting/` | `[topic].md` |
+| Design references / UI research | `.agents/design/` | `[site]-reference/[topic].md` |
 | Implementation plans | `.agents/plans/` | `[feature]-[plan-type].md` |
 | Skills (multi-step guides) | `.agents/skills/[name]/` | `SKILL.md` + optional `references/` |
 | Workflows / procedures | `.agents/workflows/` | `[workflow-name].md` |

@@ -25,9 +25,9 @@ Agentic memory for persistent context across sessions. AI agents should update t
 
 | Date | Decision | Rationale | Reference |
 |------|----------|-----------|-----------|
-| 2026-01 | Use Convex over Supabase | Built-in RAG, real-time, TypeScript-first | `.agents/context/research/tech-stack-evaluation.md` |
-| 2026-01 | Use Clerk for auth | Native integration with Convex + Flowglad | `.agents/context/research/tech-stack-evaluation.md` |
-| 2026-01 | Use Flowglad for payments | Open-source, Clerk-native | `.agents/context/research/tech-stack-evaluation.md` |
+| 2026-01 | Use Convex over Supabase | Built-in RAG, real-time, TypeScript-first | `.agents/research/tech-stack-evaluation.md` |
+| 2026-01 | Use Clerk for auth | Native integration with Convex + Flowglad | `.agents/research/tech-stack-evaluation.md` |
+| 2026-01 | Use Flowglad for payments | Open-source, Clerk-native | `.agents/research/tech-stack-evaluation.md` |
 | 2026-01 | Testing: critical paths only | AI responses non-deterministic | `AGENTS.md` |
 
 ---

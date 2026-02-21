@@ -89,7 +89,6 @@ describe("ChatInput primary action", () => {
           onFileRemove={() => {}}
           onSuggestion={() => {}}
           hasSuggestions={false}
-          onSelectModel={() => {}}
           selectedModel="openai/gpt-4.1-mini"
           isUserAuthenticated
           stop={stop}

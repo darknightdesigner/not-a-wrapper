@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     // Disables Turbopack's persistent SST cache to prevent recurring ENOENT crashes
     // from corrupted cache files. Trade-off: slightly slower cold starts (~5-15s).
     // TODO: Re-enable once upstream fix lands — https://github.com/vercel/next.js/issues
-    // See: .agents/context/troubleshooting/turbopack-sst-write-failure.md
+    // See: .agents/troubleshooting/turbopack-sst-write-failure.md
     turbopackFileSystemCacheForDev: false,
   },
   serverExternalPackages: ["shiki", "vscode-oniguruma"],

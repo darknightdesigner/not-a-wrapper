@@ -344,4 +344,4 @@ export const mockUserMessage = {
 
 ---
 
-*See `@.agents/context/research/tech-stack-evaluation.md` for testing strategy rationale and `@AGENTS.md` for gold standard examples.*
+*See `@.agents/research/tech-stack-evaluation.md` for testing strategy rationale and `@AGENTS.md` for gold standard examples.*

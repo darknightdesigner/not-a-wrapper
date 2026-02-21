@@ -28,9 +28,9 @@ convex/              # Database schema & functions
 
 .agents/              # AI context & knowledge base
 ├── context/         # Domain knowledge & references
-│   ├── decisions/  # Architecture Decision Records
-│   ├── research/   # Research & evaluations
-│   └── troubleshooting/ # Known issues & fixes
+├── research/        # Research & evaluations
+├── troubleshooting/ # Known issues & fixes
+├── design/          # Design references & UI research
 ├── plans/           # Implementation plans
 ├── skills/          # Multi-step task guides
 ├── workflows/       # Development procedures
@@ -54,9 +54,9 @@ convex/              # Database schema & functions
 
 | Type | Location |
 |------|----------|
-| Research / evaluation | `.agents/context/research/` |
-| Architecture decision | `.agents/context/decisions/NNN-topic.md` |
-| Known issue / fix | `.agents/context/troubleshooting/` |
+| Research / evaluation | `.agents/research/` |
+| Known issue / fix | `.agents/troubleshooting/` |
+| Design reference / UI research | `.agents/design/` |
 | Domain reference | `.agents/context/` |
 | Implementation plan | `.agents/plans/` |
 | New skill guide | `.agents/skills/[name]/SKILL.md` |

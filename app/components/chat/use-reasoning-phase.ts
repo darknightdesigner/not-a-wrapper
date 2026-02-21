@@ -8,6 +8,7 @@ export type ReasoningPhase = {
   reasoningText: string
   durationSeconds: number | undefined
   isReasoningStreaming: boolean
+  isOpaqueReasoning: boolean
 }
 
 type UseReasoningPhaseParams = {
@@ -34,44 +35,33 @@ export function useReasoningPhase({
 
   if (reasoningParts.length > 0) {
     const text = reasoningParts.map((p) => p.text).join("\n\n")
-    const hasVisibleTextContent =
-      parts?.some((p) => p.type === "text" && p.text.trim().length > 0) ?? false
 
-    // If response text has started but reasoning never produced visible content,
-    // treat reasoning as absent so the thinking UI disappears.
-    if (!text.trim() && hasVisibleTextContent) {
-      phase = "idle"
-      reasoningText = ""
+    const isAnyStreaming = reasoningParts.some(
+      (p) => (p as { state?: string }).state === "streaming"
+    )
+
+    if (isAnyStreaming) {
+      phase = "thinking"
+      reasoningText = text
     } else {
-      // Check if any reasoning part is actively streaming
-      const isAnyStreaming = reasoningParts.some(
-        (p) => (p as { state?: string }).state === "streaming"
+      const isAnyDone = reasoningParts.some(
+        (p) => (p as { state?: string }).state === "done"
       )
 
-      if (isAnyStreaming) {
-        phase = "thinking"
+      if (isAnyDone || status === "ready" || status === "error") {
+        phase = "complete"
+        reasoningText = text
+      } else if (text.trim()) {
+        phase = "complete"
         reasoningText = text
       } else {
-        // Check if explicitly done
-        const isAnyDone = reasoningParts.some(
-          (p) => (p as { state?: string }).state === "done"
-        )
-
-        if (isAnyDone || status === "ready" || status === "error") {
-          phase = "complete"
-          reasoningText = text
-        } else if (text) {
-          // Fallback: state is undefined but reasoning text exists — treat as complete
-          phase = "complete"
-          reasoningText = text
-        } else {
-          // Reasoning part exists but no text yet (model just started) — thinking
-          phase = "thinking"
-          reasoningText = ""
-        }
+        phase = "thinking"
+        reasoningText = ""
       }
     }
   }
+
+  const isOpaqueReasoning = phase !== "idle" && !reasoningText.trim()
 
   // Client-side timer.
   // React 19 render-sync pattern: reset tickedSeconds when entering thinking.
@@ -138,5 +128,6 @@ export function useReasoningPhase({
     reasoningText,
     durationSeconds,
     isReasoningStreaming: phase === "thinking",
+    isOpaqueReasoning,
   }
 }

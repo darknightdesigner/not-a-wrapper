@@ -29,7 +29,7 @@ Launch these research threads in parallel:
 | A1: Codebase scan | Existing patterns, related files, dependencies | Read files, grep for patterns |
 | A2: External research | Best practices, library docs, API references | Web search, fetch docs |
 | A3: Constraint analysis | Security, performance, permissions, edge cases | Read `AGENTS.md`, config files |
-| A4: Prior art | Existing plans, ADRs, related decisions | Read `.agents/plans/`, `.agents/context/decisions/` |
+| A4: Prior art | Existing plans, related decisions | Read `.agents/plans/`, `.agents/research/` |
 
 **Parallelization rules:**
 - A1–A4 are independent — run all simultaneously
@@ -162,7 +162,7 @@ Run this validation checklist:
 - File names: `kebab-case-description.md`
 - Reference existing plans for format: `@.agents/plans/mcp-integration-plan.md` (gold standard)
 - Plans reference skills when applicable: `@.agents/skills/convex-function/SKILL.md`
-- Cross-reference ADRs for architectural decisions: `@.agents/context/decisions/`
+- Cross-reference research for architectural context: `@.agents/research/`
 
 ## Additional Resources
 

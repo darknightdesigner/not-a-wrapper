@@ -1,6 +1,6 @@
 # Tier 1 Foundation Hardening — Implementation Plan
 
-> **Based on**: `.agents/context/research/tier-1-foundation-summary.md`
+> **Based on**: `.agents/research/tier-1-foundation-summary.md`
 > **Created**: February 13, 2026
 > **Status**: Ready for implementation
 > **Estimated effort**: ~11 hours (4 phases)

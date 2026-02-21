@@ -37,18 +37,18 @@ function DialogClose({
 
 function DialogOverlay({
   className,
+  animated = true,
   ...props
-}: DialogPrimitive.Backdrop.Props) {
+}: DialogPrimitive.Backdrop.Props & { animated?: boolean }) {
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
         "fixed inset-0 z-50 bg-black/50",
-        "data-[starting-style]:opacity-0",
-        "data-[ending-style]:opacity-0",
+        animated && "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
         className
       )}
-      style={{ transition: "opacity 200ms ease-out" }}
+      style={animated ? { transition: "opacity 100ms ease-out" } : undefined}
       {...props}
     />
   )
@@ -58,24 +58,23 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  animated = true,
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
+  animated?: boolean
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay animated={animated} />
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
           "bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg outline-none sm:max-w-lg",
-          "data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)]",
-          "data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
+          animated && "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
           className
         )}
-        style={{
-          transition: "opacity 200ms ease-out, transform 200ms ease-out",
-        }}
+        style={animated ? { transition: "opacity 100ms ease-out" } : undefined}
         {...props}
       >
         {children}

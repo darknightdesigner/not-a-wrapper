@@ -1,6 +1,5 @@
 "use client"
 
-import { ModelSelector } from "@/components/common/model-selector/base"
 import { PromptSystem } from "@/app/components/suggestions/prompt-system"
 import { ButtonPlusMenu } from "@/app/components/chat-input/button-plus-menu"
 import { InputDropZone } from "@/app/components/chat-input/input-drop-zone"
@@ -29,7 +28,6 @@ type MultiChatInputProps = {
   onFileUpload: (files: File[]) => void
   onFileRemove: (file: File) => void
   selectedModelIds: string[]
-  onSelectedModelIdsChange: (modelIds: string[]) => void
   isUserAuthenticated: boolean
   fileUploadState: "supported" | "unsupported" | "no-selection"
   stop: () => void
@@ -48,7 +46,6 @@ export function MultiChatInput({
   onSend,
   isSubmitting,
   selectedModelIds,
-  onSelectedModelIdsChange,
   isUserAuthenticated,
   files,
   onFileUpload,
@@ -157,12 +154,6 @@ export function MultiChatInput({
                   isSearchDisabled={isSearchDisabled}
                   fileUploadDisabledMessage={fileUploadDisabledMessage}
                   searchDisabledMessage={searchDisabledMessage}
-                />
-                <ModelSelector
-                  mode="multi"
-                  selectedModelIds={selectedModelIds}
-                  setSelectedModelIds={onSelectedModelIdsChange}
-                  className="rounded-full"
                 />
               </div>
               <PromptInputAction

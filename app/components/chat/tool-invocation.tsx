@@ -393,7 +393,9 @@ function SingleToolCard({
       )
     }
 
-    // Handle string results
+    // Handle string results — rendered as raw text intentionally.
+    // Tool output may contain JSON, code, or bracket/paren characters
+    // that would be misinterpreted by a markdown renderer.
     if (typeof parsedResult === "string") {
       return <div className="whitespace-pre-wrap">{parsedResult}</div>
     }

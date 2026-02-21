@@ -55,10 +55,10 @@ function DropdownMenuContent({
           data-slot="dropdown-menu-content"
           className={cn(
             "bg-popover text-popover-foreground z-50 max-h-(--available-height) min-w-[8rem] origin-(--transform-origin) overflow-x-hidden overflow-y-auto rounded-md border p-1 shadow-md",
-            animated && "data-[starting-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[ending-style]:[transform:scale(0.95)]",
+            animated && "data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
             className
           )}
-          style={animated ? { transition: "opacity 150ms ease-out, transform 150ms ease-out" } : undefined}
+          style={animated ? { transition: "opacity 100ms ease-out" } : undefined}
           {...props}
         />
       </MenuPrimitive.Positioner>

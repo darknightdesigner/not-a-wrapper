@@ -90,7 +90,6 @@ describe("MultiChatInput primary action", () => {
           onFileUpload={() => {}}
           onFileRemove={() => {}}
           selectedModelIds={[]}
-          onSelectedModelIdsChange={() => {}}
           isUserAuthenticated
           fileUploadState="supported"
           stop={stop}

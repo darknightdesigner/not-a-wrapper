@@ -7,21 +7,26 @@
  *   - Uses `LinkMarkdown` component for custom link handling with previews
  *   - Integrates `ButtonCopy` for one-click code copying in code blocks
  *   - Adds `CodeBlockGroup` header with language label display
- *   - Uses `marked.lexer()` for block-level parsing optimization
+ *   - Uses remark parser for block-level splitting (same parser as renderer)
  *   - Per-block memoization via `MemoizedMarkdownBlock` for better performance
  *   - Upstream has basic code/link handling; Not A Wrapper has enhanced UX features
  * @upgradeNotes
  *   - Preserve LinkMarkdown, ButtonCopy, and CodeBlockGroup integrations
  *   - Maintain per-block memoization pattern for performance
+ *   - Keep parsing and rendering on the same remark-based pipeline
  *   - Verify INITIAL_COMPONENTS customizations are not overwritten
  */
 import { LinkMarkdown } from "@/app/components/chat/link-markdown"
+import { remarkUnwrapLinkParens } from "@/lib/markdown/remark-unwrap-link-parens"
 import { cn } from "@/lib/utils"
-import { marked } from "marked"
 import { memo, useId, useMemo } from "react"
 import ReactMarkdown, { Components } from "react-markdown"
+import rehypeKatex from "rehype-katex"
 import remarkBreaks from "remark-breaks"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import remarkParse from "remark-parse"
+import { unified } from "unified"
 import { ButtonCopy } from "../common/button-copy"
 import {
   CodeBlock,
@@ -36,9 +41,24 @@ export type MarkdownProps = {
   components?: Partial<Components>
 }
 
+const markdownProcessor = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkMath)
+
 function parseMarkdownIntoBlocks(markdown: string): string[] {
-  const tokens = marked.lexer(markdown)
-  return tokens.map((token) => token.raw)
+  const tree = markdownProcessor.parse(markdown)
+
+  return tree.children.flatMap((node) => {
+    const start = node.position?.start.offset
+    const end = node.position?.end.offset
+
+    if (typeof start !== "number" || typeof end !== "number") {
+      return []
+    }
+
+    return markdown.slice(start, end)
+  })
 }
 
 function extractLanguage(className?: string): string {
@@ -109,7 +129,8 @@ const MemoizedMarkdownBlock = memo(
   }) {
     return (
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
+        remarkPlugins={[remarkGfm, remarkBreaks, remarkMath, remarkUnwrapLinkParens]}
+        rehypePlugins={[rehypeKatex]}
         components={components}
       >
         {content}
@@ -127,11 +148,21 @@ function MarkdownComponent({
   children,
   id,
   className,
-  components = INITIAL_COMPONENTS,
+  components,
 }: MarkdownProps) {
   const generatedId = useId()
   const blockId = id ?? generatedId
-  const blocks = useMemo(() => parseMarkdownIntoBlocks(children), [children])
+  const blocks = useMemo(
+    () => parseMarkdownIntoBlocks(children),
+    [children]
+  )
+  const mergedComponents = useMemo(
+    () =>
+      components
+        ? { ...INITIAL_COMPONENTS, ...components }
+        : INITIAL_COMPONENTS,
+    [components]
+  )
 
   return (
     <div className={className}>
@@ -139,7 +170,7 @@ function MarkdownComponent({
         <MemoizedMarkdownBlock
           key={`${blockId}-block-${index}`}
           content={block}
-          components={components}
+          components={mergedComponents}
         />
       ))}
     </div>
