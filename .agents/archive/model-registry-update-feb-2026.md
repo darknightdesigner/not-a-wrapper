@@ -1,7 +1,7 @@
 # Model Registry Update — February 2026
 
 > **Created**: February 6, 2026
-> **Research**: `.agents/context/research/latest-models-february-2026.md`
+> **Research**: `.agents/research/latest-models-february-2026.md`
 > **Scope**: Deprecate retired models, update stale entries, add new generation models
 > **Skill**: Follow `@.agents/skills/add-model/SKILL.md` for the 3-step model addition pattern
 

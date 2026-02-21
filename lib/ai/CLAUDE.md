@@ -140,5 +140,5 @@ After Convex migration:
 ## References
 
 - `.agents/context/ai-context-engineering-guide.md` — Context management best practices
-- `.agents/context/research/tech-stack-evaluation.md` — Sub-agent architecture research
+- `.agents/research/tech-stack-evaluation.md` — Sub-agent architecture research
 - `AGENTS.md` — Universal agent guidelines

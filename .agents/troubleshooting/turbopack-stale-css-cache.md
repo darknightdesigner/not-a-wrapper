@@ -100,4 +100,4 @@ When documenting Tailwind class issues in `.agents/` or any non-gitignored direc
 - `components/ui/sidebar.tsx` — Lines 245, 258: correct `calc(var(--spacing)*N)` pattern
 - `postcss.config.mjs` — PostCSS config using `@tailwindcss/postcss` plugin
 - `.next/dev/cache/turbopack/` — Turbopack's persistent cache (SST files)
-- `.agents/context/troubleshooting/turbopack-sst-write-failure.md` — Related issue where `.next` stays empty (different root cause, similar symptoms)
+- `.agents/troubleshooting/turbopack-sst-write-failure.md` — Related issue where `.next` stays empty (different root cause, similar symptoms)

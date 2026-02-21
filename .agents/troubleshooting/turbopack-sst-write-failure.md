@@ -138,4 +138,4 @@ If you see BOTH issues simultaneously, fix the SST issue first (reinstall node_m
 - `next.config.ts` — `turbopackFileSystemCacheForDev` option
 - `.next/dev/cache/turbopack/` — SST cache files (when working correctly)
 - `node_modules/@next/swc-darwin-arm64/` — Turbopack native binary
-- `.agents/context/troubleshooting/turbopack-stale-css-cache.md` — Related Turbopack CSS issue
+- `.agents/troubleshooting/turbopack-stale-css-cache.md` — Related Turbopack CSS issue

@@ -729,7 +729,7 @@ Both ChatGPT and Claude memory systems are locked to their respective providers.
 
 Several planned features (image generation, code execution, MCP tools, deep research) consume API credits or require specific provider keys. The current BYOK model works well for chat, but tool-based features introduce new questions: Who pays for tool calls? How do you rate-limit tool usage separately from chat? What happens when a user's BYOK key doesn't support a needed tool (e.g., image generation requires an OpenAI key, but the user only has an Anthropic key)?
 
-**Action**: Design a clear access model before building P1 tool-dependent features. Options include: (a) all tool calls use the user's BYOK key for the relevant provider, (b) platform-subsidized tools on the Pro plan, (c) hybrid where users can choose. Document this as an ADR in `.agents/context/decisions/`.
+**Action**: Design a clear access model before building P1 tool-dependent features. Options include: (a) all tool calls use the user's BYOK key for the relevant provider, (b) platform-subsidized tools on the Pro plan, (c) hybrid where users can choose. Document this as an ADR in `.agents/research/`.
 
 ---
 

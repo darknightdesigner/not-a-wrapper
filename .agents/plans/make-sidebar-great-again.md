@@ -3,7 +3,7 @@
 > **Status**: Planning
 > **Priority**: P1
 > **Updated**: February 17, 2026
-> **Primary references**: `.agents/context/research/sidebar/chatgpt-expanded-html.md`, `.agents/context/research/sidebar/chatgpt-collapsed-html.md`, `.agents/context/research/sidebar/chatgpt-styles-reference.md`
+> **Primary references**: `.agents/design/chatgpt-reference/sidebar/chatgpt-expanded-html.md`, `.agents/design/chatgpt-reference/sidebar/chatgpt-collapsed-html.md`, `.agents/design/chatgpt-reference/sidebar/chatgpt-styles-reference.md`
 
 ---
 

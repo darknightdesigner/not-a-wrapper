@@ -4,7 +4,7 @@
 > **Priority**: P0 — Ship before expanding tool count
 > **Timeline**: ~1 week (6 phases, Phase 4 parallelizable with 2→3 sequence)
 > **Date**: February 12, 2026
-> **Research**: `.agents/context/research/multi-tool-calling-system-design.md`
+> **Research**: `.agents/research/multi-tool-calling-system-design.md`
 > **Skill**: `.agents/skills/multiple-tool-calling-design-pattern/SKILL.md`
 > **Depends on**: Phases 1–5 of tool infrastructure (already shipped)
 > **AI SDK**: v6.0.78 (`ai`), v3.0.26 (`@ai-sdk/openai`), v3.0.41 (`@ai-sdk/anthropic`), v3.0.24 (`@ai-sdk/google`)
@@ -873,4 +873,4 @@ After all phases are complete:
 
 ---
 
-*Plan derived from multi-tool calling system design research, Open WebUI competitive analysis, and Phase 7 future tool integrations plan. See `.agents/context/research/multi-tool-calling-system-design.md` for full research context.*
+*Plan derived from multi-tool calling system design research, Open WebUI competitive analysis, and Phase 7 future tool integrations plan. See `.agents/research/multi-tool-calling-system-design.md` for full research context.*

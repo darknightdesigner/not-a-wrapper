@@ -74,9 +74,9 @@ When you need additional context, use the `@` import syntax:
 |----------|---------|
 | `.agents/context/` | Architecture, API, database, and deployment docs |
 | `.agents/context/glossary.md` | Domain terminology (Model, providerId, parts, etc.) |
-| `.agents/context/research/` | Research, evaluations, analyses |
-| `.agents/context/decisions/` | Architecture Decision Records |
-| `.agents/context/troubleshooting/` | Known issues & fixes |
+| `.agents/research/` | Research, evaluations, analyses |
+| `.agents/troubleshooting/` | Known issues & fixes |
+| `.agents/design/` | Design references & UI research |
 | `.agents/plans/` | Implementation plans |
 | `.agents/skills/` | Multi-step task guides |
 | `.agents/workflows/` | Development workflows and procedures |
@@ -120,7 +120,7 @@ For critical paths (auth, data transforms, rate limiting):
 When sessions get long:
 - Summarize older messages (keep last 10)
 - Write session discoveries to `NOTES.md` (project root — scratch notes only)
-- Write lasting research/analysis to `.agents/context/research/`
+- Write lasting research/analysis to `.agents/research/`
 - Reference `@` files instead of pasting content
 - Use context compaction strategies
 
@@ -156,7 +156,7 @@ For long sessions, Claude should:
 Before writing code, follow this sequence:
 
 1. **Research the domain** — Search for established patterns, prior art, and industry conventions for the problem at hand
-2. **Check for existing solutions** — Look in `.agents/context/research/` for prior analysis; check if the codebase already solves a similar problem
+2. **Check for existing solutions** — Look in `.agents/research/` for prior analysis; check if the codebase already solves a similar problem
 3. **Evaluate approaches** — When multiple solutions exist, compare trade-offs (performance, maintainability, complexity, ecosystem alignment)
 4. **Align with the codebase** — Ensure the chosen approach extends existing conventions rather than introducing a parallel pattern
 5. **Implement and verify** — Build incrementally, verifying each step against the gold standard examples in `AGENTS.md`
@@ -166,7 +166,7 @@ Before writing code, follow this sequence:
 ```markdown
 ✅ DO: Research the problem first — "Let me check how this is typically handled in Next.js App Router..."
 ✅ DO: Reference prior art — "React's documentation recommends this pattern for..."
-✅ DO: Document your reasoning — Create a research doc in .agents/context/research/ for non-trivial decisions
+✅ DO: Document your reasoning — Create a research doc in .agents/research/ for non-trivial decisions
 ✅ DO: Propose options — "There are two established approaches here. Option A... Option B... I recommend B because..."
 
 ❌ DON'T: Jump to the first solution that works
@@ -193,9 +193,10 @@ Before writing code, follow this sequence:
 
 ### Reference for Fixes
 
-- `.agents/context/research/` — Prior research and analysis
+- `.agents/research/` — Prior research and analysis
 - `.agents/workflows/react-19-lint-fixes.md` — React 19 / React Compiler patterns
 - `.agents/context/conventions.md` — Quality gates and acceptable exceptions
+- `.agents/troubleshooting/` — Known issues & fixes
 - Gold standard examples in `AGENTS.md`
 
 ## Debugging Workflow

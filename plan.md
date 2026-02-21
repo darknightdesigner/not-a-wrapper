@@ -8,7 +8,9 @@ High-level roadmap connecting vision to execution. Detailed implementation plans
 plan.md              ← What & why (this file)
 AGENTS.md            ← Rules & permissions
 .agents/plans/       ← How (implementation details)
-.agents/context/     ← Reference (architecture, research, ADRs)
+.agents/context/     ← Reference (architecture, domain knowledge)
+.agents/research/    ← Research, evaluations, analyses
+.agents/design/      ← Design references & UI research
 .agents/workflows/   ← Process (dev cycle, debugging)
 .agents/skills/      ← Guides (multi-step tasks)
 ```
@@ -24,7 +26,7 @@ AGENTS.md            ← Rules & permissions
 
 ## Priorities
 
-> Sources: `.agents/plans/todo-fixes-and-features.md`, `.agents/context/research/open-webui-analysis/SUMMARY.md`, `.agents/context/research/webclaw/06-recommendations.md`
+> Sources: `.agents/plans/todo-fixes-and-features.md`, `.agents/research/open-webui-analysis/SUMMARY.md`, `.agents/research/webclaw/06-recommendations.md`
 
 ### P0 — Do Now
 
@@ -59,7 +61,7 @@ AGENTS.md            ← Rules & permissions
 
 - [ ] **#5 Security headers** (`Not started` — templates exist in docs)
   Sources: `research/open-webui-analysis/SUMMARY.md`, `.agents/context/deployment.md`, `.agents/skills/base-ui-csp-provider/`
-  - [ ] Add baseline CSP with least-privilege defaults and required exceptions. (Reference: `.agents/context/deployment.md:248-271`)
+  - [ ] Add baseline CSP with least-privilege defaults and required exceptions. (Reference: `.agents/context/deployment.md`)
   - [ ] Add HSTS (with rollout-safe max-age strategy).
   - [ ] Add `X-Frame-Options` and validate embed behavior expectations.
   - [ ] Validate headers in local, preview, and production deployments.
@@ -168,7 +170,7 @@ AGENTS.md            ← Rules & permissions
   - [ ] Evaluate retrieval quality with representative datasets.
 
 - [ ] **#43 Motion preference respect** (`Not started`)  
-  Sources: ChatGPT prompt input research (`research/prompt-input/`), [MDN prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)
+  Sources: ChatGPT prompt input research (`design/chatgpt-reference/prompt-input/`), [MDN prefers-reduced-motion](https://developer.mozilla.org/en-US/docs/Web/CSS/@media/prefers-reduced-motion)
   - [ ] Audit all Motion/Framer animations and add `useReducedMotion()` guards. (Files: `app/components/chat-input/file-list.tsx`, `app/components/chat-input/suggestions.tsx`, `components/motion-primitives/`)
   - [ ] Add `motion-safe:` Tailwind prefix to CSS transitions. (Files: `components/ui/prompt-input.tsx`, `app/components/chat-input/chat-input.tsx`)
   - [ ] Verify reduced-motion behavior across composer, suggestions, file list, and streaming animations.
@@ -245,7 +247,7 @@ AGENTS.md            ← Rules & permissions
   - [ ] Prototype notification delivery UX and permission handling.
 
 - [ ] **#44 Rich-text composer (ProseMirror/TipTap)** (`Not started`)  
-  Sources: ChatGPT prompt input research (`research/prompt-input/`), [TipTap](https://tiptap.dev/), [ProseMirror](https://prosemirror.net/), [Lexical](https://lexical.dev/)
+  Sources: ChatGPT prompt input research (`design/chatgpt-reference/prompt-input/`), [TipTap](https://tiptap.dev/), [ProseMirror](https://prosemirror.net/), [Lexical](https://lexical.dev/)
   - [ ] Evaluate TipTap vs Lexical vs raw ProseMirror for bundle size, React 19 compat, and extension ecosystem.
   - [ ] Prototype replacement of `PromptInputTextarea` (`components/ui/prompt-input.tsx:117-166`) with rich-text editor.
   - [ ] Preserve existing auto-resize, keyboard handling (`chat-input.tsx:133-149`), paste behavior (`chat-input.tsx:151-188`), and `PromptInput` context API (`components/ui/prompt-input.tsx:35-55`).
@@ -302,7 +304,7 @@ AGENTS.md            ← Rules & permissions
 
 ### P4 — Performance & DX
 
-> Sources: `.agents/context/research/webclaw/06-recommendations.md` (Sections 1, 2, 4)
+> Sources: `.agents/research/webclaw/06-recommendations.md` (Sections 1, 2, 4)
 
 - [x] **#35 Message memoization** (`Done`)  
   Benefit: Eliminate long-thread streaming jank by restricting re-renders to active message.  
@@ -368,7 +370,7 @@ AGENTS.md            ← Rules & permissions
 
 - [ ] **#45 Voice/dictation controls** (`Not started`)  
   Benefit: Enable speech-to-text input in the composer, matching ChatGPT's dictation UX.  
-  Sources: ChatGPT prompt input research (`research/prompt-input/`), [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), see also P2 #24 Audio STT/TTS
+  Sources: ChatGPT prompt input research (`design/chatgpt-reference/prompt-input/`), [Web Speech API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API), see also P2 #24 Audio STT/TTS
   - [ ] Add dictation button to composer trailing actions. (File: `app/components/chat-input/chat-input.tsx:244-280`)
   - [ ] Implement Web Speech API `SpeechRecognition` with start/stop/interim-result states.
   - [ ] Handle browser support detection and graceful fallback (hide button when unsupported).
@@ -378,7 +380,7 @@ AGENTS.md            ← Rules & permissions
 
 - [ ] **#46 Mobile-specific file inputs** (`Not started`)  
   Benefit: Expose camera capture and photo gallery picker on mobile, matching ChatGPT's mobile composer.  
-  Sources: ChatGPT prompt input mobile research (`research/prompt-input/chatgpt-prompt-input-mobile-html.md`)
+  Sources: ChatGPT prompt input mobile research (`design/chatgpt-reference/prompt-input/chatgpt-prompt-input-mobile-html.md`)
   - [ ] Add hidden camera input (`accept="image/*" capture="environment"`). (Ref: ChatGPT `#upload-camera`)
   - [ ] Add hidden gallery input (`accept="image/*" multiple`). (Ref: ChatGPT `#upload-photos`)
   - [ ] Add "Take photo" and "Choose from gallery" items to `ButtonPlusMenu`. (File: `app/components/chat-input/button-plus-menu.tsx:127-181`)
@@ -420,27 +422,21 @@ Mobile File Inputs (#46) ← no deps (P4, mobile UX)
 
 <!-- TODO: 2-3 sentence summary of current architecture and planned changes -->
 
-| ADR | Decision | Rationale |
-|-----|----------|-----------|
-| [001](.agents/context/decisions/001-convex-database.md) | Convex over Supabase | <!-- brief --> |
-| [002](.agents/context/decisions/002-vercel-ai-sdk.md) | Vercel AI SDK for multi-provider | <!-- brief --> |
-| [003](.agents/context/decisions/003-optimistic-updates.md) | Optimistic update pattern | <!-- brief --> |
-
 ---
 
 ## Research
 
-> All research: `.agents/context/research/`
+> All research: `.agents/research/`
 
 | Topic | Document |
 |-------|----------|
-| Provider history replay | `.agents/context/research/provider-aware-history-adaptation.md` |
-| Open WebUI comparison | `.agents/context/research/open-webui-analysis/SUMMARY.md` |
-| Latest models (Feb 2026) | `.agents/context/research/latest-models-february-2026.md` |
-| Multi-tool calling | `.agents/context/research/multi-tool-calling-system-design.md` |
-| Desktop/CLI access | `.agents/context/research/desktop-cli-local-access-evaluation.md` |
-| Base UI migration | `.agents/context/research/radix-to-base-ui-css-variables.md` |
-| WebClaw architecture & perf | `.agents/context/research/webclaw/06-recommendations.md` |
+| Provider history replay | `.agents/research/provider-aware-history-adaptation.md` |
+| Open WebUI comparison | `.agents/research/open-webui-analysis/SUMMARY.md` |
+| Latest models (Feb 2026) | `.agents/research/latest-models-february-2026.md` |
+| Multi-tool calling | `.agents/research/multi-tool-calling-system-design.md` |
+| Desktop/CLI access | `.agents/research/desktop-cli-local-access-evaluation.md` |
+| Base UI migration | `.agents/research/radix-to-base-ui-css-variables.md` |
+| WebClaw architecture & perf | `.agents/research/webclaw/06-recommendations.md` |
 
 ---
 

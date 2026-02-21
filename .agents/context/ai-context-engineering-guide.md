@@ -1116,11 +1116,11 @@ The following areas require additional investigation or clarification:
 
 | Question | Resolution | Reference |
 |----------|------------|-----------|
-| Convex vs Supabase for AI-first apps? | **Convex** — Built-in RAG, vector search, TypeScript-first | `.agents/context/research/tech-stack-evaluation.md` |
-| Auth provider for Convex + payments? | **Clerk** — Native integration with both Convex and Flowglad | `.agents/context/research/tech-stack-evaluation.md` |
-| Payments platform? | **Flowglad** — Open-source, Clerk-native, developer-friendly | `.agents/context/research/tech-stack-evaluation.md` |
-| Testing strategy for AI apps? | **Critical paths only** — Auth, data transforms, rate limiting | `.agents/context/research/tech-stack-evaluation.md` |
-| Sub-agent architecture? | **4-agent design** — Transcript, Title, Thumbnail, Analytics | `.agents/context/research/tech-stack-evaluation.md` |
+| Convex vs Supabase for AI-first apps? | **Convex** — Built-in RAG, vector search, TypeScript-first | `.agents/research/tech-stack-evaluation.md` |
+| Auth provider for Convex + payments? | **Clerk** — Native integration with both Convex and Flowglad | `.agents/research/tech-stack-evaluation.md` |
+| Payments platform? | **Flowglad** — Open-source, Clerk-native, developer-friendly | `.agents/research/tech-stack-evaluation.md` |
+| Testing strategy for AI apps? | **Critical paths only** — Auth, data transforms, rate limiting | `.agents/research/tech-stack-evaluation.md` |
+| Sub-agent architecture? | **4-agent design** — Transcript, Title, Thumbnail, Analytics | `.agents/research/tech-stack-evaluation.md` |
 
 ### Remaining Questions
 
@@ -1215,8 +1215,8 @@ The following areas require additional investigation or clarification:
 - [Anthropic Model System Cards](https://www.anthropic.com/system-cards)
 
 ### Project-Specific Research (Not A Wrapper)
-- `.agents/context/research/tech-stack-evaluation.md` — Comprehensive tech stack evaluation (Convex vs Supabase, auth, payments)
-- `.agents/context/research/youtube-transcript-evaluation.md` — YouTube transcript extraction research
+- `.agents/research/tech-stack-evaluation.md` — Comprehensive tech stack evaluation (Convex vs Supabase, auth, payments)
+- `.agents/research/youtube-transcript-evaluation.md` — YouTube transcript extraction research
 - `AGENTS.md` — Finalized project configuration for AI agents
 
 ## Case Study: Not A Wrapper

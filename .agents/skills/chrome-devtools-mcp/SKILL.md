@@ -82,7 +82,7 @@ Step 3: Claude uses /chrome tools to:
   - evaluate_script → extract CSS custom properties, computed styles, colors
   - take_screenshot → visual reference
 
-Step 4: Results saved to .agents/context/research/design-tokens-[site].md
+Step 4: Results saved to .agents/design/<site>-reference/design-tokens-[site].md
 ```
 
 ### Why Not chrome-devtools-mcp for Signed-In Pages?
@@ -236,7 +236,7 @@ Network presets: `No emulation`, `Offline`, `Slow 3G`, `Fast 3G`, `Slow 4G`, `Fa
    emulate({ colorScheme: "dark" })
    # Re-run steps 3-5
 
-7. Save to .agents/context/research/design-tokens-[site].md
+7. Save to .agents/design/<site>-reference/design-tokens-[site].md
 ```
 
 ### Workflow: Network & Console Debugging
@@ -399,7 +399,7 @@ Navigate to target URL BEFORE starting trace if `reload` or `autoStop` is true.
 
 ## Output Format: Design Token Markdown
 
-When extracting tokens, save in this format to `.agents/context/research/`:
+When extracting tokens, save in this format to `.agents/design/`:
 
 ```markdown
 # Design Tokens — [Site Name]

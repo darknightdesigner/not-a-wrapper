@@ -341,4 +341,4 @@ This is a larger refactor and should be planned separately.
 
 ---
 
-*Research document for `.agents/context/research/webclaw/`. See `00-research-plan.md` for the overall research track methodology.*
+*Research document for `.agents/research/webclaw/`. See `00-research-plan.md` for the overall research track methodology.*

@@ -71,8 +71,7 @@ If feature-flag conventions require env-driven flags, use the existing project f
 | 5 | `app/api/chat/adapters/__tests__/cross-provider.test.ts` | Modify — add OpenAI -> Anthropic web search regression |
 | 5 | `app/api/chat/replay/__tests__/matrix.test.ts` | Create — provider-switch matrix coverage |
 | 6 | `app/api/chat/route.ts` | Modify — replay observability and fail-safe behavior |
-| 7 | `.agents/context/decisions/005-provider-neutral-replay-compiler.md` | Create — ADR for architecture decision |
-| 7 | `.agents/context/troubleshooting/replay-shape-errors.md` | Create — operational runbook |
+| 7 | `.agents/troubleshooting/replay-shape-errors.md` | Create — operational runbook |
 
 ---
 
@@ -307,8 +306,7 @@ Manual:
 
 ### Context to Load
 
-- `.agents/context/decisions/004-provider-history-adapters.md`
-- `.agents/context/troubleshooting/`
+- `.agents/troubleshooting/`
 
 ### Steps
 

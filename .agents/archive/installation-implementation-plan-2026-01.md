@@ -119,7 +119,7 @@
 # Check current status
 git status
 
-# Stage the evaluation document (historical path, now at .agents/context/research/)
+# Stage the evaluation document (historical path, now at .agents/research/)
 git add docs/youtube-transcript-evaluation.md
 
 # Review changes to layout
@@ -2001,7 +2001,7 @@ rm -rf app/api/youtube
 
 ### Project Documentation
 - [INSTALL.md](../../INSTALL.md) - Full installation guide
-- [YouTube Transcript Evaluation](../context/research/youtube-transcript-evaluation.md) - Detailed transcript implementation options
+- [YouTube Transcript Evaluation](../research/youtube-transcript-evaluation.md) - Detailed transcript implementation options
 
 ### UI Component Libraries
 - [shadcn/ui Docs](https://ui.shadcn.com/docs)

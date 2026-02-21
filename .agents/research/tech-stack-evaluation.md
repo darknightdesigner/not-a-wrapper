@@ -102,7 +102,7 @@ A platform that:
 
 | Document | Status | Notes |
 |----------|--------|-------|
-| `.agents/context/research/youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
+| `.agents/research/youtube-transcript-evaluation.md` | ✅ Complete | Comprehensive transcript extraction research |
 | `.agents/archive/installation-implementation-plan-2026-01.md` | ✅ Complete | Phased implementation roadmap |
 | `.agents/context/ai-context-engineering-guide.md` | ✅ Complete | AI orchestration best practices |
 

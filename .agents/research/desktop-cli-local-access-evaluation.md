@@ -904,7 +904,7 @@ A web-only AI chat cannot:
 When investigating questions from this document, create a **numbered markdown file** in the research folder:
 
 ```
-.agents/context/research/
+.agents/research/
 ├── desktop-cli-local-access-evaluation.md  ← This document (parent)
 ├── 001-architecture-foundation.md          ← Phase 1 output
 ├── 002-mcp-protocol-evaluation.md          ← Phase 2 output
@@ -1033,7 +1033,7 @@ You are a senior technical reviewer verifying AI-conducted research.
 
 ## Research to Review
 - **Phase:** [Phase number and title]
-- **File:** .agents/context/research/NNN-[topic].md
+- **File:** .agents/research/NNN-[topic].md
 
 ## Your Task
 

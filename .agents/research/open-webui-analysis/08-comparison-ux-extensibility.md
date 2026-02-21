@@ -398,7 +398,7 @@ If NaW expands to enterprise markets or non-English-first regions, revisit. The 
 - `lib/mcp/` — MCP client (wiring into chat flow)
 - `app/api/chat/route.ts` — Chat route (tool injection point)
 - `convex/schema.ts` — Database schema (model ACLs, prompt library, memories)
-- `.agents/context/research/competitive-feature-analysis.md` — Prior ChatGPT/Claude analysis
+- `.agents/research/competitive-feature-analysis.md` — Prior ChatGPT/Claude analysis
 
 ---
 

@@ -501,7 +501,7 @@ backend/open_webui/routers/pipelines.py  # Pipeline framework
 - `app/components/chat/` — Chat components
 - `app/components/layout/settings/` — Settings UI
 - `components/ui/` — Design system
-- `.agents/context/research/competitive-feature-analysis.md` — Prior analysis
+- `.agents/research/competitive-feature-analysis.md` — Prior analysis
 
 ---
 

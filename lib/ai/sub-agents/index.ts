@@ -24,7 +24,7 @@
  * ```
  *
  * @see CLAUDE.md - Sub-Agent Architecture section
- * @see .agents/context/research/tech-stack-evaluation.md - Research and rationale
+ * @see .agents/research/tech-stack-evaluation.md - Research and rationale
  *
  * @example
  * ```typescript

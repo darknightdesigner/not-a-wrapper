@@ -36,9 +36,9 @@ This project uses a structured context system for AI assistants:
 | `.cursor/rules/` | Cursor-specific patterns | Auto by Cursor |
 | `.agents/context/` | Domain knowledge & references | On-demand |
 | `.agents/context/glossary.md` | Domain terminology | On-demand |
-| `.agents/context/research/` | Research, evaluations, analyses | On-demand |
-| `.agents/context/decisions/` | Architecture Decision Records | On-demand |
-| `.agents/context/troubleshooting/` | Known issues & fixes | On-demand |
+| `.agents/research/` | Research, evaluations, analyses | On-demand |
+| `.agents/troubleshooting/` | Known issues & fixes | On-demand |
+| `.agents/design/` | Design references & UI research | On-demand |
 | `.agents/plans/` | Implementation plans | On-demand |
 | `.agents/skills/` | Multi-step task guides | On-demand |
 | `.agents/workflows/` | Development procedures | On-demand |
@@ -64,14 +64,6 @@ This project uses a structured context system for AI assistants:
 | `debugging.md` | Troubleshooting issues |
 | `release.md` | Releasing new versions |
 
-### Architecture Decisions
-
-| ADR | Topic |
-|-----|-------|
-| `001-convex-database.md` | Why Convex over Supabase |
-| `002-vercel-ai-sdk.md` | Multi-provider abstraction |
-| `003-optimistic-updates.md` | State update pattern |
-
 ## Directory Structure
 
 ```
@@ -94,9 +86,9 @@ convex/               # Convex DB schema & functions
 
 .agents/               # AI context & knowledge base
 ├── context/          # Domain knowledge & references
-│   ├── decisions/   # Architecture Decision Records
-│   ├── research/    # Research & evaluations
-│   └── troubleshooting/ # Known issues & fixes
+├── research/         # Research & evaluations
+├── troubleshooting/  # Known issues & fixes
+├── design/           # Design references & UI research
 ├── plans/            # Implementation plans
 ├── skills/           # Multi-step task guides
 ├── workflows/        # Development procedures
@@ -127,7 +119,7 @@ When implementing features or fixing bugs:
 4. **Extend existing conventions** — Follow and build upon the codebase's established patterns
 5. **Evaluate trade-offs** — When multiple approaches exist, analyze pros/cons before committing
 
-> When unsure, consult `.agents/context/research/` for prior analysis or create a new research document before implementing.
+> When unsure, consult `.agents/research/` for prior analysis or create a new research document before implementing.
 
 ## Prompt Delivery Default
 

@@ -384,7 +384,7 @@ When updating an existing reference file, follow this workflow:
 ### Step 1: Read the Existing Reference
 
 ```
-Read tool: .agents/context/research/<path>/reference-file.md
+Read tool: .agents/design/<path>/reference-file.md
 ```
 
 ### Step 2: Identify Sections to Update

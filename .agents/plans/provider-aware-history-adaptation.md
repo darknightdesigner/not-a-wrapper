@@ -4,7 +4,7 @@
 > **Priority**: P0 — Production replay errors affecting all non-Anthropic providers
 > **Timeline**: ~6 engineering days (~47.5h), 2 weeks
 > **Date**: February 13, 2026
-> **Research**: `.agents/context/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md`
+> **Research**: `.agents/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md`
 > **Architecture**: Option A — Sanitize-on-Send with Per-Provider Adapters
 > **AI SDK**: v6.0.78 (`ai`), v3.0.26 (`@ai-sdk/openai`), v3.0.41 (`@ai-sdk/anthropic`), v3.0.24 (`@ai-sdk/google`)
 > **Triggered by**: Production bug — OpenAI Responses API rejected replayed history with orphaned `web_search_call` items
@@ -1415,7 +1415,7 @@ bun run lint
 
 1. **`AGENTS.md`**: Add adapter pattern to Gold Standard Examples table.
 2. **`.agents/context/glossary.md`**: Add entries for `ProviderHistoryAdapter`, `AdaptationContext`, `AdaptationResult`.
-3. **Create ADR**: `.agents/context/decisions/004-provider-history-adapters.md` documenting the Option A decision and why Options B/C were rejected.
+3. **Create ADR**: `.agents/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md` documenting the Option A decision and why Options B/C were rejected.
 4. **Update `app/api/CLAUDE.md`**: Add adapters to the file structure and describe the adapter pattern.
 
 ### Verify
@@ -1436,7 +1436,7 @@ bun run build # Production build succeeds
 | `.env.example` | Modify (remove HISTORY_ADAPTER_V2) |
 | `AGENTS.md` | Modify (add adapter pattern) |
 | `.agents/context/glossary.md` | Modify (add adapter terms) |
-| `.agents/context/decisions/004-provider-history-adapters.md` | Create |
+| `.agents/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md` | Create |
 | `app/api/CLAUDE.md` | Modify (add adapter docs) |
 
 ---
@@ -1464,7 +1464,7 @@ bun run build # Production build succeeds
 | `app/api/chat/adapters/__tests__/default.test.ts` | Phase 4A | Test |
 | `app/api/chat/adapters/__tests__/pipeline.test.ts` | Phase 4B | Test |
 | `app/api/chat/adapters/__tests__/cross-provider.test.ts` | Phase 4C | Test |
-| `.agents/context/decisions/004-provider-history-adapters.md` | Phase 7 | Docs |
+| `.agents/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md` | Phase 7 | Docs |
 
 ### Modified Files (4)
 
@@ -1529,11 +1529,11 @@ For deep-dive context on any provider's invariants, load the corresponding resea
 
 | Provider | Research Document |
 |----------|------------------|
-| OpenAI | `.agents/context/research/provider-aware-history-adaptation/openai-replay-invariants.md` |
-| Anthropic | `.agents/context/research/provider-aware-history-adaptation/anthropic-replay-invariants.md` |
-| Google | `.agents/context/research/provider-aware-history-adaptation/google-replay-invariants.md` |
-| xAI/Mistral/Perplexity | `.agents/context/research/provider-aware-history-adaptation/xai-mistral-perplexity-replay-invariants.md` |
-| AI SDK conversion | `.agents/context/research/provider-aware-history-adaptation/ai-sdk-convert-messages.md` |
-| Tool artifacts | `.agents/context/research/provider-aware-history-adaptation/cross-turn-tool-artifacts.md` |
-| Open-source survey | `.agents/context/research/provider-aware-history-adaptation/open-source-patterns.md` |
-| Parent plan | `.agents/context/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md` |
+| OpenAI | `.agents/research/provider-aware-history-adaptation/openai-replay-invariants.md` |
+| Anthropic | `.agents/research/provider-aware-history-adaptation/anthropic-replay-invariants.md` |
+| Google | `.agents/research/provider-aware-history-adaptation/google-replay-invariants.md` |
+| xAI/Mistral/Perplexity | `.agents/research/provider-aware-history-adaptation/xai-mistral-perplexity-replay-invariants.md` |
+| AI SDK conversion | `.agents/research/provider-aware-history-adaptation/ai-sdk-convert-messages.md` |
+| Tool artifacts | `.agents/research/provider-aware-history-adaptation/cross-turn-tool-artifacts.md` |
+| Open-source survey | `.agents/research/provider-aware-history-adaptation/open-source-patterns.md` |
+| Parent plan | `.agents/research/provider-aware-history-adaptation/provider-aware-history-adaptation.md` |

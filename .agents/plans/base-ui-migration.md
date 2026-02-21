@@ -35,7 +35,7 @@ Phases can be resumed independently. An agent starting at Phase 3 only needs to 
 
 **Evolution path**: v1 (this plan — full migration with asChild shim) → v1.1 (deprecate asChild shim, migrate all app/ call sites to `render` prop) → v1.2 (update `components.json` style from `"new-york"` to `"base-vega"` so future `shadcn add` commands pull Base UI variants automatically) → v2 (adopt new Base UI-only components: Autocomplete, Combobox, NumberField, Toast).
 
-**Supporting research**: `.agents/context/research/radix-to-base-ui-css-variables.md` — CSS custom property mapping (`--radix-*` → Base UI equivalents). 14 variables, 12 direct renames, 2 requiring architectural adjustment (navigation-menu viewport).
+**Supporting research**: `.agents/research/radix-to-base-ui-css-variables.md` — CSS custom property mapping (`--radix-*` → Base UI equivalents). 14 variables, 12 direct renames, 2 requiring architectural adjustment (navigation-menu viewport).
 
 **CLI mechanism (verified 2026-02-09)**: shadcn/ui does NOT have a `--base-ui` CLI flag. Instead, the `style` field in `components.json` controls which primitive library is used. Setting it to a `base-*` value (e.g., `base-vega`) causes `shadcn add` to pull Base UI variants from the registry. The project currently uses `"style": "new-york"` (legacy Radix). The eventual cutover will update this to `"style": "base-vega"` so future `shadcn add` commands automatically pull Base UI variants. See "Research Findings" section below for full details.
 
@@ -1019,7 +1019,7 @@ Critical manual tests:
    - Alternative: the Positioner exposes `--positioner-height` and `--positioner-width` which could also be used.
    - The official Base UI NavigationMenu CSS Module examples use CSS transitions on the Popup's width/height properties directly, confirming this is the intended approach.
 
-   > **Research source**: `.agents/context/research/radix-to-base-ui-css-variables.md` — Section 4 "Navigation Menu Viewport Dimensions"
+   > **Research source**: `.agents/research/radix-to-base-ui-css-variables.md` — Section 4 "Navigation Menu Viewport Dimensions"
 
 **Verify**: `bun run typecheck`
 
@@ -1393,7 +1393,7 @@ Search and replace within each migrated file's className strings:
 
 ### Pattern: CSS Custom Property Migration (`--radix-*` → Base UI)
 
-> **Full research**: `.agents/context/research/radix-to-base-ui-css-variables.md`
+> **Full research**: `.agents/research/radix-to-base-ui-css-variables.md`
 
 Base UI uses **unnamespaced** CSS variables instead of Radix's component-specific prefixed names. All positioned components share the same variable names on their Positioner and Popup elements.
 

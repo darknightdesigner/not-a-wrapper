@@ -94,7 +94,7 @@
 
 **Stack**: React, Tailwind, **Streamdown** (not react-markdown), **no typography plugin**
 
-**Source**: [Research in `.agents/context/research/webclaw/02-chat-ux-components.md`](../../.agents/context/research/webclaw/02-chat-ux-components.md), Section 1.2 and Section 9
+**Source**: [Research in `.agents/research/webclaw/02-chat-ux-components.md`](../../.agents/research/webclaw/02-chat-ux-components.md), Section 1.2 and Section 9
 
 **How typography is applied**:
 
@@ -385,4 +385,4 @@ After adding these overrides, `dark:prose-invert` on the `MessageContent` class 
 
 ---
 
-*Research completed February 16, 2026. Sources: Zola GitHub repo (main branch), Open WebUI GitHub repo (main branch), WebClaw research (`.agents/context/research/webclaw/02-chat-ux-components.md`).*
+*Research completed February 16, 2026. Sources: Zola GitHub repo (main branch), Open WebUI GitHub repo (main branch), WebClaw research (`.agents/research/webclaw/02-chat-ux-components.md`).*

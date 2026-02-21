@@ -523,7 +523,7 @@ Regardless of which recommendation is chosen, provide a phased rollout plan:
 When all phases are complete, the `chat-widgets/` directory should contain:
 
 ```
-.agents/context/research/chat-widgets/
+.agents/design/chatgpt-reference/chat-widgets/
 ├── RESEARCH-PLAN.md                          ← This file
 ├── phase-1-chatgpt-widget-architecture.md    ← ChatGPT reverse-engineering
 ├── phase-2-official-docs-survey.md           ← Provider docs & standards
