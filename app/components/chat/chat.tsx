@@ -63,7 +63,7 @@ export function Chat() {
   } = useFileUpload()
 
   // Model selection
-  const { selectedModel, handleModelChange } = useModel({
+  const { selectedModel } = useModel({
     currentChat: currentChat || null,
     user,
     updateChatModel,
@@ -192,7 +192,6 @@ export function Chat() {
       onFileRemove: handleFileRemove,
       hasSuggestions:
         preferences.promptSuggestions && !chatId && messages.length === 0,
-      onSelectModel: handleModelChange,
       selectedModel,
       isUserAuthenticated: isAuthenticated,
       stop,
@@ -214,7 +213,6 @@ export function Chat() {
       preferences.promptSuggestions,
       chatId,
       messages.length,
-      handleModelChange,
       selectedModel,
       isAuthenticated,
       stop,

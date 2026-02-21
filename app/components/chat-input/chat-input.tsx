@@ -1,6 +1,5 @@
 "use client"
 
-import { ModelSelector } from "@/components/common/model-selector/base"
 import { InputDropZone } from "./input-drop-zone"
 import {
   PromptInput,
@@ -30,7 +29,6 @@ type ChatInputProps = {
   onFileRemove: (file: File) => void
   onSuggestion: (suggestion: string) => void
   hasSuggestions?: boolean
-  onSelectModel: (model: string) => void
   selectedModel: string
   isUserAuthenticated: boolean
   stop: () => void
@@ -55,7 +53,6 @@ export function ChatInput({
   onFileRemove,
   onSuggestion,
   hasSuggestions,
-  onSelectModel,
   selectedModel,
   isUserAuthenticated,
   stop,
@@ -250,13 +247,6 @@ export function ChatInput({
                   enableSearch={enableSearch}
                   onToggleSearch={setEnableSearch}
                   isSearchDisabled={isSearchDisabled}
-                />
-                <ModelSelector
-                  mode="single"
-                  selectedModelId={selectedModel}
-                  setSelectedModelId={onSelectModel}
-                  isUserAuthenticated={isUserAuthenticated}
-                  className="rounded-full"
                 />
               </div>
               <PromptInputAction
