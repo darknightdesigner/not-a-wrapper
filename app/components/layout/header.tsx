@@ -25,8 +25,8 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   return (
     <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0">
       <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2">
-        {/* LEFT SECTION */}
-        <div className="flex flex-1 items-center gap-2">
+        {/* LEFT SECTION - natural width, not flex-1 */}
+        <div className="flex items-center gap-2">
           {/* Hide logo/text when sidebar is present on desktop (sidebar has its own home link) */}
           {(!hasSidebar || isMobile) && (
             <Link
@@ -41,13 +41,13 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
           {hasSidebar && isMobile && <HeaderSidebarTrigger />}
         </div>
 
-        {/* CENTER SECTION */}
-        <div className="pointer-events-auto flex flex-1 items-center justify-start">
+        {/* CENTER SECTION - flex-1 to fill remaining space */}
+        <div className="pointer-events-auto flex flex-1 items-center">
           {isLoggedIn && !isMultiModelEnabled && <ModelSelectorHeader />}
         </div>
 
-        {/* RIGHT SECTION */}
-        <div className="pointer-events-auto flex flex-1 items-center justify-end gap-2">
+        {/* RIGHT SECTION - natural width, not flex-1 */}
+        <div className="pointer-events-auto flex items-center justify-end gap-2">
           {!isLoggedIn ? (
             <>
               <Button variant="outline" render={<Link href="/auth/login" />}>
