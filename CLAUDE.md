@@ -219,6 +219,7 @@ When debugging issues:
 - **Auth**: Uses Clerk for authentication; avoid touching `middleware.ts` without review
 - **File Storage**: Uses Convex storage for file uploads
 - **Model terminology**: See `.agents/context/glossary.md` for precise definitions
+- **Pull requests**: Always `git fetch origin` first and compare against `origin/main`, never local `main`. Local main can be arbitrarily stale, causing commit/diff inflation in PR descriptions.
 
 ---
 

@@ -237,6 +237,15 @@ Use `ultrathink` for complex architectural decisions.
 
 See `.agents/workflows/development-cycle.md` for details.
 
+## Pull Requests
+
+When creating a pull request:
+
+1. **Always fetch first** — Run `git fetch origin` before comparing branches
+2. **Compare against remote** — Use `origin/main` (not local `main`) for diffs and commit logs. Local `main` may be stale.
+3. **Verify commit count** — Run `git log origin/main..HEAD --oneline` and confirm the number matches what GitHub will show
+4. **Scope the description** — The PR body must reflect only the commits unique to the branch, not the full history since an outdated local ref
+
 ---
 
 *~200 lines. For detailed patterns, see `.cursor/rules/` and `.agents/skills/`.*

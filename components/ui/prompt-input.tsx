@@ -97,7 +97,7 @@ function PromptInput({
     >
       <div
         className={cn(
-          "border-input bg-background cursor-text rounded-3xl border p-2 shadow-xs",
+          "bg-[var(--composer-bg)] cursor-text rounded-[28px] p-2 shadow-composer",
           className
         )}
         onClick={() => {
