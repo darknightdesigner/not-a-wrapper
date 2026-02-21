@@ -1,6 +1,5 @@
 import {
   Brain01Icon,
-  Note01Icon,
   PaintBrush01Icon,
   ChartUpIcon,
   Search01Icon,
@@ -56,18 +55,6 @@ export const SUGGESTIONS: Array<{
       "Help me implement authentication in my Next.js app",
     ],
     icon: Brain01Icon,
-  },
-  {
-    label: "Writing",
-    highlight: "Write",
-    prompt: `Write`,
-    items: [
-      "Write a professional email to follow up on a job application",
-      "Write documentation for my open-source project",
-      "Write a blog post explaining machine learning basics",
-      "Write a compelling product description for my startup",
-    ],
-    icon: Note01Icon,
   },
   {
     label: "Research",

@@ -261,7 +261,7 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-  /* Composer surface — ChatGPT-aligned shadow tokens */
+  /* Composer surface */
   --composer-shadow-drop: rgba(0, 0, 0, 0.04);
   --composer-shadow-edge: rgba(0, 0, 0, 0.62);
   --composer-shadow-drop-offset: 0px 4px 4px 0px;
@@ -278,7 +278,7 @@
   --popover-foreground: oklch(0.985 0 0);
   --primary: oklch(0.985 0 0);
   --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.32 0 0);
+  --secondary: oklch(0.30 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.274 0.006 286.033);
   --muted-foreground: oklch(0.705 0.015 286.067);

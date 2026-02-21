@@ -278,12 +278,66 @@ ui-sans-serif, -apple-system, "system-ui", "Segoe UI", Helvetica, "Apple Color E
 
 ## Shadows
 
-### Composer Shadow (Dark Mode)
+> Confirmed via Chrome DevTools, 2026-02-20
+
+### Composer Shadow — `shadow-short` Tailwind Utility
+
+ChatGPT defines a custom Tailwind 4 utility `shadow-short` with **mode-aware values**. The shadow uses an **inverted edge strategy**: light mode uses an outer dark edge, dark mode uses an inset white glow.
+
+#### Light Mode
 
 ```css
-rgba(0, 0, 0, 0.1) 0px 4px 12px 0px,
-rgba(255, 255, 255, 0.2) 0px 0px 1px 0px inset
+.shadow-short {
+  --tw-shadow:
+    0px 4px 4px 0px var(--tw-shadow-color, var(--shadow-color-1, #0000000a)),
+    0px 0px 1px 0px var(--tw-shadow-color, var(--shadow-color-2, #0000009e));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
+              var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
 ```
+
+Computed values:
+- **Layer 1 (drop):** `rgba(0, 0, 0, 0.04) 0px 4px 4px 0px` — subtle 4px depth shadow
+- **Layer 2 (edge):** `rgba(0, 0, 0, 0.62) 0px 0px 1px 0px` — **outer** dark 1px edge (acts as visible border)
+
+#### Dark Mode
+
+```css
+.shadow-short:where(.dark, .dark *):not(:where(.dark .light, .dark .light *)) {
+  --tw-shadow:
+    0px 4px 12px 0px var(--tw-shadow-color, var(--shadow-color-1, #0000001a)),
+    inset 0px 0px 1px 0px var(--tw-shadow-color, var(--shadow-color-2, #fff3));
+  box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow),
+              var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+}
+```
+
+Computed values:
+- **Layer 1 (drop):** `rgba(0, 0, 0, 0.1) 0px 4px 12px 0px` — deeper 12px depth shadow (3x blur vs light)
+- **Layer 2 (edge):** `rgba(255, 255, 255, 0.2) 0px 0px 1px 0px inset` — **inset** white glow (luminous inner edge)
+
+#### Mode Comparison
+
+| Property | Light Mode | Dark Mode |
+|----------|-----------|-----------|
+| Drop shadow blur | 4px | 12px |
+| Drop shadow opacity | 4% black | 10% black |
+| Drop shadow offset | 0 4px | 0 4px |
+| Edge shadow direction | **outer** | **inset** |
+| Edge shadow color | 62% black | 20% white |
+| Edge shadow blur | 1px | 1px |
+| CSS border | `0px` (none) | `0px` (none) |
+| Focus state change | None | None |
+| Responsive change | None | None |
+| Transition includes shadow | No | No |
+
+#### Key Insight
+
+The perceived "border" on the composer is NOT a CSS border — `border-width` is `0px` in both modes. The edge is created entirely by `box-shadow`:
+- Light: outer dark shadow against white bg = visible edge
+- Dark: inset white glow against dark bg = luminous edge
+
+This is more physically natural than a solid CSS border, creating a card-like depth in dark mode and a crisp paper-edge feel in light mode.
 
 ### Header Shadow
 
@@ -297,13 +351,22 @@ var(--sharp-edge-top-shadow): 0 1px 0 var(--border-sharp)
 
 ### Chat Composer (Input Area)
 
+> Confirmed via Chrome DevTools, 2026-02-20
+
 | Property | Value |
 |----------|-------|
 | Container border radius | 28px (superellipse via `corner-superellipse/1.1`) |
 | Container padding | 10px (`p-2.5`) |
 | Container background (dark) | `#303030` (`--bg-secondary`) |
 | Container background (light) | `#fff` (`--bg-primary`) |
-| Container shadow | `rgba(0,0,0,0.1) 0 4px 12px, rgba(255,255,255,0.2) 0 0 1px inset` |
+| Container shadow (light) | `rgba(0,0,0,0.04) 0 4px 4px, rgba(0,0,0,0.62) 0 0 1px` |
+| Container shadow (dark) | `rgba(0,0,0,0.1) 0 4px 12px, inset rgba(255,255,255,0.2) 0 0 1px` |
+| Container shadow utility | `shadow-short` (custom Tailwind class, see Shadows section) |
+| Container border | `0px` — **no CSS border**; edge is purely shadow-based |
+| Container border-color (set but unused) | Light: `rgba(13,13,13,0.05)` / Dark: `rgba(255,255,255,0.05)` |
+| Container transition | `transition-colors 0.2s ease-in-out` (motion-safe only; does NOT include box-shadow) |
+| Container backdrop-filter | `none` — no frosted glass effect |
+| Container outline (focus) | `none` — no visual change on focus |
 | Input element | ProseMirror (contenteditable div) |
 | Input padding | 0px 0px 16px (bottom only) |
 | Input font size | 16px |
@@ -410,5 +473,5 @@ ChatGPT supports multiple accent color themes (visible in "mini" mode):
 4. **Token aliasing** — Semantic tokens reference base scale tokens (e.g., `--text-accent: var(--blue-200)`)
 5. **Theme-aware accent** — Accent colors swap between light (50–100 range) and dark (600–800 range) via selector-scoped tokens
 6. **Pill buttons** — CTAs use extreme border-radius (`1.67772e+07px` / effectively `9999px`) for pill shape
-7. **Inset shadow + outer shadow** — Composer combines outer depth shadow with subtle inset glow for a raised, tactile feel
+7. **Mode-aware shadow edges** — Composer uses an inverted edge strategy: light mode has an **outer** dark 1px shadow (62% black) as a border substitute; dark mode has an **inset** white 1px glow (20% white). No CSS `border` is used. The drop shadow also scales between modes (4px/4% light vs 12px/10% dark). Defined via custom `shadow-short` Tailwind utility.
 8. **Tailwind 4** — Uses Tailwind CSS v4 with CSS-based configuration and `var()` references in utility classes
