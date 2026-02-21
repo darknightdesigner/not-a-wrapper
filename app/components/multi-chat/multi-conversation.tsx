@@ -97,7 +97,6 @@ function ResponseCard({ response, group }: ResponseCardProps) {
             onReload={() => group.onReload(response.model)}
             status={response.isLoading ? "streaming" : "ready"}
             isLast={response.isLoading === true}
-            hasScrollAnchor={false}
             className="bg-transparent p-0 px-0"
           >
             {messageText}

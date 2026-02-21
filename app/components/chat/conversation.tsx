@@ -7,7 +7,6 @@ import { Message as MessageContainer } from "@/components/ui/message"
 import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
 import { UIMessage as MessageType } from "@ai-sdk/react"
-import { useState } from "react"
 import { Message } from "./message"
 
 // v6 helper: Extract text content from all text parts in order.
@@ -61,9 +60,6 @@ export function Conversation({
   isUserAuthenticated,
   lastFinishReason,
 }: ConversationProps) {
-  // Use state to capture initial message count once on mount
-  const [initialCount] = useState(() => messages.length)
-
   if (!messages || messages.length === 0)
     return <div className="h-full w-full"></div>
 
@@ -80,7 +76,6 @@ export function Conversation({
           {messages?.map((message, index) => {
             const isLast =
               index === messages.length - 1 && status !== "submitted"
-            const hasScrollAnchor = isLast && messages.length > initialCount
 
             return (
               <Message
@@ -93,7 +88,6 @@ export function Conversation({
                 onEdit={onEdit}
                 onReload={onReload}
                 onStop={isLast && status === "streaming" ? onStop : undefined}
-                hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
                 metadata={message.metadata as Record<string, unknown> | undefined}
                 status={status}
@@ -111,7 +105,7 @@ export function Conversation({
           {status === "submitted" &&
             messages.length > 0 &&
             messages[messages.length - 1].role === "user" && (
-              <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2 min-h-scroll-anchor">
+              <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2">
                 <div className="relative flex min-w-full flex-col gap-2">
                   <ThinkingBar text="Generating" onStop={onStop} />
                 </div>

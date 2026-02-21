@@ -39,7 +39,6 @@ import { useLoadingState } from "./use-loading-state"
 type MessageAssistantProps = {
   children: string
   isLast?: boolean
-  hasScrollAnchor?: boolean
   copied?: boolean
   copyToClipboard?: () => void
   onReload?: () => void
@@ -80,7 +79,6 @@ function formatToolProgressLabel(toolName: string): string {
 export function MessageAssistant({
   children,
   isLast,
-  hasScrollAnchor,
   copied,
   copyToClipboard,
   onReload,
@@ -191,7 +189,6 @@ export function MessageAssistant({
     <Message
       className={cn(
         "group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
-        hasScrollAnchor && "min-h-scroll-anchor",
         className
       )}
     >

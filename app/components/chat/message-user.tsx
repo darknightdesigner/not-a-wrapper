@@ -43,7 +43,6 @@ type MessageAttachment = {
 }
 
 export type MessageUserProps = {
-  hasScrollAnchor?: boolean
   attachments?: MessageAttachment[]
   children: string
   copied: boolean
@@ -57,7 +56,6 @@ export type MessageUserProps = {
 }
 
 export function MessageUser({
-  hasScrollAnchor,
   attachments,
   children,
   copied,
@@ -138,7 +136,6 @@ export function MessageUser({
     <MessageContainer
       className={cn(
         "group flex w-full max-w-3xl flex-col items-end gap-0.5 px-6 pb-2",
-        hasScrollAnchor && "min-h-scroll-anchor",
         className
       )}
     >

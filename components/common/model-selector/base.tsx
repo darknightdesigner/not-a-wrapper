@@ -379,7 +379,7 @@ export function ModelSelector(props: ModelSelectorProps) {
       <Popover>
         <Tooltip disableHoverablePopup>
           <TooltipTrigger render={<PopoverTrigger render={trigger} />} />
-          <TooltipContent side="bottom" hideArrow>
+          <TooltipContent side="right" hideArrow>
             {mode === "single" ? "Select a model" : "Select models"}
           </TooltipContent>
         </Tooltip>
@@ -479,7 +479,7 @@ export function ModelSelector(props: ModelSelectorProps) {
           }}
         >
           <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
-          <TooltipContent side="bottom" hideArrow>
+          <TooltipContent side="right" hideArrow>
             {tooltipText}
           </TooltipContent>
           <DropdownMenuContent
