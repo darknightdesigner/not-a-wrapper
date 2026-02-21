@@ -149,7 +149,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
           onOpenChange={setMenuOpen}
           modal={false}
         >
-          <Tooltip>
+          <Tooltip disableHoverablePopup>
             <TooltipTrigger
               render={
                 <DropdownMenuTrigger

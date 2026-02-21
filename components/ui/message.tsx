@@ -135,7 +135,7 @@ const MessageAction = ({
   })
 
   return (
-    <Tooltip {...props}>
+    <Tooltip disableHoverablePopup {...props}>
       <TooltipTrigger render={trigger} />
       <TooltipContent side={side} className={className}>
         {tooltip}

@@ -203,7 +203,7 @@ export function AppSidebar() {
                   </Link>
                 )}
                 {/* Toggle button with resize cursor */}
-                <Tooltip>
+                <Tooltip disableHoverablePopup>
                   <TooltipTrigger
                     render={
                       <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
@@ -373,7 +373,7 @@ function CollapsedHeaderToggle() {
   const { toggleSidebar } = useSidebar()
 
   return (
-    <Tooltip>
+    <Tooltip disableHoverablePopup>
       <TooltipTrigger
         render={
           <button
@@ -435,7 +435,7 @@ function CollapsedMenuItem({
   const tooltipContent = shortcut ? `${label} ${shortcut}` : label
 
   return (
-    <Tooltip>
+    <Tooltip disableHoverablePopup>
       <TooltipTrigger
         render={
           href ? (

@@ -11,7 +11,7 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
 
   return (
     <MultiModelSelectionProvider>
-      <div className="bg-background flex h-svh w-full overflow-hidden">
+      <div className="flex h-svh w-full overflow-hidden">
         {hasSidebar && <AppSidebar />}
         <main className="@container/main relative flex h-svh w-0 flex-shrink flex-grow flex-col overflow-hidden">
           <Header hasSidebar={hasSidebar} />

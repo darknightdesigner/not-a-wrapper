@@ -224,7 +224,7 @@ export function ModelSelector(props: ModelSelectorProps) {
     mode === "single" ? (
       <Button
         variant="ghost"
-        className={cn("justify-between", className)}
+        className={cn("justify-between text-lg font-normal", className)}
         disabled={isLoadingModels}
       >
         <span>{currentModel?.name || "Select model"}</span>
@@ -237,7 +237,7 @@ export function ModelSelector(props: ModelSelectorProps) {
     ) : (
       <Button
         variant="ghost"
-        className={cn("min-w-0 justify-between", className)}
+        className={cn("min-w-0 justify-between text-lg font-normal", className)}
         disabled={isLoadingModels}
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -377,7 +377,7 @@ export function ModelSelector(props: ModelSelectorProps) {
   if (!isUserAuthenticated) {
     return (
       <Popover>
-        <Tooltip>
+        <Tooltip disableHoverablePopup>
           <TooltipTrigger render={<PopoverTrigger render={trigger} />} />
           <TooltipContent side="bottom" hideArrow>
             {mode === "single" ? "Select a model" : "Select models"}
@@ -468,7 +468,7 @@ export function ModelSelector(props: ModelSelectorProps) {
         setIsOpen={setIsProDialogOpen}
         currentModel={selectedProModel || ""}
       />
-      <Tooltip>
+      <Tooltip disableHoverablePopup>
         <DropdownMenu
           open={isDropdownOpen}
           onOpenChange={(open) => {

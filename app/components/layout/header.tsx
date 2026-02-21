@@ -16,6 +16,7 @@ import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
+
   const { user } = useUser()
   const { preferences } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
@@ -23,7 +24,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isLoggedIn = !!user
 
   return (
-    <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0">
+    <header className="2xl:bg-transparent bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0">
       <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2">
         {/* LEFT SECTION - natural width, not flex-1 */}
         <div className="flex items-center gap-2">
