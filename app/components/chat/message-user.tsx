@@ -135,7 +135,7 @@ export function MessageUser({
   return (
     <MessageContainer
       className={cn(
-        "group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1.5rem)] pb-2",
+        "group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1rem)] pb-2",
         className
       )}
       data-turn="user"

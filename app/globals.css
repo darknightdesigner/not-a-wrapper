@@ -310,10 +310,26 @@
   }
 }
 
-/* Thread content width tokens — shared by messages, composer, and thread-bottom */
+/* Thread content width tokens — shared by messages, composer, and thread-bottom.
+   Base values are the narrowest (mobile); container query overrides widen
+   at sm (640px) and lg (1024px) breakpoints, matching ChatGPT's system.
+   Overrides target direct children (> *) because a container can't query itself. */
 .\@container\/main {
-  --thread-content-max-width: 48rem;
-  --thread-content-margin: 1.5rem;
+  --thread-content-max-width: 40rem;
+  --thread-content-margin: 1rem;
+}
+
+@container main (min-width: 640px) {
+  .\@container\/main > * {
+    --thread-content-margin: 1.5rem;
+  }
+}
+
+@container main (min-width: 1024px) {
+  .\@container\/main > * {
+    --thread-content-max-width: 48rem;
+    --thread-content-margin: 4rem;
+  }
 }
 
 @layer utilities {

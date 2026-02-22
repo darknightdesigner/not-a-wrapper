@@ -188,7 +188,7 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-        "group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2",
+        "group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2",
         className
       )}
       data-turn="assistant"

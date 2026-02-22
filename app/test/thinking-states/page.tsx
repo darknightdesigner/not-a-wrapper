@@ -289,7 +289,7 @@ function StateAnnotation({
 function UserBubble({ children }: { children: string }) {
   const isMultiline = children.includes("\n")
   return (
-    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1.5rem)] pb-2">
+    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1rem)] pb-2">
       <MessageContent
         className={cn(
           "bg-accent prose relative max-w-[var(--user-chat-width,70%)] rounded-[18px] px-4",
@@ -311,7 +311,7 @@ function AssistantShell({
   isLast?: boolean
 }) {
   return (
-    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2">
+    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2">
       <div
         className={cn(
           "relative flex min-w-full flex-col gap-2",
@@ -810,7 +810,7 @@ export default function ThinkingStatesTestPage() {
         </div>
 
         {/* ━━━ Composer ━━━ */}
-        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)]">
+        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)]">
           <ChatInput
             defaultValue=""
             onValueChange={noopStr}

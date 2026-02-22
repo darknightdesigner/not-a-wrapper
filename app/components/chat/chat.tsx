@@ -21,11 +21,6 @@ import { useChatCore } from "./use-chat-core"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
 
-const FeedbackWidget = dynamic(
-  () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
-  { ssr: false }
-)
-
 const DialogAuth = dynamic(
   () => import("./dialog-auth").then((mod) => mod.DialogAuth),
   { ssr: false }
@@ -276,7 +271,7 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <div className="sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)] bg-background pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)] bg-background pb-[env(safe-area-inset-bottom,0px)]">
         <div className="pointer-events-none absolute inset-x-0 bottom-full flex items-center justify-center pb-4">
           <div className="pointer-events-auto">
             <ScrollButton />
@@ -284,8 +279,6 @@ export function Chat() {
         </div>
         <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
       </div>
-
-      <FeedbackWidget authUserId={user?.id} />
     </div>
   )
 }

@@ -98,7 +98,7 @@ export function Conversation({
       {status === "submitted" &&
         messages.length > 0 &&
         messages[messages.length - 1].role === "user" && (
-          <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2">
+          <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2">
             <div className="relative flex min-w-full flex-col gap-2">
               <ThinkingBar text="Thinking" onStop={onStop} />
             </div>
