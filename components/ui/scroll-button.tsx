@@ -1,11 +1,28 @@
 "use client"
 
+import { useContext } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { type VariantProps } from "class-variance-authority"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { ArrowDown02Icon } from "@hugeicons-pro/core-stroke-rounded"
 import { useStickToBottomContext } from "use-stick-to-bottom"
+import { ScrollRootContext } from "@/components/ui/scroll-root"
+
+// Dual-context hook: prefers ScrollRoot when available, falls back to legacy
+// StickToBottom context. The conditional hook call is safe because the provider
+// tree is static — ScrollButton is always mounted inside exactly one provider.
+function useScrollContext() {
+  const scrollRoot = useContext(ScrollRootContext)
+  if (scrollRoot) {
+    return {
+      isAtBottom: scrollRoot.isAtBottom,
+      scrollToBottom: scrollRoot.scrollToBottom,
+    }
+  }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return useStickToBottomContext()
+}
 
 export type ScrollButtonProps = {
   className?: string
@@ -19,7 +36,7 @@ function ScrollButton({
   size = "sm",
   ...props
 }: ScrollButtonProps) {
-  const { isAtBottom, scrollToBottom } = useStickToBottomContext()
+  const { isAtBottom, scrollToBottom } = useScrollContext()
 
   return (
     <Button

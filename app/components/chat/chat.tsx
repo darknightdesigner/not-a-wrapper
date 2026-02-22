@@ -11,6 +11,7 @@ import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
+import { ScrollButton } from "@/components/ui/scroll-button"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
 import dynamic from "next/dynamic"
@@ -251,7 +252,8 @@ export function Chat() {
   return (
     <div
       className={cn(
-        "@container/main relative flex h-full flex-col items-center justify-end md:justify-center"
+        "relative flex min-h-0 flex-1 flex-col items-center",
+        showOnboarding && "justify-end md:justify-center"
       )}
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
@@ -260,17 +262,10 @@ export function Chat() {
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
+            className="flex w-full flex-1 items-end justify-center md:items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            layout="position"
-            layoutId="onboarding"
-            transition={{
-              layout: {
-                duration: 0,
-              },
-            }}
           >
             <h1 className="mb-6 text-3xl font-medium tracking-tight text-balance">
               What&apos;s on your mind?
@@ -281,20 +276,14 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <motion.div
-        className={cn(
-          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)] pb-[env(safe-area-inset-bottom,0px)]"
-        )}
-        layout="position"
-        layoutId="chat-input-container"
-        transition={{
-          layout: {
-            duration: messages.length === 1 ? 0.3 : 0,
-          },
-        }}
-      >
+      <div className="sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)] bg-background pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-full flex items-center justify-center pb-4">
+          <div className="pointer-events-auto">
+            <ScrollButton />
+          </div>
+        </div>
         <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
-      </motion.div>
+      </div>
 
       <FeedbackWidget authUserId={user?.id} />
     </div>

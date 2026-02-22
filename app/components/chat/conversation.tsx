@@ -1,8 +1,4 @@
-import {
-  ChatContainerContent,
-  ChatContainerRoot,
-  ChatContainerScrollButton,
-} from "@/components/ui/chat-container"
+import { ScrollRootContent } from "@/components/ui/scroll-root"
 import { Message as MessageContainer } from "@/components/ui/message"
 import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
@@ -61,69 +57,58 @@ export function Conversation({
   lastFinishReason,
 }: ConversationProps) {
   if (!messages || messages.length === 0)
-    return <div className="h-full w-full"></div>
+    return <div className="w-full flex-1"></div>
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center overflow-x-hidden overflow-y-auto">
-      <ChatContainerRoot className="relative w-full">
-        <ChatContainerContent
-          className="relative flex w-full flex-col items-center pt-4 pb-4"
-          style={{
-            scrollbarGutter: "stable both-edges",
-            scrollbarWidth: "none",
-          }}
-        >
-          <div
-            aria-hidden="true"
-            data-edge="top"
-            className="pointer-events-none absolute top-0 h-px w-px"
-          />
-          {messages?.map((message, index) => {
-            const isLast =
-              index === messages.length - 1 && status !== "submitted"
+    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-8">
+      <div
+        aria-hidden="true"
+        data-edge="top"
+        className="pointer-events-none absolute top-0 h-px w-px"
+      />
+      {messages?.map((message, index) => {
+        const isLast =
+          index === messages.length - 1 && status !== "submitted"
 
-            return (
-              <Message
-                key={message.id}
-                id={message.id}
-                variant={message.role}
-                attachments={getMessageAttachments(message)}
-                isLast={isLast}
-                onDelete={onDelete}
-                onEdit={onEdit}
-                onReload={onReload}
-                onStop={isLast && status === "streaming" ? onStop : undefined}
-                parts={message.parts}
-                metadata={message.metadata as Record<string, unknown> | undefined}
-                status={status}
-                onQuote={onQuote}
-                messageGroupId={
-                  (message as ExtendedMessageAISDK).message_group_id ?? null
-                }
-                isUserAuthenticated={isUserAuthenticated}
-                finishReason={isLast ? lastFinishReason : undefined}
-              >
-                {getMessageText(message)}
-              </Message>
-            );
-          })}
-          {status === "submitted" &&
-            messages.length > 0 &&
-            messages[messages.length - 1].role === "user" && (
-              <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2">
-                <div className="relative flex min-w-full flex-col gap-2">
-                  <ThinkingBar text="Thinking" onStop={onStop} />
-                </div>
-              </MessageContainer>
-            )}
-          <div
-            aria-hidden="true"
-            data-edge="bottom"
-            className="pointer-events-none absolute bottom-0 h-px w-px"
-          />
-        </ChatContainerContent>
-        <ChatContainerScrollButton />
-      </ChatContainerRoot>
-    </div>
+        return (
+          <Message
+            key={message.id}
+            id={message.id}
+            variant={message.role}
+            attachments={getMessageAttachments(message)}
+            isLast={isLast}
+            onDelete={onDelete}
+            onEdit={onEdit}
+            onReload={onReload}
+            onStop={isLast && status === "streaming" ? onStop : undefined}
+            parts={message.parts}
+            metadata={message.metadata as Record<string, unknown> | undefined}
+            status={status}
+            onQuote={onQuote}
+            messageGroupId={
+              (message as ExtendedMessageAISDK).message_group_id ?? null
+            }
+            isUserAuthenticated={isUserAuthenticated}
+            finishReason={isLast ? lastFinishReason : undefined}
+          >
+            {getMessageText(message)}
+          </Message>
+        );
+      })}
+      {status === "submitted" &&
+        messages.length > 0 &&
+        messages[messages.length - 1].role === "user" && (
+          <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,48rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1.5rem)] pb-2">
+            <div className="relative flex min-w-full flex-col gap-2">
+              <ThinkingBar text="Thinking" onStop={onStop} />
+            </div>
+          </MessageContainer>
+        )}
+      <div
+        aria-hidden="true"
+        data-edge="bottom"
+        className="pointer-events-none absolute bottom-0 h-px w-px"
+      />
+    </ScrollRootContent>
   );
 }

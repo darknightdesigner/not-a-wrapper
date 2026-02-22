@@ -199,13 +199,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --spacing-scroll-area: calc(
-    -1 * var(--spacing-input-area)
-  );
-  --spacing-scroll-anchor-offset: 140px;
-  --spacing-scroll-anchor: calc(
-    var(--spacing-scroll-area) - var(--spacing-scroll-anchor-offset) + 100dvh
-  );
 }
 
 :root {
@@ -223,9 +216,6 @@
 
   /* Sticky header z-index */
   --header-z-index: 20;
-
-  /* Scroll padding (no longer need fixed header compensation) */
-  --spacing-scroll-padding-top: 0px;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);

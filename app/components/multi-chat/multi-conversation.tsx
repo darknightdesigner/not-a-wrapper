@@ -1,10 +1,6 @@
 "use client"
 
-import {
-  ChatContainerContent,
-  ChatContainerRoot,
-  ChatContainerScrollButton,
-} from "@/components/ui/chat-container"
+import { ScrollRootContent } from "@/components/ui/scroll-root"
 import { Loader } from "@/components/ui/loader"
 import type { StreamingIndicatorVariant } from "@/components/ui/loader"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
@@ -149,82 +145,69 @@ export function MultiModelConversation({
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center overflow-y-auto">
-      <ChatContainerRoot className="relative w-full">
-        <ChatContainerContent
-          className="flex w-full flex-col items-center pt-4 pb-[134px]"
-          style={{
-            scrollbarGutter: "stable both-edges",
-            scrollbarWidth: "none",
-          }}
-        >
-          {messageGroups.length === 0
-            ? null
-            : messageGroups.map((group, groupIndex) => {
-                // Extract text and attachments using helper functions
-                const userMessageText = getMessageText(group.userMessage)
-                const userMessageAttachments = getMessageAttachments(group.userMessage)
-                
-                return (
-                  <div key={groupIndex} className="mb-10 w-full space-y-3">
-                    <div className="mx-auto w-full max-w-3xl">
-                      <Message
-                        id={group.userMessage.id}
-                        variant="user"
-                        parts={
-                          group.userMessage.parts || [
-                            { type: "text", text: userMessageText },
-                          ]
+    <ScrollRootContent className="flex w-full flex-1 flex-col items-center pt-4 pb-8">
+      {messageGroups.length === 0
+        ? null
+        : messageGroups.map((group, groupIndex) => {
+            const userMessageText = getMessageText(group.userMessage)
+            const userMessageAttachments = getMessageAttachments(group.userMessage)
+            
+            return (
+              <div key={groupIndex} className="mb-10 w-full space-y-3">
+                <div className="mx-auto w-full max-w-3xl">
+                  <Message
+                    id={group.userMessage.id}
+                    variant="user"
+                    parts={
+                      group.userMessage.parts || [
+                        { type: "text", text: userMessageText },
+                      ]
+                    }
+                    attachments={userMessageAttachments}
+                    onDelete={() => {}}
+                    onEdit={() => {}}
+                    onReload={() => {}}
+                    status="ready"
+                    messageGroupId={
+                      (group.userMessage as ExtendedMessageAISDK)
+                        .message_group_id ?? null
+                    }
+                  >
+                    {userMessageText}
+                  </Message>
+                </div>
+                <div
+                  className={cn(
+                    "mx-auto w-full",
+                    groupResponses[groupIndex]?.length > 1
+                      ? "max-w-[1800px]"
+                      : "max-w-3xl"
+                  )}
+                >
+                  <div className={cn("overflow-x-auto pl-6")}>
+                    <div className="flex gap-4">
+                      {(groupResponses[groupIndex] || group.responses).map(
+                        (response) => {
+                          return (
+                            <div
+                              key={`${response.model}-${response.message?.id ?? "loading"}`}
+                              className="max-w-[420px] min-w-[320px] flex-shrink-0"
+                            >
+                              <ResponseCard
+                                response={response}
+                                group={group}
+                              />
+                            </div>
+                          )
                         }
-                        attachments={userMessageAttachments}
-                        onDelete={() => {}}
-                        onEdit={() => {}}
-                        onReload={() => {}}
-                        status="ready"
-                        messageGroupId={
-                          (group.userMessage as ExtendedMessageAISDK)
-                            .message_group_id ?? null
-                        }
-                      >
-                        {userMessageText}
-                      </Message>
-                    </div>
-                    <div
-                      className={cn(
-                        "mx-auto w-full",
-                        groupResponses[groupIndex]?.length > 1
-                          ? "max-w-[1800px]"
-                          : "max-w-3xl"
                       )}
-                    >
-                      <div className={cn("overflow-x-auto pl-6")}>
-                        <div className="flex gap-4">
-                          {(groupResponses[groupIndex] || group.responses).map(
-                            (response) => {
-                              return (
-                                <div
-                                  key={`${response.model}-${response.message?.id ?? "loading"}`}
-                                  className="max-w-[420px] min-w-[320px] flex-shrink-0"
-                                >
-                                  <ResponseCard
-                                    response={response}
-                                    group={group}
-                                  />
-                                </div>
-                              )
-                            }
-                          )}
-                          {/* Spacer to create scroll padding - only when more than 2 items */}
-                          <div className="w-px flex-shrink-0" />
-                        </div>
-                      </div>
+                      <div className="w-px flex-shrink-0" />
                     </div>
                   </div>
-                );
-              })}
-        </ChatContainerContent>
-        <ChatContainerScrollButton className="bottom-36" />
-      </ChatContainerRoot>
-    </div>
+                </div>
+              </div>
+            );
+          })}
+    </ScrollRootContent>
   );
 }

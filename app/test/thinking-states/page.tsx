@@ -5,11 +5,8 @@ import { SourcesList } from "@/app/components/chat/sources-list"
 import { ToolInvocation } from "@/app/components/chat/tool-invocation"
 import { LayoutApp } from "@/app/components/layout/layout-app"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
-import {
-  ChatContainerContent,
-  ChatContainerRoot,
-  ChatContainerScrollButton,
-} from "@/components/ui/chat-container"
+import { ScrollRootContent } from "@/components/ui/scroll-root"
+import { ScrollButton } from "@/components/ui/scroll-button"
 import {
   Loader,
   StreamingCaret,
@@ -368,15 +365,7 @@ export default function ThinkingStatesTestPage() {
     <LayoutApp>
       <div className="@container/main relative flex h-full flex-col items-center justify-end md:justify-center">
         {/* ━━━ Conversation ━━━ */}
-        <div className="relative flex h-full w-full flex-col items-center overflow-x-hidden overflow-y-auto">
-          <ChatContainerRoot className="relative w-full">
-            <ChatContainerContent
-              className="flex w-full flex-col items-center pt-4 pb-4"
-              style={{
-                scrollbarGutter: "stable both-edges",
-                scrollbarWidth: "none",
-              }}
-            >
+        <ScrollRootContent className="flex w-full flex-1 flex-col items-center pt-4 pb-4">
               {/* ─── User message ─── */}
               <UserBubble>This is a test chat thread</UserBubble>
 
@@ -813,13 +802,15 @@ export default function ThinkingStatesTestPage() {
 
                 <CopyRegenActions />
               </AssistantShell>
-            </ChatContainerContent>
-            <ChatContainerScrollButton />
-          </ChatContainerRoot>
+        </ScrollRootContent>
+        <div className="pointer-events-none sticky inset-x-0 bottom-20 z-10 flex items-center justify-center">
+          <div className="pointer-events-auto">
+            <ScrollButton />
+          </div>
         </div>
 
         {/* ━━━ Composer ━━━ */}
-        <div className="relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)]">
+        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,48rem)]">
           <ChatInput
             defaultValue=""
             onValueChange={noopStr}

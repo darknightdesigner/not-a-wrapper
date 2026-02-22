@@ -28,7 +28,7 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
-import { useStickToBottomContext } from "use-stick-to-bottom"
+import { useScrollRoot } from "@/components/ui/scroll-root"
 
 const getTextFromDataUrl = (dataUrl: string) => {
   const base64 = dataUrl.split(",")[1]
@@ -71,7 +71,7 @@ export function MessageUser({
   const contentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const savedScrollTopRef = useRef<number | null>(null)
-  const { stopScroll, scrollRef } = useStickToBottomContext()
+  const { stopScroll, scrollRef } = useScrollRoot()
 
   const handleEditCancel = () => {
     setIsEditing(false)
