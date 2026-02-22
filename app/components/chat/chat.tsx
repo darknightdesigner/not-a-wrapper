@@ -287,7 +287,7 @@ export function Chat() {
             </div>
           </div>
         )}
-        <div className="mx-auto w-full [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
+        <div className="mx-auto w-full [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
           <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
         </div>
         {!showOnboarding && (

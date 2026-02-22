@@ -62,7 +62,7 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased isolate`}
       >
         <a
-          href="#main-content"
+          href="#main"
           className="fixed inset-x-0 top-0 z-[100] mx-auto mt-4 w-fit rounded-2xl bg-background px-4 py-2 text-sm font-medium text-foreground shadow-lg ring-1 ring-border focus:outline-none not-focus:sr-only"
         >
           Skip to content
@@ -98,20 +98,6 @@ export default async function RootLayout({
             </UserProvider>
           </TanstackQueryProvider>
         </Providers>
-        <div
-          id="live-region-assertive"
-          role="status"
-          aria-live="assertive"
-          aria-atomic="true"
-          className="sr-only"
-        />
-        <div
-          id="live-region-polite"
-          role="log"
-          aria-live="polite"
-          aria-atomic="true"
-          className="sr-only"
-        />
       </body>
     </html>
   )

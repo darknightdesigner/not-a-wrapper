@@ -3,7 +3,6 @@
 Extracted from a live authenticated ChatGPT conversation page.
 URL pattern: `chatgpt.com/c/{conversation-id}`
 
-> **Extracted:** 2026-02-21 via Chrome DevTools HTML copies
 > **Page title in captures:** "Video Editing System Premiere Pro"
 > **Model label in header:** `ChatGPT 5.2` / `ChatGPT 5.2 Thinking` (varies by capture)
 > **Viewports covered:** desktop `1609px` and mobile `390px`
@@ -15,7 +14,7 @@ URL pattern: `chatgpt.com/c/{conversation-id}`
 
 ```
 <body class="">
-├── <span.hidden [testid="blocking-initial-modals-done"]>
+├── <span.hidden [data-testid="blocking-initial-modals-done"]>
 ├── <div.fixed.inset-x-0.top-0.z-50.mt-4...>         # skip link wrapper
 │   └── <a [data-skip-to-content] [href="#main"]>
 │
@@ -47,31 +46,31 @@ class="border-token-border-light relative z-21 h-full shrink-0 overflow-hidden b
 #stage-slideover-sidebar
 ├── #stage-sidebar-tiny-bar                          # collapsed rail
 │   ├── <button [aria-label="Open sidebar"] [aria-controls="stage-slideover-sidebar"] [aria-expanded="false"]>
-│   ├── <a [testid="create-new-chat-button"] [data-sidebar-item="true"]>
-│   ├── <a [testid="sidebar-item-library"] [data-sidebar-item="true"]>
-│   └── <div [testid="accounts-profile-button"] [role="button"] [aria-label="Open profile menu"] [aria-haspopup="menu"]>
+│   ├── <a [data-testid="create-new-chat-button"] [data-sidebar-item="true"]>
+│   ├── <a [data-testid="sidebar-item-library"] [data-sidebar-item="true"]>
+│   └── <div [data-testid="accounts-profile-button"] [role="button"] [aria-label="Open profile menu"] [aria-haspopup="menu"]>
 │
 └── <nav [aria-label="Chat history"] class="group/scrollport ...">
     ├── #sidebar-header
     │   ├── <a [aria-label="Home"] [data-sidebar-item="true"]>
-    │   └── <button [testid="close-sidebar-button"] [aria-label="Close sidebar"] [aria-controls="stage-slideover-sidebar"] [aria-expanded="true"]>
+    │   └── <button [data-testid="close-sidebar-button"] [aria-label="Close sidebar"] [aria-controls="stage-slideover-sidebar"] [aria-expanded="true"]>
     ├── <aside>                                      # quick actions
-    │   ├── <a [testid="create-new-chat-button"]>
+    │   ├── <a [data-testid="create-new-chat-button"]>
     │   ├── <div [data-sidebar-item="true"]>         # Search chats row
-    │   └── <a [testid="sidebar-item-library"]>
-    ├── <a [testid="apps-button"]>
-    ├── <a [testid="deep-research-sidebar-item"]>
+    │   └── <a [data-testid="sidebar-item-library"]>
+    ├── <a [data-testid="apps-button"]>
+    ├── <a [data-testid="deep-research-sidebar-item"]>
     ├── <div.group/sidebar-expando-section>          # GPTs / Projects / Group chats / Your chats
     ├── <div#history>                                # history list (many anchors)
-    │   └── <button [testid="history-item-*-options"] [aria-label="Open conversation options"]>
-    └── <div [testid="accounts-profile-button"] [role="button"] [aria-label="Open profile menu"]>
+    │   └── <button [data-testid="history-item-*-options"] [aria-label="Open conversation options"]>
+    └── <div [data-testid="accounts-profile-button"] [role="button"] [aria-label="Open profile menu"]>
 ```
 
 ### Mobile sidebar variant (390px captures)
 
 ```
 #page-header
-└── <button [testid="open-sidebar-button"]
+└── <button [data-testid="open-sidebar-button"]
             [aria-controls="stage-popover-sidebar"]
             [aria-expanded="false"]>
 ```
@@ -109,14 +108,14 @@ Dark mobile capture variant:
 #page-header [data-fixed-header="less-than-xl"]
 ├── <div.pointer-events-none.absolute...>           # left absolute anchor
 ├── <div.pointer-events-none!.flex.flex-1...>       # model area
-│   ├── mobile: <button [testid="open-sidebar-button"] [aria-controls="stage-popover-sidebar"]>
-│   └── <button [testid="model-switcher-dropdown-button"] [aria-label="Model selector, current model is ..."] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
+│   ├── mobile: <button [data-testid="open-sidebar-button"] [aria-controls="stage-popover-sidebar"]>
+│   └── <button [data-testid="model-switcher-dropdown-button"] [aria-label="Model selector, current model is ..."] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
 └── <div#conversation-header-actions>
     ├── mobile: <a [aria-label="New chat"]>         # appears in mobile captures
-    ├── <button [testid="share-chat-button"]>
+    ├── <button [data-testid="share-chat-button"]>
     │   ├── desktop: wide button (`btn btn-ghost ...`) label "Share"
     │   └── mobile: icon button (`text-token-text-primary ...`)
-    └── <button [testid="conversation-options-button"] [aria-label="Open conversation options"]>
+    └── <button [data-testid="conversation-options-button"] [aria-label="Open conversation options"]>
 ```
 
 ---
@@ -133,8 +132,8 @@ class="group/thread flex flex-col min-h-full"
     ├── <div class="relative basis-auto flex-col -mb-(--composer-overlap-px) [--composer-overlap-px:28px] grow flex">
     │   ├── <div [data-edge="true"] [aria-hidden="true"]>
     │   └── <div class="flex flex-col text-sm pb-25">
-    │       ├── <article [testid="conversation-turn-1"] [data-turn="user"] [data-turn-id] [data-scroll-anchor="false"]>
-    │       └── <article [testid="conversation-turn-2"] [data-turn="assistant"] [data-turn-id] [data-scroll-anchor="true"]>
+    │       ├── <article [data-testid="conversation-turn-1"] [data-turn="user"] [data-turn-id] [data-scroll-anchor="false"]>
+    │       └── <article [data-testid="conversation-turn-2"] [data-turn="assistant"] [data-turn-id] [data-scroll-anchor="true"]>
     ├── #thread-bottom-container
     └── disclaimer block
 ```
@@ -150,7 +149,7 @@ class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] 
 ```
 
 ```
-<article [testid="conversation-turn-1"] [data-turn="user"]>
+<article [data-testid="conversation-turn-1"] [data-turn="user"]>
 ├── <h5.sr-only>                                  # "You said:"
 ├── <div class="text-base my-auto mx-auto pt-3 ...">
 │   └── <div class="[--thread-content-max-width:40rem] ... group/turn-messages ...">
@@ -159,7 +158,7 @@ class="text-token-text-primary w-full focus:outline-none [--shadow-height:45px] 
 │       │       └── <div [data-multiline] class="user-message-bubble-color corner-superellipse/1.1 relative rounded-[18px] px-4 py-1.5 data-[multiline]:py-3 max-w-[var(--user-chat-width,70%)]">
 │       │           └── <div.whitespace-pre-wrap> [message text]
 │       └── action row
-│           ├── <button [testid="copy-turn-action-button"] [aria-label="Copy"] [aria-pressed="false"]>
+│           ├── <button [data-testid="copy-turn-action-button"] [aria-label="Copy"] [aria-pressed="false"]>
 │           └── <button [aria-label="Edit message"] [aria-pressed="false"]>
 └── <span.sr-only><br></span>
 ```
@@ -175,7 +174,7 @@ scroll-mt-[calc(var(--header-height)+min(200px,max(70px,20svh)))]
 ```
 
 ```
-<article [testid="conversation-turn-2"] [data-turn="assistant"]>
+<article [data-testid="conversation-turn-2"] [data-turn="assistant"]>
 ├── <h6.sr-only>                                  # "ChatGPT said:"
 ├── <div class="text-base my-auto mx-auto pb-10 ...">
 │   └── <div class="[--thread-content-max-width:40rem] ... agent-turn">
@@ -186,9 +185,9 @@ scroll-mt-[calc(var(--header-height)+min(200px,max(70px,20svh)))]
 │       │           ├── <p>, <h2>, <h3>, <ul>, <li>, <pre>, ...
 │       │           └── inline citation pills (see below)
 │       └── assistant action row
-│           ├── <button [testid="copy-turn-action-button"] [aria-label="Copy"]>
-│           ├── <button [testid="good-response-turn-action-button"] [aria-label="Good response"]>
-│           ├── <button [testid="bad-response-turn-action-button"] [aria-label="Bad response"]>
+│           ├── <button [data-testid="copy-turn-action-button"] [aria-label="Copy"]>
+│           ├── <button [data-testid="good-response-turn-action-button"] [aria-label="Good response"]>
+│           ├── <button [data-testid="bad-response-turn-action-button"] [aria-label="Bad response"]>
 │           ├── <button [aria-label="Share"]>
 │           ├── <button [aria-label="Switch model"] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
 │           ├── <button [aria-label="More actions"] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
@@ -219,7 +218,7 @@ Observed inline source pills inside markdown body:
 
 ```
 <span [data-state="closed"]>
-└── <span [testid="webpage-citation-pill"] class="ms-1 inline-flex max-w-full items-center select-none relative top-[-0.094rem] animate-[show_150ms_ease-in]">
+└── <span [data-testid="webpage-citation-pill"] class="ms-1 inline-flex max-w-full items-center select-none relative top-[-0.094rem] animate-[show_150ms_ease-in]">
     └── <a class="flex h-4.5 overflow-hidden rounded-xl px-2 text-[9px] font-medium transition-colors duration-150 ease-in-out text-token-text-secondary! bg-[#F4F4F4]! dark:bg-[#303030]!">
 ```
 
@@ -244,12 +243,12 @@ class="sticky bottom-0 group/thread-bottom-container relative isolate z-10 w-ful
 │           │   ├── <textarea name="prompt-textarea" placeholder="Ask anything" style="display:none">
 │           │   └── <div#prompt-textarea.ProseMirror [contenteditable="true"] [data-virtualkeyboard="true"]>
 │           ├── [grid-area:leading]
-│           │   └── <button#composer-plus-btn.composer-btn [testid="composer-plus-btn"] [aria-label="Add files and more"] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
+│           │   └── <button#composer-plus-btn.composer-btn [data-testid="composer-plus-btn"] [aria-label="Add files and more"] [aria-haspopup="menu"] [aria-expanded="false"] [data-state="closed"]>
 │           ├── [grid-area:footer] (optional in some captures)
-│           │   └── <div [testid="composer-footer-actions"] ...>
+│           │   └── <div [data-testid="composer-footer-actions"] ...>
 │           └── [grid-area:trailing]
 │               ├── <button.composer-btn [aria-label="Dictate button"]>
-│               └── <button#composer-submit-button.composer-submit-btn [testid="send-button"] [aria-label="Send prompt"]>
+│               └── <button#composer-submit-button.composer-submit-btn [data-testid="send-button"] [aria-label="Send prompt"]>
 ├── <input#upload-photos [type="file"] [accept="image/*"] [multiple]>
 ├── <input#upload-camera [type="file"] [accept="image/*"] [capture="environment"] [multiple]>
 └── disclaimer text wrapper

@@ -83,7 +83,7 @@ export function Conversation({
             )}
             data-turn={message.role}
           >
-            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
               <Message
                 id={message.id}
                 variant={message.role}
@@ -116,7 +116,7 @@ export function Conversation({
             className="text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
             data-turn="assistant"
           >
-            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
               <MessageContainer className="flex w-full flex-1 items-start gap-4">
                 <div className="relative flex min-w-full flex-col gap-2">
                   <ThinkingBar text="Thinking" onStop={onStop} />
