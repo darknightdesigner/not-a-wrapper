@@ -271,7 +271,7 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <div className="group/thread-bottom-container thread-bottom-soft-mask sticky bottom-0 relative isolate z-10 flex w-full basis-auto flex-col bg-background [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="group/thread-bottom-container content-fade sticky bottom-0 relative isolate z-10 flex w-full basis-auto flex-col [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]">
         <div className="relative h-0">
           <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
             <div className="pointer-events-auto">
