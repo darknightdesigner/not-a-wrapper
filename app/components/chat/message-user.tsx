@@ -28,7 +28,7 @@ import {
 } from "@hugeicons-pro/core-stroke-rounded"
 import Image from "next/image"
 import React, { useEffect, useRef, useState } from "react"
-import { useStickToBottomContext } from "use-stick-to-bottom"
+import { useScrollRoot } from "@/components/ui/scroll-root"
 
 const getTextFromDataUrl = (dataUrl: string) => {
   const base64 = dataUrl.split(",")[1]
@@ -43,7 +43,6 @@ type MessageAttachment = {
 }
 
 export type MessageUserProps = {
-  hasScrollAnchor?: boolean
   attachments?: MessageAttachment[]
   children: string
   copied: boolean
@@ -57,7 +56,6 @@ export type MessageUserProps = {
 }
 
 export function MessageUser({
-  hasScrollAnchor,
   attachments,
   children,
   copied,
@@ -73,7 +71,7 @@ export function MessageUser({
   const contentRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const savedScrollTopRef = useRef<number | null>(null)
-  const { stopScroll, scrollRef } = useStickToBottomContext()
+  const { stopScroll, scrollRef } = useScrollRoot()
 
   const handleEditCancel = () => {
     setIsEditing(false)
@@ -137,11 +135,15 @@ export function MessageUser({
   return (
     <MessageContainer
       className={cn(
-        "group flex w-full max-w-3xl flex-col items-end gap-0.5 px-6 pb-2",
-        hasScrollAnchor && "min-h-scroll-anchor",
+        "flex w-full flex-col items-end gap-0.5",
         className
       )}
+      data-turn="user"
+      data-message-id={id}
+      data-scroll-anchor="false"
+      tabIndex={-1}
     >
+      <h5 className="sr-only">You said:</h5>
       {attachments?.map((attachment, index) => (
         <div
           className="flex flex-row gap-2"
@@ -250,10 +252,10 @@ export function MessageUser({
           {children}
         </MessageContent>
       )}
-      <MessageActions className="invisible flex gap-0 opacity-0 transition-opacity group-hover:visible group-hover:opacity-100">
+      <MessageActions className="invisible flex gap-0 opacity-0 transition-opacity group-hover/turn-messages:visible group-hover/turn-messages:opacity-100 pointer-coarse:visible pointer-coarse:opacity-100">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
             aria-label="Copy text"
             onClick={copyToClipboard}
             type="button"
@@ -273,7 +275,7 @@ export function MessageUser({
             delay={0}
           >
             <button
-              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
               aria-label={isEditing ? "Cancel edit" : "Edit message"}
               onClick={isEditing ? handleEditCancel : handleEditStart}
               type="button"

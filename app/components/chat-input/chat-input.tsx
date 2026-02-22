@@ -221,11 +221,11 @@ export function ChatInput({
         disabled={!isUserAuthenticated || !isFileUploadAvailable}
       >
         <div
-          className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1"
+          className="relative order-2 pb-3 sm:pb-4 md:order-1"
           onClick={() => textareaRef.current?.focus()}
         >
           <PromptInput
-            className="relative z-10 p-0 pt-1"
+            className="relative z-10"
             maxHeight={200}
             value={localValue}
             onValueChange={handleValueChange}
@@ -236,9 +236,9 @@ export function ChatInput({
               placeholder="Ask anything..."
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              className="min-h-[44px] pt-3 pl-4 text-base leading-[1.3] sm:text-base md:text-base"
+              className="pt-4 px-4 leading-[1.3]"
             />
-            <PromptInputActions className="mt-3 w-full justify-between p-2">
+            <PromptInputActions className="w-full justify-between p-2">
               <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                 <ButtonPlusMenu
                   onFileUpload={onFileUpload}

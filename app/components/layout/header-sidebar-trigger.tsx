@@ -19,7 +19,7 @@ export function HeaderSidebarTrigger({
   const { toggleSidebar, open } = useSidebar()
 
   return (
-    <Tooltip>
+    <Tooltip disableHoverablePopup>
       <TooltipTrigger
         render={
           <button

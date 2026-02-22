@@ -199,13 +199,6 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  --spacing-scroll-area: calc(
-    -1 * var(--spacing-input-area)
-  );
-  --spacing-scroll-anchor-offset: 140px;
-  --spacing-scroll-anchor: calc(
-    var(--spacing-scroll-area) - var(--spacing-scroll-anchor-offset) + 100dvh
-  );
 }
 
 :root {
@@ -223,9 +216,6 @@
 
   /* Sticky header z-index */
   --header-z-index: 20;
-
-  /* Scroll padding (no longer need fixed header compensation) */
-  --spacing-scroll-padding-top: 0px;
 
   --background: oklch(1 0 0);
   --foreground: oklch(0.141 0.005 285.823);
@@ -262,11 +252,9 @@
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
   /* Composer surface */
-  --composer-shadow-drop: rgba(0, 0, 0, 0.04);
-  --composer-shadow-edge: rgba(0, 0, 0, 0.62);
-  --composer-shadow-drop-offset: 0px 4px 4px 0px;
-  --composer-shadow-edge-offset: 0px 0px 1px 0px;
   --composer-bg: var(--background);
+  --sharp-edge-top-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
 }
 
 .dark {
@@ -303,12 +291,10 @@
   --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-  /* Composer surface — dark mode shadow tokens */
-  --composer-shadow-drop: rgba(0, 0, 0, 0.1);
-  --composer-shadow-edge: rgba(255, 255, 255, 0.2);
-  --composer-shadow-drop-offset: 0px 4px 12px 0px;
-  --composer-shadow-edge-offset: inset 0px 0px 1px 0px;
+  /* Composer surface */
   --composer-bg: oklch(24.56% 0 0);
+  --sharp-edge-top-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+  --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
 }
 
 @layer base {
@@ -321,10 +307,39 @@
 }
 
 @layer utilities {
+  /* Content fade: two-layer gradient pseudo behind sticky composer.
+     Layer 1 (28px): transparent → background (fade zone matching border-radius).
+     Layer 2 (full): transparent for 28px then solid background below. */
+  .content-fade::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(transparent, var(--background)),
+      linear-gradient(transparent 28px, var(--background) 28px);
+    background-size: 100% 28px, 100% 100%;
+    background-repeat: no-repeat;
+  }
+
   .shadow-composer {
+    --tw-shadow:
+      0px 4px 4px 0px rgba(0, 0, 0, 0.04),
+      0px 0px 1px 0px rgba(0, 0, 0, 0.62);
+    --tw-inset-shadow: 0 0 transparent;
     box-shadow:
-      var(--composer-shadow-drop-offset) var(--composer-shadow-drop),
-      var(--composer-shadow-edge-offset) var(--composer-shadow-edge);
+      var(--tw-inset-shadow, 0 0 transparent),
+      var(--tw-inset-ring-shadow, 0 0 transparent),
+      var(--tw-ring-offset-shadow, 0 0 transparent),
+      var(--tw-ring-shadow, 0 0 transparent),
+      var(--tw-shadow);
+  }
+  .shadow-composer:where(.dark, .dark *):not(
+      :where(.dark .light, .dark .light *)
+    ) {
+    --tw-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.1);
+    --tw-inset-shadow: inset 0px 0px 1px 0px rgba(255, 255, 255, 0.2);
   }
 }
 
@@ -400,6 +415,13 @@ code {
 .prose [data-footnote-backref] {
   color: var(--muted-foreground);
   text-decoration: none;
+}
+
+[data-scroll-anchor="false"] {
+  overflow-anchor: none;
+}
+[data-scroll-anchor="true"] {
+  overflow-anchor: auto;
 }
 
 /* sonner toast */

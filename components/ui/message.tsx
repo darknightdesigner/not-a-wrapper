@@ -29,12 +29,14 @@ const Markdown = dynamic(() => import("./markdown").then((mod) => mod.Markdown))
 export type MessageProps = {
   children: React.ReactNode
   className?: string
-} & React.HTMLProps<HTMLDivElement>
+  'data-turn'?: 'user' | 'assistant'
+  'data-message-id'?: string
+} & React.HTMLProps<HTMLElement>
 
 const Message = ({ children, className, ...props }: MessageProps) => (
-  <div className={cn("flex gap-3", className)} {...props}>
+  <article className={cn("flex gap-3", className)} {...props}>
     {children}
-  </div>
+  </article>
 )
 
 export type MessageAvatarProps = {
@@ -135,7 +137,7 @@ const MessageAction = ({
   })
 
   return (
-    <Tooltip {...props}>
+    <Tooltip disableHoverablePopup {...props}>
       <TooltipTrigger render={trigger} />
       <TooltipContent side={side} className={className}>
         {tooltip}

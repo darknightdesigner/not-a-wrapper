@@ -408,9 +408,9 @@ export function TextBlinkLoader({
   size?: "sm" | "md" | "lg"
 }) {
   const textSizes = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
   }
 
   return (
@@ -440,9 +440,9 @@ export function TextShimmerLoader({
   size?: "sm" | "md" | "lg"
 }) {
   const textSizes = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
   }
 
   const shimmerClassName = cn(
@@ -622,9 +622,9 @@ export function TextDotsLoader({
   size?: "sm" | "md" | "lg"
 }) {
   const textSizes = {
-    sm: "text-xs",
-    md: "text-sm",
-    lg: "text-base",
+    sm: "text-sm",
+    md: "text-base",
+    lg: "text-lg",
   }
 
   return (

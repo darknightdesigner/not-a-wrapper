@@ -175,11 +175,11 @@ function ReasoningLabel({ className }: ReasoningLabelProps) {
   const labelText =
     phase === "thinking" ? (
       <>
-        <TextShimmer duration={2} spread={15} className="text-sm font-medium">
+        <TextShimmer duration={2} spread={15} className="text-base font-medium">
           Thinking
         </TextShimmer>
         {durationSeconds !== undefined && durationSeconds > 0 && (
-          <span className="text-muted-foreground ml-1 text-sm font-normal">
+          <span className="text-muted-foreground ml-1 text-base font-normal">
             {formatDuration(durationSeconds)}
           </span>
         )}
@@ -194,7 +194,7 @@ function ReasoningLabel({ className }: ReasoningLabelProps) {
 
   if (opaque) {
     return (
-      <div className={cn("flex items-center gap-1.5 text-sm", className)}>
+      <div className={cn("flex items-center gap-1.5 text-base", className)}>
         {labelText}
       </div>
     )
@@ -204,7 +204,7 @@ function ReasoningLabel({ className }: ReasoningLabelProps) {
     <button
       type="button"
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 text-sm transition-colors",
+        "flex cursor-pointer items-center gap-1.5 text-base transition-colors",
         className
       )}
       onClick={() => onOpenChange(!isOpen)}
@@ -255,7 +255,7 @@ function ReasoningContent({
     >
       <div
         className={cn(
-          "text-muted-foreground prose prose-sm overflow-hidden",
+          "text-muted-foreground prose overflow-hidden",
           contentClassName
         )}
       >

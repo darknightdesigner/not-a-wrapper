@@ -56,7 +56,7 @@ export function ButtonPlusMenu({
   if (!isUserAuthenticated) {
     return (
       <Popover>
-        <Tooltip>
+        <Tooltip disableHoverablePopup>
           <TooltipTrigger
             render={
               <PopoverTrigger
@@ -102,7 +102,7 @@ export function ButtonPlusMenu({
         }}
       />
       <DropdownMenu>
-        <Tooltip>
+        <Tooltip disableHoverablePopup>
           <TooltipTrigger
             render={
               <DropdownMenuTrigger

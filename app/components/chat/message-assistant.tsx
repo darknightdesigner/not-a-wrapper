@@ -39,7 +39,6 @@ import { useLoadingState } from "./use-loading-state"
 type MessageAssistantProps = {
   children: string
   isLast?: boolean
-  hasScrollAnchor?: boolean
   copied?: boolean
   copyToClipboard?: () => void
   onReload?: () => void
@@ -80,7 +79,6 @@ function formatToolProgressLabel(toolName: string): string {
 export function MessageAssistant({
   children,
   isLast,
-  hasScrollAnchor,
   copied,
   copyToClipboard,
   onReload,
@@ -190,17 +188,22 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-        "group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2",
-        hasScrollAnchor && "min-h-scroll-anchor",
+        "flex w-full flex-1 items-start gap-4",
         className
       )}
+      data-turn="assistant"
+      data-message-id={messageId}
+      data-scroll-anchor={isLast ? "true" : "false"}
+      tabIndex={-1}
     >
+      <h6 className="sr-only">Assistant said:</h6>
       <div
         ref={messageRef}
         className={cn(
           "relative flex min-w-full flex-col gap-2",
           isLast && "pb-8"
         )}
+        // Inner data-message-id for quote selection — closest() finds this before the outer article
         {...(isQuoteEnabled && { "data-message-id": messageId })}
       >
         {reasoningPhase !== "idle" && (
@@ -288,7 +291,21 @@ export function MessageAssistant({
         {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
           <MessageActions
             className={cn(
-              "-ml-2 flex gap-0"
+              "-ml-2 flex gap-0",
+              "pointer-events-none",
+              "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+              "[mask-size:300%_100%]",
+              "[mask-position:100%_0%]",
+              "motion-safe:transition-[mask-position]",
+              "duration-[1.5s]",
+              "group-hover/turn-messages:pointer-events-auto",
+              "group-hover/turn-messages:[mask-position:0_0]",
+              "group-focus-within/turn-messages:pointer-events-auto",
+              "group-focus-within/turn-messages:[mask-position:0_0]",
+              "has-[[data-state=open]]:pointer-events-auto",
+              "has-[[data-state=open]]:[mask-position:0_0]",
+              "pointer-coarse:pointer-events-auto",
+              "pointer-coarse:[mask-image:none]"
             )}
           >
             <MessageAction
@@ -296,7 +313,7 @@ export function MessageAssistant({
               side="bottom"
             >
               <button
-                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
                 aria-label="Copy text"
                 onClick={copyToClipboard}
                 type="button"
@@ -315,7 +332,7 @@ export function MessageAssistant({
                 delay={0}
               >
                 <button
-                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
                   aria-label="Regenerate"
                   onClick={onReload}
                   type="button"

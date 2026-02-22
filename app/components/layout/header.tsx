@@ -7,24 +7,39 @@ import { UserMenu } from "@/app/components/layout/user-menu"
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { NawIcon } from "@/components/icons/naw"
 import { Button } from "@/components/ui/button"
+import { useScrollRoot } from "@/components/ui/scroll-root"
 import { APP_NAME } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
 import Link from "next/link"
+import { useEffect, useState } from "react"
 import { DialogPublish } from "./dialog-publish"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 
 export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isMobile = useBreakpoint(768)
+
   const { user } = useUser()
   const { preferences } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
 
   const isLoggedIn = !!user
 
+  const { scrollRef } = useScrollRoot()
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => setIsScrolled(el.scrollTop > 0)
+    el.addEventListener("scroll", onScroll, { passive: true })
+    onScroll()
+    return () => el.removeEventListener("scroll", onScroll)
+  }, [scrollRef])
+
   return (
-    <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0">
-      <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2">
+    <header className="pointer-events-none sticky top-0 z-20 h-app-header shrink-0 bg-background [box-shadow:var(--sharp-edge-top-shadow-placeholder)] data-[scrolled]:[box-shadow:var(--sharp-edge-top-shadow)] @7xl/main:bg-transparent @7xl/main:[box-shadow:none]!" data-scrolled={isScrolled || undefined}>
+      <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2 pointer-coarse:px-2.5">
         {/* LEFT SECTION - natural width, not flex-1 */}
         <div className="flex items-center gap-2">
           {/* Hide logo/text when sidebar is present on desktop (sidebar has its own home link) */}
@@ -47,7 +62,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         </div>
 
         {/* RIGHT SECTION - natural width, not flex-1 */}
-        <div className="pointer-events-auto flex items-center justify-end gap-2">
+        <div className="pointer-events-auto flex items-center justify-end gap-0">
           {!isLoggedIn ? (
             <>
               <Button variant="outline" render={<Link href="/auth/login" />}>

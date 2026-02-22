@@ -11,6 +11,7 @@ import { useChatSession } from "@/lib/chat-store/session/provider"
 import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
+import { ScrollButton } from "@/components/ui/scroll-button"
 import { cn } from "@/lib/utils"
 import { AnimatePresence, motion } from "motion/react"
 import dynamic from "next/dynamic"
@@ -19,11 +20,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useChatCore } from "./use-chat-core"
 import { useChatOperations } from "./use-chat-operations"
 import { useFileUpload } from "./use-file-upload"
-
-const FeedbackWidget = dynamic(
-  () => import("./feedback-widget").then((mod) => mod.FeedbackWidget),
-  { ssr: false }
-)
 
 const DialogAuth = dynamic(
   () => import("./dialog-auth").then((mod) => mod.DialogAuth),
@@ -251,7 +247,8 @@ export function Chat() {
   return (
     <div
       className={cn(
-        "@container/main relative flex h-full flex-col items-center justify-end md:justify-center"
+        "relative flex min-h-0 flex-1 flex-col items-center",
+        showOnboarding && "justify-end md:justify-center"
       )}
     >
       <DialogAuth open={hasDialogAuth} setOpen={setHasDialogAuth} />
@@ -260,17 +257,10 @@ export function Chat() {
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="absolute bottom-[60%] mx-auto max-w-[50rem] md:relative md:bottom-auto"
+            className="flex flex-col items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            layout="position"
-            layoutId="onboarding"
-            transition={{
-              layout: {
-                duration: 0,
-              },
-            }}
           >
             <h1 className="mb-6 text-3xl font-medium tracking-tight text-balance">
               What&apos;s on your mind?
@@ -281,22 +271,35 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <motion.div
+      <div
         className={cn(
-          "relative inset-x-0 bottom-0 z-50 mx-auto w-full max-w-3xl"
+          "relative isolate z-10 flex w-full basis-auto flex-col [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]",
+          !showOnboarding &&
+            "group/thread-bottom-container content-fade sticky bottom-0"
         )}
-        layout="position"
-        layoutId="chat-input-container"
-        transition={{
-          layout: {
-            duration: messages.length === 1 ? 0.3 : 0,
-          },
-        }}
       >
-        <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
-      </motion.div>
-
-      <FeedbackWidget authUserId={user?.id} />
+        {!showOnboarding && (
+          <div className="relative h-0">
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
+              <div className="pointer-events-auto">
+                <ScrollButton />
+              </div>
+            </div>
+          </div>
+        )}
+        <div className="mx-auto w-full [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
+          <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
+        </div>
+        {!showOnboarding && (
+          <div className="-mt-4 text-muted-foreground relative w-full overflow-hidden text-center text-xs md:px-[60px]">
+            <div className="flex min-h-8 w-full items-center justify-center p-2 select-none">
+              <div className="pointer-events-auto">
+                <div>Not A Wrapper can make mistakes. Check important info.</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

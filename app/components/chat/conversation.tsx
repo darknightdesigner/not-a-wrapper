@@ -1,13 +1,9 @@
-import {
-  ChatContainerContent,
-  ChatContainerRoot,
-  ChatContainerScrollButton,
-} from "@/components/ui/chat-container"
+import { ScrollRootContent } from "@/components/ui/scroll-root"
 import { Message as MessageContainer } from "@/components/ui/message"
 import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
+import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
-import { useState } from "react"
 import { Message } from "./message"
 
 // v6 helper: Extract text content from all text parts in order.
@@ -61,30 +57,34 @@ export function Conversation({
   isUserAuthenticated,
   lastFinishReason,
 }: ConversationProps) {
-  // Use state to capture initial message count once on mount
-  const [initialCount] = useState(() => messages.length)
-
   if (!messages || messages.length === 0)
-    return <div className="h-full w-full"></div>
+    return <div className="w-full flex-1"></div>
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center overflow-x-hidden overflow-y-auto">
-      <ChatContainerRoot className="relative w-full">
-        <ChatContainerContent
-          className="flex w-full flex-col items-center pt-4 pb-4"
-          style={{
-            scrollbarGutter: "stable both-edges",
-            scrollbarWidth: "none",
-          }}
-        >
-          {messages?.map((message, index) => {
-            const isLast =
-              index === messages.length - 1 && status !== "submitted"
-            const hasScrollAnchor = isLast && messages.length > initialCount
+    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 [--composer-overlap-px:28px] [--thread-bottom-offset:calc(var(--spacing-input-area)+2rem+env(safe-area-inset-bottom,0px))] pb-[var(--thread-bottom-offset)] -mb-[var(--composer-overlap-px)]">
+      <div
+        aria-hidden="true"
+        data-edge="top"
+        className="pointer-events-none absolute top-0 h-px w-px"
+      />
+      {messages?.map((message, index) => {
+        const isLast =
+          index === messages.length - 1 && status !== "submitted"
+        const isAssistant = message.role === "assistant"
+        const isUser = message.role === "user"
 
-            return (
+        return (
+          <article
+            key={message.id}
+            className={cn(
+              "text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)]",
+              isUser && "pt-3 scroll-mt-[var(--spacing-app-header)]",
+              isAssistant && "pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
+            )}
+            data-turn={message.role}
+          >
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
               <Message
-                key={message.id}
                 id={message.id}
                 variant={message.role}
                 attachments={getMessageAttachments(message)}
@@ -93,7 +93,6 @@ export function Conversation({
                 onEdit={onEdit}
                 onReload={onReload}
                 onStop={isLast && status === "streaming" ? onStop : undefined}
-                hasScrollAnchor={hasScrollAnchor}
                 parts={message.parts}
                 metadata={message.metadata as Record<string, unknown> | undefined}
                 status={status}
@@ -106,20 +105,31 @@ export function Conversation({
               >
                 {getMessageText(message)}
               </Message>
-            );
-          })}
-          {status === "submitted" &&
-            messages.length > 0 &&
-            messages[messages.length - 1].role === "user" && (
-              <MessageContainer className="group flex w-full max-w-3xl flex-1 items-start gap-4 px-6 pb-2 min-h-scroll-anchor">
+            </div>
+          </article>
+        );
+      })}
+      {status === "submitted" &&
+        messages.length > 0 &&
+        messages[messages.length - 1].role === "user" && (
+          <div
+            className="text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
+            data-turn="assistant"
+          >
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+              <MessageContainer className="flex w-full flex-1 items-start gap-4">
                 <div className="relative flex min-w-full flex-col gap-2">
-                  <ThinkingBar text="Generating" onStop={onStop} />
+                  <ThinkingBar text="Thinking" onStop={onStop} />
                 </div>
               </MessageContainer>
-            )}
-        </ChatContainerContent>
-        <ChatContainerScrollButton />
-      </ChatContainerRoot>
-    </div>
+            </div>
+          </div>
+        )}
+      <div
+        aria-hidden="true"
+        data-edge="bottom"
+        className="pointer-events-none absolute bottom-0 h-px w-px"
+      />
+    </ScrollRootContent>
   );
 }

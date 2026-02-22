@@ -21,7 +21,6 @@ type MessageProps = {
   onEdit: (id: string, newText: string) => Promise<void> | void
   onReload: () => void
   onStop?: () => void
-  hasScrollAnchor?: boolean
   parts?: MessageType["parts"]
   metadata?: Record<string, unknown>
   status?: "streaming" | "ready" | "submitted" | "error"
@@ -89,7 +88,6 @@ function areMessagesEqual(prev: MessageProps, next: MessageProps): boolean {
   if (prev.status !== next.status) return false
   if (prev.metadata !== next.metadata) return false
   if (prev.finishReason !== next.finishReason) return false
-  if (prev.hasScrollAnchor !== next.hasScrollAnchor) return false
   if (prev.className !== next.className) return false
   if (prev.messageGroupId !== next.messageGroupId) return false
   if (prev.isUserAuthenticated !== next.isUserAuthenticated) return false
@@ -120,7 +118,6 @@ function MessageInner({
   onEdit,
   onReload,
   onStop,
-  hasScrollAnchor,
   parts,
   metadata,
   status,
@@ -146,7 +143,6 @@ function MessageInner({
         onReload={onReload}
         onEdit={onEdit}
         id={id}
-        hasScrollAnchor={hasScrollAnchor}
         attachments={attachments}
         className={className}
         messageGroupId={messageGroupId}
@@ -165,7 +161,6 @@ function MessageInner({
         onReload={onReload}
         onStop={onStop}
         isLast={isLast}
-        hasScrollAnchor={hasScrollAnchor}
         parts={parts}
         metadata={metadata}
         status={status}
