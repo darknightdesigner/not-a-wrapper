@@ -62,7 +62,7 @@ function ScrollRoot({ children, className, ...props }: ScrollRootProps) {
       <div
         ref={scrollRef}
         className={cn(
-          "relative flex min-h-0 flex-1 flex-col overflow-y-auto",
+          "relative flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-clip",
           className
         )}
         {...props}

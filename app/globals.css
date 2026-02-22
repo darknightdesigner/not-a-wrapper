@@ -252,11 +252,9 @@
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
   /* Composer surface */
-  --composer-shadow-drop: rgba(0, 0, 0, 0.04);
-  --composer-shadow-edge: rgba(0, 0, 0, 0.62);
-  --composer-shadow-drop-offset: 0px 4px 4px 0px;
-  --composer-shadow-edge-offset: 0px 0px 1px 0px;
   --composer-bg: var(--background);
+  --sharp-edge-top-shadow: 0 1px 0 rgba(0, 0, 0, 0.05);
+  --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
 }
 
 .dark {
@@ -293,12 +291,10 @@
   --sidebar-border: oklch(0.274 0.006 286.033);
   --sidebar-ring: oklch(0.705 0.015 286.067);
 
-  /* Composer surface — dark mode shadow tokens */
-  --composer-shadow-drop: rgba(0, 0, 0, 0.1);
-  --composer-shadow-edge: rgba(255, 255, 255, 0.2);
-  --composer-shadow-drop-offset: 0px 4px 12px 0px;
-  --composer-shadow-edge-offset: inset 0px 0px 1px 0px;
+  /* Composer surface */
   --composer-bg: oklch(24.56% 0 0);
+  --sharp-edge-top-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+  --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
 }
 
 @layer base {
@@ -310,33 +306,21 @@
   }
 }
 
-/* Thread content width tokens — shared by messages, composer, and thread-bottom.
-   Base values are the narrowest (mobile); container query overrides widen
-   at sm (640px) and lg (1024px) breakpoints, matching ChatGPT's system.
-   Overrides target direct children (> *) because a container can't query itself. */
-.\@container\/main {
-  --thread-content-max-width: 40rem;
-  --thread-content-margin: 1rem;
-}
-
-@container main (min-width: 640px) {
-  .\@container\/main > * {
-    --thread-content-margin: 1.5rem;
-  }
-}
-
-@container main (min-width: 1024px) {
-  .\@container\/main > * {
-    --thread-content-max-width: 48rem;
-    --thread-content-margin: 4rem;
-  }
-}
-
 @layer utilities {
   .shadow-composer {
+    --tw-shadow:
+      0px 4px 4px 0px rgba(0, 0, 0, 0.04),
+      0px 0px 1px 0px rgba(0, 0, 0, 0.62);
     box-shadow:
-      var(--composer-shadow-drop-offset) var(--composer-shadow-drop),
-      var(--composer-shadow-edge-offset) var(--composer-shadow-edge);
+      var(--tw-inset-shadow, 0 0 transparent),
+      var(--tw-inset-ring-shadow, 0 0 transparent),
+      var(--tw-ring-offset-shadow, 0 0 transparent),
+      var(--tw-ring-shadow, 0 0 transparent),
+      var(--tw-shadow);
+  }
+  .shadow-composer:is(.dark *) {
+    --tw-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.1);
+    --tw-inset-shadow: inset 0px 0px 1px 0px rgba(255, 255, 255, 0.2);
   }
 }
 
@@ -412,6 +396,13 @@ code {
 .prose [data-footnote-backref] {
   color: var(--muted-foreground);
   text-decoration: none;
+}
+
+[data-scroll-anchor="false"] {
+  overflow-anchor: none;
+}
+[data-scroll-anchor="true"] {
+  overflow-anchor: auto;
 }
 
 /* sonner toast */

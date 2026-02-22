@@ -221,7 +221,7 @@ export function ChatInput({
         disabled={!isUserAuthenticated || !isFileUploadAvailable}
       >
         <div
-          className="relative order-2 px-2 pb-3 sm:pb-4 md:order-1"
+          className="relative order-2 pb-3 sm:pb-4 md:order-1"
           onClick={() => textareaRef.current?.focus()}
         >
           <PromptInput

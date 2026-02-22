@@ -271,14 +271,16 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <div className="sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)] px-[var(--thread-content-margin,1rem)] bg-background pb-[env(safe-area-inset-bottom,0px)]">
+      <div className="sticky bottom-0 z-10 w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]">
         <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-background to-transparent" aria-hidden="true" />
         <div className="pointer-events-none absolute inset-x-0 bottom-full flex items-center justify-center pb-4">
           <div className="pointer-events-auto">
             <ScrollButton />
           </div>
         </div>
-        <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
+        <div className="mx-auto w-full [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
+          <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
+        </div>
       </div>
     </div>
   )

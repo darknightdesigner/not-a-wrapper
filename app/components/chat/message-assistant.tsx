@@ -188,14 +188,15 @@ export function MessageAssistant({
   return (
     <Message
       className={cn(
-        "group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2",
+        "flex w-full flex-1 items-start gap-4",
         className
       )}
       data-turn="assistant"
       data-message-id={messageId}
+      data-scroll-anchor={isLast ? "true" : "false"}
       tabIndex={-1}
     >
-      <span className="sr-only">Assistant said:</span>
+      <h6 className="sr-only">Assistant said:</h6>
       <div
         ref={messageRef}
         className={cn(
@@ -297,10 +298,10 @@ export function MessageAssistant({
               "[mask-position:100%_0%]",
               "motion-safe:transition-[mask-position]",
               "duration-[1.5s]",
-              "group-hover/message:pointer-events-auto",
-              "group-hover/message:[mask-position:0_0]",
-              "group-focus-within/message:pointer-events-auto",
-              "group-focus-within/message:[mask-position:0_0]",
+              "group-hover/turn-messages:pointer-events-auto",
+              "group-hover/turn-messages:[mask-position:0_0]",
+              "group-focus-within/turn-messages:pointer-events-auto",
+              "group-focus-within/turn-messages:[mask-position:0_0]",
               "has-[[data-state=open]]:pointer-events-auto",
               "has-[[data-state=open]]:[mask-position:0_0]",
               "pointer-coarse:pointer-events-auto",

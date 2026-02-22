@@ -2,6 +2,7 @@ import { ScrollRootContent } from "@/components/ui/scroll-root"
 import { Message as MessageContainer } from "@/components/ui/message"
 import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { ExtendedMessageAISDK } from "@/lib/chat-store/messages/api"
+import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import { Message } from "./message"
 
@@ -60,7 +61,7 @@ export function Conversation({
     return <div className="w-full flex-1"></div>
 
   return (
-    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-24">
+    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-25 [--composer-overlap-px:28px] -mb-[var(--composer-overlap-px)]">
       <div
         aria-hidden="true"
         data-edge="top"
@@ -69,40 +70,60 @@ export function Conversation({
       {messages?.map((message, index) => {
         const isLast =
           index === messages.length - 1 && status !== "submitted"
+        const isAssistant = message.role === "assistant"
+        const isUser = message.role === "user"
 
         return (
-          <Message
+          <article
             key={message.id}
-            id={message.id}
-            variant={message.role}
-            attachments={getMessageAttachments(message)}
-            isLast={isLast}
-            onDelete={onDelete}
-            onEdit={onEdit}
-            onReload={onReload}
-            onStop={isLast && status === "streaming" ? onStop : undefined}
-            parts={message.parts}
-            metadata={message.metadata as Record<string, unknown> | undefined}
-            status={status}
-            onQuote={onQuote}
-            messageGroupId={
-              (message as ExtendedMessageAISDK).message_group_id ?? null
-            }
-            isUserAuthenticated={isUserAuthenticated}
-            finishReason={isLast ? lastFinishReason : undefined}
+            className={cn(
+              "text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)]",
+              isUser && "pt-3 scroll-mt-[var(--spacing-app-header)]",
+              isAssistant && "pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
+            )}
+            data-turn={message.role}
           >
-            {getMessageText(message)}
-          </Message>
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+              <Message
+                id={message.id}
+                variant={message.role}
+                attachments={getMessageAttachments(message)}
+                isLast={isLast}
+                onDelete={onDelete}
+                onEdit={onEdit}
+                onReload={onReload}
+                onStop={isLast && status === "streaming" ? onStop : undefined}
+                parts={message.parts}
+                metadata={message.metadata as Record<string, unknown> | undefined}
+                status={status}
+                onQuote={onQuote}
+                messageGroupId={
+                  (message as ExtendedMessageAISDK).message_group_id ?? null
+                }
+                isUserAuthenticated={isUserAuthenticated}
+                finishReason={isLast ? lastFinishReason : undefined}
+              >
+                {getMessageText(message)}
+              </Message>
+            </div>
+          </article>
         );
       })}
       {status === "submitted" &&
         messages.length > 0 &&
         messages[messages.length - 1].role === "user" && (
-          <MessageContainer className="flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2">
-            <div className="relative flex min-w-full flex-col gap-2">
-              <ThinkingBar text="Thinking" onStop={onStop} />
+          <div
+            className="text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
+            data-turn="assistant"
+          >
+            <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+              <MessageContainer className="flex w-full flex-1 items-start gap-4">
+                <div className="relative flex min-w-full flex-col gap-2">
+                  <ThinkingBar text="Thinking" onStop={onStop} />
+                </div>
+              </MessageContainer>
             </div>
-          </MessageContainer>
+          </div>
         )}
       <div
         aria-hidden="true"

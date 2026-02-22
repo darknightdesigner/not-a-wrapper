@@ -14,15 +14,14 @@ export function LayoutApp({ children }: { children: React.ReactNode }) {
     <MultiModelSelectionProvider>
       <div className="flex h-svh w-full overflow-hidden">
         {hasSidebar && <AppSidebar />}
-        <ScrollRoot
-          className="@container/main h-svh w-0 flex-shrink flex-grow scroll-pt-[var(--spacing-app-header)] print:overflow-visible"
-          style={{ scrollbarGutter: "stable both-edges" }}
-        >
-          <Header hasSidebar={hasSidebar} />
-          <div id="main-content" className="flex min-h-[calc(100%-var(--spacing-app-header))] flex-col">
-            {children}
-          </div>
-        </ScrollRoot>
+        <div className="@container/main relative flex min-w-0 flex-1 flex-col">
+          <ScrollRoot className="min-w-0 scroll-pt-[var(--spacing-app-header)] [scrollbar-gutter:stable] @sm/main:[scrollbar-gutter:stable_both-edges] pointer-coarse:[scrollbar-width:none] print:overflow-visible">
+            <Header hasSidebar={hasSidebar} />
+            <main id="main" className="flex min-h-[calc(100%-var(--spacing-app-header))] flex-col">
+              {children}
+            </main>
+          </ScrollRoot>
+        </div>
       </div>
     </MultiModelSelectionProvider>
   )
