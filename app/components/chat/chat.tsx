@@ -272,6 +272,7 @@ export function Chat() {
       </AnimatePresence>
 
       <div className="sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)] bg-background pb-[env(safe-area-inset-bottom,0px)]">
+        <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-background to-transparent" aria-hidden="true" />
         <div className="pointer-events-none absolute inset-x-0 bottom-full flex items-center justify-center pb-4">
           <div className="pointer-events-auto">
             <ScrollButton />
