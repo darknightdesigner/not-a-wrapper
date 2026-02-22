@@ -24,7 +24,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
   const isLoggedIn = !!user
 
   return (
-    <header className="bg-background pointer-events-none sticky top-0 z-20 h-app-header shrink-0 2xl:bg-transparent 2xl:backdrop-blur-sm">
+    <header className="pointer-events-none sticky top-0 z-20 h-app-header shrink-0 [box-shadow:0_1px_0_var(--border)] 2xl:[box-shadow:none]">
       <div className="relative mx-auto flex h-full max-w-full items-center justify-between px-2">
         {/* LEFT SECTION - natural width, not flex-1 */}
         <div className="flex items-center gap-2">
@@ -48,7 +48,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         </div>
 
         {/* RIGHT SECTION - natural width, not flex-1 */}
-        <div className="pointer-events-auto flex items-center justify-end gap-2">
+        <div className="pointer-events-auto flex items-center justify-end gap-0">
           {!isLoggedIn ? (
             <>
               <Button variant="outline" render={<Link href="/auth/login" />}>
