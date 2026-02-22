@@ -225,7 +225,7 @@ export function ChatInput({
           onClick={() => textareaRef.current?.focus()}
         >
           <PromptInput
-            className="relative z-10 p-0 pt-1"
+            className="relative z-10"
             maxHeight={200}
             value={localValue}
             onValueChange={handleValueChange}

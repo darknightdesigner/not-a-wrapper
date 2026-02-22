@@ -61,7 +61,7 @@ export function Conversation({
     return <div className="w-full flex-1"></div>
 
   return (
-    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-25 [--composer-overlap-px:28px] -mb-[var(--composer-overlap-px)]">
+    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 [--composer-overlap-px:28px] [--thread-bottom-offset:calc(var(--spacing-input-area)+2rem+env(safe-area-inset-bottom,0px))] pb-[var(--thread-bottom-offset)] -mb-[var(--composer-overlap-px)]">
       <div
         aria-hidden="true"
         data-edge="top"
