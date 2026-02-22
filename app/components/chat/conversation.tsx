@@ -60,7 +60,7 @@ export function Conversation({
     return <div className="w-full flex-1"></div>
 
   return (
-    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-8">
+    <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 pb-24">
       <div
         aria-hidden="true"
         data-edge="top"

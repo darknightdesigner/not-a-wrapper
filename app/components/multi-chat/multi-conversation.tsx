@@ -145,7 +145,7 @@ export function MultiModelConversation({
   }
 
   return (
-    <ScrollRootContent className="flex w-full flex-1 flex-col items-center pt-4 pb-8">
+    <ScrollRootContent className="flex w-full flex-1 flex-col items-center pt-4 pb-24">
       {messageGroups.length === 0
         ? null
         : messageGroups.map((group, groupIndex) => {
