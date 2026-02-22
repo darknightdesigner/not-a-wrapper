@@ -810,7 +810,7 @@ export default function ThinkingStatesTestPage() {
         </div>
 
         {/* ━━━ Composer ━━━ */}
-        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)]">
+        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)] px-[var(--thread-content-margin,1rem)]">
           <ChatInput
             defaultValue=""
             onValueChange={noopStr}
