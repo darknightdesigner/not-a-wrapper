@@ -44,7 +44,7 @@ export function ThinkingBar({
         <button
           type="button"
           onClick={onClick}
-          className="flex items-center gap-1 text-sm transition-opacity hover:opacity-80"
+          className="flex items-center gap-1 text-base transition-opacity hover:opacity-80"
         >
           <TextShimmer className="font-medium">{text}</TextShimmer>
           <HugeiconsIcon icon={ArrowRight01Icon} size={16} className="text-muted-foreground" />
