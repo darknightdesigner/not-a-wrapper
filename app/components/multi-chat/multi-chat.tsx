@@ -700,7 +700,7 @@ export function MultiChat() {
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="flex w-full flex-1 items-end justify-center md:items-center"
+            className="flex flex-col items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -714,14 +714,33 @@ export function MultiChat() {
         )}
       </AnimatePresence>
 
-      <div className="sticky bottom-0 z-10 mx-auto w-full max-w-3xl bg-background pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-t from-background to-transparent" aria-hidden="true" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-full flex items-center justify-center pb-4">
-          <div className="pointer-events-auto">
-            <ScrollButton />
+      <div
+        className={cn(
+          "relative isolate z-10 w-full pb-[env(safe-area-inset-bottom,0px)] px-[var(--thread-content-margin,1rem)]",
+          !showOnboarding && "content-fade sticky bottom-0"
+        )}
+      >
+        {!showOnboarding && (
+          <div className="relative h-0">
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
+              <div className="pointer-events-auto">
+                <ScrollButton />
+              </div>
+            </div>
           </div>
+        )}
+        <div className="mx-auto w-full max-w-3xl">
+          <MultiChatInput {...inputProps} />
         </div>
-        <MultiChatInput {...inputProps} />
+        {!showOnboarding && (
+          <div className="-mt-4 text-muted-foreground relative w-full overflow-hidden text-center text-xs md:px-[60px]">
+            <div className="flex min-h-8 w-full items-center justify-center p-2 select-none">
+              <div className="pointer-events-auto">
+                <div>Not A Wrapper can make mistakes. Check important info.</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

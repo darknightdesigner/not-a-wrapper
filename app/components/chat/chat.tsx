@@ -257,7 +257,7 @@ export function Chat() {
         {showOnboarding ? (
           <motion.div
             key="onboarding"
-            className="flex w-full flex-1 items-end justify-center md:items-center"
+            className="flex flex-col items-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -271,24 +271,34 @@ export function Chat() {
         )}
       </AnimatePresence>
 
-      <div className="group/thread-bottom-container content-fade sticky bottom-0 relative isolate z-10 flex w-full basis-auto flex-col [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]">
-        <div className="relative h-0">
-          <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
-            <div className="pointer-events-auto">
-              <ScrollButton />
+      <div
+        className={cn(
+          "relative isolate z-10 flex w-full basis-auto flex-col [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)]",
+          !showOnboarding &&
+            "group/thread-bottom-container content-fade sticky bottom-0"
+        )}
+      >
+        {!showOnboarding && (
+          <div className="relative h-0">
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
+              <div className="pointer-events-auto">
+                <ScrollButton />
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <div className="mx-auto w-full [--thread-content-max-width:40rem] @lg/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
           <ChatInput defaultValue={initialInputValue} {...chatInputProps} />
         </div>
-        <div className="-mt-4 text-muted-foreground relative w-full overflow-hidden text-center text-xs md:px-[60px]">
-          <div className="flex min-h-8 w-full items-center justify-center p-2 select-none">
-            <div className="pointer-events-auto">
-              <div>Not A Wrapper can make mistakes. Check important info.</div>
+        {!showOnboarding && (
+          <div className="-mt-4 text-muted-foreground relative w-full overflow-hidden text-center text-xs md:px-[60px]">
+            <div className="flex min-h-8 w-full items-center justify-center p-2 select-none">
+              <div className="pointer-events-auto">
+                <div>Not A Wrapper can make mistakes. Check important info.</div>
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
