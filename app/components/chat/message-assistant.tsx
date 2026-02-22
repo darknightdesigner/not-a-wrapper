@@ -312,7 +312,7 @@ export function MessageAssistant({
               side="bottom"
             >
               <button
-                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
                 aria-label="Copy text"
                 onClick={copyToClipboard}
                 type="button"
@@ -331,7 +331,7 @@ export function MessageAssistant({
                 delay={0}
               >
                 <button
-                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
                   aria-label="Regenerate"
                   onClick={onReload}
                   type="button"

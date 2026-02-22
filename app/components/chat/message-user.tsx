@@ -254,7 +254,7 @@ export function MessageUser({
       <MessageActions className="invisible flex gap-0 opacity-0 transition-opacity group-hover/message:visible group-hover/message:opacity-100">
         <MessageAction tooltip={copied ? "Copied!" : "Copy text"} side="bottom">
           <button
-            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+            className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
             aria-label="Copy text"
             onClick={copyToClipboard}
             type="button"
@@ -274,7 +274,7 @@ export function MessageUser({
             delay={0}
           >
             <button
-              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+              className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
               aria-label={isEditing ? "Cancel edit" : "Edit message"}
               onClick={isEditing ? handleEditCancel : handleEditStart}
               type="button"
