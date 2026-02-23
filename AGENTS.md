@@ -6,63 +6,52 @@ Open-source multi-AI chat app with a unified model interface across providers.
 
 Deliver correct, secure, maintainable changes with minimal, focused diffs.
 
-## Implementation Philosophy (Highest Priority)
+## Context File Contract (Paper-Aligned)
 
-Prefer well-researched, industry-standard solutions over quick fixes.
+- Keep this file minimal and high-signal.
+- Include only mandatory constraints and critical patterns.
+- Avoid broad repository overviews and generic checklists.
+- Load deeper guidance from `.agents/` only when task-relevant.
 
-When implementing features or fixing bugs:
+## Implementation Philosophy (SHOULD)
 
-1. Research first: understand established patterns before coding.
-2. Prefer proven approaches: use battle-tested libraries and conventions.
-3. Extend existing project patterns instead of introducing parallel systems.
-4. Fix root causes, not symptoms.
-5. Optimize for maintainability and clarity over short-term speed.
-6. Evaluate trade-offs when multiple valid options exist, then choose deliberately.
+- Prefer well-researched, industry-standard solutions over quick fixes.
+- Extend existing project patterns instead of introducing parallel systems.
+- Fix root causes instead of symptoms.
+- Optimize for maintainability and clarity over short-term speed.
+- If unsure, consult `.agents/research/` and document non-trivial trade-offs.
 
-If unsure, consult `.agents/research/` first and document reasoning for non-trivial choices.
+## Correctness-First Escalation (MUST)
 
-## Study-Aligned Context Rule
-
-Keep this file minimal and high signal.
-
-- Include only hard constraints and critical project patterns.
-- Do not add broad repository overviews or generic advice here.
-- Keep deeper guidance in `.agents/` and load it only when task-relevant.
-
-## Core Commands
-
-```bash
-bun install
-bun run dev
-bun run dev:clean
-bun run lint
-bun run typecheck
-bun run build
-bun run test
-```
+- Use risk-based rigor: keep low-risk tasks lightweight, increase rigor for medium/high-risk tasks.
+- Medium/high-risk changes require a brief approach decision before coding (options, trade-offs, chosen approach).
+- High-risk triggers include: auth, schema/data model, API contracts, persistence, concurrency, migrations, billing/payments, and security-critical paths.
+- Introducing a new dependency or architectural pattern requires explicit justification and at least one alternative considered.
+- Validation depth must scale with risk; do not treat successful compilation as sufficient evidence of correctness.
+- For the detailed process, load `.agents/workflows/correctness-decision-workflow.md` on demand.
 
 ## Non-Negotiable Rules
 
-### Security
+### Security (MUST)
 
 - Never read/write `.env*` files.
 - Never log or expose secrets, tokens, or credentials.
 - Treat BYOK/API key data as encrypted-at-rest.
 
-### Code Quality
+### Code Quality (MUST)
 
 - No `// @ts-ignore`.
 - No lint-rule bypassing (`eslint-disable`) without explicit documented approval.
 - Do not downgrade or disable checks to "make it pass."
 - Prefer source fixes over workarounds.
 
-### Git Safety
+### Git Safety (MUST)
 
 - Never create branches unless explicitly asked.
 - Never force-push to shared branches.
 - Avoid destructive git commands unless explicitly requested.
 
-## Ask Before Making These Changes
+## Ask Before Making These Changes (MUST)
 
 - Adding dependencies (`bun add ...`)
 - Modifying `package.json`, `tsconfig*`, `next.config.*`
@@ -71,7 +60,7 @@ bun run test
 - Changing CI/CD (`.github/workflows/`)
 - Deleting files
 
-## Critical Project Patterns
+## Required Project Patterns (MUST When Applicable)
 
 ### Streaming Responses (AI SDK v6)
 
@@ -106,20 +95,12 @@ try {
 }
 ```
 
-## Golden References
-
-- API route pattern: `app/api/chat/route.ts`
-- Adapter registry: `app/api/chat/adapters/index.ts`
-- Chat hook pattern: `app/components/chat/use-chat-core.ts`
-- Chat store provider: `lib/chat-store/chats/provider.tsx`
-- Chat component pattern: `app/components/chat/chat.tsx`
-
-## Execution Loop
+## Execution Defaults (SHOULD)
 
 1. Gather only the context needed for the current task.
 2. Plan small, testable edits.
 3. Implement focused changes.
-4. Verify with relevant checks (`lint`, `typecheck`, targeted tests).
+4. Run only relevant checks (`lint`, `typecheck`, targeted tests).
 5. Report key trade-offs and residual risks.
 
 ## On-Demand Context
@@ -132,12 +113,12 @@ Load only when needed:
 - `.agents/troubleshooting/`
 - `.agents/context/glossary.md`
 
-## Output Preferences
+## Output Preferences (SHOULD)
 
 - If asked to create a prompt, return it directly in chat unless a file is explicitly requested.
 - Do not include timeline or effort estimates unless explicitly requested.
 
-## Pull Request Baseline
+## Pull Request Baseline (SHOULD When Preparing PRs)
 
 1. Run `git fetch origin` before branch comparisons.
 2. Diff and log against `origin/main` (not local `main`).

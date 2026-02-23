@@ -73,6 +73,13 @@ export type ToolMetadata = {
    * Used for future retry policies (only retry idempotent tools).
    */
   idempotent?: boolean
+  /**
+   * Whether this tool interacts with an open-world context
+   * (arbitrary internet/external systems).
+   * Mapped from MCP `openWorldHint` annotation when available.
+   * Used by centralized capability/risk policy decisions.
+   */
+  openWorld?: boolean
 }
 
 /**
@@ -124,6 +131,7 @@ export type ToolTrace = {
   retryAfterSeconds?: number
   budgetKeyMode?: "platform" | "byok"
   budgetDenied?: boolean
+  retryCount?: number
 }
 
 /**

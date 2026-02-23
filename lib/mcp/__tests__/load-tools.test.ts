@@ -8,6 +8,9 @@ import { resetAllCircuits, recordFailure } from "../circuit-breaker"
 const mockCreateMCPClient = vi.fn()
 const mockFetchQuery = vi.fn()
 const mockFetchMutation = vi.fn()
+const { mockTrustedRetryAllowlist } = vi.hoisted(() => ({
+  mockTrustedRetryAllowlist: [] as string[],
+}))
 
 vi.mock("@ai-sdk/mcp", () => ({
   createMCPClient: (...args: unknown[]) => mockCreateMCPClient(...args),
@@ -38,6 +41,7 @@ vi.mock("@/lib/config", () => ({
   MCP_CONNECTION_TIMEOUT_MS: 5000,
   MCP_MAX_TOOLS_PER_REQUEST: 50,
   MCP_CIRCUIT_BREAKER_THRESHOLD: 3,
+  MCP_TRUSTED_RETRY_SERVER_ALLOWLIST: mockTrustedRetryAllowlist,
 }))
 
 // =============================================================================
@@ -124,6 +128,7 @@ describe("loadUserMcpTools", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     resetAllCircuits()
+    mockTrustedRetryAllowlist.length = 0
     // fetchMutation is fire-and-forget with .catch() — must return a promise
     mockFetchMutation.mockResolvedValue(undefined)
     // Suppress console output in tests
@@ -228,6 +233,8 @@ describe("loadUserMcpTools", () => {
         destructive: true,
         idempotent: false,
         openWorld: true,
+        retrySafetyTrusted: false,
+        policyHintsTrusted: false,
       })
     })
 
@@ -258,6 +265,32 @@ describe("loadUserMcpTools", () => {
       expect(issueInfo?.destructive).toBeUndefined()
       expect(issueInfo?.idempotent).toBeUndefined()
       expect(issueInfo?.openWorld).toBeUndefined()
+      expect(issueInfo?.retrySafetyTrusted).toBe(false)
+      expect(issueInfo?.policyHintsTrusted).toBe(false)
+    })
+
+    it("marks retry hints trusted when server matches allowlist", async () => {
+      mockTrustedRetryAllowlist.push("github")
+
+      const server = mockServer({ name: "GitHub" })
+      const client = mockClient({
+        create_issue: {
+          ...mockTool("create_issue"),
+          annotations: { idempotentHint: true },
+        },
+      })
+
+      mockFetchQuery
+        .mockResolvedValueOnce([server])
+        .mockResolvedValueOnce([])
+
+      mockCreateMCPClient.mockResolvedValue(client)
+
+      const result = await loadUserMcpTools("test-token")
+      const issueInfo = result.toolServerMap.get("github_create_issue")
+
+      expect(issueInfo?.retrySafetyTrusted).toBe(true)
+      expect(issueInfo?.policyHintsTrusted).toBe(true)
     })
   })
 
@@ -316,6 +349,54 @@ describe("loadUserMcpTools", () => {
       // Both should exist under different namespaces
       expect(result.tools).toHaveProperty("server_a_search")
       expect(result.tools).toHaveProperty("server_b_search")
+    })
+
+    it("drops colliding namespaced tools when slug normalization collides", async () => {
+      const servers = [
+        mockServer({ _id: "s1", name: "Alpha Beta" }),
+        mockServer({ _id: "s2", name: "Alpha---Beta", url: "https://alpha2.example.com" }),
+      ]
+
+      const client1 = mockClient({ search: mockTool("search") })
+      const client2 = mockClient({ search: mockTool("search") })
+
+      mockFetchQuery
+        .mockResolvedValueOnce(servers)
+        .mockResolvedValueOnce([])
+
+      mockCreateMCPClient
+        .mockResolvedValueOnce(client1)
+        .mockResolvedValueOnce(client2)
+
+      const result = await loadUserMcpTools("test-token")
+
+      expect(result.tools).not.toHaveProperty("alpha_beta_search")
+      expect(result.toolServerMap.has("alpha_beta_search")).toBe(false)
+    })
+
+    it("drops colliding namespaced tools when server slugs collide after truncation", async () => {
+      const base = "a".repeat(30)
+      const servers = [
+        mockServer({ _id: "s1", name: `${base}-x` }),
+        mockServer({ _id: "s2", name: `${base}_y`, url: "https://long2.example.com" }),
+      ]
+
+      const client1 = mockClient({ lookup: mockTool("lookup") })
+      const client2 = mockClient({ lookup: mockTool("lookup") })
+
+      mockFetchQuery
+        .mockResolvedValueOnce(servers)
+        .mockResolvedValueOnce([])
+
+      mockCreateMCPClient
+        .mockResolvedValueOnce(client1)
+        .mockResolvedValueOnce(client2)
+
+      const result = await loadUserMcpTools("test-token")
+      const collidingName = `${base}_lookup`
+
+      expect(result.tools).not.toHaveProperty(collidingName)
+      expect(result.toolServerMap.has(collidingName)).toBe(false)
     })
   })
 

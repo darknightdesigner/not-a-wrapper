@@ -9,38 +9,35 @@
 import type { ToolSet } from "ai"
 import { ToolTraceCollector } from "./types"
 import type { ToolTrace } from "./types"
-import { truncateToolResult, enrichToolError } from "./utils"
+import {
+  truncateToolResult,
+  enrichToolError,
+  executeWithRetries,
+  extractAbortSignalFromOptions,
+  runWithToolAbortAndTimeout,
+  ToolTimeoutError,
+} from "./utils"
 import { extractToolErrorData, type ToolErrorCode } from "./errors"
 import { extractPolicyErrorData } from "./policy"
 import type { ServerInfo } from "@/lib/mcp/load-tools"
 import {
   MAX_TOOL_RESULT_SIZE,
+  MCP_CIRCUIT_BREAKER_THRESHOLD,
   MCP_TOOL_EXECUTION_TIMEOUT_MS,
 } from "@/lib/config"
 
 // Re-export trace types for backward compatibility (route.ts imports from here)
 export { ToolTraceCollector, type ToolTrace }
+export { ToolTimeoutError }
 
-// ── Error Types ────────────────────────────────────────────
-
-/**
- * Thrown when a tool execution exceeds its timeout.
- * The AI SDK catches this in execute() and returns a tool-error to the model,
- * which can acknowledge the failure and continue streaming.
- */
-export class ToolTimeoutError extends Error {
-  readonly toolName: string
-  readonly timeoutMs: number
-
-  constructor(toolName: string, timeoutMs: number) {
-    super(
-      `Tool "${toolName}" timed out after ${timeoutMs}ms. ` +
-        `The operation was taking too long and was cancelled.`
-    )
-    this.name = "ToolTimeoutError"
-    this.toolName = toolName
-    this.timeoutMs = timeoutMs
-  }
+function isTransientCircuitFailure(errorCode: ToolErrorCode | undefined): boolean {
+  if (!errorCode) return false
+  return (
+    errorCode === "timeout" ||
+    errorCode === "rate_limit" ||
+    errorCode === "network" ||
+    errorCode === "upstream_failure"
+  )
 }
 
 // ── Configuration ──────────────────────────────────────────
@@ -94,7 +91,7 @@ export function wrapMcpTools(
   } = config
 
   const serverFailureCounts = new Map<string, number>()
-  const circuitThreshold = 3
+  const circuitThreshold = MCP_CIRCUIT_BREAKER_THRESHOLD
 
   const wrapped: Record<string, unknown> = {}
 
@@ -116,6 +113,22 @@ export function wrapMcpTools(
 
     const serverInfo = toolServerMap.get(name)
     const displayName = serverInfo?.displayName ?? name
+    const trustedRetryHints = serverInfo?.retrySafetyTrusted === true
+    // MCP annotation hints are advisory by default. Automatic retries are only
+    // enabled when the request context explicitly trusts the server AND the
+    // safety signal is clear (explicit idempotent + explicit non-destructive).
+    const hasExplicitNonDestructiveSignal =
+      serverInfo?.destructive === false || serverInfo?.readOnly === true
+    const retryMetadata =
+      trustedRetryHints &&
+      serverInfo?.idempotent === true &&
+      hasExplicitNonDestructiveSignal
+        ? {
+            idempotent: true,
+            readOnly: serverInfo?.readOnly,
+            destructive: serverInfo?.destructive,
+          }
+        : undefined
 
     wrapped[name] = {
       ...original,
@@ -123,11 +136,12 @@ export function wrapMcpTools(
         params: unknown,
         options: { toolCallId: string; [k: string]: unknown }
       ): Promise<unknown> => {
+        const upstreamAbortSignal = extractAbortSignalFromOptions(options)
         const serverKey = serverInfo?.serverId ?? "unknown"
         const failures = serverFailureCounts.get(serverKey) ?? 0
         if (failures >= circuitThreshold) {
           throw enrichToolError(
-            new Error(`Server "${serverInfo?.serverName ?? serverKey}" circuit open — ${failures} consecutive tool failures in this request`),
+            new Error(`Server "${serverInfo?.serverName ?? serverKey}" circuit open — ${failures} consecutive transient tool failures in this request`),
             displayName
           )
         }
@@ -140,29 +154,46 @@ export function wrapMcpTools(
         let retryAfterSeconds: number | undefined
         let budgetKeyMode: "platform" | "byok" | undefined
         let budgetDenied: boolean | undefined
+        let retryCount = 0
 
         try {
           if (enforceToolBudget) {
             await enforceToolBudget(name)
           }
 
-          // ── Timeout + Execution ────────────────────────
-          // Promise.race: either the tool resolves or the timeout rejects.
-          // When timeout wins, ToolTimeoutError is thrown → caught below →
-          // re-thrown with recovery hint → SDK sets isError: true.
-          // Uses AbortSignal.timeout() for cleaner timer lifecycle —
-          // no manual clearTimeout needed. The signal's internal timer
-          // fires harmlessly after the race settles on serverless.
-          const rawResult = await Promise.race([
-            origExec(params, options),
-            new Promise<never>((_, reject) => {
-              AbortSignal.timeout(timeoutMs).addEventListener(
-                "abort",
-                () => reject(new ToolTimeoutError(name, timeoutMs)),
-                { once: true }
-              )
-            }),
-          ])
+          const { value: rawResult, retryCount: retries } =
+            await executeWithRetries({
+              toolName: name,
+              metadata: retryMetadata,
+              abortSignal: upstreamAbortSignal,
+              execute: async () =>
+                runWithToolAbortAndTimeout({
+                  toolName: name,
+                  timeoutMs,
+                  upstreamSignal: upstreamAbortSignal,
+                  operation: (combinedSignal) =>
+                    origExec(params, {
+                      ...options,
+                      abortSignal: combinedSignal,
+                    }),
+                }),
+              onRetryAttempt: (attempt) => {
+                console.warn(
+                  JSON.stringify({
+                    _tag: "tool_retry",
+                    requestId,
+                    tool: name,
+                    source: "mcp",
+                    server: serverInfo?.serverName ?? "unknown",
+                    attempt: attempt.attempt,
+                    maxAttempts: attempt.maxAttempts,
+                    delayMs: attempt.delayMs,
+                    errorCode: attempt.error.code,
+                  })
+                )
+              },
+            })
+          retryCount = retries
 
           // ── Measure result size (for trace, before truncation) ──
           try {
@@ -173,7 +204,12 @@ export function wrapMcpTools(
           }
 
           // ── Truncation ─────────────────────────────────
-          const truncatedResult = truncateToolResult(rawResult, maxResultBytes)
+          const truncatedResult = truncateToolResult(rawResult, {
+            maxBytes: maxResultBytes,
+            toolName: name,
+          })
+
+          serverFailureCounts.delete(serverKey)
 
           return truncatedResult
         } catch (err) {
@@ -190,7 +226,15 @@ export function wrapMcpTools(
           }
 
           const failKey = serverInfo?.serverId ?? "unknown"
-          serverFailureCounts.set(failKey, (serverFailureCounts.get(failKey) ?? 0) + 1)
+          if (isTransientCircuitFailure(errorCode)) {
+            serverFailureCounts.set(
+              failKey,
+              (serverFailureCounts.get(failKey) ?? 0) + 1
+            )
+          } else {
+            // Circuit breaker tracks consecutive transient failures only.
+            serverFailureCounts.delete(failKey)
+          }
 
           console.error(
             `[tools/mcp] ${displayName} failed after ${Date.now() - startMs}ms:`,
@@ -211,6 +255,7 @@ export function wrapMcpTools(
             retryAfterSeconds,
             budgetKeyMode,
             budgetDenied,
+            retryCount,
           })
         }
       },

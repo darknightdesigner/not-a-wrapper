@@ -3,6 +3,15 @@ import { ToolPolicyError } from "../policy"
 import { normalizeToolError } from "../errors"
 
 describe("normalizeToolError", () => {
+  it("maps abort/cancel errors", () => {
+    const err = new Error("Request was aborted by caller")
+    err.name = "AbortError"
+    const normalized = normalizeToolError(err)
+
+    expect(normalized.code).toBe("aborted")
+    expect(normalized.retryable).toBe(false)
+  })
+
   it("maps timeout-like errors", () => {
     const err = new Error("operation timed out after 30000ms")
     err.name = "ToolTimeoutError"

@@ -5,7 +5,8 @@ import type { ToolMetadata } from "./types"
 import { getPayClawConfig } from "@/lib/payclaw/config"
 import { payClawToolInputSchema, type ShippingAddress } from "@/lib/payclaw/schemas"
 import { PayClawApiError, createJob, getJob, getJobEvents } from "@/lib/payclaw/client"
-import { enrichToolError } from "./utils"
+import { enrichToolError, extractAbortSignalFromOptions } from "./utils"
+import { extractToolErrorData } from "./errors"
 
 export async function getPlatformTools(options?: {
   userName?: string
@@ -22,6 +23,10 @@ export async function getPlatformTools(options?: {
   if (!config) {
     return { tools: tools as ToolSet, metadata }
   }
+
+  // Request-scoped dedupe cache to reduce duplicate purchase side effects when
+  // the model emits identical pay_purchase calls in the same generation.
+  const purchaseRequestCache = new Map<string, Promise<{ jobId: string; status: string }>>()
 
   tools.pay_purchase = tool({
     description:
@@ -43,10 +48,38 @@ export async function getPlatformTools(options?: {
       "- Do NOT call this tool to check on an existing job — use pay_status instead.\n" +
       "- Do NOT re-create a job for the same URL if a previous pay_purchase result already exists in this conversation, unless the user explicitly asks for a new purchase.",
     inputSchema: payClawToolInputSchema,
-    execute: async (input) => {
+    inputExamples: [
+      {
+        input: {
+          url: "https://example-saas.com/pricing",
+          maxSpend: 2500,
+          product: "Pro monthly subscription",
+        },
+      },
+      {
+        input: {
+          url: "https://store.example.com/products/ergonomic-mouse",
+          maxSpend: 4800,
+          shippingAddress: {
+            name: "Alex Rivera",
+            line1: "123 Main St",
+            city: "San Francisco",
+            state: "CA",
+            postalCode: "94105",
+            country: "US",
+            phone: "+1-415-555-0123",
+            email: "alex@example.com",
+          },
+        },
+      },
+    ],
+    execute: async (input, toolOptions) => {
       const startMs = Date.now()
       try {
         const resolvedInput = { ...input }
+        const abortSignal = toolOptions
+          ? extractAbortSignalFromOptions(toolOptions)
+          : undefined
 
         if (!resolvedInput.shippingAddress && options?.defaultShippingAddress) {
           resolvedInput.shippingAddress = {
@@ -91,7 +124,27 @@ export async function getPlatformTools(options?: {
           }
         }
 
-        const result = await createJob(resolvedInput, config)
+        const dedupeKey = JSON.stringify({
+          url: resolvedInput.url,
+          maxSpend: resolvedInput.maxSpend,
+          product: resolvedInput.product ?? null,
+          shippingAddress: resolvedInput.shippingAddress ?? null,
+          paymentMethod: resolvedInput.paymentMethod ?? null,
+          browserProvider: resolvedInput.browserProvider ?? null,
+        })
+
+        let jobPromise = purchaseRequestCache.get(dedupeKey)
+        if (!jobPromise) {
+          jobPromise = createJob(resolvedInput, config, { signal: abortSignal })
+            .then((result) => ({ jobId: result.jobId, status: result.status }))
+            .catch((error) => {
+              purchaseRequestCache.delete(dedupeKey)
+              throw error
+            })
+          purchaseRequestCache.set(dedupeKey, jobPromise)
+        }
+
+        const result = await jobPromise
         console.log(JSON.stringify({
           _tag: "tool_exec",
           tool: "pay_purchase",
@@ -137,13 +190,25 @@ export async function getPlatformTools(options?: {
           "The job ID returned by pay_purchase. Use this to check status of an existing purchase job."
         ),
     }),
-    execute: async (input) => {
+    inputExamples: [
+      { input: { jobId: "job_abc123xyz" } },
+      { input: { jobId: "job_2026_02_23_001" } },
+    ],
+    execute: async (input, toolOptions) => {
       const startMs = Date.now()
       try {
-        const eventsPromise = getJobEvents(input.jobId, config)
+        const abortSignal = toolOptions
+          ? extractAbortSignalFromOptions(toolOptions)
+          : undefined
+
+        const eventsPromise = getJobEvents(input.jobId, config, { signal: abortSignal })
           .then((events) => ({ events, degraded: false as const }))
           .catch((err) => {
             if (err instanceof PayClawApiError) {
+              throw err
+            }
+            const errorData = extractToolErrorData(err, { toolName: "pay_status" })
+            if (errorData.code === "aborted" || errorData.code === "timeout") {
               throw err
             }
 
@@ -156,7 +221,7 @@ export async function getPlatformTools(options?: {
           })
 
         const [job, eventsResult] = await Promise.all([
-          getJob(input.jobId, config),
+          getJob(input.jobId, config, { signal: abortSignal }),
           eventsPromise,
         ])
         const events = eventsResult.events

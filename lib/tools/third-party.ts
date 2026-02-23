@@ -4,9 +4,23 @@ import { tool } from "ai"
 import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
-import { truncateToolResult, enrichToolError } from "./utils"
+import {
+  truncateToolResult,
+  enrichToolError,
+  extractAbortSignalFromOptions,
+  runWithToolAbortAndTimeout,
+  throwIfAborted,
+} from "./utils"
 import type { ToolPolicyGuard } from "./policy"
-import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
+import {
+  EXA_CONTENT_FRESHNESS_MAX_AGE_HOURS,
+  THIRD_PARTY_EXTRACTION_CACHE_MAX_ENTRIES,
+  THIRD_PARTY_EXTRACTION_CACHE_TTL_MS,
+  THIRD_PARTY_SEARCH_CACHE_MAX_ENTRIES,
+  THIRD_PARTY_SEARCH_CACHE_TTL_MS,
+  TOOL_EXECUTION_TIMEOUT_MS,
+} from "@/lib/config"
+import { LruTtlCache } from "./cache"
 
 // ── Content Extraction Cache ────────────────────────────────
 // Process-level LRU cache for content extraction results.
@@ -15,12 +29,10 @@ import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
 
 type CachedExtraction = { url: string; title?: string; content?: string }
 
-const extractionCache = new Map<
-  string,
-  { data: CachedExtraction; fetchedAt: number }
->()
-const EXTRACTION_CACHE_TTL_MS = 15 * 60 * 1000
-const EXTRACTION_CACHE_MAX_ENTRIES = 500
+const extractionCache = new LruTtlCache<string, CachedExtraction>({
+  ttlMs: THIRD_PARTY_EXTRACTION_CACHE_TTL_MS,
+  maxEntries: THIRD_PARTY_EXTRACTION_CACHE_MAX_ENTRIES,
+})
 
 function normalizeUrl(url: string): string {
   try {
@@ -39,21 +51,11 @@ function normalizeUrl(url: string): string {
 
 function getCachedExtraction(url: string): CachedExtraction | null {
   const key = normalizeUrl(url)
-  const entry = extractionCache.get(key)
-  if (!entry) return null
-  if (Date.now() - entry.fetchedAt > EXTRACTION_CACHE_TTL_MS) {
-    extractionCache.delete(key)
-    return null
-  }
-  return entry.data
+  return extractionCache.get(key)
 }
 
 function setCachedExtraction(inputUrl: string, data: CachedExtraction): void {
-  if (extractionCache.size >= EXTRACTION_CACHE_MAX_ENTRIES) {
-    const oldestKey = extractionCache.keys().next().value
-    if (oldestKey) extractionCache.delete(oldestKey)
-  }
-  extractionCache.set(normalizeUrl(inputUrl), { data, fetchedAt: Date.now() })
+  extractionCache.set(normalizeUrl(inputUrl), data)
 }
 
 // ── Search Result Cache ─────────────────────────────────────
@@ -68,12 +70,10 @@ type CachedSearchResult = {
   publishedDate?: string
 }
 
-const searchCache = new Map<
-  string,
-  { data: CachedSearchResult[]; fetchedAt: number }
->()
-const SEARCH_CACHE_TTL_MS = 15 * 60 * 1000
-const SEARCH_CACHE_MAX_ENTRIES = 500
+const searchCache = new LruTtlCache<string, CachedSearchResult[]>({
+  ttlMs: THIRD_PARTY_SEARCH_CACHE_TTL_MS,
+  maxEntries: THIRD_PARTY_SEARCH_CACHE_MAX_ENTRIES,
+})
 
 function normalizeQuery(query: string): string {
   return query.toLowerCase().trim().replace(/\s+/g, " ")
@@ -81,21 +81,11 @@ function normalizeQuery(query: string): string {
 
 function getCachedSearch(query: string): CachedSearchResult[] | null {
   const key = normalizeQuery(query)
-  const entry = searchCache.get(key)
-  if (!entry) return null
-  if (Date.now() - entry.fetchedAt > SEARCH_CACHE_TTL_MS) {
-    searchCache.delete(key)
-    return null
-  }
-  return entry.data
+  return searchCache.get(key)
 }
 
 function setCachedSearch(query: string, data: CachedSearchResult[]): void {
-  if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) {
-    const oldestKey = searchCache.keys().next().value
-    if (oldestKey) searchCache.delete(oldestKey)
-  }
-  searchCache.set(normalizeQuery(query), { data, fetchedAt: Date.now() })
+  searchCache.set(normalizeQuery(query), data)
 }
 
 /**
@@ -183,9 +173,21 @@ export async function getThirdPartyTools(
             .max(200)
             .describe("The search query — be specific for better results"),
         }),
-        execute: async ({ query }) => {
+        inputExamples: [
+          { input: { query: "latest federal reserve interest rate decision summary" } },
+          { input: { query: "vercel ai sdk 6 tool calling docs" } },
+        ],
+        execute: async ({ query }, options) => {
           const startMs = Date.now()
+          const upstreamAbortSignal = options
+            ? extractAbortSignalFromOptions(options)
+            : undefined
           try {
+            throwIfAborted(upstreamAbortSignal, {
+              toolName: "web_search",
+              upstreamSignal: upstreamAbortSignal,
+            })
+
             // ── Cache check ──────────────────────────────
             const cached = getCachedSearch(query)
             if (cached) {
@@ -197,29 +199,32 @@ export async function getThirdPartyTools(
                 resultCount: cached.length,
                 cached: true,
               }))
-              return truncateToolResult(cached)
+              return truncateToolResult(cached, {
+                toolName: "web_search",
+                resultCategory: "search_results",
+              })
             }
 
-            // Timeout via Promise.race — the exa-js SDK does not accept
-            // AbortSignal, so the underlying HTTP request may continue after
-            // timeout. On serverless this is bounded by function lifetime.
-            const { results } = await Promise.race([
-              exa.searchAndContents(query, {
-                type: "auto",
-                numResults: 5,
-                text: { maxCharacters: 2000 },
-                livecrawl: "fallback",
-              }),
-              new Promise<never>((_, reject) => {
-                AbortSignal.timeout(TOOL_EXECUTION_TIMEOUT_MS).addEventListener(
-                  "abort",
-                  () => reject(new Error(
-                    `Exa search timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
-                  )),
-                  { once: true }
-                )
-              }),
-            ])
+            // Exa SDK does not accept AbortSignal yet. Race the call against the
+            // composed signal so we return promptly on upstream cancel/timeout.
+            const { results } = await runWithToolAbortAndTimeout({
+              toolName: "web_search",
+              timeoutMs: TOOL_EXECUTION_TIMEOUT_MS,
+              upstreamSignal: upstreamAbortSignal,
+              operation: async () =>
+                // searchAndContents does not expose the same freshness knob as getContents.
+                // Keep current safe defaults and rely on cache TTL for freshness.
+                exa.searchAndContents(query, {
+                  type: "auto",
+                  numResults: 5,
+                  text: { maxCharacters: 2000 },
+                  livecrawl: "fallback",
+                }),
+            })
+            throwIfAborted(upstreamAbortSignal, {
+              toolName: "web_search",
+              upstreamSignal: upstreamAbortSignal,
+            })
             const mapped = results.map((r) => ({
               title: r.title ?? undefined,
               url: r.url,
@@ -234,7 +239,10 @@ export async function getThirdPartyTools(
               durationMs: Date.now() - startMs,
               resultCount: results.length,
             }))
-            return truncateToolResult(mapped)
+            return truncateToolResult(mapped, {
+              toolName: "web_search",
+              resultCategory: "search_results",
+            })
           } catch (err) {
             console.error(
               `[tools/exa] Search failed after ${Date.now() - startMs}ms:`,
@@ -251,6 +259,8 @@ export async function getThirdPartyTools(
         icon: "search",
         estimatedCostPer1k: 5, // $5/1K search requests (1-25 results per request)
         readOnly: true,
+        idempotent: true,
+        openWorld: true,
       })
     } catch (err) {
       console.error("[tools/third-party] Failed to load Exa search:", err)
@@ -295,12 +305,19 @@ export async function getContentExtractionTools(options: {
 
     tools.extract_content = tool({
       description:
-        "Fetch and extract clean, readable content from web page URLs as markdown. " +
-        "Use when the user provides URLs to read, analyze, or summarize, or when you need " +
-        "the full content of a URL found via web search. " +
-        "Do NOT use for URLs appearing in code snippets, import statements, or reference links " +
-        "unless the user explicitly asks to read them. " +
-        "Returns the page title, URL, and extracted markdown content for each URL.",
+        "Fetch and extract clean, readable page content from URLs. " +
+        "Returns each URL with title and extracted markdown content.\n\n" +
+        "When to use:\n" +
+        "- The user explicitly asks to read, summarize, compare, or analyze one or more URLs\n" +
+        "- You found a promising URL via search and need full page content before answering\n" +
+        "- The answer depends on details that are not present in short snippets\n\n" +
+        "When NOT to use:\n" +
+        "- URLs in code snippets, import statements, stack traces, or citation lists unless the user asks to open them\n" +
+        "- Cases where search snippets already answer the question\n" +
+        "- Internal/private URLs that are unlikely to be publicly accessible\n\n" +
+        "Caveats:\n" +
+        "- Batch related URLs in a single call (up to 5)\n" +
+        "- Keep URLs specific to avoid unnecessary extraction cost",
       inputSchema: z.object({
         urls: z
           .array(z.string().url())
@@ -308,9 +325,32 @@ export async function getContentExtractionTools(options: {
           .max(5)
           .describe("URLs to extract content from (1-5 URLs per call)"),
       }),
-      execute: async ({ urls }) => {
+      inputExamples: [
+        {
+          input: {
+            urls: ["https://ai-sdk.dev/docs/ai-sdk-core/tools-and-tool-calling"],
+          },
+        },
+        {
+          input: {
+            urls: [
+              "https://vercel.com/blog",
+              "https://ai-sdk.dev/docs/reference/ai-sdk-core/stream-text",
+            ],
+          },
+        },
+      ],
+      execute: async ({ urls }, options) => {
         const startMs = Date.now()
+        const upstreamAbortSignal = options
+          ? extractAbortSignalFromOptions(options)
+          : undefined
         try {
+          throwIfAborted(upstreamAbortSignal, {
+            toolName: "extract_content",
+            upstreamSignal: upstreamAbortSignal,
+          })
+
           // ── Cache check ────────────────────────────────
           const cached = new Map<string, CachedExtraction>()
           const uncachedUrls: string[] = []
@@ -338,8 +378,15 @@ export async function getContentExtractionTools(options: {
               failedCount: 0,
               cachedCount: cached.size,
             }))
-            return truncateToolResult(mapped)
+            return truncateToolResult(mapped, {
+              toolName: "extract_content",
+              resultCategory: "content_extraction",
+            })
           }
+          throwIfAborted(upstreamAbortSignal, {
+            toolName: "extract_content",
+            upstreamSignal: upstreamAbortSignal,
+          })
 
           // ── Persistent per-domain limit (uncached only) ─
           // Cache hits intentionally do NOT consume domain quota.
@@ -358,23 +405,30 @@ export async function getContentExtractionTools(options: {
             }
             await policyGuard.enforceExtractDomainLimit(uncachedDomainCounts)
           }
+          throwIfAborted(upstreamAbortSignal, {
+            toolName: "extract_content",
+            upstreamSignal: upstreamAbortSignal,
+          })
 
           // ── Fetch uncached URLs from Exa ───────────────
-          // Timeout via Promise.race — exa-js does not accept AbortSignal.
-          const response = await Promise.race([
-            exa.getContents(uncachedUrls, {
-              text: { maxCharacters: 10000 },
-            }),
-            new Promise<never>((_, reject) => {
-              AbortSignal.timeout(TOOL_EXECUTION_TIMEOUT_MS).addEventListener(
-                "abort",
-                () => reject(new Error(
-                  `Exa getContents timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
-                )),
-                { once: true }
-              )
-            }),
-          ])
+          // Exa SDK does not accept AbortSignal yet. Race to avoid blocking
+          // response teardown on cancellation while the HTTP request continues.
+          const response = await runWithToolAbortAndTimeout({
+            toolName: "extract_content",
+            timeoutMs: TOOL_EXECUTION_TIMEOUT_MS,
+            upstreamSignal: upstreamAbortSignal,
+            operation: async () => {
+              const getContentsOptions = {
+                text: { maxCharacters: 10000 },
+                maxAgeHours: EXA_CONTENT_FRESHNESS_MAX_AGE_HOURS,
+              }
+              return exa.getContents(uncachedUrls, getContentsOptions)
+            },
+          })
+          throwIfAborted(upstreamAbortSignal, {
+            toolName: "extract_content",
+            upstreamSignal: upstreamAbortSignal,
+          })
 
           // SDK types for Status are minimal ({ id, status, source }) but the
           // API returns error details (tag, httpStatusCode) on failures.
@@ -464,7 +518,10 @@ export async function getContentExtractionTools(options: {
             failedCount,
             cachedCount: cached.size,
           }))
-          return truncateToolResult(mapped)
+          return truncateToolResult(mapped, {
+            toolName: "extract_content",
+            resultCategory: "content_extraction",
+          })
         } catch (err) {
           console.error(
             `[tools/exa] Content extraction failed after ${Date.now() - startMs}ms:`,
@@ -481,6 +538,8 @@ export async function getContentExtractionTools(options: {
       icon: "extract",
       estimatedCostPer1k: 1,
       readOnly: true,
+      idempotent: true,
+      openWorld: true,
     })
   } catch (err) {
     console.error(

@@ -46,6 +46,10 @@ export function isToolPolicyError(err: unknown): err is ToolPolicyError {
   return err instanceof ToolPolicyError
 }
 
+export function isPolicyUnavailableError(err: unknown): err is ToolPolicyError {
+  return isToolPolicyError(err) && err.code === "TOOL_POLICY_UNAVAILABLE"
+}
+
 export function extractPolicyErrorData(err: unknown): ToolPolicyErrorData | null {
   if (!isToolPolicyError(err)) return null
   return {
@@ -54,6 +58,146 @@ export function extractPolicyErrorData(err: unknown): ToolPolicyErrorData | null
     keyMode: err.keyMode,
     scopeKey: err.scopeKey,
     budgetDenied: err.budgetDenied,
+  }
+}
+
+export type RequestLocalToolSoftCapSnapshot = {
+  toolName: string
+  used: number
+  remaining: number
+  maxCalls: number
+}
+
+export type RequestLocalToolSoftCap = {
+  getSnapshot(toolName: string): RequestLocalToolSoftCapSnapshot
+  recordCall(toolName: string): RequestLocalToolSoftCapSnapshot
+}
+
+export function createRequestLocalToolSoftCap(options?: {
+  maxCallsPerTool?: number
+}): RequestLocalToolSoftCap {
+  const maxCallsPerTool = Math.max(1, Math.trunc(options?.maxCallsPerTool ?? 3))
+  const callsByTool = new Map<string, number>()
+
+  const snapshotFor = (toolName: string): RequestLocalToolSoftCapSnapshot => {
+    const used = callsByTool.get(toolName) ?? 0
+    return {
+      toolName,
+      used,
+      remaining: Math.max(0, maxCallsPerTool - used),
+      maxCalls: maxCallsPerTool,
+    }
+  }
+
+  return {
+    getSnapshot(toolName: string): RequestLocalToolSoftCapSnapshot {
+      return snapshotFor(toolName)
+    },
+    recordCall(toolName: string): RequestLocalToolSoftCapSnapshot {
+      const used = (callsByTool.get(toolName) ?? 0) + 1
+      callsByTool.set(toolName, used)
+      return snapshotFor(toolName)
+    },
+  }
+}
+
+export type OutageTolerantBudgetEvent =
+  | {
+      type: "recovered"
+      toolName: string
+      keyMode: ToolKeyMode
+    }
+  | {
+      type: "degraded_allow"
+      toolName: string
+      keyMode: ToolKeyMode
+      retryAfterSeconds?: number
+      snapshot: RequestLocalToolSoftCapSnapshot
+      error: string
+    }
+  | {
+      type: "degraded_block"
+      toolName: string
+      keyMode: ToolKeyMode
+      retryAfterSeconds?: number
+      snapshot: RequestLocalToolSoftCapSnapshot
+      error: string
+    }
+
+export function createOutageTolerantToolBudgetEnforcer(options: {
+  enforceToolBudget: (toolName: string) => Promise<void>
+  keyMode: ToolKeyMode
+  maxCallsPerTool?: number
+  onEvent?: (event: OutageTolerantBudgetEvent) => void
+}): (toolName: string) => Promise<void> {
+  const softCap = createRequestLocalToolSoftCap({
+    maxCallsPerTool: options.maxCallsPerTool,
+  })
+  const degradedTools = new Set<string>()
+  const exhaustedTools = new Set<string>()
+
+  return async (toolName: string) => {
+    if (exhaustedTools.has(toolName)) {
+      throw new ToolPolicyError(
+        "TOOL_BUDGET_EXCEEDED: Tool budget exceeded while policy service is unavailable. Retry later with fewer tool calls.",
+        {
+          code: "TOOL_BUDGET_EXCEEDED",
+          keyMode: options.keyMode,
+          scopeKey: "*",
+          budgetDenied: true,
+        }
+      )
+    }
+
+    try {
+      await options.enforceToolBudget(toolName)
+      if (degradedTools.delete(toolName)) {
+        options.onEvent?.({
+          type: "recovered",
+          toolName,
+          keyMode: options.keyMode,
+        })
+      }
+      return
+    } catch (error) {
+      if (!isPolicyUnavailableError(error)) {
+        throw error
+      }
+
+      degradedTools.add(toolName)
+      const current = softCap.getSnapshot(toolName)
+      if (current.remaining <= 0) {
+        exhaustedTools.add(toolName)
+        options.onEvent?.({
+          type: "degraded_block",
+          toolName,
+          keyMode: options.keyMode,
+          retryAfterSeconds: error.retryAfterSeconds,
+          snapshot: current,
+          error: error.message,
+        })
+        throw new ToolPolicyError(
+          "TOOL_BUDGET_EXCEEDED: Tool budget exceeded while policy service is unavailable. Retry later with fewer tool calls.",
+          {
+            code: "TOOL_BUDGET_EXCEEDED",
+            retryAfterSeconds: error.retryAfterSeconds,
+            keyMode: options.keyMode,
+            scopeKey: "*",
+            budgetDenied: true,
+          }
+        )
+      }
+
+      const snapshot = softCap.recordCall(toolName)
+      options.onEvent?.({
+        type: "degraded_allow",
+        toolName,
+        keyMode: options.keyMode,
+        retryAfterSeconds: error.retryAfterSeconds,
+        snapshot,
+        error: error.message,
+      })
+    }
   }
 }
 
@@ -168,6 +312,34 @@ function toRetryHint(retryAfterSeconds?: number): string {
 export type ToolPolicyGuard = {
   enforceToolBudget(toolName: string): Promise<void>
   enforceExtractDomainLimit(domainCounts: Map<string, number>): Promise<void>
+}
+
+export async function probeToolBudget(options: {
+  store: ToolLimitStore
+  keyMode: ToolKeyMode
+  toolName: string
+  actorKey?: string
+}): Promise<{
+  allowed: boolean
+  retryAfterSeconds?: number
+  scopeKey?: string
+}> {
+  const { store, keyMode, toolName, actorKey } = options
+  const policy = getToolBudgetPolicy(toolName, keyMode)
+  const result = await store.checkAndConsume({
+    actorKey,
+    limitType: "budget",
+    toolName,
+    keyMode,
+    scopeCounts: [{ scopeKey: "*", count: 1 }],
+    ...policy,
+    consume: false,
+  })
+  return {
+    allowed: result.allowed,
+    retryAfterSeconds: result.retryAfterSeconds,
+    scopeKey: result.scopeKey,
+  }
 }
 
 export function createToolPolicyGuard(options: {

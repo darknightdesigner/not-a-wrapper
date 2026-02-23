@@ -3,9 +3,14 @@ import type { ToolSet } from "ai"
 import { wrapMcpTools, ToolTraceCollector } from "../mcp-wrapper"
 import { wrapToolsWithTracing } from "../utils"
 import {
+  createOutageTolerantToolBudgetEnforcer,
+  createRequestLocalToolSoftCap,
   createToolPolicyGuard,
   getToolBudgetPolicy,
   InMemoryToolLimitStore,
+  isPolicyUnavailableError,
+  probeToolBudget,
+  type ToolLimitStore,
   ToolPolicyError,
 } from "../policy"
 
@@ -187,15 +192,15 @@ describe("tool policy guardrails", () => {
 
     await guard.enforceExtractDomainLimit(new Map([["shape.example", 6]]))
 
-    await expect(
-      guard.enforceExtractDomainLimit(new Map([["shape.example", 1]]))
-    ).rejects.toSatisfy((error: unknown) => {
-      if (!(error instanceof ToolPolicyError)) return false
-      return (
-        error.code === "EXTRACT_CONTENT_DOMAIN_LIMIT_EXCEEDED" &&
-        error.message.includes("Retry after approximately")
-      )
-    })
+    const error = await guard
+      .enforceExtractDomainLimit(new Map([["shape.example", 1]]))
+      .then(() => null)
+      .catch((err) => err)
+
+    expect(error).toBeInstanceOf(ToolPolicyError)
+    const typed = error as ToolPolicyError
+    expect(typed.code).toBe("EXTRACT_CONTENT_DOMAIN_LIMIT_EXCEEDED")
+    expect(typed.message).toContain("Retry after approximately")
   })
 
   it("returns stable budget error code with actionable retry hint", async () => {
@@ -211,14 +216,166 @@ describe("tool policy guardrails", () => {
       await guard.enforceToolBudget("web_search")
     }
 
-    await expect(guard.enforceToolBudget("web_search")).rejects.toSatisfy(
-      (error: unknown) => {
-        if (!(error instanceof ToolPolicyError)) return false
-        return (
-          error.code === "TOOL_BUDGET_EXCEEDED" &&
-          error.message.includes("Retry after approximately")
+    const error = await guard
+      .enforceToolBudget("web_search")
+      .then(() => null)
+      .catch((err) => err)
+
+    expect(error).toBeInstanceOf(ToolPolicyError)
+    const typed = error as ToolPolicyError
+    expect(typed.code).toBe("TOOL_BUDGET_EXCEEDED")
+    expect(typed.message).toContain("Retry after approximately")
+  })
+
+  it("degrades with a bounded request-local soft cap when policy backend is unavailable", async () => {
+    const unavailableStore: ToolLimitStore = {
+      async checkAndConsume() {
+        throw new ToolPolicyError(
+          "TOOL_POLICY_UNAVAILABLE: Tool policy service is unavailable. Retry in 30 seconds.",
+          {
+            code: "TOOL_POLICY_UNAVAILABLE",
+            retryAfterSeconds: 30,
+          }
         )
-      }
+      },
+    }
+
+    const probeError = await probeToolBudget({
+      store: unavailableStore,
+      keyMode: "platform",
+      toolName: "web_search",
+    }).catch((err) => err)
+    expect(isPolicyUnavailableError(probeError)).toBe(true)
+
+    const softCap = createRequestLocalToolSoftCap({ maxCallsPerTool: 2 })
+    expect(softCap.getSnapshot("web_search")).toMatchObject({
+      used: 0,
+      remaining: 2,
+      maxCalls: 2,
+    })
+
+    expect(softCap.recordCall("web_search")).toMatchObject({
+      used: 1,
+      remaining: 1,
+      maxCalls: 2,
+    })
+    expect(softCap.recordCall("web_search")).toMatchObject({
+      used: 2,
+      remaining: 0,
+      maxCalls: 2,
+    })
+  })
+
+  it("supports non-consuming budget probes for provider-executed tools", async () => {
+    const store = new InMemoryToolLimitStore(() => 6_000_000)
+    const guard = createToolPolicyGuard({
+      store,
+      keyMode: "platform",
+      actorKey: "user:user_provider_probe",
+    })
+    const budget = getToolBudgetPolicy("web_search", "platform")
+
+    for (let i = 0; i < 10; i++) {
+      const probe = await probeToolBudget({
+        store,
+        keyMode: "platform",
+        actorKey: "user:user_provider_probe",
+        toolName: "web_search",
+      })
+      expect(probe.allowed).toBe(true)
+    }
+
+    for (let i = 0; i < budget.maxCount; i++) {
+      await expect(guard.enforceToolBudget("web_search")).resolves.toBeUndefined()
+    }
+
+    const exhaustedProbe = await probeToolBudget({
+      store,
+      keyMode: "platform",
+      actorKey: "user:user_provider_probe",
+      toolName: "web_search",
+    })
+    expect(exhaustedProbe.allowed).toBe(false)
+  })
+
+  it("degrades non-built-in budget enforcement with bounded request-local caps", async () => {
+    const unavailable = () =>
+      new ToolPolicyError(
+        "TOOL_POLICY_UNAVAILABLE: Tool policy service is unavailable. Retry in 30 seconds.",
+        {
+          code: "TOOL_POLICY_UNAVAILABLE",
+          retryAfterSeconds: 30,
+        }
+      )
+
+    const events: Array<{ type: string }> = []
+    const enforce = createOutageTolerantToolBudgetEnforcer({
+      enforceToolBudget: async () => {
+        throw unavailable()
+      },
+      keyMode: "platform",
+      maxCallsPerTool: 2,
+      onEvent: (event) => {
+        events.push({ type: event.type })
+      },
+    })
+
+    await expect(enforce("web_search")).resolves.toBeUndefined()
+    await expect(enforce("web_search")).resolves.toBeUndefined()
+    await expect(enforce("web_search")).rejects.toMatchObject({
+      code: "TOOL_BUDGET_EXCEEDED",
+      budgetDenied: true,
+    })
+
+    expect(events.map((event) => event.type)).toEqual([
+      "degraded_allow",
+      "degraded_allow",
+      "degraded_block",
+    ])
+  })
+
+  it("emits degraded recovery once policy backend is available again", async () => {
+    let callCount = 0
+    const events: Array<{ type: string }> = []
+    const enforce = createOutageTolerantToolBudgetEnforcer({
+      enforceToolBudget: async () => {
+        callCount++
+        if (callCount === 1) {
+          throw new ToolPolicyError(
+            "TOOL_POLICY_UNAVAILABLE: Tool policy service is unavailable. Retry in 30 seconds.",
+            {
+              code: "TOOL_POLICY_UNAVAILABLE",
+              retryAfterSeconds: 30,
+            }
+          )
+        }
+      },
+      keyMode: "platform",
+      maxCallsPerTool: 2,
+      onEvent: (event) => {
+        events.push({ type: event.type })
+      },
+    })
+
+    await expect(enforce("web_search")).resolves.toBeUndefined()
+    await expect(enforce("web_search")).resolves.toBeUndefined()
+    expect(events.map((event) => event.type)).toEqual([
+      "degraded_allow",
+      "recovered",
+    ])
+  })
+
+  it("keeps fail-closed behavior for non-policy errors", async () => {
+    const enforce = createOutageTolerantToolBudgetEnforcer({
+      enforceToolBudget: async () => {
+        throw new Error("unexpected policy backend failure")
+      },
+      keyMode: "platform",
+      maxCallsPerTool: 2,
+    })
+
+    await expect(enforce("web_search")).rejects.toThrow(
+      "unexpected policy backend failure"
     )
   })
 })

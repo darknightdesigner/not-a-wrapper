@@ -11,7 +11,10 @@ import { ToolPolicyError } from "../policy"
 
 /** Create a minimal tool with the given execute function */
 function makeTool(
-  executeFn: (params: unknown, options: { toolCallId: string }) => Promise<unknown>
+  executeFn: (
+    params: unknown,
+    options: { toolCallId: string; abortSignal?: AbortSignal; [k: string]: unknown }
+  ) => Promise<unknown>
 ) {
   return {
     description: "test tool",
@@ -93,6 +96,153 @@ describe("wrapMcpTools", () => {
     expect(trace!.durationMs).toBeLessThan(500) // Should fail fast
   })
 
+  it("cancels on upstream abortSignal and preserves abort taxonomy", async () => {
+    const config = makeConfig({ timeoutMs: 5000 })
+    const tools = {
+      test_tool: makeTool(
+        async (_params, options) =>
+          new Promise((_, reject) => {
+            const signal = options.abortSignal as AbortSignal | undefined
+            if (!signal) return
+            signal.addEventListener(
+              "abort",
+              () => reject(new Error("tool saw abort")),
+              { once: true }
+            )
+          })
+      ),
+    } as unknown as ToolSet
+
+    const wrapped = wrapMcpTools(tools, config)
+    const controller = new AbortController()
+    const pending = (wrapped.test_tool as { execute: Function }).execute(
+      {},
+      { toolCallId: "call_upstream_abort", abortSignal: controller.signal }
+    )
+    controller.abort("request_cancelled")
+
+    await expect(pending).rejects.toThrow(/cancelled|aborted/i)
+    const trace = config.traceCollector.get("call_upstream_abort")
+    expect(trace?.success).toBe(false)
+    expect(trace?.errorCode).toBe("aborted")
+  })
+
+  it("retries idempotent MCP tool on transient failure when retry hints are trusted", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockResolvedValueOnce({ ok: true })
+    const traceCollector = new ToolTraceCollector()
+    const wrapped = wrapMcpTools(
+      {
+        test_tool: makeTool(execute),
+      } as unknown as ToolSet,
+      {
+        toolServerMap: new Map([
+          [
+            "test_tool",
+            {
+              displayName: "Test Tool",
+              serverName: "test-server",
+              serverId: "server123",
+              idempotent: true,
+              destructive: false,
+              retrySafetyTrusted: true,
+            },
+          ],
+        ]),
+        traceCollector,
+        timeoutMs: 1000,
+      }
+    )
+
+    const result = await (wrapped.test_tool as { execute: Function }).execute(
+      {},
+      { toolCallId: "call_retry_mcp" }
+    )
+    expect(result).toEqual({ ok: true })
+    expect(execute).toHaveBeenCalledTimes(2)
+    expect(traceCollector.get("call_retry_mcp")?.retryCount).toBe(1)
+  })
+
+  it("does not retry trusted idempotent MCP tool when non-destructive signal is missing", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockResolvedValueOnce({ ok: true })
+    const traceCollector = new ToolTraceCollector()
+    const wrapped = wrapMcpTools(
+      {
+        test_tool: makeTool(execute),
+      } as unknown as ToolSet,
+      {
+        toolServerMap: new Map([
+          [
+            "test_tool",
+            {
+              displayName: "Test Tool",
+              serverName: "test-server",
+              serverId: "server123",
+              idempotent: true,
+              retrySafetyTrusted: true,
+            },
+          ],
+        ]),
+        traceCollector,
+        timeoutMs: 1000,
+      }
+    )
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_retry_trusted_without_non_destructive" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(
+      traceCollector.get("call_retry_trusted_without_non_destructive")?.retryCount
+    ).toBe(0)
+  })
+
+  it("does not retry idempotent MCP tool when retry hints are untrusted", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockResolvedValueOnce({ ok: true })
+    const traceCollector = new ToolTraceCollector()
+    const wrapped = wrapMcpTools(
+      {
+        test_tool: makeTool(execute),
+      } as unknown as ToolSet,
+      {
+        toolServerMap: new Map([
+          [
+            "test_tool",
+            {
+              displayName: "Test Tool",
+              serverName: "test-server",
+              serverId: "server123",
+              idempotent: true,
+              retrySafetyTrusted: false,
+            },
+          ],
+        ]),
+        traceCollector,
+        timeoutMs: 1000,
+      }
+    )
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_retry_untrusted_mcp" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(traceCollector.get("call_retry_untrusted_mcp")?.retryCount).toBe(0)
+  })
+
   it("throws and traces when tool execute() rejects", async () => {
     const config = makeConfig({ timeoutMs: 5000 })
     const tools = {
@@ -149,6 +299,177 @@ describe("wrapMcpTools", () => {
     expect(trace!.retryAfterSeconds).toBe(60)
     expect(trace!.budgetKeyMode).toBe("platform")
     expect(trace!.budgetDenied).toBe(true)
+  })
+
+  it("opens only after true consecutive transient failures", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+
+    const wrapped = wrapMcpTools(
+      { test_tool: makeTool(execute) } as unknown as ToolSet,
+      makeConfig()
+    )
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_1" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_2" }
+      )
+    ).resolves.toEqual({ ok: true })
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_3" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_4" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_5" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_reset_6" }
+      )
+    ).rejects.toThrow(/circuit open/i)
+
+    expect(execute).toHaveBeenCalledTimes(5)
+  })
+
+  it("resets transient streak when a non-transient failure occurs", async () => {
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockRejectedValueOnce(new Error("invalid input: query is required"))
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+      .mockRejectedValueOnce(new Error("fetch failed ECONNREFUSED"))
+
+    const wrapped = wrapMcpTools(
+      { test_tool: makeTool(execute) } as unknown as ToolSet,
+      makeConfig()
+    )
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_1" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_2" }
+      )
+    ).rejects.toThrow(/invalid input/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_3" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_4" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_5" }
+      )
+    ).rejects.toThrow(/fetch failed/i)
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_streak_6" }
+      )
+    ).rejects.toThrow(/circuit open/i)
+
+    expect(execute).toHaveBeenCalledTimes(5)
+  })
+
+  it("does not count policy or input-validation failures toward circuit opening", async () => {
+    const policyFailure = makeTool(async () => {
+      throw new ToolPolicyError(
+        "TOOL_BUDGET_EXCEEDED: Tool budget exceeded. Retry after approximately 30 seconds.",
+        {
+          code: "TOOL_BUDGET_EXCEEDED",
+          retryAfterSeconds: 30,
+          keyMode: "platform",
+          budgetDenied: true,
+        }
+      )
+    })
+    const validationFailure = makeTool(async () => {
+      throw new Error("invalid input: query is required")
+    })
+
+    const wrapped = wrapMcpTools(
+      {
+        test_tool: policyFailure,
+        validation_tool: validationFailure,
+      } as unknown as ToolSet,
+      {
+        toolServerMap: new Map([
+          [
+            "test_tool",
+            {
+              displayName: "Test Tool",
+              serverName: "test-server",
+              serverId: "server123",
+            },
+          ],
+          [
+            "validation_tool",
+            {
+              displayName: "Validation Tool",
+              serverName: "test-server",
+              serverId: "server123",
+            },
+          ],
+        ]),
+        traceCollector: new ToolTraceCollector(),
+      }
+    )
+
+    for (let i = 0; i < 5; i++) {
+      await expect(
+        (wrapped.test_tool as { execute: Function }).execute(
+          {},
+          { toolCallId: `call_policy_${i}` }
+        )
+      ).rejects.toThrow("TOOL_BUDGET_EXCEEDED")
+      await expect(
+        (wrapped.validation_tool as { execute: Function }).execute(
+          {},
+          { toolCallId: `call_validation_${i}` }
+        )
+      ).rejects.toThrow(/invalid input/i)
+    }
   })
 
   it("passes through tools without execute unchanged", () => {

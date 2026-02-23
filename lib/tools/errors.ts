@@ -1,6 +1,7 @@
 import { extractPolicyErrorData, type ToolPolicyCode } from "./policy"
 
 export type ToolErrorCode =
+  | "aborted"
   | "timeout"
   | "rate_limit"
   | "auth"
@@ -93,6 +94,15 @@ function isTimeoutLike(err: Error): boolean {
   )
 }
 
+function isAbortedLike(err: Error): boolean {
+  return (
+    err.name === "AbortError" ||
+    err.name === "ToolAbortError" ||
+    /\baborted\b/i.test(err.message) ||
+    /\bcancel(?:ed|led)\b/i.test(err.message)
+  )
+}
+
 function isRateLimitLike(err: Error, statusCode?: number): boolean {
   if (statusCode === 429) return true
   return (
@@ -173,6 +183,9 @@ export function normalizeToolError(
   if (isTimeoutLike(original)) {
     code = "timeout"
     retryable = true
+  } else if (isAbortedLike(original)) {
+    code = "aborted"
+    retryable = false
   } else if (isRateLimitLike(original, statusCode)) {
     code = "rate_limit"
     retryable = true
@@ -220,6 +233,8 @@ export function extractToolErrorData(
 
 export function getToolRecoveryHint(data: ToolErrorData): string {
   switch (data.code) {
+    case "aborted":
+      return "Tool execution was cancelled. Continue without this tool result."
     case "timeout":
       return "Try a shorter or more specific query, or skip this step."
     case "rate_limit":
