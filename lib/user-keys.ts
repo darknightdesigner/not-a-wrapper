@@ -119,6 +119,7 @@ export async function getUserKey(
 /** Tool provider IDs that can be stored in userKeys */
 export const TOOL_PROVIDERS = ["exa", "firecrawl"] as const
 export type ToolProvider = (typeof TOOL_PROVIDERS)[number]
+export type ToolKeyMode = "platform" | "byok"
 
 /** Maps tool provider IDs to their environment variable names */
 const TOOL_ENV_MAP: Record<ToolProvider, string> = {
@@ -143,12 +144,28 @@ export async function getEffectiveToolKey(
   provider: ToolProvider,
   convexToken?: string
 ): Promise<string | undefined> {
+  const resolved = await getEffectiveToolKeyWithMode(provider, convexToken)
+  return resolved.key
+}
+
+/**
+ * Resolve a tool provider key and where it came from.
+ * Used by tool budget policy to apply platform-vs-BYOK limits.
+ */
+export async function getEffectiveToolKeyWithMode(
+  provider: ToolProvider,
+  convexToken?: string
+): Promise<{ key?: string; keyMode?: ToolKeyMode }> {
   // 1. Try user BYOK key first (getUserKeyFromConvex accepts string)
   if (convexToken) {
     const userKey = await getUserKeyFromConvex(provider, convexToken)
-    if (userKey) return userKey
+    if (userKey) return { key: userKey, keyMode: "byok" }
   }
 
   // 2. Fall back to platform env var
-  return process.env[TOOL_ENV_MAP[provider]] || undefined
+  const platformKey = process.env[TOOL_ENV_MAP[provider]] || undefined
+  if (platformKey) {
+    return { key: platformKey, keyMode: "platform" }
+  }
+  return {}
 }

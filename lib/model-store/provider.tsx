@@ -2,6 +2,7 @@
 
 import { api } from "@/convex/_generated/api"
 import { fetchClient } from "@/lib/fetch"
+import { getModelInfo } from "@/lib/models"
 import { ModelConfig } from "@/lib/models/types"
 import { useQuery } from "convex/react"
 import {
@@ -39,6 +40,7 @@ type ModelContextType = {
   userKeyStatus: UserKeyStatus
   favoriteModels: string[]
   lastUsedModel: string | null
+  modelPrefsHydrated: boolean
   setLastUsedModel: (model: string) => void
   isLoading: boolean
   refreshModels: () => Promise<void>
@@ -50,26 +52,29 @@ type ModelContextType = {
 
 const ModelContext = createContext<ModelContextType | undefined>(undefined)
 
+function isKnownModelId(modelId: string): boolean {
+  return getModelInfo(modelId) !== undefined
+}
+
+function normalizeFavoriteModels(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+
+  const knownFavorites = value.filter(
+    (entry): entry is string =>
+      typeof entry === "string" && isKnownModelId(entry)
+  )
+
+  return [...new Set(knownFavorites)]
+}
+
 export function ModelProvider({ children }: { children: React.ReactNode }) {
   const [rawModels, setRawModels] = useState<ModelConfig[]>([])
-  const [favoriteModels, setFavoriteModels] = useState<string[]>(() => {
-    if (typeof window === "undefined") return []
-    try {
-      const cached = localStorage.getItem("cachedFavoriteModels")
-      return cached ? JSON.parse(cached) : []
-    } catch {
-      return []
-    }
-  })
-  const [lastUsedModel, setLastUsedModelState] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null
-    try {
-      return localStorage.getItem("lastUsedModel")
-    } catch {
-      return null
-    }
-  })
+  // Keep first render deterministic between SSR and hydration.
+  // Persisted browser values are applied after mount.
+  const [favoriteModels, setFavoriteModels] = useState<string[]>([])
+  const [lastUsedModel, setLastUsedModelState] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [modelPrefsHydrated, setModelPrefsHydrated] = useState(false)
 
   const setLastUsedModel = useCallback((model: string) => {
     setLastUsedModelState(model)
@@ -191,6 +196,34 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
     }
   }, [fetchModels, fetchFavoriteModels])
 
+  // Hydrate cached browser-only model preferences after mount.
+  useEffect(() => {
+    try {
+      const cachedFavoriteModels = localStorage.getItem("cachedFavoriteModels")
+      if (cachedFavoriteModels) {
+        const parsed = JSON.parse(cachedFavoriteModels)
+        const normalized = normalizeFavoriteModels(parsed)
+        setFavoriteModels(normalized)
+
+        const normalizedSerialized = JSON.stringify(normalized)
+        if (normalizedSerialized !== cachedFavoriteModels) {
+          localStorage.setItem("cachedFavoriteModels", normalizedSerialized)
+        }
+      }
+    } catch {}
+
+    try {
+      const cachedLastUsedModel = localStorage.getItem("lastUsedModel")
+      if (cachedLastUsedModel && isKnownModelId(cachedLastUsedModel)) {
+        setLastUsedModelState(cachedLastUsedModel)
+      } else if (cachedLastUsedModel) {
+        localStorage.removeItem("lastUsedModel")
+      }
+    } catch {}
+
+    setModelPrefsHydrated(true)
+  }, [])
+
   // Initial data fetch for non-Convex data
   useEffect(() => {
     const initFetch = async () => {
@@ -211,6 +244,7 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
         userKeyStatus,
         favoriteModels,
         lastUsedModel,
+        modelPrefsHydrated,
         setLastUsedModel,
         isLoading,
         refreshModels,

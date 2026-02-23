@@ -137,6 +137,28 @@ export default defineSchema({
     dailyReset: v.number(), // Unix timestamp (start of day)
   }).index("by_anonymous_id", ["anonymousId"]),
 
+  // Persistent tool limit buckets for sliding-window enforcement.
+  // Shared by:
+  // - extract_content per-domain abuse control
+  // - centralized per-tool budgets (platform/BYOK policies)
+  toolLimitBuckets: defineTable({
+    actorKey: v.string(), // "user:<clerkId>" or "guest:<anonymousId>"
+    limitType: v.union(v.literal("domain"), v.literal("budget")),
+    toolName: v.string(),
+    scopeKey: v.string(), // domain for domain limits, "*" for per-tool budgets
+    keyMode: v.union(v.literal("platform"), v.literal("byok")),
+    bucketStartMs: v.number(),
+    count: v.number(),
+    updatedAt: v.number(),
+  }).index("by_actor_limit_scope_bucket", [
+    "actorKey",
+    "limitType",
+    "toolName",
+    "scopeKey",
+    "keyMode",
+    "bucketStartMs",
+  ]),
+
   // ============================================================================
   // MCP (Model Context Protocol) Integration
   // ============================================================================
@@ -194,7 +216,8 @@ export default defineSchema({
     source: v.union(
       v.literal("builtin"),
       v.literal("third-party"),
-      v.literal("mcp")
+      v.literal("mcp"),
+      v.literal("platform")
     ),
     // Service name for display and filtering (e.g., "OpenAI", "Exa", "my-mcp-server")
     serviceName: v.optional(v.string()),
@@ -213,6 +236,18 @@ export default defineSchema({
     // Original result size in bytes before truncation.
     // Helps identify tools that consistently return large results.
     resultSizeBytes: v.optional(v.number()),
+
+    // Request-level correlation ID (crypto.randomUUID() from the chat route).
+    // Enables joining tool calls, PostHog events, and console logs for a single request.
+    requestId: v.optional(v.string()),
+    // Policy denial enrichment (optional). Present when a wrapper denies a call
+    // due to budget controls before execution.
+    errorCode: v.optional(v.string()),
+    retryAfterSeconds: v.optional(v.number()),
+    budgetKeyMode: v.optional(
+      v.union(v.literal("platform"), v.literal("byok"))
+    ),
+    budgetDenied: v.optional(v.boolean()),
   })
     .index("by_user", ["userId"])
     .index("by_chat", ["chatId"])

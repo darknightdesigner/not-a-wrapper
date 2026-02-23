@@ -188,7 +188,7 @@ function ReasoningLabel({ className }: ReasoningLabelProps) {
       <span className="text-muted-foreground font-medium">
         {durationSeconds !== undefined
           ? `Thought for ${formatDuration(durationSeconds)}`
-          : "Reasoned"}
+          : "Thoughts"}
       </span>
     )
 

@@ -45,7 +45,9 @@ export const payClawToolInputSchema = z.object({
   paymentMethod: paymentMethodSchema.optional().describe(
     'Payment method override. Omit this field — a default payment card is applied automatically.'
   ),
-  browserProvider: browserProviderSchema.optional(),
+  browserProvider: browserProviderSchema.optional().describe(
+    'Optional runtime override for browser automation. Omit unless the user explicitly requests a specific browser provider.'
+  ),
 })
 
 // -- API Response Schemas --------------------------------------

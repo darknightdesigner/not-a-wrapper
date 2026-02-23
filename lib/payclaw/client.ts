@@ -201,9 +201,14 @@ type CreateJobIndirectBody = {
 
 type CreateJobRequestBody = CreateJobDirectBody | CreateJobIndirectBody
 
+type PayClawRequestOptions = {
+  signal?: AbortSignal
+}
+
 export async function createJob(
   input: PayClawToolInput,
   config: PayClawConfig,
+  options: PayClawRequestOptions = {},
 ): Promise<CreateJobResponse> {
   const paymentMethod = input.paymentMethod ?? (
     config.defaultCardId
@@ -232,6 +237,7 @@ export async function createJob(
     method: 'POST',
     headers: makeHeaders(config),
     body: JSON.stringify(body),
+    signal: options.signal,
   })
 
   if (!res.ok) {
@@ -244,9 +250,11 @@ export async function createJob(
 export async function getJob(
   jobId: string,
   config: PayClawConfig,
+  options: PayClawRequestOptions = {},
 ): Promise<Job> {
   const res = await fetch(`${config.appBaseUrl}/api/v1/jobs/${jobId}`, {
     headers: makeHeaders(config),
+    signal: options.signal,
   })
 
   if (!res.ok) {
@@ -259,9 +267,11 @@ export async function getJob(
 export async function getJobEvents(
   jobId: string,
   config: PayClawConfig,
+  options: PayClawRequestOptions = {},
 ): Promise<JobEvent[]> {
   const res = await fetch(`${config.appBaseUrl}/api/v1/jobs/${jobId}/events`, {
     headers: makeHeaders(config),
+    signal: options.signal,
   })
 
   if (!res.ok) {

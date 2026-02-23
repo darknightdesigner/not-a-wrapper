@@ -1,142 +1,70 @@
 # Not A Wrapper
 
-Open-source multi-AI chat application with unified model interface. Supports 100+ models across 8 providers with multi-model comparison, BYOK, and local model support.
+Open-source multi-AI chat app with a unified model interface across providers.
 
-## Tech Stack
+## Primary Objective
 
-| Layer | Technology |
-|-------|------------|
-| Framework | Next.js 16 (App Router), React 19, TypeScript |
-| Database | Convex (reactive DB + built-in RAG) |
-| Auth | Clerk |
-| Payments | Flowglad |
-| AI | Vercel AI SDK → Multi-provider (OpenAI, Claude, Gemini, etc.) |
-| State | Zustand + TanStack Query |
-| UI | Shadcn/Base UI + Tailwind 4 |
+Deliver correct, secure, maintainable changes with minimal, focused diffs.
 
-## Commands
+## Context File Contract (Paper-Aligned)
 
-```bash
-bun install        # Install deps
-bun run dev        # Dev server (:3000)
-bun run dev:clean  # Dev server with fresh .next cache
-bun run lint       # ESLint
-bun run typecheck  # tsc --noEmit
-bun run build      # Production build
-bun run test       # Vitest (critical paths)
-```
+- Keep this file minimal and high-signal.
+- Include only mandatory constraints and critical patterns.
+- Avoid broad repository overviews and generic checklists.
+- Load deeper guidance from `.agents/` only when task-relevant.
 
-## Context System
+## Implementation Philosophy (SHOULD)
 
-This project uses a structured context system for AI assistants:
+- Prefer well-researched, industry-standard solutions over quick fixes.
+- Extend existing project patterns instead of introducing parallel systems.
+- Fix root causes instead of symptoms.
+- Optimize for maintainability and clarity over short-term speed.
+- If unsure, consult `.agents/research/` and document non-trivial trade-offs.
 
-| Location | Purpose | When Loaded |
-|----------|---------|-------------|
-| `AGENTS.md` | Quick reference (this file) | Always |
-| `.cursor/rules/` | Cursor-specific patterns | Auto by Cursor |
-| `.agents/context/` | Domain knowledge & references | On-demand |
-| `.agents/context/glossary.md` | Domain terminology | On-demand |
-| `.agents/research/` | Research, evaluations, analyses | On-demand |
-| `.agents/troubleshooting/` | Known issues & fixes | On-demand |
-| `.agents/design/` | Design references & UI research | On-demand |
-| `.agents/plans/` | Implementation plans | On-demand |
-| `.agents/skills/` | Multi-step task guides | On-demand |
-| `.agents/workflows/` | Development procedures | On-demand |
-| `.agents/archive/` | Superseded documents | On-demand |
+## Correctness-First Escalation (MUST)
 
-### Key Skills
+- Use risk-based rigor: keep low-risk tasks lightweight, increase rigor for medium/high-risk tasks.
+- Medium/high-risk changes require a brief approach decision before coding (options, trade-offs, chosen approach).
+- High-risk triggers include: auth, schema/data model, API contracts, persistence, concurrency, migrations, billing/payments, and security-critical paths.
+- Introducing a new dependency or architectural pattern requires explicit justification and at least one alternative considered.
+- Validation depth must scale with risk; do not treat successful compilation as sufficient evidence of correctness.
+- For the detailed process, load `.agents/workflows/correctness-decision-workflow.md` on demand.
 
-**Load skills BEFORE starting work** when a task matches the trigger.
+## Non-Negotiable Rules
 
-| Skill | Use When |
-|-------|----------|
-| `add-ai-provider` | Integrating new AI service |
-| `add-model` | Adding model to existing provider |
-| `convex-function` | Creating database functions |
+### Security (MUST)
 
-> Skills contain checklists and patterns that prevent common mistakes. Load via `@.agents/skills/[name]/SKILL.md`
+- Never read/write `.env*` files.
+- Never log or expose secrets, tokens, or credentials.
+- Treat BYOK/API key data as encrypted-at-rest.
 
-### Workflows
+### Code Quality (MUST)
 
-| Workflow | Use When |
-|----------|----------|
-| `new-feature.md` | Implementing new features |
-| `debugging.md` | Troubleshooting issues |
-| `release.md` | Releasing new versions |
+- No `// @ts-ignore`.
+- No lint-rule bypassing (`eslint-disable`) without explicit documented approval.
+- Do not downgrade or disable checks to "make it pass."
+- Prefer source fixes over workarounds.
 
-## Directory Structure
+### Git Safety (MUST)
 
-```
-app/                    # Next.js App Router
-├── api/               # API routes (streaming)
-├── auth/              # Auth pages/actions
-├── c/[chatId]/        # Chat pages
-├── p/[projectId]/     # Project pages
-├── share/             # Public share pages
-└── components/chat/   # Chat UI
+- Never create branches unless explicitly asked.
+- Never force-push to shared branches.
+- Avoid destructive git commands unless explicitly requested.
 
-lib/                    # Shared utilities
-├── chat-store/        # Chat state
-├── config.ts          # Constants
-├── models/            # AI model definitions
-└── openproviders/     # AI provider abstraction
+## Ask Before Making These Changes (MUST)
 
-components/            # Shadcn UI components (Base UI primitives)
-convex/               # Convex DB schema & functions
+- Adding dependencies (`bun add ...`)
+- Modifying `package.json`, `tsconfig*`, `next.config.*`
+- Editing auth-critical paths (`app/auth/`, `middleware.ts`)
+- Changing DB schema (`convex/schema.ts`)
+- Changing CI/CD (`.github/workflows/`)
+- Deleting files
 
-.agents/               # AI context & knowledge base
-├── context/          # Domain knowledge & references
-├── research/         # Research & evaluations
-├── troubleshooting/  # Known issues & fixes
-├── design/           # Design references & UI research
-├── plans/            # Implementation plans
-├── skills/           # Multi-step task guides
-├── workflows/        # Development procedures
-└── archive/          # Superseded documents
+## Required Project Patterns (MUST When Applicable)
 
-.cursor/rules/         # Cursor-specific rules
-```
-
-## Gold Standard Examples
-
-| Pattern | File |
-|---------|------|
-| API Route | `app/api/chat/route.ts` |
-| Provider History Adapter Registry | `app/api/chat/adapters/index.ts` |
-| Custom Hook | `app/components/chat/use-chat-core.ts` |
-| Context Provider | `lib/chat-store/chats/provider.tsx` |
-| Component | `app/components/chat/chat.tsx` |
-
-## Implementation Philosophy
-
-**Prefer well-researched, industry-standard solutions over quick fixes.**
-
-When implementing features or fixing bugs:
-
-1. **Research first** — Understand the problem domain and established solutions before writing code
-2. **Use proven patterns** — Prefer battle-tested approaches (design patterns, established libraries, documented techniques) over novel or ad-hoc solutions
-3. **Optimize for maintainability** — Long-term code health over short-term velocity
-4. **Extend existing conventions** — Follow and build upon the codebase's established patterns
-5. **Evaluate trade-offs** — When multiple approaches exist, analyze pros/cons before committing
-
-> When unsure, consult `.agents/research/` for prior analysis or create a new research document before implementing.
-
-## Prompt Delivery Default
-
-When the user asks to "create a prompt" (or similar), return the prompt directly in chat.
-Do not create a markdown file unless the user explicitly asks for a file.
-If ambiguous, prefer chat output.
-
-## No Timeline Estimates
-
-**Never include time estimates, durations, or effort assessments** in plans, summaries, or implementation outputs. This includes phrases like "~30 minutes", "2-3 hours", "Phase 1 (Day 1)", "Quick win", or any similar timeline/effort language. AI-generated timeline estimates are unreliable and misleading. Only include timeline or effort information if the user explicitly requests it.
-
-## Critical Patterns
-
-### Streaming Responses (MUST)
+### Streaming Responses (AI SDK v6)
 
 ```typescript
-// ALWAYS use toUIMessageStreamResponse for AI chat (AI SDK v6)
 return result.toUIMessageStreamResponse({
   sendReasoning: true,
   sendSources: true,
@@ -144,108 +72,54 @@ return result.toUIMessageStreamResponse({
 })
 ```
 
-### Convex Auth Pattern (MUST)
+### Convex Auth Pattern
 
 ```typescript
-// All mutations modifying user data:
 const identity = await ctx.auth.getUserIdentity()
 if (!identity) throw new Error("Not authenticated")
-// ... lookup user, verify ownership, then operate
+// verify ownership before user-scoped mutations
 ```
 
-### Optimistic Updates
+### Optimistic Update Pattern
 
 ```typescript
-// Store previous → Update optimistic → Rollback on error
 let previous = null
-setState((prev) => { previous = prev; return updated })
-try { await mutation() } 
-catch { if (previous) setState(previous) }
+setState((prev) => {
+  previous = prev
+  return updated
+})
+try {
+  await mutation()
+} catch {
+  if (previous) setState(previous)
+}
 ```
 
-## AI Agent Permissions
+## Execution Defaults (SHOULD)
 
-### ✅ Allowed
+1. Gather only the context needed for the current task.
+2. Plan small, testable edits.
+3. Implement focused changes.
+4. Run only relevant checks (`lint`, `typecheck`, targeted tests).
+5. Report key trade-offs and residual risks.
 
-- Read any source file
-- Run: `dev`, `build`, `lint`, `typecheck`, `test`
-- Create/edit in: `app/`, `lib/`, `components/`, `hooks/`
-- Create/edit documentation in: `.agents/` (follow `.cursor/rules/070-documentation.mdc`)
+## On-Demand Context
 
-### ⚠️ Ask First
+Load only when needed:
 
-- `bun add <package>`
-- Modify: `package.json`, `tsconfig.json`, `next.config.*`
-- Git operations
-- Auth logic (`app/auth/`, `middleware.ts`)
-- Delete files
-- DB schema (`convex/schema.ts`)
-- CI/CD (`.github/workflows/`)
+- `.agents/context/`
+- `.agents/skills/`
+- `.agents/workflows/`
+- `.agents/troubleshooting/`
+- `.agents/context/glossary.md`
 
-### 🚫 Forbidden
+## Output Preferences (SHOULD)
 
-- **Creating git branches** — NEVER create new branches unless the user explicitly asks for a branch to be created. Implementation plans, feature work, and all other tasks must be done on the current branch. Branch creation requires explicit user instruction.
-- Read/write `.env*` files
-- Force push or commit secrets
-- `// @ts-ignore` (never acceptable)
-- `eslint-disable` without documented reason
-- Disabling lint rules to bypass errors
+- If asked to create a prompt, return it directly in chat unless a file is explicitly requested.
+- Do not include timeline or effort estimates unless explicitly requested.
 
-## Security
+## Pull Request Baseline (SHOULD When Preparing PRs)
 
-**Never log:** OAuth tokens, API keys, credentials, session tokens
-
-**Encrypt at rest:** User-provided API keys (BYOK) via AES-256-GCM
-
-**Rate limiting:** Check BEFORE calling `streamText()`
-
-## Key Terminology
-
-> Full glossary: `.agents/context/glossary.md`
-
-| Term | Meaning |
-|------|---------|
-| Model | Config object, ID string, or SDK instance (context-dependent) |
-| providerId | Internal ID for API key lookups (`"anthropic"`) |
-| baseProviderId | AI SDK identifier (`"claude"`) |
-| parts | AI SDK message content array (text, tools, reasoning) |
-| BYOK | Bring Your Own Key |
-
-## Environment Variables
-
-```bash
-# Required
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
-CONVEX_DEPLOYMENT=
-NEXT_PUBLIC_CONVEX_URL=
-CSRF_SECRET=
-ENCRYPTION_KEY=  # Must be 32 bytes base64
-
-# AI Providers (at least one)
-ANTHROPIC_API_KEY=
-OPENAI_API_KEY=
-```
-
-See `.env.example` for complete documentation.
-
-## Development Workflow
-
-Four-phase cycle: **Research → Plan → Code & Verify → Commit**
-
-Use `ultrathink` for complex architectural decisions.
-
-See `.agents/workflows/development-cycle.md` for details.
-
-## Pull Requests
-
-When creating a pull request:
-
-1. **Always fetch first** — Run `git fetch origin` before comparing branches
-2. **Compare against remote** — Use `origin/main` (not local `main`) for diffs and commit logs. Local `main` may be stale.
-3. **Verify commit count** — Run `git log origin/main..HEAD --oneline` and confirm the number matches what GitHub will show
-4. **Scope the description** — The PR body must reflect only the commits unique to the branch, not the full history since an outdated local ref
-
----
-
-*~200 lines. For detailed patterns, see `.cursor/rules/` and `.agents/skills/`.*
+1. Run `git fetch origin` before branch comparisons.
+2. Diff and log against `origin/main` (not local `main`).
+3. Scope PR descriptions to commits in `origin/main..HEAD`.

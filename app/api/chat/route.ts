@@ -18,7 +18,7 @@ import {
   flushPostHog,
   getPostHogClient,
 } from "@/lib/posthog"
-import type { Provider } from "@/lib/user-keys"
+import type { Provider, ToolKeyMode } from "@/lib/user-keys"
 import {
   UIMessage as MessageAISDK,
   streamText,
@@ -48,12 +48,27 @@ import {
   loadUserMcpTools,
   type LoadToolsResult,
 } from "@/lib/mcp/load-tools"
-import { resolveToolCapabilities } from "@/lib/tools/types"
-import { shouldInjectSearchTools } from "./search-tools"
+import {
+  enforceToolNamingGovernance,
+  type ToolLayerMap,
+} from "@/lib/tools/naming"
+import {
+  filterMetadataMapByPolicy,
+  filterToolSetByPolicy,
+  getActiveToolsForStep,
+  resolveCapabilityPolicy,
+  type ToolPolicyInput,
+  type ToolPolicyDecision,
+} from "@/lib/tools/capability-policy"
+import {
+  buildFinishToolInvocationStreamMetadata,
+  buildStartToolInvocationStreamMetadata,
+  buildToolInvocationMetadataByName,
+  type ToolInvocationMetadataByCallId,
+} from "@/lib/tools/ui-metadata"
 import {
   ToolTraceCollector,
   wrapMcpTools,
-  isToolResultEnvelope,
 } from "@/lib/tools/mcp-wrapper"
 import type { ShippingAddress } from "@/lib/payclaw/schemas"
 
@@ -265,6 +280,7 @@ export async function POST(req: Request) {
         )
       }
     }
+    const providerToolKeyMode: ToolKeyMode = apiKey ? "byok" : "platform"
 
     // enableSearch is no longer passed to the model — it controls tool injection below.
     // All search is now provided via visible, auditable tool calls (Layer 1 or Layer 2).
@@ -290,8 +306,27 @@ export async function POST(req: Request) {
     let builtInTools: ToolSet = {} as ToolSet
     let builtInToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-    const capabilities = resolveToolCapabilities(modelConfig.tools)
-    const shouldInjectSearch = shouldInjectSearchTools(enableSearch, modelConfig.tools)
+    const initialCapabilityPolicy = resolveCapabilityPolicy({
+      modelTools: modelConfig.tools,
+      isAuthenticated,
+    })
+    const capabilities = initialCapabilityPolicy.capabilities
+    const shouldInjectSearch = enableSearch && capabilities.search
+    const requestId = crypto.randomUUID()
+
+    console.log(
+      JSON.stringify({
+        _tag: "tool_capability_policy",
+        requestId,
+        chatId,
+        userId,
+        model,
+        userTier: initialCapabilityPolicy.userTier,
+        capabilities: initialCapabilityPolicy.capabilities,
+        capabilityReasons: initialCapabilityPolicy.capabilityReasons,
+        keyModeReason: initialCapabilityPolicy.keyModeReason,
+      })
+    )
 
     if (shouldInjectSearch) {
       const { getProviderTools } = await import("@/lib/tools/provider")
@@ -301,17 +336,137 @@ export async function POST(req: Request) {
     }
 
     // -----------------------------------------------------------------------
-    // Third-Party Tool Loading (Layer 2)
+    // Exa API Key Resolution (shared by Layer 2 capabilities)
+    //
+    // Resolved once, used by both search fallback and content extraction.
+    // Key resolution: user BYOK key → platform env var → undefined.
+    // The exa-js SDK accepts keys in its constructor, so BYOK keys
+    // are passed directly — no env var manipulation needed.
+    //
+    // NOT gated on isAuthenticated — anonymous users get Exa-powered tools
+    // when the platform has an EXA_API_KEY configured (same as Layer 1).
+    // -----------------------------------------------------------------------
+    let resolvedExaKey: string | undefined
+    let resolvedExaKeyMode: ToolKeyMode | undefined
+    const { getEffectiveToolKeyWithMode } = await import("@/lib/user-keys")
+    const resolvedExa = await getEffectiveToolKeyWithMode("exa", convexToken)
+    resolvedExaKey = resolvedExa.key
+    resolvedExaKeyMode = resolvedExa.keyMode
+
+    const {
+      createOutageTolerantToolBudgetEnforcer,
+      createConvexToolLimitStore,
+      createRequestLocalToolSoftCap,
+      createToolPolicyGuard,
+      isPolicyUnavailableError,
+      probeToolBudget,
+    } = await import("@/lib/tools/policy")
+    const toolLimitStore = createConvexToolLimitStore({
+      convexToken,
+      anonymousId,
+    })
+    const makePolicyGuard = (keyMode: ToolKeyMode) =>
+      createToolPolicyGuard({ store: toolLimitStore, keyMode })
+
+    const builtInPolicyGuard = makePolicyGuard(providerToolKeyMode)
+    const mcpPolicyGuard = makePolicyGuard("platform")
+    const platformPolicyGuard = makePolicyGuard("platform")
+    const exaPolicyGuard =
+      resolvedExaKeyMode ? makePolicyGuard(resolvedExaKeyMode) : undefined
+
+    const logOutageTolerantBudgetEvent = (
+      source: "third-party" | "content" | "platform" | "mcp",
+      event: {
+        type: "recovered" | "degraded_allow" | "degraded_block"
+        toolName: string
+        keyMode: ToolKeyMode
+        retryAfterSeconds?: number
+        snapshot?: {
+          used: number
+          remaining: number
+          maxCalls: number
+        }
+        error?: string
+      }
+    ) => {
+      if (event.type === "recovered") {
+        console.warn(
+          JSON.stringify({
+            _tag: "tool_budget_gate_recovered",
+            requestId,
+            tool: event.toolName,
+            source,
+            keyMode: event.keyMode,
+            action: "resume_policy_enforced_budgeting",
+          })
+        )
+        return
+      }
+
+      console.warn(
+        JSON.stringify({
+          _tag: "tool_budget_gate_degraded",
+          requestId,
+          tool: event.toolName,
+          source,
+          keyMode: event.keyMode,
+          policyUnavailable: true,
+          usedCalls: event.snapshot?.used ?? null,
+          remainingCalls: event.snapshot?.remaining ?? null,
+          maxCalls: event.snapshot?.maxCalls ?? null,
+          retryAfterSeconds: event.retryAfterSeconds ?? null,
+          error: event.error ?? null,
+          action:
+            event.type === "degraded_allow"
+              ? "allow_tool_with_request_local_soft_cap"
+              : "disable_tool_for_remaining_request",
+        })
+      )
+    }
+
+    const thirdPartyBudgetEnforcer =
+      exaPolicyGuard && resolvedExaKeyMode
+        ? createOutageTolerantToolBudgetEnforcer({
+            enforceToolBudget: (toolName) => exaPolicyGuard.enforceToolBudget(toolName),
+            keyMode: resolvedExaKeyMode,
+            maxCallsPerTool: PREPARE_STEP_THRESHOLD,
+            onEvent: (event) => logOutageTolerantBudgetEvent("third-party", event),
+          })
+        : undefined
+
+    const contentBudgetEnforcer =
+      exaPolicyGuard && resolvedExaKeyMode
+        ? createOutageTolerantToolBudgetEnforcer({
+            enforceToolBudget: (toolName) => exaPolicyGuard.enforceToolBudget(toolName),
+            keyMode: resolvedExaKeyMode,
+            maxCallsPerTool: PREPARE_STEP_THRESHOLD,
+            onEvent: (event) => logOutageTolerantBudgetEvent("content", event),
+          })
+        : undefined
+
+    const platformBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
+      enforceToolBudget: (toolName) => platformPolicyGuard.enforceToolBudget(toolName),
+      keyMode: "platform",
+      maxCallsPerTool: PREPARE_STEP_THRESHOLD,
+      onEvent: (event) => logOutageTolerantBudgetEvent("platform", event),
+    })
+
+    const mcpBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
+      enforceToolBudget: (toolName) => mcpPolicyGuard.enforceToolBudget(toolName),
+      keyMode: "platform",
+      maxCallsPerTool: PREPARE_STEP_THRESHOLD,
+      onEvent: (event) => logOutageTolerantBudgetEvent("mcp", event),
+    })
+
+    // -----------------------------------------------------------------------
+    // Third-Party Search Fallback (Layer 2 — Search)
     // Universal search fallback for providers without native search tools.
     // Only loaded when enableSearch is true AND Layer 1 didn't provide search.
     //
     // The coordination model is simple:
     //   - enableSearch === true: route.ts injects search tools
-    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2
+    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2 search
     //   - Layer 1 did NOT provide search: load Layer 2 Exa fallback
-    //
-    // NOT gated on isAuthenticated — anonymous users get search when
-    // the platform has an EXA_API_KEY configured (same as Layer 1).
     // -----------------------------------------------------------------------
     let thirdPartyTools: ToolSet = {} as ToolSet
     let thirdPartyToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
@@ -319,31 +474,35 @@ export async function POST(req: Request) {
     if (shouldInjectSearch) {
       const builtInHasSearch = Object.keys(builtInTools).length > 0
 
-      // Only load Layer 2 when Layer 1 didn't provide search.
-      // This is the sole coordination point — third-party.ts does not
-      // know about providers. It just receives a skipSearch flag.
       if (!builtInHasSearch) {
         const { getThirdPartyTools } = await import("@/lib/tools/third-party")
-
-        // Key resolution: user BYOK key → platform env var → undefined
-        // The exa-js SDK accepts keys in its constructor, so BYOK keys
-        // are passed directly — no env var manipulation needed.
-        let resolvedExaKey: string | undefined
-        if (convexToken) {
-          const { getEffectiveToolKey } = await import("@/lib/user-keys")
-          resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
-        }
-        if (!resolvedExaKey) {
-          resolvedExaKey = process.env.EXA_API_KEY
-        }
-
         const thirdPartyResult = await getThirdPartyTools({
-          skipSearch: false, // We already know we need search (builtInHasSearch is false)
+          skipSearch: false,
           exaKey: resolvedExaKey,
         })
         thirdPartyTools = thirdPartyResult.tools
         thirdPartyToolMetadata = thirdPartyResult.metadata
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Content Extraction Tools (Layer 2 — Content)
+    // Independent capability — NOT gated on shouldInjectSearch or
+    // builtInHasSearch. Gated on capabilities.extract and Exa key.
+    // Available for ALL providers including those with native Layer 1
+    // search (OpenAI, Anthropic, Google, xAI).
+    // -----------------------------------------------------------------------
+    let contentTools: ToolSet = {} as ToolSet
+    let contentToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    if (resolvedExaKey && capabilities.extract) {
+      const { getContentExtractionTools } = await import("@/lib/tools/third-party")
+      const contentResult = await getContentExtractionTools({
+        exaKey: resolvedExaKey,
+        policyGuard: exaPolicyGuard,
+      })
+      contentTools = contentResult.tools
+      contentToolMetadata = contentResult.metadata
     }
 
     // -----------------------------------------------------------------------
@@ -401,7 +560,7 @@ export async function POST(req: Request) {
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
     let userCardId: string | undefined
-    if (isAuthenticated) {
+    if (isAuthenticated && capabilities.platform) {
       if (convexToken) {
         try {
           userAddresses = (await fetchQuery(
@@ -464,6 +623,134 @@ export async function POST(req: Request) {
       platformToolMetadata = platformResult.metadata
     }
 
+    const toolPolicyInputs: ToolPolicyInput[] = [
+      ...Object.keys(builtInTools).map((toolName) => {
+        const meta = builtInToolMetadata.get(toolName)
+        return {
+          toolName,
+          source: meta?.source ?? "builtin",
+          capability: "search" as const,
+          readOnly: meta?.readOnly,
+          destructive: meta?.destructive,
+          idempotent: meta?.idempotent,
+          openWorld: meta?.openWorld,
+        }
+      }),
+      ...Object.keys(thirdPartyTools).map((toolName) => {
+        const meta = thirdPartyToolMetadata.get(toolName)
+        return {
+          toolName,
+          source: meta?.source ?? "third-party",
+          capability: "search" as const,
+          readOnly: meta?.readOnly,
+          destructive: meta?.destructive,
+          idempotent: meta?.idempotent,
+          openWorld: meta?.openWorld,
+        }
+      }),
+      ...Object.keys(contentTools).map((toolName) => {
+        const meta = contentToolMetadata.get(toolName)
+        return {
+          toolName,
+          source: meta?.source ?? "third-party",
+          capability: "extract" as const,
+          readOnly: meta?.readOnly,
+          destructive: meta?.destructive,
+          idempotent: meta?.idempotent,
+          openWorld: meta?.openWorld,
+        }
+      }),
+      ...Object.keys(platformTools).map((toolName) => {
+        const meta = platformToolMetadata.get(toolName)
+        return {
+          toolName,
+          source: meta?.source ?? "platform",
+          capability: "platform" as const,
+          readOnly: meta?.readOnly,
+          destructive: meta?.destructive,
+          idempotent: meta?.idempotent,
+          openWorld: meta?.openWorld,
+        }
+      }),
+      ...Object.keys(mcpTools).map((toolName) => {
+        const info = mcpToolServerMap.get(toolName)
+        const policyHintsTrusted = info?.policyHintsTrusted === true
+        return {
+          toolName,
+          source: "mcp" as const,
+          capability: "mcp" as const,
+          riskHintsTrusted: policyHintsTrusted,
+          readOnly: policyHintsTrusted ? info?.readOnly : undefined,
+          destructive: policyHintsTrusted ? info?.destructive : undefined,
+          idempotent: policyHintsTrusted ? info?.idempotent : undefined,
+          openWorld: policyHintsTrusted ? info?.openWorld : undefined,
+        }
+      }),
+    ]
+
+    const toolPolicy = resolveCapabilityPolicy({
+      modelTools: modelConfig.tools,
+      isAuthenticated,
+      keyMode: resolvedExaKeyMode,
+      tools: toolPolicyInputs,
+    })
+
+    const summarizeReasonCounts = (
+      decisions: ToolPolicyDecision[],
+      selector: (decision: ToolPolicyDecision) => string
+    ) => {
+      const counts: Record<string, number> = {}
+      for (const decision of decisions) {
+        const reason = selector(decision)
+        counts[reason] = (counts[reason] ?? 0) + 1
+      }
+      return counts
+    }
+
+    console.log(
+      JSON.stringify({
+        _tag: "tool_policy_matrix",
+        requestId,
+        chatId,
+        userId,
+        model,
+        userTier: toolPolicy.userTier,
+        keyMode: toolPolicy.keyMode ?? null,
+        keyModeReason: toolPolicy.keyModeReason,
+        capabilities: toolPolicy.capabilities,
+        capabilityReasons: toolPolicy.capabilityReasons,
+        totalTools: toolPolicy.toolDecisions.length,
+        earlyAllowedCount: toolPolicy.earlyToolNames.length,
+        lateAllowedCount: toolPolicy.lateToolNames.length,
+        earlyReasonCounts: summarizeReasonCounts(
+          toolPolicy.toolDecisions,
+          (decision) => decision.earlyReasonCode
+        ),
+        lateReasonCounts: summarizeReasonCounts(
+          toolPolicy.toolDecisions,
+          (decision) => decision.lateReasonCode
+        ),
+      })
+    )
+
+    builtInTools = filterToolSetByPolicy(builtInTools, toolPolicy)
+    thirdPartyTools = filterToolSetByPolicy(thirdPartyTools, toolPolicy)
+    contentTools = filterToolSetByPolicy(contentTools, toolPolicy)
+    platformTools = filterToolSetByPolicy(platformTools, toolPolicy)
+    mcpTools = filterToolSetByPolicy(mcpTools, toolPolicy)
+
+    builtInToolMetadata = filterMetadataMapByPolicy(builtInToolMetadata, toolPolicy)
+    thirdPartyToolMetadata = filterMetadataMapByPolicy(
+      thirdPartyToolMetadata,
+      toolPolicy
+    )
+    contentToolMetadata = filterMetadataMapByPolicy(contentToolMetadata, toolPolicy)
+    platformToolMetadata = filterMetadataMapByPolicy(
+      platformToolMetadata,
+      toolPolicy
+    )
+    mcpToolServerMap = filterMetadataMapByPolicy(mcpToolServerMap, toolPolicy)
+
     // Wrap MCP tools with timeout, timing, truncation, and envelope.
     // Single wrapper handles all Layer 3 concerns — follows the Exa gold
     // standard pattern (lib/tools/third-party.ts:82-119).
@@ -474,28 +761,232 @@ export async function POST(req: Request) {
       mcpTools = wrapMcpTools(mcpTools, {
         toolServerMap: mcpToolServerMap,
         traceCollector,
+        requestId,
+        enforceToolBudget: async (toolName) => {
+          await mcpBudgetEnforcer(toolName)
+        },
       }) as ToolSet
     }
 
-    // Merge all tool layers: search (Layer 1 OR Layer 2) + platform (Layer 4) + MCP (Layer 3)
-    // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
-    // MCP tools are always independent and additive.
-    // Spread order matters for conflict resolution:
-    //   1. Built-in/third-party search tools (lowest priority)
-    //   2. Platform tools (middle priority)
-    //   3. MCP tools (highest priority — user-configured, namespaced)
-    const searchTools = { ...builtInTools, ...thirdPartyTools }
-    const allTools = { ...searchTools, ...platformTools, ...mcpTools } as ToolSet
+    // Wrap non-builtin tools with tracing (Layer 2 + Layer 4).
+    // Records durationMs and resultSizeBytes into traceCollector so
+    // onStepFinish and onFinish can read them for ALL tool types.
+    const { wrapToolsWithTracing } = await import("@/lib/tools/utils")
+    if (Object.keys(thirdPartyTools).length > 0) {
+      thirdPartyTools = wrapToolsWithTracing(
+        thirdPartyTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          if (!thirdPartyBudgetEnforcer) return
+          await thirdPartyBudgetEnforcer(toolName)
+        },
+        thirdPartyToolMetadata
+      )
+    }
+    if (Object.keys(contentTools).length > 0) {
+      contentTools = wrapToolsWithTracing(
+        contentTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          if (!contentBudgetEnforcer) return
+          await contentBudgetEnforcer(toolName)
+        },
+        contentToolMetadata
+      )
+    }
+    if (Object.keys(platformTools).length > 0) {
+      platformTools = wrapToolsWithTracing(
+        platformTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          await platformBudgetEnforcer(toolName)
+        },
+        platformToolMetadata
+      )
+    }
 
-    // Dev-mode collision detection: warn when duplicate keys are found
-    if (process.env.NODE_ENV !== "production") {
-      const searchKeys = new Set(Object.keys(searchTools))
-      for (const key of Object.keys(mcpTools)) {
-        if (searchKeys.has(key)) {
-          console.warn(`[tools] Key collision: "${key}" exists in both search and MCP tools. MCP wins.`)
-        }
+    // Merge all tool layers:
+    //   - Search: Layer 1 (built-in) XOR Layer 2 (Exa fallback) — never both
+    //   - Content: Layer 2 content extraction — independent of search gating
+    //   - Platform: Layer 4 (Flowglad Pay, etc.)
+    //   - MCP: Layer 3 (user-configured servers)
+    // Spread order = conflict resolution priority (last wins):
+    //   1. Search tools (lowest priority)
+    //   2. Content extraction tools (same priority tier as search)
+    //   3. Platform tools (middle priority)
+    //   4. MCP tools (highest priority — user-configured, namespaced)
+    const toolLayers: ToolLayerMap = {
+      "built-in": builtInTools,
+      "third-party-search": thirdPartyTools,
+      "content-extraction": contentTools,
+      platform: platformTools,
+      mcp: mcpTools,
+    }
+
+    const namingResult = enforceToolNamingGovernance(toolLayers)
+    if (namingResult.invalid.length > 0) {
+      for (const invalid of namingResult.invalid) {
+        console.warn(
+          JSON.stringify({
+            _tag: "tool_name_invalid",
+            requestId,
+            tool: invalid.toolKey,
+            layer: invalid.layer,
+            reason: invalid.reason,
+            action: "drop_invalid_tool",
+          })
+        )
       }
     }
+    if (namingResult.collisions.length > 0) {
+      for (const collision of namingResult.collisions) {
+        const droppedLayers = collision.owners.filter(
+          (layer) => layer !== collision.winner
+        )
+        console.warn(
+          JSON.stringify({
+            _tag: "tool_name_collision",
+            requestId,
+            tool: collision.toolKey,
+            layers: collision.owners,
+            winner: collision.winner,
+            droppedLayers,
+            action: "keep_winner_drop_losers",
+          })
+        )
+      }
+    }
+
+    builtInTools = (namingResult.sanitizedLayers["built-in"] ?? {}) as ToolSet
+    thirdPartyTools = (namingResult.sanitizedLayers["third-party-search"] ??
+      {}) as ToolSet
+    contentTools = (namingResult.sanitizedLayers["content-extraction"] ??
+      {}) as ToolSet
+    platformTools = (namingResult.sanitizedLayers.platform ?? {}) as ToolSet
+    mcpTools = (namingResult.sanitizedLayers.mcp ?? {}) as ToolSet
+
+    const filterMetadataByTools = <T>(
+      metadata: ReadonlyMap<string, T>,
+      tools: ToolSet
+    ) =>
+      new Map(
+        Array.from(metadata.entries()).filter(([name]) =>
+          Object.prototype.hasOwnProperty.call(tools, name)
+        )
+      )
+
+    builtInToolMetadata = filterMetadataByTools(builtInToolMetadata, builtInTools)
+    thirdPartyToolMetadata = filterMetadataByTools(
+      thirdPartyToolMetadata,
+      thirdPartyTools
+    )
+    contentToolMetadata = filterMetadataByTools(contentToolMetadata, contentTools)
+    platformToolMetadata = filterMetadataByTools(
+      platformToolMetadata,
+      platformTools
+    )
+    mcpToolServerMap = new Map(
+      Array.from(mcpToolServerMap.entries()).filter(([name]) =>
+        Object.prototype.hasOwnProperty.call(mcpTools, name)
+      )
+    )
+
+    const builtInToolNames = new Set(Object.keys(builtInTools))
+    const exhaustedBuiltInTools = new Set<string>()
+    const degradedBuiltInTools = new Set<string>()
+    const degradedBuiltInSoftCap = createRequestLocalToolSoftCap({
+      maxCallsPerTool: PREPARE_STEP_THRESHOLD,
+    })
+
+    // Provider-native (Layer 1) tools are provider-executed and do not expose a
+    // local execute() hook for per-call preflight enforcement. Compensating
+    // control: probe budget during prepareStep (consume:false) and account
+    // actual usage in onStepFinish. This preserves centralized budget policy
+    // semantics, with a bounded request-local soft cap when policy is unavailable.
+    const isBuiltInToolBudgetAllowed = async (toolName: string): Promise<boolean> => {
+      if (!builtInToolNames.has(toolName)) return true
+      if (exhaustedBuiltInTools.has(toolName)) return false
+
+      try {
+        const probe = await probeToolBudget({
+          store: toolLimitStore,
+          keyMode: providerToolKeyMode,
+          toolName,
+        })
+        if (probe.allowed) {
+          if (degradedBuiltInTools.delete(toolName)) {
+            console.warn(
+              JSON.stringify({
+                _tag: "tool_budget_gate_recovered",
+                requestId,
+                tool: toolName,
+                source: "builtin",
+                keyMode: providerToolKeyMode,
+                action: "resume_policy_enforced_budgeting",
+              })
+            )
+          }
+          return true
+        }
+        degradedBuiltInTools.delete(toolName)
+        exhaustedBuiltInTools.add(toolName)
+        console.warn(
+          JSON.stringify({
+            _tag: "tool_budget_gate",
+            requestId,
+            tool: toolName,
+            source: "builtin",
+            keyMode: providerToolKeyMode,
+            retryAfterSeconds: probe.retryAfterSeconds ?? null,
+            action: "disable_tool_for_remaining_steps",
+          })
+        )
+        return false
+      } catch (error) {
+        if (isPolicyUnavailableError(error)) {
+          degradedBuiltInTools.add(toolName)
+          const softCap = degradedBuiltInSoftCap.getSnapshot(toolName)
+          const allowed = softCap.remaining > 0
+          console.warn(
+            JSON.stringify({
+              _tag: "tool_budget_gate_degraded",
+              requestId,
+              tool: toolName,
+              source: "builtin",
+              keyMode: providerToolKeyMode,
+              policyUnavailable: true,
+              usedCalls: softCap.used,
+              remainingCalls: softCap.remaining,
+              maxCalls: softCap.maxCalls,
+              error: error.message,
+              action: allowed
+                ? "allow_tool_with_request_local_soft_cap"
+                : "disable_tool_until_policy_recovers",
+            })
+          )
+          return allowed
+        }
+        exhaustedBuiltInTools.add(toolName)
+        console.warn(
+          JSON.stringify({
+            _tag: "tool_budget_gate_error",
+            requestId,
+            tool: toolName,
+            source: "builtin",
+            keyMode: providerToolKeyMode,
+            error: error instanceof Error ? error.message : String(error),
+            action: "disable_tool_fail_closed",
+          })
+        )
+        return false
+      }
+    }
+
+    const searchTools = { ...builtInTools, ...thirdPartyTools }
+    const allTools = { ...searchTools, ...contentTools, ...platformTools, ...mcpTools } as ToolSet
 
     const hasAnyTools = Object.keys(allTools).length > 0
 
@@ -747,20 +1238,27 @@ export async function POST(req: Request) {
     // The header is safe to apply: @ai-sdk/anthropic@3.0.41 comma-merges
     // user and inferred betas (getBetasFromHeaders + Array.from(betas).join(",")).
     // -----------------------------------------------------------------------
+    const isTokenEfficient =
+      process.env.ANTHROPIC_TOKEN_EFFICIENT_TOOLS !== "false"
     const requestHeaders: Record<string, string> = {}
 
-    if (provider === "anthropic" && hasAnyTools) {
+    if (provider === "anthropic" && hasAnyTools && isTokenEfficient) {
       requestHeaders["anthropic-beta"] = ANTHROPIC_BETA_HEADERS.tokenEfficient
     }
 
     // Collect all tool metadata for prepareStep tool restriction.
-    // Merge built-in + third-party metadata (MCP metadata not available here —
-    // MCP tools are conservatively included in the safe list).
+    // Merge built-in + third-party + content + platform metadata (MCP metadata
+    // not available here — MCP tools are conservatively included in the safe list).
     const allToolMetadata = new Map([
       ...builtInToolMetadata,
       ...thirdPartyToolMetadata,
+      ...contentToolMetadata,
       ...platformToolMetadata,
     ])
+    const toolMetadataByName = buildToolInvocationMetadataByName({
+      nonMcpMetadata: allToolMetadata,
+      mcpToolServerMap,
+    })
     let enrichedSystemPrompt = effectiveSystemPrompt
     if (isAuthenticated && userAddresses.length > 0) {
       enrichedSystemPrompt += formatAddressContext(userAddresses)
@@ -768,12 +1266,14 @@ export async function POST(req: Request) {
 
     const streamStartMs = Date.now()
     let stepCounter = 0
+    let toolMetadataByCallId: ToolInvocationMetadataByCallId = {}
 
     // Track reasoning timing for messageMetadata persistence.
     // The first reasoning chunk records a start timestamp; when text-delta
     // arrives (reasoning is done) or onFinish fires, we compute elapsed ms.
     let reasoningStartMs: number | null = null
     let reasoningDurationMs: number | null = null
+    let loggedLateStepPolicy = false
 
     const result = streamText({
       model: aiModel,
@@ -782,30 +1282,48 @@ export async function POST(req: Request) {
       tools: allTools,
       stopWhen: stepCountIs(maxSteps),
 
-      // Restrict tools after PREPARE_STEP_THRESHOLD to prevent runaway
-      // tool chains. Only tools explicitly marked readOnly: true remain
-      // available. MCP tools are conservatively included (can't classify
-      // read/write yet). Unclassified non-MCP tools are restricted
-      // (fail closed — new tools must opt in via readOnly: true).
+      // Centralized step gating from the capability policy resolver.
+      // After PREPARE_STEP_THRESHOLD, only late-step-safe tools remain
+      // (currently read_only risk class). Unknown risk fails closed.
       prepareStep: hasAnyTools
         ? async ({ stepNumber }) => {
-            if (stepNumber <= PREPARE_STEP_THRESHOLD) return {}
-
-            // Build safe tool list: only tools explicitly marked readOnly.
-            // New tools that omit readOnly default to RESTRICTED (fail closed).
-            const safeTools: string[] = []
-            for (const [name, meta] of allToolMetadata) {
-              if (meta.readOnly === true) safeTools.push(name)
+            const isLateStep = stepNumber > PREPARE_STEP_THRESHOLD
+            const policyToolsForStep = getActiveToolsForStep(
+              toolPolicy,
+              stepNumber,
+              PREPARE_STEP_THRESHOLD
+            )
+            const budgetAllowedTools: string[] = []
+            for (const toolName of policyToolsForStep ?? []) {
+              if (!builtInToolNames.has(toolName)) {
+                budgetAllowedTools.push(toolName)
+                continue
+              }
+              if (await isBuiltInToolBudgetAllowed(toolName)) {
+                budgetAllowedTools.push(toolName)
+              }
             }
-            // Include all MCP tools (can't classify read/write yet)
-            for (const name of Object.keys(mcpTools)) {
-              if (!safeTools.includes(name)) safeTools.push(name)
+
+            if (isLateStep && !loggedLateStepPolicy) {
+              loggedLateStepPolicy = true
+              console.log(
+                JSON.stringify({
+                  _tag: "tool_policy_step_gate",
+                  requestId,
+                  chatId,
+                  userId,
+                  model,
+                  stepNumber,
+                  threshold: PREPARE_STEP_THRESHOLD,
+                  earlyToolCount: toolPolicy.earlyToolNames.length,
+                  lateToolCount: budgetAllowedTools.length,
+                  blockedCount:
+                    toolPolicy.earlyToolNames.length - budgetAllowedTools.length,
+                })
+              )
             }
 
-            // Fail closed: if no safe tools found, no tools available.
-            // This is intentional — prevents unrestricted tool access
-            // if readOnly metadata is misconfigured.
-            return { activeTools: safeTools }
+            return { activeTools: budgetAllowedTools }
           }
         : undefined,
 
@@ -813,9 +1331,64 @@ export async function POST(req: Request) {
       // Captures tool name, duration, token usage, and success per step.
       // This data feeds into the existing toolCallLog for trajectory analysis
       // and future trace-based evaluation.
-      onStepFinish: ({ toolCalls, toolResults, usage, finishReason }) => {
+      onStepFinish: async ({ toolCalls, toolResults, usage, finishReason }) => {
         stepCounter++
         if (toolCalls.length === 0) return
+
+        for (const call of toolCalls) {
+          if (!builtInToolNames.has(call.toolName)) continue
+          try {
+            await builtInPolicyGuard.enforceToolBudget(call.toolName)
+            if (degradedBuiltInTools.delete(call.toolName)) {
+              console.warn(
+                JSON.stringify({
+                  _tag: "tool_budget_post_accounting_recovered",
+                  requestId,
+                  tool: call.toolName,
+                  source: "builtin",
+                  keyMode: providerToolKeyMode,
+                  action: "resume_policy_enforced_budgeting",
+                })
+              )
+            }
+          } catch (error) {
+            if (isPolicyUnavailableError(error)) {
+              degradedBuiltInTools.add(call.toolName)
+              const softCap = degradedBuiltInSoftCap.recordCall(call.toolName)
+              console.warn(
+                JSON.stringify({
+                  _tag: "tool_budget_post_accounting_degraded",
+                  requestId,
+                  tool: call.toolName,
+                  source: "builtin",
+                  keyMode: providerToolKeyMode,
+                  policyUnavailable: true,
+                  usedCalls: softCap.used,
+                  remainingCalls: softCap.remaining,
+                  maxCalls: softCap.maxCalls,
+                  error: error.message,
+                  action:
+                    softCap.remaining > 0
+                      ? "allow_tool_with_request_local_soft_cap"
+                      : "disable_tool_until_policy_recovers",
+                })
+              )
+              continue
+            }
+            exhaustedBuiltInTools.add(call.toolName)
+            console.warn(
+              JSON.stringify({
+                _tag: "tool_budget_post_accounting_denied",
+                requestId,
+                tool: call.toolName,
+                source: "builtin",
+                keyMode: providerToolKeyMode,
+                error: error instanceof Error ? error.message : String(error),
+                action: "disable_tool_for_remaining_steps",
+              })
+            )
+          }
+        }
 
         for (const call of toolCalls) {
           const result = toolResults.find(
@@ -825,18 +1398,26 @@ export async function POST(req: Request) {
             ? !(result as { isError?: boolean }).isError
             : false
           const meta = allToolMetadata.get(call.toolName)
+          const trace = traceCollector.get(call.toolCallId)
 
           // Structured JSON log — parseable by Vercel log drain and grep.
           // Uses _tag for machine filtering without affecting human readability.
           console.log(
             JSON.stringify({
               _tag: "tool_trace",
+              requestId,
               chatId,
+              userId,
               step: stepCounter,
               tool: meta?.displayName ?? call.toolName,
               source: meta?.source ?? "unknown",
               success,
-              durationMs: traceCollector.get(call.toolCallId)?.durationMs ?? null,
+              durationMs: trace?.durationMs ?? null,
+              estimatedCostPer1k: meta?.estimatedCostPer1k ?? null,
+              errorCode: trace?.errorCode ?? null,
+              retryAfterSeconds: trace?.retryAfterSeconds ?? null,
+              budgetKeyMode: trace?.budgetKeyMode ?? null,
+              budgetDenied: trace?.budgetDenied ?? null,
               tokens: {
                 in: usage?.inputTokens ?? null,
                 out: usage?.outputTokens ?? null,
@@ -909,6 +1490,19 @@ export async function POST(req: Request) {
       },
 
       onFinish: ({ text, usage, steps, finishReason }) => {
+        if (steps) {
+          const resolvedByCallId: ToolInvocationMetadataByCallId = {}
+          for (const step of steps) {
+            for (const toolCall of step.toolCalls ?? []) {
+              const resolved = toolMetadataByName[toolCall.toolName]
+              if (resolved) {
+                resolvedByCallId[toolCall.toolCallId] = resolved
+              }
+            }
+          }
+          toolMetadataByCallId = resolvedByCallId
+        }
+
         // Freeze reasoning duration if it wasn't already frozen by text-delta
         // (e.g. reasoning-only responses with no text output, or errors)
         if (reasoningStartMs !== null && reasoningDurationMs === null) {
@@ -945,7 +1539,7 @@ export async function POST(req: Request) {
           console.log(
             `[chat] Anthropic tool usage — inputTokens: ${usage?.inputTokens ?? "?"}, ` +
             `toolCount: ${Object.keys(allTools).length}, ` +
-            `tokenEfficient: true`
+            `tokenEfficient: ${isTokenEfficient}`
           )
         }
 
@@ -974,13 +1568,6 @@ export async function POST(req: Request) {
             // PostHog: unified tool call events — one event per tool invocation (all sources)
             // Replaces the previous MCP-only mcp_tool_call event.
             if (steps) {
-              // Combine all metadata maps for source identification
-              const allToolMetadata = new Map([
-                ...builtInToolMetadata,
-                ...thirdPartyToolMetadata,
-                ...platformToolMetadata,
-              ])
-
               for (const step of steps) {
                 if (step.toolCalls) {
                   for (const toolCall of step.toolCalls) {
@@ -1002,6 +1589,7 @@ export async function POST(req: Request) {
                     const success = toolResult
                       ? !(toolResult as { isError?: boolean }).isError
                       : false
+                    const trace = traceCollector.get(toolCall.toolCallId)
 
                     phClient.capture({
                       distinctId: userId,
@@ -1014,7 +1602,12 @@ export async function POST(req: Request) {
                         success,
                         chatId,
                         // Phase C: Observability enrichment
-                        durationMs: traceCollector.get(toolCall.toolCallId)?.durationMs ?? undefined,
+                        durationMs: trace?.durationMs ?? undefined,
+                        errorCode: trace?.errorCode,
+                        retryAfterSeconds: trace?.retryAfterSeconds,
+                        budgetKeyMode: trace?.budgetKeyMode,
+                        budgetDenied: trace?.budgetDenied,
+                        requestId,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -1060,12 +1653,7 @@ export async function POST(req: Request) {
                   ? !(toolResult as { isError?: boolean }).isError
                   : false
 
-                // Extract data from envelope for preview — avoids wasting
-                // 500 chars on envelope metadata ({"ok":true,"data":...}).
-                const output = toolResult?.output
-                const previewData = isToolResultEnvelope(output)
-                  ? output.data
-                  : output
+                const previewData = toolResult?.output
                 const trace = traceCollector.get(toolCall.toolCallId)
 
                 void fetchMutation(
@@ -1089,6 +1677,11 @@ export async function POST(req: Request) {
                     inputTokens: step.usage?.inputTokens,
                     outputTokens: step.usage?.outputTokens,
                     resultSizeBytes: trace?.resultSizeBytes,
+                    requestId,
+                    errorCode: trace?.errorCode,
+                    retryAfterSeconds: trace?.retryAfterSeconds,
+                    budgetKeyMode: trace?.budgetKeyMode,
+                    budgetDenied: trace?.budgetDenied,
                   },
                   { token: convexToken }
                 ).catch(() => {
@@ -1102,14 +1695,7 @@ export async function POST(req: Request) {
         // Audit log: persist built-in + third-party tool calls (fire-and-forget).
         // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
         if (convexToken && steps) {
-          // Combine built-in and third-party metadata maps
-          const nonMcpMetadata = new Map([
-            ...builtInToolMetadata,
-            ...thirdPartyToolMetadata,
-            ...platformToolMetadata,
-          ])
-
-          if (nonMcpMetadata.size > 0) {
+          if (allToolMetadata.size > 0) {
             let finishStepNumber = 0
 
             for (const step of steps) {
@@ -1120,7 +1706,7 @@ export async function POST(req: Request) {
                   // Skip MCP tools (already logged above)
                   if (mcpToolServerMap.get(toolCall.toolName)) continue
 
-                  const meta = nonMcpMetadata.get(toolCall.toolName)
+                  const meta = allToolMetadata.get(toolCall.toolName)
                   if (!meta) continue // Unknown tool — skip
 
                   const toolResult = step.toolResults?.find(
@@ -1131,11 +1717,9 @@ export async function POST(req: Request) {
                     ? !(toolResult as { isError?: boolean }).isError
                     : false
 
-                  // For non-MCP tools, check if result is enveloped (Exa uses envelopes)
-                  const output = toolResult?.output
-                  const previewData = isToolResultEnvelope(output)
-                    ? output.data
-                    : output
+                  const previewData = toolResult?.output
+
+                  const trace = traceCollector.get(toolCall.toolCallId)
 
                   void fetchMutation(
                     api.toolCallLog.log,
@@ -1149,18 +1733,19 @@ export async function POST(req: Request) {
                         ? JSON.stringify(previewData).slice(0, 500)
                         : undefined,
                       success,
-                      // FIX: Use actual per-tool duration instead of total stream duration.
-                      // For Exa, the envelope's meta.durationMs has the real timing.
-                      // For builtin tools, we don't have per-tool timing (no trace collector).
-                      durationMs: isToolResultEnvelope(output)
-                        ? output.meta.durationMs
-                        : undefined,
+                      durationMs: trace?.durationMs,
                       source: meta.source,
                       serviceName: meta.serviceName,
                       // Phase C: Observability enrichment
                       stepNumber: finishStepNumber,
                       inputTokens: step.usage?.inputTokens,
                       outputTokens: step.usage?.outputTokens,
+                      resultSizeBytes: trace?.resultSizeBytes,
+                      requestId,
+                      errorCode: trace?.errorCode,
+                      retryAfterSeconds: trace?.retryAfterSeconds,
+                      budgetKeyMode: trace?.budgetKeyMode,
+                      budgetDenied: trace?.budgetDenied,
                     },
                     { token: convexToken }
                   ).catch(() => {
@@ -1178,8 +1763,14 @@ export async function POST(req: Request) {
       sendReasoning: true,
       sendSources: true,
       messageMetadata: ({ part }) => {
-        if (part.type === "finish" && reasoningDurationMs !== null) {
-          return { reasoningDurationMs }
+        if (part.type === "start") {
+          return buildStartToolInvocationStreamMetadata(toolMetadataByName)
+        }
+        if (part.type === "finish") {
+          return buildFinishToolInvocationStreamMetadata({
+            toolMetadataByCallId,
+            reasoningDurationMs,
+          })
         }
         return {}
       },

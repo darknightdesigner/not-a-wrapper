@@ -184,6 +184,22 @@ export const MCP_CONNECTION_TIMEOUT_MS = 5000
 export const MCP_CIRCUIT_BREAKER_THRESHOLD = 3
 export const MCP_MAX_STEP_COUNT = 20
 export const MCP_MAX_TOOLS_PER_REQUEST = 50
+/**
+ * Comma-separated allowlist for MCP servers whose annotation hints are trusted
+ * for retry safety decisions.
+ *
+ * Values are normalized to lowercase and matched against server id, server
+ * name, slugified server name, and server URL host.
+ *
+ * Example:
+ * MCP_TRUSTED_RETRY_SERVER_ALLOWLIST=server_123,github-mcp,mcp.example.com
+ */
+export const MCP_TRUSTED_RETRY_SERVER_ALLOWLIST = (
+  process.env.MCP_TRUSTED_RETRY_SERVER_ALLOWLIST ?? ""
+)
+  .split(",")
+  .map((entry) => entry.trim().toLowerCase())
+  .filter((entry) => entry.length > 0)
 
 /** Timeout for MCP tool executions (in milliseconds).
  * MCP tools connect to arbitrary user-configured servers that can hang.
@@ -227,6 +243,52 @@ export const PREPARE_STEP_THRESHOLD = 3
  * with AbortSignal support are added for third-party tools.
  */
 export const TOOL_EXECUTION_TIMEOUT_MS = 15_000
+
+/**
+ * Third-party cache policy (Layer 2 Exa tools).
+ * TTL governs in-process reuse lifetime; max entries bounds memory usage.
+ */
+export const THIRD_PARTY_SEARCH_CACHE_TTL_MS = 15 * 60_000
+export const THIRD_PARTY_SEARCH_CACHE_MAX_ENTRIES = 500
+export const THIRD_PARTY_EXTRACTION_CACHE_TTL_MS = 15 * 60_000
+export const THIRD_PARTY_EXTRACTION_CACHE_MAX_ENTRIES = 500
+
+/**
+ * Freshness window passed to Exa content extraction when supported.
+ * Keeps extraction results reasonably up-to-date while avoiding unnecessary recrawls.
+ */
+export const EXA_CONTENT_FRESHNESS_MAX_AGE_HOURS = 24
+
+/**
+ * Persistent bucket size for tool limit windows (domain + budget).
+ * Smaller buckets improve retry-after precision at the cost of more writes.
+ */
+export const TOOL_LIMIT_BUCKET_SIZE_MS = 60_000
+
+/**
+ * Sliding-window controls for extract_content domain abuse protection.
+ * Applies per actor + domain and is enforced only for uncached URL fetches.
+ */
+export const EXTRACT_CONTENT_DOMAIN_WINDOW_MS = 15 * 60_000
+export const EXTRACT_CONTENT_DOMAIN_MAX_REQUESTS = 6
+
+/**
+ * Centralized per-tool invocation budgets for server-executed layers.
+ * Platform-key budgets are stricter to protect shared infrastructure.
+ */
+export const TOOL_BUDGET_WINDOW_MS = 15 * 60_000
+export const TOOL_BUDGET_LIMITS = {
+  platform: {
+    default: 25,
+    web_search: 25,
+    extract_content: 20,
+  },
+  byok: {
+    default: 80,
+    web_search: 80,
+    extract_content: 60,
+  },
+} as const
 
 // ============================================================================
 // History Replay Compiler

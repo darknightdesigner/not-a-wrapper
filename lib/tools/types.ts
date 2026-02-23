@@ -1,12 +1,35 @@
 // lib/tools/types.ts
 
+import type { ToolErrorCode } from "./errors"
+
+/**
+ * Tool Naming Convention
+ *
+ * Layer 1 (provider): Use the SDK-defined name (e.g., `web_search` from
+ * `openai.tools.webSearch()`). These names are controlled by the provider
+ * SDK and should not be renamed.
+ *
+ * Layer 2 (third-party): Use `{action}_{resource}` format.
+ * Current: `web_search` (Exa), `extract_content` (Exa).
+ * When the third provider is added, consider migrating to `{service}_{action}`
+ * format (e.g., `exa_search`, `exa_extract`) to disambiguate providers.
+ *
+ * Layer 3 (MCP): Namespaced automatically by the MCP client as
+ * `{serverName}_{toolName}`. No manual naming needed.
+ *
+ * Layer 4 (platform): Use `{action}_{resource}` format with the service
+ * implied by the action. Current: `pay_purchase`, `pay_status`.
+ * If a second payment provider is added, migrate to `{service}_{action}`
+ * (e.g., `flowglad_purchase`, `stripe_checkout`).
+ */
+
 /**
  * Source identifier for tool audit logging and UI display.
  * - "builtin": Provider-specific tools (OpenAI web search, Google grounding, etc.)
  * - "third-party": Third-party tools via API keys (Exa, Firecrawl, etc.)
  * - "mcp": User-configured MCP server tools (existing system)
  */
-export type ToolSource = "builtin" | "third-party" | "mcp"
+export type ToolSource = "builtin" | "third-party" | "mcp" | "platform"
 
 /**
  * Metadata for a tool, used for UI display, audit logging, and cost tracking.
@@ -38,21 +61,39 @@ export type ToolMetadata = {
    * Default: true for search tools, false for write tools.
    */
   readOnly?: boolean
+  /**
+   * Whether this tool performs destructive updates (delete, overwrite).
+   * Mapped from MCP `destructiveHint` annotation when available.
+   * Used for future approval UI and prepareStep restrictions.
+   */
+  destructive?: boolean
+  /**
+   * Whether calling this tool multiple times with the same input is safe.
+   * Mapped from MCP `idempotentHint` annotation when available.
+   * Used for future retry policies (only retry idempotent tools).
+   */
+  idempotent?: boolean
+  /**
+   * Whether this tool interacts with an open-world context
+   * (arbitrary internet/external systems).
+   * Mapped from MCP `openWorldHint` annotation when available.
+   * Used by centralized capability/risk policy decisions.
+   */
+  openWorld?: boolean
 }
 
 /**
- * Standardized tool result envelope for Layer 2 (third-party) tools.
- * Layer 1 (provider) tools return opaque results — do NOT wrap them.
- * Layer 3 (MCP) tools return their own format — do NOT wrap them.
+ * @deprecated No longer used for model-facing tool results.
  *
- * IMPORTANT: Only used for the SUCCESS path. On error, tools should
- * throw so the AI SDK sets isError: true — this preserves correct
- * success detection in onFinish, PostHog events, and audit logs.
+ * All tool layers now return raw data to the model. Observability
+ * metadata (durationMs, source, tool name) is emitted via structured
+ * console.log with `_tag: "tool_exec"` or recorded in ToolTraceCollector.
  *
- * This envelope enables:
- * - Structured success data with metadata
- * - Tool result caching (hash the envelope for dedup)
- * - Observability via meta field (duration, result count)
+ * On error, tools throw so the AI SDK sets isError: true — this
+ * preserves correct success detection in onFinish, PostHog events,
+ * and audit logs.
+ *
+ * Retained for type reference in tests only. Do NOT use in new code.
  */
 export type ToolResultEnvelope<T = unknown> = {
   ok: boolean
@@ -76,13 +117,63 @@ export type ToolResultEnvelope<T = unknown> = {
  * When `tools: false` on a ModelConfig, ALL capabilities are disabled.
  * When `tools: ToolCapabilities`, individual capabilities can be toggled.
  */
+// ── Trace Types ────────────────────────────────────────────
+
+export type ToolTrace = {
+  toolName: string
+  toolCallId: string
+  requestId?: string
+  durationMs: number
+  success: boolean
+  error?: string
+  resultSizeBytes?: number
+  errorCode?: ToolErrorCode
+  retryAfterSeconds?: number
+  budgetKeyMode?: "platform" | "byok"
+  budgetDenied?: boolean
+  retryCount?: number
+}
+
+/**
+ * Collects per-tool-call traces for a single streamText() request.
+ * Created before streamText(), read in onStepFinish and onFinish.
+ *
+ * Lifecycle:
+ *   1. Created in route.ts before streamText()
+ *   2. wrapMcpTools() / wrapToolsWithTracing() record traces during execute()
+ *   3. onStepFinish reads traces for structured logging
+ *   4. onFinish reads traces for Convex + PostHog enrichment
+ *   5. Garbage collected when the request ends
+ */
+export class ToolTraceCollector {
+  private traces = new Map<string, ToolTrace>()
+
+  record(trace: ToolTrace): void {
+    this.traces.set(trace.toolCallId, trace)
+  }
+
+  get(toolCallId: string): ToolTrace | undefined {
+    return this.traces.get(toolCallId)
+  }
+
+  getAll(): ToolTrace[] {
+    return Array.from(this.traces.values())
+  }
+}
+
+// ── Tool Capabilities ─────────────────────────────────────
+
 export type ToolCapabilities = {
   /** Web search (Layer 1 provider tools + Layer 2 Exa). Default: true */
   search?: boolean
+  /** Content extraction from URLs (Layer 2 Exa getContents). Default: true */
+  extract?: boolean
   /** Code execution (provider sandboxes, future). Default: true */
   code?: boolean
   /** MCP server tools (Layer 3). Default: true */
   mcp?: boolean
+  /** Platform tools like Flowglad Pay (Layer 4). Default: true */
+  platform?: boolean
 }
 
 /**
@@ -95,11 +186,13 @@ export type ToolCapabilities = {
 export function resolveToolCapabilities(
   tools: boolean | ToolCapabilities | undefined
 ): Required<ToolCapabilities> {
-  if (tools === false) return { search: false, code: false, mcp: false }
-  if (tools === true || tools === undefined) return { search: true, code: true, mcp: true }
+  if (tools === false) return { search: false, extract: false, code: false, mcp: false, platform: false }
+  if (tools === true || tools === undefined) return { search: true, extract: true, code: true, mcp: true, platform: true }
   return {
     search: tools.search !== false,
+    extract: tools.extract !== false,
     code: tools.code !== false,
     mcp: tools.mcp !== false,
+    platform: tools.platform !== false,
   }
 }

@@ -6,6 +6,7 @@ import { decryptKey } from "@/lib/encryption"
 import {
   MCP_CONNECTION_TIMEOUT_MS,
   MCP_MAX_TOOLS_PER_REQUEST,
+  MCP_TRUSTED_RETRY_SERVER_ALLOWLIST,
 } from "@/lib/config"
 import {
   isCircuitOpen,
@@ -32,6 +33,24 @@ export type ServerInfo = {
   serverName: string
   /** Convex document ID of the MCP server */
   serverId: string
+  /** Whether this tool is read-only (from MCP tool annotations) */
+  readOnly?: boolean
+  /** Whether this tool performs destructive actions (from MCP annotations) */
+  destructive?: boolean
+  /** Whether this tool is idempotent (from MCP annotations) */
+  idempotent?: boolean
+  /** Whether this tool operates in an open-world context (from MCP annotations) */
+  openWorld?: boolean
+  /**
+   * Whether MCP annotation hints are trusted for retry safety decisions.
+   * Hints are advisory by default and only become retry-driving when trusted.
+   */
+  retrySafetyTrusted?: boolean
+  /**
+   * Whether MCP annotation hints are trusted for safety-critical risk policy.
+   * Untrusted hints are retained for UI context but ignored by gating policy.
+   */
+  policyHintsTrusted?: boolean
 }
 
 /** Result from loadUserMcpTools — everything the chat route needs */
@@ -51,6 +70,18 @@ export type LoadToolsOptions = {
   timeout?: number
 }
 
+type NamespacedToolOwner = {
+  serverId: string
+  serverName: string
+  displayName: string
+}
+
+type RetryTrustServer = {
+  _id: string
+  name: string
+  url: string
+}
+
 // =============================================================================
 // Helpers
 // =============================================================================
@@ -66,6 +97,44 @@ function isToolDescriptor(value: unknown): boolean {
     "execute" in value &&
     typeof (value as Record<string, unknown>).execute === "function"
   )
+}
+
+type ToolAnnotationHints = {
+  // MCP annotations are optional, provider-defined hints.
+  // Treat as advisory unless paired with an explicit trust context.
+  readOnly?: boolean
+  destructive?: boolean
+  idempotent?: boolean
+  openWorld?: boolean
+}
+
+function extractToolAnnotationHints(tool: unknown): ToolAnnotationHints {
+  if (typeof tool !== "object" || tool === null) return {}
+
+  const toolRecord = tool as Record<string, unknown>
+  if (!("annotations" in toolRecord)) return {}
+
+  const annotations = toolRecord.annotations as Record<string, unknown> | undefined
+  if (!annotations) return {}
+
+  return {
+    readOnly:
+      typeof annotations.readOnlyHint === "boolean"
+        ? annotations.readOnlyHint
+        : undefined,
+    destructive:
+      typeof annotations.destructiveHint === "boolean"
+        ? annotations.destructiveHint
+        : undefined,
+    idempotent:
+      typeof annotations.idempotentHint === "boolean"
+        ? annotations.idempotentHint
+        : undefined,
+    openWorld:
+      typeof annotations.openWorldHint === "boolean"
+        ? annotations.openWorldHint
+        : undefined,
+  }
 }
 
 /**
@@ -86,6 +155,32 @@ export function slugify(name: string): string {
       .replace(/^_+|_+$/g, "")
       .slice(0, 30) || "server"
   )
+}
+
+function normalizeRetryTrustToken(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function getServerHost(url: string): string | undefined {
+  try {
+    return new URL(url).host.toLowerCase()
+  } catch {
+    return undefined
+  }
+}
+
+function isRetrySafetyTrustedServer(server: RetryTrustServer): boolean {
+  if (MCP_TRUSTED_RETRY_SERVER_ALLOWLIST.length === 0) return false
+
+  const allowlist = new Set(MCP_TRUSTED_RETRY_SERVER_ALLOWLIST)
+  const candidates = [
+    normalizeRetryTrustToken(server._id),
+    normalizeRetryTrustToken(server.name),
+    normalizeRetryTrustToken(slugify(server.name)),
+    getServerHost(server.url),
+  ].filter((candidate): candidate is string => Boolean(candidate))
+
+  return candidates.some((candidate) => allowlist.has(candidate))
 }
 
 /**
@@ -278,6 +373,9 @@ export async function loadUserMcpTools(
   // without introducing a runtime wrapper around each tool descriptor.
   const mergedTools: Record<string, unknown> = {}
   const toolServerMap = new Map<string, ServerInfo>()
+  const namespacedOwners = new Map<string, NamespacedToolOwner>()
+  const namespacedCollisionOwners = new Map<string, NamespacedToolOwner[]>()
+  const collidingNames = new Set<string>()
   let toolCount = 0
   let connectionFailures = 0
 
@@ -307,6 +405,7 @@ export async function loadUserMcpTools(
     try {
       const tools = await client.tools()
       const serverSlug = slugify(server.name)
+      const retrySafetyTrusted = isRetrySafetyTrustedServer(server)
 
       // Update successful connection status (best-effort)
       updateConnectionStatus(
@@ -338,14 +437,53 @@ export async function loadUserMcpTools(
           continue
         }
 
-        // 7. Namespace tool name: `${serverSlug}_${toolName}`
+        // 7. Read MCP annotation hints.
+        // These are advisory/untrusted by default and may be absent.
+        // Downstream policy and retry code must fail safe without them.
+        const annotationHints = extractToolAnnotationHints(tool)
+
+        // 8. Namespace tool name: `${serverSlug}_${toolName}`
         const namespacedName = `${serverSlug}_${toolName}`
+        const owner: NamespacedToolOwner = {
+          serverId: server._id,
+          serverName: server.name,
+          displayName: toolName,
+        }
+
+        if (collidingNames.has(namespacedName)) {
+          const existing = namespacedCollisionOwners.get(namespacedName) ?? []
+          namespacedCollisionOwners.set(namespacedName, [...existing, owner])
+          continue
+        }
+
+        if (mergedTools[namespacedName]) {
+          collidingNames.add(namespacedName)
+          const previousOwner = namespacedOwners.get(namespacedName)
+          namespacedCollisionOwners.set(
+            namespacedName,
+            previousOwner ? [previousOwner, owner] : [owner]
+          )
+
+          delete mergedTools[namespacedName]
+          toolServerMap.delete(namespacedName)
+          namespacedOwners.delete(namespacedName)
+          toolCount = Math.max(0, toolCount - 1)
+          continue
+        }
+
         mergedTools[namespacedName] = tool
         toolServerMap.set(namespacedName, {
           displayName: toolName,
           serverName: server.name,
           serverId: server._id,
+          readOnly: annotationHints.readOnly,
+          destructive: annotationHints.destructive,
+          idempotent: annotationHints.idempotent,
+          openWorld: annotationHints.openWorld,
+          retrySafetyTrusted,
+          policyHintsTrusted: retrySafetyTrusted,
         })
+        namespacedOwners.set(namespacedName, owner)
         toolCount++
       }
     } catch (error) {
@@ -358,6 +496,26 @@ export async function loadUserMcpTools(
       )
       updateConnectionStatus(server._id, { lastError: errorMsg }, convexToken)
     }
+  }
+
+  for (const [namespacedName, owners] of namespacedCollisionOwners.entries()) {
+    const distinctOwners = owners.filter(
+      (owner, index, all) =>
+        all.findIndex(
+          (candidate) =>
+            candidate.serverId === owner.serverId &&
+            candidate.displayName === owner.displayName
+        ) === index
+    )
+    console.warn(
+      JSON.stringify({
+        _tag: "mcp_tool_name_collision",
+        namespacedName,
+        ownerCount: distinctOwners.length,
+        owners: distinctOwners,
+        action: "drop_all_colliders",
+      })
+    )
   }
 
   return {

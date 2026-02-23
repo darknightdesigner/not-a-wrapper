@@ -32,7 +32,7 @@ import {
   Copy01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import type { SourceUrlUIPart, ToolUIPart } from "ai"
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useState, useEffect, useId } from "react"
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -286,20 +286,51 @@ function StateAnnotation({
   )
 }
 
+function ArticleWrapper({
+  children,
+  role,
+}: {
+  children: React.ReactNode
+  role: "user" | "assistant"
+}) {
+  return (
+    <article
+      className={cn(
+        "text-base mx-auto w-full [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)]",
+        role === "user" && "pt-3 scroll-mt-[var(--spacing-app-header)]",
+        role === "assistant" && "pb-10 scroll-mt-[calc(var(--spacing-app-header)+min(200px,max(70px,20svh)))]"
+      )}
+      data-turn={role}
+    >
+      <div className="group/turn-messages relative mx-auto flex w-full min-w-0 [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)] flex-1 flex-col">
+        {children}
+      </div>
+    </article>
+  )
+}
+
 function UserBubble({ children }: { children: string }) {
   const isMultiline = children.includes("\n")
   return (
-    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-col items-end gap-0.5 px-[var(--thread-content-margin,1rem)] pb-2">
-      <MessageContent
-        className={cn(
-          "bg-accent prose relative max-w-[var(--user-chat-width,70%)] rounded-[18px] px-4",
-          isMultiline ? "py-3" : "py-1.5"
-        )}
-        markdown={false}
+    <ArticleWrapper role="user">
+      <Message
+        className="flex w-full flex-col items-end gap-0.5"
+        data-turn="user"
+        data-scroll-anchor="false"
+        tabIndex={-1}
       >
-        {children}
-      </MessageContent>
-    </Message>
+        <h5 className="sr-only">You said:</h5>
+        <MessageContent
+          className={cn(
+            "bg-accent prose relative max-w-[var(--user-chat-width,70%)] rounded-[18px] px-4",
+            isMultiline ? "py-3" : "py-1.5"
+          )}
+          markdown={false}
+        >
+          {children}
+        </MessageContent>
+      </Message>
+    </ArticleWrapper>
   )
 }
 
@@ -310,26 +341,54 @@ function AssistantShell({
   children: React.ReactNode
   isLast?: boolean
 }) {
+  const msgId = useId()
   return (
-    <Message className="group/message flex w-full max-w-[var(--thread-content-max-width,40rem)] flex-1 items-start gap-4 px-[var(--thread-content-margin,1rem)] pb-2">
-      <div
-        className={cn(
-          "relative flex min-w-full flex-col gap-2",
-          isLast && "pb-8"
-        )}
+    <ArticleWrapper role="assistant">
+      <Message
+        className="flex w-full flex-1 items-start gap-4"
+        data-turn="assistant"
+        data-message-id={msgId}
+        data-scroll-anchor={isLast ? "true" : "false"}
+        tabIndex={-1}
       >
-        {children}
-      </div>
-    </Message>
+        <h6 className="sr-only">Assistant said:</h6>
+        <div
+          className={cn(
+            "relative flex min-w-full flex-col gap-2",
+            isLast && "pb-8"
+          )}
+        >
+          {children}
+        </div>
+      </Message>
+    </ArticleWrapper>
   )
 }
 
 function CopyRegenActions() {
   return (
-    <MessageActions className="-ml-2 flex gap-0">
+    <MessageActions
+      className={cn(
+        "-ml-2 flex gap-0",
+        "pointer-events-none",
+        "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+        "[mask-size:300%_100%]",
+        "[mask-position:100%_0%]",
+        "motion-safe:transition-[mask-position]",
+        "duration-[1.5s]",
+        "group-hover/turn-messages:pointer-events-auto",
+        "group-hover/turn-messages:[mask-position:0_0]",
+        "group-focus-within/turn-messages:pointer-events-auto",
+        "group-focus-within/turn-messages:[mask-position:0_0]",
+        "has-[[data-state=open]]:pointer-events-auto",
+        "has-[[data-state=open]]:[mask-position:0_0]",
+        "pointer-coarse:pointer-events-auto",
+        "pointer-coarse:[mask-image:none]"
+      )}
+    >
       <MessageAction tooltip="Copy text" side="bottom">
         <button
-          className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+          className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
           aria-label="Copy text"
           type="button"
         >
@@ -338,7 +397,7 @@ function CopyRegenActions() {
       </MessageAction>
       <MessageAction tooltip="Regenerate" side="bottom" delay={0}>
         <button
-          className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition"
+          className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
           aria-label="Regenerate"
           type="button"
         >
@@ -363,9 +422,9 @@ export default function ThinkingStatesTestPage() {
   return (
     <MessagesProvider>
     <LayoutApp>
-      <div className="@container/main relative flex h-full flex-col items-center justify-end md:justify-center">
+      <div className="relative flex min-h-0 flex-1 flex-col items-center">
         {/* ━━━ Conversation ━━━ */}
-        <ScrollRootContent className="flex w-full flex-1 flex-col items-center pt-4 pb-4">
+        <ScrollRootContent className="relative flex w-full flex-1 flex-col items-center pt-4 [--composer-overlap-px:28px] [--thread-bottom-offset:calc(var(--spacing-input-area)+2rem+env(safe-area-inset-bottom,0px))] pb-[var(--thread-bottom-offset)] -mb-[var(--composer-overlap-px)]">
               {/* ─── User message ─── */}
               <UserBubble>This is a test chat thread</UserBubble>
 
@@ -483,7 +542,7 @@ export default function ThinkingStatesTestPage() {
               <AssistantShell>
                 <Loader
                   variant="text-shimmer"
-                  text="Generating"
+                  text="Thinking"
                   showCaret
                   streamingIndicatorVariant={STREAMING_INDICATOR_VARIANT}
                 />
@@ -803,31 +862,42 @@ export default function ThinkingStatesTestPage() {
                 <CopyRegenActions />
               </AssistantShell>
         </ScrollRootContent>
-        <div className="pointer-events-none sticky inset-x-0 bottom-20 z-10 flex items-center justify-center">
-          <div className="pointer-events-auto">
-            <ScrollButton />
-          </div>
-        </div>
 
         {/* ━━━ Composer ━━━ */}
-        <div className="bg-background sticky bottom-0 z-10 mx-auto w-full max-w-[var(--thread-content-max-width,40rem)] px-[var(--thread-content-margin,1rem)]">
-          <ChatInput
-            defaultValue=""
-            onValueChange={noopStr}
-            onSend={noop}
-            isSubmitting={false}
-            files={[]}
-            onFileUpload={noopFiles}
-            onFileRemove={noopFile}
-            onSuggestion={noopStr}
-            hasSuggestions={false}
-            selectedModel="gpt-5.2"
-            isUserAuthenticated={true}
-            stop={noop}
-            status="ready"
-            setEnableSearch={noopBool}
-            enableSearch={false}
-          />
+        <div className="group/thread-bottom-container content-fade relative isolate z-10 flex w-full basis-auto flex-col [--thread-content-margin:1rem] @sm/main:[--thread-content-margin:1.5rem] @lg/main:[--thread-content-margin:4rem] px-[var(--thread-content-margin,1rem)] pb-[env(safe-area-inset-bottom,0px)] sticky bottom-0">
+          <div className="relative h-0">
+            <div className="pointer-events-none absolute inset-x-0 bottom-[calc(100%+1.5rem)] z-30 flex justify-center">
+              <div className="pointer-events-auto">
+                <ScrollButton />
+              </div>
+            </div>
+          </div>
+          <div className="mx-auto w-full [--thread-content-max-width:40rem] @[64rem]/main:[--thread-content-max-width:48rem] max-w-[var(--thread-content-max-width,40rem)]">
+            <ChatInput
+              defaultValue=""
+              onValueChange={noopStr}
+              onSend={noop}
+              isSubmitting={false}
+              files={[]}
+              onFileUpload={noopFiles}
+              onFileRemove={noopFile}
+              onSuggestion={noopStr}
+              hasSuggestions={false}
+              selectedModel="gpt-5.2"
+              isUserAuthenticated={true}
+              stop={noop}
+              status="ready"
+              setEnableSearch={noopBool}
+              enableSearch={false}
+            />
+          </div>
+          <div className="-mt-4 text-muted-foreground relative w-full overflow-hidden text-center text-xs md:px-[60px]">
+            <div className="flex min-h-8 w-full items-center justify-center p-2 select-none">
+              <div className="pointer-events-auto">
+                <div>Not A Wrapper can make mistakes. Check important info.</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </LayoutApp>

@@ -28,16 +28,20 @@ export function useModel({
   chatId,
 }: UseModelProps) {
   // Get favorite models and last-used model from ModelProvider
-  const { favoriteModels, lastUsedModel, setLastUsedModel } =
+  const { favoriteModels, lastUsedModel, modelPrefsHydrated, setLastUsedModel } =
     useModelProvider()
 
   // Calculate the effective model based on priority: chat model > last used > first favorite > default
   const getEffectiveModel = useCallback(() => {
-    const firstFavoriteModel = favoriteModels[0]
+    const hydratedLastUsedModel = modelPrefsHydrated ? lastUsedModel : null
+    const firstFavoriteModel = modelPrefsHydrated ? favoriteModels[0] : null
     return (
-      currentChat?.model || lastUsedModel || firstFavoriteModel || MODEL_DEFAULT
+      currentChat?.model ||
+      hydratedLastUsedModel ||
+      firstFavoriteModel ||
+      MODEL_DEFAULT
     )
-  }, [currentChat?.model, lastUsedModel, favoriteModels])
+  }, [currentChat?.model, favoriteModels, lastUsedModel, modelPrefsHydrated])
 
   // Use local state only for temporary overrides, derive base value from props
   const [localSelectedModel, setLocalSelectedModel] = useState<string | null>(

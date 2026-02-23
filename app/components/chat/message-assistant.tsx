@@ -225,7 +225,10 @@ export function MessageAssistant({
         {toolInvocationParts &&
           toolInvocationParts.length > 0 &&
           preferences.showToolInvocations && (
-            <ToolInvocation toolInvocations={toolInvocationParts} />
+            <ToolInvocation
+              toolInvocations={toolInvocationParts}
+              metadata={metadata}
+            />
           )}
 
         {showToolProgress && (

@@ -3,8 +3,15 @@
 import { cn } from "@/lib/utils"
 import type { ToolUIPart } from 'ai'
 import { getStaticToolName } from 'ai'
+import {
+  humanizeToolName,
+  resolveToolInvocationMetadata,
+  type ToolInvocationDisplayMetadata,
+  type ToolInvocationStreamMetadata,
+} from "@/lib/tools/ui-metadata"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
+  AlertCircleIcon,
   ArrowDown01Icon,
   CheckmarkCircle01Icon,
   SourceCodeIcon,
@@ -12,6 +19,7 @@ import {
   NutIcon,
   Loading01Icon,
   Search01Icon,
+  FileSearchIcon,
   Wrench01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
@@ -19,6 +27,7 @@ import { useMemo, useState } from "react"
 
 type ToolInvocationProps = {
   toolInvocations: ToolUIPart[]
+  metadata?: Record<string, unknown>
   className?: string
   defaultOpen?: boolean
 }
@@ -32,30 +41,119 @@ const TRANSITION = {
 /** Maps built-in tool names to human-readable display names and icons */
 const BUILTIN_TOOL_DISPLAY: Record<
   string,
-  { name: string; icon: "search" | "code" | "image" | "extract" }
+  { name: string; icon: "search" | "code" | "image" | "extract" | "wrench" }
 > = {
   web_search: { name: "Web Search", icon: "search" },
   google_search: { name: "Web Search", icon: "search" },
+  extract_content: { name: "Read Page", icon: "extract" },
+  pay_purchase: { name: "Purchase", icon: "wrench" },
+  pay_status: { name: "Purchase Status", icon: "wrench" },
   // Future built-in tools:
   // code_execution: { name: "Code Execution", icon: "code" },
   // image_generation: { name: "Image Generation", icon: "image" },
 }
 
-/** Resolve icon component from BUILTIN_TOOL_DISPLAY icon identifier */
-function getToolIcon(iconId: "search" | "code" | "image" | "extract") {
+/** Resolve icon component from metadata icon identifier */
+function getToolIcon(iconId: NonNullable<ToolInvocationDisplayMetadata["icon"]>) {
   switch (iconId) {
     case "search":
       return Search01Icon
+    case "extract":
+      return FileSearchIcon
+    case "wrench":
+      return Wrench01Icon
     default:
       return Wrench01Icon
   }
 }
 
+function isToolSource(value: unknown): value is ToolInvocationDisplayMetadata["source"] {
+  return (
+    value === "builtin" ||
+    value === "third-party" ||
+    value === "mcp" ||
+    value === "platform"
+  )
+}
+
+function isToolIcon(value: unknown): value is NonNullable<ToolInvocationDisplayMetadata["icon"]> {
+  return (
+    value === "search" ||
+    value === "code" ||
+    value === "image" ||
+    value === "extract" ||
+    value === "wrench"
+  )
+}
+
+function isToolInvocationDisplayMetadata(
+  value: unknown
+): value is ToolInvocationDisplayMetadata {
+  if (typeof value !== "object" || value === null) return false
+  const candidate = value as Record<string, unknown>
+  if (typeof candidate.displayName !== "string") return false
+  if (!isToolSource(candidate.source)) return false
+  if (typeof candidate.serviceName !== "string") return false
+  if (candidate.icon !== undefined && !isToolIcon(candidate.icon)) return false
+  if (
+    candidate.estimatedCostPer1k !== undefined &&
+    typeof candidate.estimatedCostPer1k !== "number"
+  ) return false
+  if (candidate.readOnly !== undefined && typeof candidate.readOnly !== "boolean") return false
+  if (candidate.destructive !== undefined && typeof candidate.destructive !== "boolean") return false
+  if (candidate.idempotent !== undefined && typeof candidate.idempotent !== "boolean") return false
+  if (candidate.openWorld !== undefined && typeof candidate.openWorld !== "boolean") return false
+  return true
+}
+
+function toMetadataRecord(
+  value: unknown
+): Record<string, ToolInvocationDisplayMetadata> {
+  if (typeof value !== "object" || value === null) return {}
+  const record = value as Record<string, unknown>
+  const parsed: Record<string, ToolInvocationDisplayMetadata> = {}
+
+  for (const [key, candidate] of Object.entries(record)) {
+    if (isToolInvocationDisplayMetadata(candidate)) {
+      parsed[key] = candidate
+    }
+  }
+
+  return parsed
+}
+
+function getToolMetadataMaps(metadata?: Record<string, unknown>) {
+  return {
+    byName: toMetadataRecord(metadata?.toolMetadataByName),
+    byCallId: toMetadataRecord(metadata?.toolMetadataByCallId),
+  }
+}
+
+function formatSource(source: ToolInvocationDisplayMetadata["source"]): string {
+  switch (source) {
+    case "builtin":
+      return "Built-in"
+    case "third-party":
+      return "Third-party"
+    case "platform":
+      return "Platform"
+    case "mcp":
+      return "MCP"
+    default:
+      return "Unknown"
+  }
+}
+
 export function ToolInvocation({
   toolInvocations,
+  metadata,
   defaultOpen = false,
 }: ToolInvocationProps) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
+  const { byName, byCallId } = useMemo(
+    () => getToolMetadataMaps(metadata),
+    [metadata]
+  )
 
   const toolInvocationsData = Array.isArray(toolInvocations)
     ? toolInvocations
@@ -81,6 +179,8 @@ export function ToolInvocation({
     return (
       <SingleToolView
         toolInvocations={toolInvocationsData}
+        metadataByName={byName}
+        metadataByCallId={byCallId}
         defaultOpen={defaultOpen}
         className="mb-10"
       />
@@ -138,6 +238,8 @@ export function ToolInvocation({
                       >
                         <SingleToolView
                           toolInvocations={toolInvocationsForId}
+                          metadataByName={byName}
+                          metadataByCallId={byCallId}
                         />
                       </div>
                     )
@@ -154,12 +256,16 @@ export function ToolInvocation({
 
 type SingleToolViewProps = {
   toolInvocations: ToolUIPart[]
+  metadataByName: Record<string, ToolInvocationDisplayMetadata>
+  metadataByCallId: Record<string, ToolInvocationDisplayMetadata>
   defaultOpen?: boolean
   className?: string
 }
 
 function SingleToolView({
   toolInvocations,
+  metadataByName,
+  metadataByCallId,
   defaultOpen = false,
   className,
 }: SingleToolViewProps) {
@@ -201,6 +307,8 @@ function SingleToolView({
     return (
       <SingleToolCard
         toolData={toolsToDisplay[0]}
+        metadataByName={metadataByName}
+        metadataByCallId={metadataByCallId}
         defaultOpen={defaultOpen}
         className={className}
       />
@@ -215,6 +323,8 @@ function SingleToolView({
           <SingleToolCard
             key={tool.toolCallId}
             toolData={tool}
+            metadataByName={metadataByName}
+            metadataByCallId={metadataByCallId}
             defaultOpen={defaultOpen}
           />
         ))}
@@ -226,27 +336,48 @@ function SingleToolView({
 // New component to handle individual tool cards
 function SingleToolCard({
   toolData,
+  metadataByName,
+  metadataByCallId,
   defaultOpen = false,
   className,
 }: {
   toolData: ToolUIPart
+  metadataByName: Record<string, ToolInvocationDisplayMetadata>
+  metadataByCallId: Record<string, ToolInvocationDisplayMetadata>
   defaultOpen?: boolean
   className?: string
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultOpen)
   const { state, toolCallId } = toolData
-  // v6: Get tool name using official helper.
-  // NOTE: For MCP tools, this returns the namespaced name (e.g. "my_github_server_create_issue").
-  // Displaying a cleaner name requires passing toolServerMap from the chat route via stream
-  // metadata, which is planned for v1.1. Until then, the namespaced name is shown as-is.
   const toolName = getStaticToolName(toolData)
+  const streamMetadata: ToolInvocationStreamMetadata = {
+    toolMetadataByName: metadataByName,
+    toolMetadataByCallId: metadataByCallId,
+  }
+  const runtimeMetadata = resolveToolInvocationMetadata({
+    toolName,
+    toolCallId,
+    streamMetadata,
+  })
   const displayInfo = BUILTIN_TOOL_DISPLAY[toolName] ?? null
-  const displayName = displayInfo?.name ?? toolName
-  const ToolIcon = displayInfo ? getToolIcon(displayInfo.icon) : Wrench01Icon
+  const displayName =
+    runtimeMetadata?.displayName ??
+    displayInfo?.name ??
+    humanizeToolName(toolName)
+  const iconId = runtimeMetadata?.icon ?? displayInfo?.icon ?? "wrench"
+  const ToolIcon = getToolIcon(iconId)
+  const source = runtimeMetadata?.source
+  const serviceName = runtimeMetadata?.serviceName
+  const estimatedCostPer1k = runtimeMetadata?.estimatedCostPer1k
+  const readOnly = runtimeMetadata?.readOnly
+  const destructive = runtimeMetadata?.destructive
+  const idempotent = runtimeMetadata?.idempotent
+  const openWorld = runtimeMetadata?.openWorld
   const args = toolData.input as Record<string, unknown> | undefined
   const isLoading = state === "input-available" || state === "input-streaming"
   const isCompleted = state === "output-available"
   const result = isCompleted ? toolData.output : undefined
+  const isError = isCompleted && result != null && typeof result === "object" && "isError" in result && (result as Record<string, unknown>).isError === true
 
   // Parse the result JSON if available
   const { parsedResult, parseError } = useMemo(() => {
@@ -421,7 +552,18 @@ function SingleToolCard({
       >
         <div className="flex flex-1 flex-row items-center gap-2 text-left text-base">
           <HugeiconsIcon icon={ToolIcon} size={16} className="text-muted-foreground" />
-          <span className={cn("text-sm", displayInfo ? "" : "font-mono")}>{displayName}</span>
+          <div className="flex min-w-0 flex-col">
+            <span className={cn("truncate text-sm", runtimeMetadata || displayInfo ? "" : "font-mono")}>
+              {displayName}
+            </span>
+            {(source || serviceName) && (
+              <span className="text-muted-foreground truncate text-xs">
+                {[source ? formatSource(source) : null, serviceName]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </span>
+            )}
+          </div>
           <AnimatePresence mode="popLayout" initial={false}>
             {isLoading ? (
               <motion.div
@@ -434,6 +576,19 @@ function SingleToolCard({
                 <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
                   <HugeiconsIcon icon={Loading01Icon} size={12} className="mr-1 h-3 w-3 animate-spin" />
                   Running
+                </div>
+              </motion.div>
+            ) : isError ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, filter: "blur(2px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 0.9, filter: "blur(2px)" }}
+                transition={{ duration: 0.15 }}
+                key="error"
+              >
+                <div className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                  <HugeiconsIcon icon={AlertCircleIcon} size={12} className="mr-1 h-3 w-3" />
+                  Failed
                 </div>
               </motion.div>
             ) : (
@@ -495,6 +650,64 @@ function SingleToolCard({
                       <div className="text-red-500">{parseError}</div>
                     ) : (
                       renderResults()
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {(source ||
+                serviceName ||
+                typeof estimatedCostPer1k === "number" ||
+                typeof readOnly === "boolean" ||
+                typeof destructive === "boolean" ||
+                typeof idempotent === "boolean" ||
+                typeof openWorld === "boolean") && (
+                <div>
+                  <div className="text-muted-foreground mb-1 text-xs font-medium">
+                    Tool info
+                  </div>
+                  <div className="bg-background space-y-1 rounded border p-2 text-sm">
+                    {source && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Source:</span>{" "}
+                        {formatSource(source)}
+                      </div>
+                    )}
+                    {serviceName && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Service:</span>{" "}
+                        {serviceName}
+                      </div>
+                    )}
+                    {typeof estimatedCostPer1k === "number" && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Estimated cost:</span>{" "}
+                        ${estimatedCostPer1k.toFixed(2)} / 1k calls
+                      </div>
+                    )}
+                    {typeof readOnly === "boolean" && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Read-only:</span>{" "}
+                        {readOnly ? "Yes" : "No"}
+                      </div>
+                    )}
+                    {typeof destructive === "boolean" && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Destructive:</span>{" "}
+                        {destructive ? "Yes" : "No"}
+                      </div>
+                    )}
+                    {typeof idempotent === "boolean" && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Idempotent:</span>{" "}
+                        {idempotent ? "Yes" : "No"}
+                      </div>
+                    )}
+                    {typeof openWorld === "boolean" && (
+                      <div>
+                        <span className="text-muted-foreground font-medium">Open-world:</span>{" "}
+                        {openWorld ? "Yes" : "No"}
+                      </div>
                     )}
                   </div>
                 </div>

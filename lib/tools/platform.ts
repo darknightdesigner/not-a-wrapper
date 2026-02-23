@@ -5,6 +5,8 @@ import type { ToolMetadata } from "./types"
 import { getPayClawConfig } from "@/lib/payclaw/config"
 import { payClawToolInputSchema, type ShippingAddress } from "@/lib/payclaw/schemas"
 import { PayClawApiError, createJob, getJob, getJobEvents } from "@/lib/payclaw/client"
+import { enrichToolError, extractAbortSignalFromOptions } from "./utils"
+import { extractToolErrorData } from "./errors"
 
 export async function getPlatformTools(options?: {
   userName?: string
@@ -22,7 +24,11 @@ export async function getPlatformTools(options?: {
     return { tools: tools as ToolSet, metadata }
   }
 
-  tools.flowglad_pay_buy = tool({
+  // Request-scoped dedupe cache to reduce duplicate purchase side effects when
+  // the model emits identical pay_purchase calls in the same generation.
+  const purchaseRequestCache = new Map<string, Promise<{ jobId: string; status: string }>>()
+
+  tools.pay_purchase = tool({
     description:
       "Buy a product or provision a service account using Flowglad Pay. " +
       "Provide the vendor URL and maximum spend in cents. " +
@@ -39,13 +45,41 @@ export async function getPlatformTools(options?: {
       "- ALWAYS extract phone number and email when the user provides them — many checkouts fail without both.\n" +
       "\n\nWhen to call this tool:\n" +
       "- The user asks to buy, purchase, order, or subscribe to something.\n" +
-      "- Do NOT call this tool to check on an existing job — use flowglad_pay_status instead.\n" +
-      "- Do NOT re-create a job for the same URL if a previous flowglad_pay_buy result already exists in this conversation, unless the user explicitly asks for a new purchase.",
+      "- Do NOT call this tool to check on an existing job — use pay_status instead.\n" +
+      "- Do NOT re-create a job for the same URL if a previous pay_purchase result already exists in this conversation, unless the user explicitly asks for a new purchase.",
     inputSchema: payClawToolInputSchema,
-    execute: async (input) => {
+    inputExamples: [
+      {
+        input: {
+          url: "https://example-saas.com/pricing",
+          maxSpend: 2500,
+          product: "Pro monthly subscription",
+        },
+      },
+      {
+        input: {
+          url: "https://store.example.com/products/ergonomic-mouse",
+          maxSpend: 4800,
+          shippingAddress: {
+            name: "Alex Rivera",
+            line1: "123 Main St",
+            city: "San Francisco",
+            state: "CA",
+            postalCode: "94105",
+            country: "US",
+            phone: "+1-415-555-0123",
+            email: "alex@example.com",
+          },
+        },
+      },
+    ],
+    execute: async (input, toolOptions) => {
       const startMs = Date.now()
       try {
         const resolvedInput = { ...input }
+        const abortSignal = toolOptions
+          ? extractAbortSignalFromOptions(toolOptions)
+          : undefined
 
         if (!resolvedInput.shippingAddress && options?.defaultShippingAddress) {
           resolvedInput.shippingAddress = {
@@ -67,64 +101,78 @@ export async function getPlatformTools(options?: {
 
         const hasPaymentMethod = resolvedInput.paymentMethod || config.defaultCardId
         if (!hasPaymentMethod) {
-          return {
-            ok: false,
-            data: null,
-            error: "No payment method available. Add a default card in settings or configure PAYCLAW_CARD_ID.",
-            meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
-          }
+          throw enrichToolError(
+            new Error("No payment method available. Add a default card in settings or configure PAYCLAW_CARD_ID."),
+            "pay_purchase"
+          )
         }
 
         const isLikelyPhysical = resolvedInput.shippingAddress !== undefined
         if (isLikelyPhysical) {
           const addr = resolvedInput.shippingAddress!
           if (!addr.phone) {
-            return {
-              ok: false,
-              data: null,
-              error:
+            throw enrichToolError(
+              new Error(
                 "Shipping address is missing a phone number, which most vendor checkouts require. " +
-                "Ask the user for their phone number and include it in the shippingAddress.",
-              meta: { tool: "Flowglad Pay", source: "platform", durationMs: Date.now() - startMs },
-            }
+                "Ask the user for their phone number and include it in the shippingAddress."
+              ),
+              "pay_purchase"
+            )
           }
           if (!addr.email) {
             console.warn("[tools/platform] Shipping address missing email — some checkouts may require it")
           }
         }
 
-        const result = await createJob(resolvedInput, config)
+        const dedupeKey = JSON.stringify({
+          url: resolvedInput.url,
+          maxSpend: resolvedInput.maxSpend,
+          product: resolvedInput.product ?? null,
+          shippingAddress: resolvedInput.shippingAddress ?? null,
+          paymentMethod: resolvedInput.paymentMethod ?? null,
+          browserProvider: resolvedInput.browserProvider ?? null,
+        })
+
+        let jobPromise = purchaseRequestCache.get(dedupeKey)
+        if (!jobPromise) {
+          jobPromise = createJob(resolvedInput, config, { signal: abortSignal })
+            .then((result) => ({ jobId: result.jobId, status: result.status }))
+            .catch((error) => {
+              purchaseRequestCache.delete(dedupeKey)
+              throw error
+            })
+          purchaseRequestCache.set(dedupeKey, jobPromise)
+        }
+
+        const result = await jobPromise
+        console.log(JSON.stringify({
+          _tag: "tool_exec",
+          tool: "pay_purchase",
+          source: "platform",
+          durationMs: Date.now() - startMs,
+        }))
         return {
-          ok: true,
-          data: {
-            jobId: result.jobId,
-            status: result.status,
-            message:
-              `Provisioning job created for ${input.url}. ` +
-              `Job ID: ${result.jobId}. The purchase agent is now working on this ` +
-              "and it typically takes 2–8 minutes to complete. " +
-              "Report this job ID and status to the user. " +
-              "Do NOT poll flowglad_pay_status repeatedly — ask the user to " +
-              "send a follow-up message when they want a status update.",
-          },
-          error: null,
-          meta: {
-            tool: "Flowglad Pay",
-            source: "platform",
-            durationMs: Date.now() - startMs,
-          },
+          jobId: result.jobId,
+          status: result.status,
+          message:
+            `Provisioning job created for ${input.url}. ` +
+            `Job ID: ${result.jobId}. The purchase agent is now working on this ` +
+            "and it typically takes 2–8 minutes to complete. " +
+            "Report this job ID and status to the user. " +
+            "Do NOT poll pay_status repeatedly — ask the user to " +
+            "send a follow-up message when they want a status update.",
         }
       } catch (err) {
         console.error(
           `[tools/platform] Flowglad Pay failed after ${Date.now() - startMs}ms:`,
           err instanceof Error ? err.message : String(err)
         )
-        throw err
+        throw enrichToolError(err, "pay_purchase")
       }
     },
   })
 
-  tools.flowglad_pay_status = tool({
+  tools.pay_status = tool({
     description:
       "Check the status of a Flowglad Pay purchase job. Returns current status, " +
       "latest progress message, and result if completed. Use this instead of creating " +
@@ -133,21 +181,34 @@ export async function getPlatformTools(options?: {
       "- Call this tool AT MOST ONCE per user message.\n" +
       "- If the job is still active (isTerminal: false), do NOT call again. " +
       "Tell the user the job is in progress and suggest they ask again in 1–2 minutes.\n" +
-      "- Only poll again when the user sends a new message asking for a status update.",
+      "- Only poll again when the user sends a new message asking for a status update.\n" +
+      "- Do NOT call pay_purchase to check status — use this tool instead.",
     inputSchema: z.object({
       jobId: z
         .string()
         .describe(
-          "The job ID returned by flowglad_pay_buy. Use this to check status of an existing purchase job."
+          "The job ID returned by pay_purchase. Use this to check status of an existing purchase job."
         ),
     }),
-    execute: async (input) => {
+    inputExamples: [
+      { input: { jobId: "job_abc123xyz" } },
+      { input: { jobId: "job_2026_02_23_001" } },
+    ],
+    execute: async (input, toolOptions) => {
       const startMs = Date.now()
       try {
-        const eventsPromise = getJobEvents(input.jobId, config)
+        const abortSignal = toolOptions
+          ? extractAbortSignalFromOptions(toolOptions)
+          : undefined
+
+        const eventsPromise = getJobEvents(input.jobId, config, { signal: abortSignal })
           .then((events) => ({ events, degraded: false as const }))
           .catch((err) => {
             if (err instanceof PayClawApiError) {
+              throw err
+            }
+            const errorData = extractToolErrorData(err, { toolName: "pay_status" })
+            if (errorData.code === "aborted" || errorData.code === "timeout") {
               throw err
             }
 
@@ -160,7 +221,7 @@ export async function getPlatformTools(options?: {
           })
 
         const [job, eventsResult] = await Promise.all([
-          getJob(input.jobId, config),
+          getJob(input.jobId, config, { signal: abortSignal }),
           eventsPromise,
         ])
         const events = eventsResult.events
@@ -175,25 +236,22 @@ export async function getPlatformTools(options?: {
           job.status === "failed" ||
           job.status === "cancelled"
 
+        console.log(JSON.stringify({
+          _tag: "tool_exec",
+          tool: "pay_status",
+          source: "platform",
+          durationMs: Date.now() - startMs,
+        }))
         return {
-          ok: true,
-          data: {
-            jobId: input.jobId,
-            status: job.status,
-            latestMessage,
-            isTerminal,
-            eventCount: events.length,
-            result: job.result,
-          },
-          error: null,
-          meta: {
-            tool: "Flowglad Pay",
-            source: "platform",
-            durationMs: Date.now() - startMs,
-          },
+          jobId: input.jobId,
+          status: job.status,
+          latestMessage,
+          isTerminal,
+          eventCount: events.length,
+          result: job.result,
           ...(!isTerminal && {
             hint:
-              "Job is still running. Do NOT call flowglad_pay_status again this turn. " +
+              "Job is still running. Do NOT call pay_status again this turn. " +
               "Tell the user the current status and ask them to check back in 1–2 minutes.",
           }),
         }
@@ -202,25 +260,28 @@ export async function getPlatformTools(options?: {
           `[tools/platform] Flowglad Pay failed after ${Date.now() - startMs}ms:`,
           err instanceof Error ? err.message : String(err)
         )
-        throw err
+        throw enrichToolError(err, "pay_status")
       }
     },
   })
 
-  metadata.set("flowglad_pay_buy", {
-    displayName: "Flowglad Pay",
-    source: "third-party",
+  metadata.set("pay_purchase", {
+    displayName: "Purchase",
+    source: "platform",
     serviceName: "Flowglad Pay",
     icon: "wrench",
     readOnly: false,
+    destructive: false,
+    idempotent: false,
   })
 
-  metadata.set("flowglad_pay_status", {
-    displayName: "Flowglad Pay Status",
-    source: "third-party",
+  metadata.set("pay_status", {
+    displayName: "Purchase Status",
+    source: "platform",
     serviceName: "Flowglad Pay",
     icon: "wrench",
     readOnly: true,
+    idempotent: true,
   })
 
   return { tools: tools as ToolSet, metadata }
