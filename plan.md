@@ -176,6 +176,13 @@ AGENTS.md            ← Rules & permissions
   - [ ] Verify reduced-motion behavior across composer, suggestions, file list, and streaming animations.
   - [ ] Test with macOS "Reduce motion" accessibility setting and `prefers-reduced-motion: reduce` emulation in DevTools.
 
+- [ ] **#47 Payclaw architecture hardening (beyond observability)** (`Not started`)  
+  Sources: `app/api/chat/route.ts`, `lib/tools/platform.ts`, `app/api/payclaw/status/route.ts`, `convex/schema.ts`, `convex/users.ts`, `convex/toolCallLog.ts`, `lib/encryption.ts`, `lib/user-keys.ts`, `lib/payclaw/client.ts`
+  - [ ] **Job ownership/authz boundary:** Add a Payclaw job ownership ledger (`payclawJobs` table) and enforce authorization on all `pay_status` reads so users cannot access jobs they did not create.
+  - [ ] **Card ID at-rest hardening:** Remove plaintext `payClawCardId` storage path; encrypt card IDs at rest using existing `lib/encryption.ts` primitives with a migration-safe fallback.
+  - [ ] **Status path consolidation:** Designate `pay_status` (tool call) as the canonical status path; deprecate `/api/payclaw/status` HTTP route with deprecation headers/logging and confirm no active runtime dependents.
+  - [ ] **Execution sequencing:** Ownership ledger first → authz enforcement on reads → card ID storage hardening → status path consolidation. Each stage independently shippable.
+
 ### P2 — Major Features
 
 - [ ] **#19 Image generation in chat** (`Not started`)  

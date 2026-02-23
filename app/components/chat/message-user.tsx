@@ -224,30 +224,10 @@ export function MessageUser({
       ) : (
         <MessageContent
           className={cn(
-            "bg-accent prose relative max-w-[var(--user-chat-width,70%)] rounded-[18px] px-4",
+            "bg-accent relative max-w-[var(--user-chat-width,70%)] whitespace-pre-wrap rounded-[18px] px-4",
             isMultiline ? "py-3" : "py-1.5"
           )}
-          markdown={true}
           ref={contentRef}
-          components={{
-            code: ({ children }) => <React.Fragment>{children}</React.Fragment>,
-            pre: ({ children }) => <React.Fragment>{children}</React.Fragment>,
-            h1: ({ children }) => <p>{children}</p>,
-            h2: ({ children }) => <p>{children}</p>,
-            h3: ({ children }) => <p>{children}</p>,
-            h4: ({ children }) => <p>{children}</p>,
-            h5: ({ children }) => <p>{children}</p>,
-            h6: ({ children }) => <p>{children}</p>,
-            p: ({ children }) => <p>{children}</p>,
-            li: ({ children }) => (
-              <div className="flex gap-2">
-                <span className="shrink-0">-</span>
-                <div className="min-w-0">{children}</div>
-              </div>
-            ),
-            ul: ({ children }) => <React.Fragment>{children}</React.Fragment>,
-            ol: ({ children }) => <React.Fragment>{children}</React.Fragment>,
-          }}
         >
           {children}
         </MessageContent>
