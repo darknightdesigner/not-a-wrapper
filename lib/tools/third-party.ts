@@ -4,8 +4,56 @@ import { tool } from "ai"
 import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
-import { truncateToolResult } from "./utils"
+import { truncateToolResult, enrichToolError } from "./utils"
 import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
+
+// ── Content Extraction Cache ────────────────────────────────
+// Process-level LRU cache for content extraction results.
+// Same URL in multi-turn conversations avoids re-fetching from Exa.
+// TTL: 15 min. Max entries: 500. Shared across requests (public URLs only).
+
+type CachedExtraction = { url: string; title?: string; content?: string }
+
+const extractionCache = new Map<
+  string,
+  { data: CachedExtraction; fetchedAt: number }
+>()
+const EXTRACTION_CACHE_TTL_MS = 15 * 60 * 1000
+const EXTRACTION_CACHE_MAX_ENTRIES = 500
+
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    parsed.hostname = parsed.hostname.toLowerCase()
+    parsed.pathname = parsed.pathname.replace(/\/$/, "") || "/"
+    for (const key of [...parsed.searchParams.keys()]) {
+      if (key.startsWith("utm_")) parsed.searchParams.delete(key)
+    }
+    parsed.searchParams.sort()
+    return parsed.toString()
+  } catch {
+    return url.toLowerCase()
+  }
+}
+
+function getCachedExtraction(url: string): CachedExtraction | null {
+  const key = normalizeUrl(url)
+  const entry = extractionCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.fetchedAt > EXTRACTION_CACHE_TTL_MS) {
+    extractionCache.delete(key)
+    return null
+  }
+  return entry.data
+}
+
+function setCachedExtraction(inputUrl: string, data: CachedExtraction): void {
+  if (extractionCache.size >= EXTRACTION_CACHE_MAX_ENTRIES) {
+    const oldestKey = extractionCache.keys().next().value
+    if (oldestKey) extractionCache.delete(oldestKey)
+  }
+  extractionCache.set(normalizeUrl(inputUrl), { data, fetchedAt: Date.now() })
+}
 
 /**
  * Configuration for third-party tool loading.
@@ -72,7 +120,19 @@ export async function getThirdPartyTools(
       tools.web_search = tool({
         description:
           "Search the web for current information using AI-native semantic search. " +
-          "Returns relevant web pages with titles, URLs, content snippets, and publication dates.",
+          "Returns up to 5 results, each with title, URL, content snippet (up to 2000 chars), and publication date.\n\n" +
+          "When to use:\n" +
+          "- The user asks about recent events, current data, or time-sensitive information\n" +
+          "- The user explicitly asks to search, look up, or find something online\n" +
+          "- You need to verify or fact-check a claim with current sources\n\n" +
+          "When NOT to use:\n" +
+          "- General knowledge questions you can answer confidently from training data\n" +
+          "- Questions about the user's own files, code, or conversation history\n" +
+          "- URLs in code snippets, import statements, or reference links\n\n" +
+          "Query tips:\n" +
+          "- Be specific and concise — include key terms, names, and dates when relevant\n" +
+          "- Do NOT append the current year unless the user specifically asks for recent results\n" +
+          "- Prefer natural language queries over keyword-stuffed searches",
         inputSchema: z.object({
           query: z
             .string()
@@ -83,6 +143,9 @@ export async function getThirdPartyTools(
         execute: async ({ query }) => {
           const startMs = Date.now()
           try {
+            // Timeout via Promise.race — the exa-js SDK does not accept
+            // AbortSignal, so the underlying HTTP request may continue after
+            // timeout. On serverless this is bounded by function lifetime.
             const { results } = await Promise.race([
               exa.searchAndContents(query, {
                 type: "auto",
@@ -120,16 +183,11 @@ export async function getThirdPartyTools(
               },
             }
           } catch (err) {
-            // Log for observability, then re-throw so the AI SDK sets isError: true
-            // on the tool result. This preserves correct success detection in
-            // onFinish (PostHog events, audit logs). The SDK passes the error
-            // message to the model as a tool result — the model can still
-            // explain "search failed" without the app crashing.
             console.error(
               `[tools/exa] Search failed after ${Date.now() - startMs}ms:`,
               err instanceof Error ? err.message : String(err)
             )
-            throw err
+            throw enrichToolError(err, "web_search")
           }
         },
       })
@@ -181,7 +239,12 @@ export async function getContentExtractionTools(options: {
     const Exa = (await import("exa-js")).default
     const exa = new Exa(exaKey)
 
-    tools.content_extract = tool({
+    // Per-request domain rate limiting — persists across tool invocations
+    // within the same streamText call but resets for each new API request.
+    const domainRequestCounts = new Map<string, number>()
+    const DOMAIN_RATE_LIMIT = 3
+
+    tools.extract_content = tool({
       description:
         "Fetch and extract clean, readable content from web page URLs as markdown. " +
         "Use when the user provides URLs to read, analyze, or summarize, or when you need " +
@@ -199,8 +262,73 @@ export async function getContentExtractionTools(options: {
       execute: async ({ urls }) => {
         const startMs = Date.now()
         try {
+          // ── Per-domain rate limiting ────────────────────
+          const batchDomainCounts = new Map<string, number>()
+          for (const url of urls) {
+            try {
+              const domain = new URL(url).hostname.toLowerCase()
+              batchDomainCounts.set(
+                domain,
+                (batchDomainCounts.get(domain) ?? 0) + 1
+              )
+            } catch {
+              /* invalid URL — will fail in Exa */
+            }
+          }
+          for (const [domain, count] of batchDomainCounts) {
+            const existing = domainRequestCounts.get(domain) ?? 0
+            if (existing + count > DOMAIN_RATE_LIMIT) {
+              throw new Error(
+                `DOMAIN_RATE_LIMIT: Too many requests to ${domain} ` +
+                  `(${existing + count} exceeds ${DOMAIN_RATE_LIMIT} per-conversation limit). ` +
+                  `Reduce URLs for this domain or extract from different sources.`
+              )
+            }
+          }
+          for (const [domain, count] of batchDomainCounts) {
+            domainRequestCounts.set(
+              domain,
+              (domainRequestCounts.get(domain) ?? 0) + count
+            )
+          }
+
+          // ── Cache check ────────────────────────────────
+          const cached = new Map<string, CachedExtraction>()
+          const uncachedUrls: string[] = []
+          for (const url of urls) {
+            const hit = getCachedExtraction(url)
+            if (hit) {
+              cached.set(url, hit)
+            } else {
+              uncachedUrls.push(url)
+            }
+          }
+
+          // If all URLs are cached, return immediately
+          if (uncachedUrls.length === 0) {
+            const mapped = urls.map(
+              (url) => cached.get(url) ?? { url, error: "CACHE_MISS" }
+            )
+            return {
+              ok: true,
+              data: truncateToolResult(mapped),
+              error: null,
+              meta: {
+                tool: "extract_content",
+                source: "exa",
+                durationMs: Date.now() - startMs,
+                urlCount: urls.length,
+                successCount: cached.size,
+                failedCount: 0,
+                cached: true,
+              },
+            }
+          }
+
+          // ── Fetch uncached URLs from Exa ───────────────
+          // Timeout via Promise.race — exa-js does not accept AbortSignal.
           const response = await Promise.race([
-            exa.getContents(urls, {
+            exa.getContents(uncachedUrls, {
               text: { maxCharacters: 10000 },
             }),
             new Promise<never>((_, reject) =>
@@ -230,38 +358,66 @@ export async function getContentExtractionTools(options: {
             }
           }
 
-          const resultMap = new Map<string, (typeof response.results)[number]>()
+          const resultMap = new Map<
+            string,
+            (typeof response.results)[number]
+          >()
           for (const r of response.results) {
             resultMap.set(r.url, r)
           }
 
-          let successCount = 0
-          let failedCount = 0
+          // Process fresh results and cache successes
+          const freshResults = new Map<string, CachedExtraction>()
+          const freshErrors = new Map<
+            string,
+            { url: string; error: string; httpStatusCode?: number }
+          >()
 
-          const mapped = urls.map((url) => {
+          for (const url of uncachedUrls) {
             const status = statusMap.get(url)
             const result = resultMap.get(url)
 
             if (status?.status === "error") {
-              failedCount++
-              return {
+              freshErrors.set(url, {
                 url,
                 error: status.error?.tag ?? "UNKNOWN_ERROR",
                 ...(status.error?.httpStatusCode != null && {
                   httpStatusCode: status.error.httpStatusCode,
                 }),
-              }
-            }
-
-            if (result) {
-              successCount++
-              return {
+              })
+            } else if (result) {
+              const extracted: CachedExtraction = {
                 url: result.url,
                 title: result.title ?? undefined,
                 content: result.text?.slice(0, 10000),
               }
+              freshResults.set(url, extracted)
+              setCachedExtraction(url, extracted)
+            } else {
+              freshErrors.set(url, { url, error: "NO_RESULT_RETURNED" })
             }
+          }
 
+          // ── Merge cached + fresh in original URL order ─
+          let successCount = 0
+          let failedCount = 0
+
+          const mapped = urls.map((url) => {
+            const cachedResult = cached.get(url)
+            if (cachedResult) {
+              successCount++
+              return cachedResult
+            }
+            const fresh = freshResults.get(url)
+            if (fresh) {
+              successCount++
+              return fresh
+            }
+            const error = freshErrors.get(url)
+            if (error) {
+              failedCount++
+              return error
+            }
             failedCount++
             return { url, error: "NO_RESULT_RETURNED" }
           })
@@ -271,12 +427,13 @@ export async function getContentExtractionTools(options: {
             data: truncateToolResult(mapped),
             error: null,
             meta: {
-              tool: "content_extract",
+              tool: "extract_content",
               source: "exa",
               durationMs: Date.now() - startMs,
               urlCount: urls.length,
               successCount,
               failedCount,
+              cachedCount: cached.size,
             },
           }
         } catch (err) {
@@ -284,11 +441,11 @@ export async function getContentExtractionTools(options: {
             `[tools/exa] Content extraction failed after ${Date.now() - startMs}ms:`,
             err instanceof Error ? err.message : String(err)
           )
-          throw err
+          throw enrichToolError(err, "extract_content")
         }
       },
     })
-    metadata.set("content_extract", {
+    metadata.set("extract_content", {
       displayName: "Read Page",
       source: "third-party",
       serviceName: "Exa",
@@ -297,7 +454,10 @@ export async function getContentExtractionTools(options: {
       readOnly: true,
     })
   } catch (err) {
-    console.error("[tools/third-party] Failed to load content extraction tools:", err)
+    console.error(
+      "[tools/third-party] Failed to load content extraction tools:",
+      err
+    )
   }
 
   return { tools: tools as ToolSet, metadata }

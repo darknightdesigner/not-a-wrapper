@@ -22,7 +22,7 @@ export async function getPlatformTools(options?: {
     return { tools: tools as ToolSet, metadata }
   }
 
-  tools.flowglad_pay_buy = tool({
+  tools.pay_purchase = tool({
     description:
       "Buy a product or provision a service account using Flowglad Pay. " +
       "Provide the vendor URL and maximum spend in cents. " +
@@ -39,8 +39,8 @@ export async function getPlatformTools(options?: {
       "- ALWAYS extract phone number and email when the user provides them — many checkouts fail without both.\n" +
       "\n\nWhen to call this tool:\n" +
       "- The user asks to buy, purchase, order, or subscribe to something.\n" +
-      "- Do NOT call this tool to check on an existing job — use flowglad_pay_status instead.\n" +
-      "- Do NOT re-create a job for the same URL if a previous flowglad_pay_buy result already exists in this conversation, unless the user explicitly asks for a new purchase.",
+      "- Do NOT call this tool to check on an existing job — use pay_status instead.\n" +
+      "- Do NOT re-create a job for the same URL if a previous pay_purchase result already exists in this conversation, unless the user explicitly asks for a new purchase.",
     inputSchema: payClawToolInputSchema,
     execute: async (input) => {
       const startMs = Date.now()
@@ -104,7 +104,7 @@ export async function getPlatformTools(options?: {
               `Job ID: ${result.jobId}. The purchase agent is now working on this ` +
               "and it typically takes 2–8 minutes to complete. " +
               "Report this job ID and status to the user. " +
-              "Do NOT poll flowglad_pay_status repeatedly — ask the user to " +
+              "Do NOT poll pay_status repeatedly — ask the user to " +
               "send a follow-up message when they want a status update.",
           },
           error: null,
@@ -124,7 +124,7 @@ export async function getPlatformTools(options?: {
     },
   })
 
-  tools.flowglad_pay_status = tool({
+  tools.pay_status = tool({
     description:
       "Check the status of a Flowglad Pay purchase job. Returns current status, " +
       "latest progress message, and result if completed. Use this instead of creating " +
@@ -133,12 +133,13 @@ export async function getPlatformTools(options?: {
       "- Call this tool AT MOST ONCE per user message.\n" +
       "- If the job is still active (isTerminal: false), do NOT call again. " +
       "Tell the user the job is in progress and suggest they ask again in 1–2 minutes.\n" +
-      "- Only poll again when the user sends a new message asking for a status update.",
+      "- Only poll again when the user sends a new message asking for a status update.\n" +
+      "- Do NOT call pay_purchase to check status — use this tool instead.",
     inputSchema: z.object({
       jobId: z
         .string()
         .describe(
-          "The job ID returned by flowglad_pay_buy. Use this to check status of an existing purchase job."
+          "The job ID returned by pay_purchase. Use this to check status of an existing purchase job."
         ),
     }),
     execute: async (input) => {
@@ -193,7 +194,7 @@ export async function getPlatformTools(options?: {
           },
           ...(!isTerminal && {
             hint:
-              "Job is still running. Do NOT call flowglad_pay_status again this turn. " +
+              "Job is still running. Do NOT call pay_status again this turn. " +
               "Tell the user the current status and ask them to check back in 1–2 minutes.",
           }),
         }
@@ -207,20 +208,23 @@ export async function getPlatformTools(options?: {
     },
   })
 
-  metadata.set("flowglad_pay_buy", {
-    displayName: "Flowglad Pay",
+  metadata.set("pay_purchase", {
+    displayName: "Purchase",
     source: "third-party",
     serviceName: "Flowglad Pay",
     icon: "wrench",
     readOnly: false,
+    destructive: false,
+    idempotent: false,
   })
 
-  metadata.set("flowglad_pay_status", {
-    displayName: "Flowglad Pay Status",
+  metadata.set("pay_status", {
+    displayName: "Purchase Status",
     source: "third-party",
     serviceName: "Flowglad Pay",
     icon: "wrench",
     readOnly: true,
+    idempotent: true,
   })
 
   return { tools: tools as ToolSet, metadata }

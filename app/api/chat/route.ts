@@ -350,17 +350,14 @@ export async function POST(req: Request) {
     // -----------------------------------------------------------------------
     // Content Extraction Tools (Layer 2 — Content)
     // Independent capability — NOT gated on shouldInjectSearch or
-    // builtInHasSearch. Available whenever an Exa key exists, ensuring
-    // content extraction works for ALL providers including those with
-    // native Layer 1 search (OpenAI, Anthropic, Google, xAI).
-    //
-    // Currently returns empty tools — the actual content_extract tool
-    // will be added in a follow-up. See .agents/plans/phase-7-future-tool-integrations.md
+    // builtInHasSearch. Gated on capabilities.extract and Exa key.
+    // Available for ALL providers including those with native Layer 1
+    // search (OpenAI, Anthropic, Google, xAI).
     // -----------------------------------------------------------------------
     let contentTools: ToolSet = {} as ToolSet
     let contentToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
-    if (resolvedExaKey) {
+    if (resolvedExaKey && capabilities.extract) {
       const { getContentExtractionTools } = await import("@/lib/tools/third-party")
       const contentResult = await getContentExtractionTools({
         exaKey: resolvedExaKey,

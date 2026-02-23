@@ -39,7 +39,7 @@ export function truncateToolResult(
     const charLimit = Math.floor(maxBytes * 0.9)
     return (
       result.slice(0, charLimit) +
-      "\n[truncated — result exceeded size limit]"
+      `\n[truncated — showing first ${charLimit} of ${result.length} chars. Use more targeted queries for smaller results.]`
     )
   }
 
@@ -65,6 +65,7 @@ export function truncateToolResult(
       _truncated: true,
       _originalCount: result.length,
       _returnedCount: items.length,
+      _hint: `Result was truncated from ${result.length} to ${items.length} items. Use more specific filters or request fewer results for complete data.`,
       data: items,
     }
   }
@@ -75,6 +76,7 @@ export function truncateToolResult(
     return {
       _truncated: true,
       _originalSizeBytes: sizeBytes,
+      _hint: `Object was truncated at ${maxBytes} bytes (original: ${sizeBytes} bytes). Request specific fields instead of the full object.`,
       _raw: truncatedStr + "...",
     }
   }
@@ -124,6 +126,59 @@ export function wrapToolsWithTruncation(
     }
   }
   return wrapped as ToolSet
+}
+
+/**
+ * Enrich a tool error with actionable recovery hints for the model.
+ * The AI SDK passes thrown error messages to the model as tool results.
+ * Adding recovery guidance helps the model self-correct instead of
+ * retrying the same failing operation.
+ *
+ * @param err - The original error
+ * @param toolName - The tool that failed (for context in the message)
+ * @returns A new Error with the original message plus a recovery hint
+ */
+export function enrichToolError(err: unknown, toolName: string): Error {
+  const original = err instanceof Error ? err : new Error(String(err))
+  const message = original.message
+
+  let hint: string
+  if (
+    message.includes("timed out") ||
+    message.includes("timeout") ||
+    original.name === "ToolTimeoutError"
+  ) {
+    hint = "Try a shorter or more specific query, or skip this step."
+  } else if (
+    message.includes("429") ||
+    message.includes("rate limit") ||
+    message.includes("Rate limit")
+  ) {
+    hint = "Rate limit exceeded. Wait before trying again or use a different approach."
+  } else if (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden")
+  ) {
+    hint = "API key is invalid or expired. Cannot retry — inform the user."
+  } else if (
+    message.includes("ECONNREFUSED") ||
+    message.includes("ENOTFOUND") ||
+    message.includes("fetch failed") ||
+    message.includes("network")
+  ) {
+    hint = "Network error — the service may be temporarily unavailable. Try a different query or skip."
+  } else if (message.includes("DOMAIN_RATE_LIMIT")) {
+    hint = "Too many requests to the same domain. Use URLs from different sources."
+  } else {
+    hint = "If the error persists, try a different approach or skip this step."
+  }
+
+  const enriched = new Error(`${toolName} failed: ${message}. ${hint}`)
+  enriched.name = original.name
+  if (original.stack) enriched.stack = original.stack
+  return enriched
 }
 
 function safeStringify(value: unknown): string {

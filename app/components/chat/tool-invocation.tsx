@@ -33,23 +33,27 @@ const TRANSITION = {
 /** Maps built-in tool names to human-readable display names and icons */
 const BUILTIN_TOOL_DISPLAY: Record<
   string,
-  { name: string; icon: "search" | "code" | "image" | "extract" }
+  { name: string; icon: "search" | "code" | "image" | "extract" | "wrench" }
 > = {
   web_search: { name: "Web Search", icon: "search" },
   google_search: { name: "Web Search", icon: "search" },
-  content_extract: { name: "Read Page", icon: "extract" },
+  extract_content: { name: "Read Page", icon: "extract" },
+  pay_purchase: { name: "Purchase", icon: "wrench" },
+  pay_status: { name: "Purchase Status", icon: "wrench" },
   // Future built-in tools:
   // code_execution: { name: "Code Execution", icon: "code" },
   // image_generation: { name: "Image Generation", icon: "image" },
 }
 
 /** Resolve icon component from BUILTIN_TOOL_DISPLAY icon identifier */
-function getToolIcon(iconId: "search" | "code" | "image" | "extract") {
+function getToolIcon(iconId: "search" | "code" | "image" | "extract" | "wrench") {
   switch (iconId) {
     case "search":
       return Search01Icon
     case "extract":
       return FileSearchIcon
+    case "wrench":
+      return Wrench01Icon
     default:
       return Wrench01Icon
   }

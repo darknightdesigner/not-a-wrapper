@@ -8,7 +8,7 @@
 
 import type { ToolSet } from "ai"
 import type { ToolResultEnvelope } from "./types"
-import { truncateToolResult } from "./utils"
+import { truncateToolResult, enrichToolError } from "./utils"
 import {
   MAX_TOOL_RESULT_SIZE,
   MCP_TOOL_EXECUTION_TIMEOUT_MS,
@@ -161,23 +161,20 @@ export function wrapMcpTools(
           // ── Timeout + Execution ────────────────────────
           // Promise.race: either the tool resolves or the timeout rejects.
           // When timeout wins, ToolTimeoutError is thrown → caught below →
-          // re-thrown → SDK sets isError: true on the tool result.
-          let timeoutId: ReturnType<typeof setTimeout> | undefined
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            timeoutId = setTimeout(
-              () => reject(new ToolTimeoutError(name, timeoutMs)),
-              timeoutMs
-            )
-          })
-
+          // re-thrown with recovery hint → SDK sets isError: true.
+          // Uses AbortSignal.timeout() for cleaner timer lifecycle —
+          // no manual clearTimeout needed. The signal's internal timer
+          // fires harmlessly after the race settles on serverless.
           const rawResult = await Promise.race([
             origExec(params, options),
-            timeoutPromise,
-          ]).finally(() => {
-            if (timeoutId !== undefined) {
-              clearTimeout(timeoutId)
-            }
-          })
+            new Promise<never>((_, reject) => {
+              AbortSignal.timeout(timeoutMs).addEventListener(
+                "abort",
+                () => reject(new ToolTimeoutError(name, timeoutMs)),
+                { once: true }
+              )
+            }),
+          ])
 
           // ── Measure result size (for trace, before truncation) ──
           try {
@@ -203,9 +200,6 @@ export function wrapMcpTools(
             },
           }
         } catch (err) {
-          // Record failure for tracing, then re-throw so the AI SDK
-          // sets isError: true — preserving audit log success detection
-          // and PostHog event accuracy.
           success = false
           error = err instanceof Error ? err.message : String(err)
 
@@ -213,7 +207,7 @@ export function wrapMcpTools(
             `[tools/mcp] ${displayName} failed after ${Date.now() - startMs}ms:`,
             error
           )
-          throw err
+          throw enrichToolError(err, displayName)
         } finally {
           // ── Trace (always — success or failure) ────────
           traceCollector.record({

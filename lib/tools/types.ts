@@ -38,6 +38,18 @@ export type ToolMetadata = {
    * Default: true for search tools, false for write tools.
    */
   readOnly?: boolean
+  /**
+   * Whether this tool performs destructive updates (delete, overwrite).
+   * Mapped from MCP `destructiveHint` annotation when available.
+   * Used for future approval UI and prepareStep restrictions.
+   */
+  destructive?: boolean
+  /**
+   * Whether calling this tool multiple times with the same input is safe.
+   * Mapped from MCP `idempotentHint` annotation when available.
+   * Used for future retry policies (only retry idempotent tools).
+   */
+  idempotent?: boolean
 }
 
 /**
@@ -79,6 +91,8 @@ export type ToolResultEnvelope<T = unknown> = {
 export type ToolCapabilities = {
   /** Web search (Layer 1 provider tools + Layer 2 Exa). Default: true */
   search?: boolean
+  /** Content extraction from URLs (Layer 2 Exa getContents). Default: true */
+  extract?: boolean
   /** Code execution (provider sandboxes, future). Default: true */
   code?: boolean
   /** MCP server tools (Layer 3). Default: true */
@@ -95,10 +109,11 @@ export type ToolCapabilities = {
 export function resolveToolCapabilities(
   tools: boolean | ToolCapabilities | undefined
 ): Required<ToolCapabilities> {
-  if (tools === false) return { search: false, code: false, mcp: false }
-  if (tools === true || tools === undefined) return { search: true, code: true, mcp: true }
+  if (tools === false) return { search: false, extract: false, code: false, mcp: false }
+  if (tools === true || tools === undefined) return { search: true, extract: true, code: true, mcp: true }
   return {
     search: tools.search !== false,
+    extract: tools.extract !== false,
     code: tools.code !== false,
     mcp: tools.mcp !== false,
   }
