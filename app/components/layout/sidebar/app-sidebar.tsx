@@ -184,35 +184,35 @@ export function AppSidebar() {
           >
             <div className="px-2">
               <div className="flex h-(--sidebar-header-height) items-center justify-between">
+                <Link
+                  href="/"
+                  onClick={isMobile ? () => setOpenMobile(false) : undefined}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
+                  data-sidebar-item="true"
+                  aria-label="Home"
+                >
+                  <NawIcon className="size-5" />
+                </Link>
                 {isMobile ? (
                   <button
                     type="button"
                     onClick={() => setOpenMobile(false)}
                     className="text-muted-foreground hover:text-foreground hover:bg-muted inline-flex size-9 items-center justify-center rounded-md bg-transparent focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                   >
-                    <HugeiconsIcon icon={Cancel01Icon} size={24} className="size-6" />
+                    <HugeiconsIcon icon={Cancel01Icon} size={20} className="size-5" />
                   </button>
                 ) : (
-                  <Link
-                    href="/"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg hover:bg-accent"
-                    data-sidebar-item="true"
-                    aria-label="Home"
-                  >
-                    <NawIcon className="size-5" />
-                  </Link>
+                  <Tooltip disableHoverablePopup>
+                    <TooltipTrigger
+                      render={
+                        <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
+                      }
+                    />
+                    <TooltipContent side="bottom" align="center">
+                      Close sidebar ⇧⌘S
+                    </TooltipContent>
+                  </Tooltip>
                 )}
-                {/* Toggle button with resize cursor */}
-                <Tooltip disableHoverablePopup>
-                  <TooltipTrigger
-                    render={
-                      <SidebarTrigger className="cursor-w-resize rtl:cursor-e-resize" />
-                    }
-                  />
-                  <TooltipContent side="bottom" align="center">
-                    Close sidebar ⇧⌘S
-                  </TooltipContent>
-                </Tooltip>
               </div>
             </div>
           </div>

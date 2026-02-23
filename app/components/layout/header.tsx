@@ -43,7 +43,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
         {/* LEFT SECTION - natural width, not flex-1 */}
         <div className="flex items-center gap-2">
           {/* Hide logo/text when sidebar is present on desktop (sidebar has its own home link) */}
-          {(!hasSidebar || isMobile) && (
+          {!hasSidebar && (
             <Link
               href="/"
               className="pointer-events-auto inline-flex items-center text-lg font-medium tracking-tight"
@@ -74,7 +74,7 @@ export function Header({ hasSidebar }: { hasSidebar: boolean }) {
             </>
           ) : (
             <>
-              {!isMultiModelEnabled && <DialogPublish />}
+              {!isMultiModelEnabled && !isMobile && <DialogPublish />}
               <ButtonNewChat />
               {!hasSidebar && <HistoryTrigger hasSidebar={hasSidebar} />}
               {!hasSidebar && <UserMenu />}

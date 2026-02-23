@@ -1,5 +1,6 @@
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import useClickOutside from "@/app/hooks/use-click-outside"
+import { useSidebar } from "@/components/ui/sidebar"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { Chat } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
@@ -21,6 +22,7 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
   const [prevChatTitle, setPrevChatTitle] = useState(chat.title)
   const inputRef = useRef<HTMLInputElement>(null)
   const { updateTitle } = useChats()
+  const { setOpenMobile } = useSidebar()
   const isMobile = useBreakpoint(768)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
@@ -113,7 +115,8 @@ export function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
 
   const handleLinkClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-  }, [])
+    if (isMobile) setOpenMobile(false)
+  }, [isMobile, setOpenMobile])
 
   // Memoize computed values
   const isActive = useMemo(
