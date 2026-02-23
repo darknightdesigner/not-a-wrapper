@@ -1,5 +1,14 @@
 import { describe, it, expect, vi } from "vitest"
-import { truncateToolResult, isTruncated, wrapToolsWithTruncation } from "../utils"
+import {
+  truncateToolResult,
+  isTruncated,
+  wrapToolsWithTruncation,
+  wrapToolsWithTracing,
+  enrichToolError,
+} from "../utils"
+import { ToolTraceCollector } from "../types"
+import { ToolExecutionError } from "../errors"
+import { ToolPolicyError } from "../policy"
 
 // Mock the config module to control MAX_TOOL_RESULT_SIZE in tests
 vi.mock("@/lib/config", () => ({
@@ -45,7 +54,7 @@ describe("truncateToolResult", () => {
 
       expect(typeof result).toBe("string")
       expect((result as string).length).toBeLessThan(2000)
-      expect(result).toContain("[truncated — result exceeded size limit]")
+      expect(result).toContain("[truncated — showing first")
     })
 
     it("preserves content up to the character limit", () => {
@@ -67,7 +76,7 @@ describe("truncateToolResult", () => {
     it("truncates strings exactly at the 100KB boundary", () => {
       const overLimit = "a".repeat(100 * 1024 + 1)
       const result = truncateToolResult(overLimit) as string
-      expect(result).toContain("[truncated — result exceeded size limit]")
+      expect(result).toContain("[truncated — showing first")
     })
   })
 
@@ -181,12 +190,12 @@ describe("truncateToolResult", () => {
       const result = truncateToolResult(largeObj, 1024) as {
         _truncated: boolean
         _originalSizeBytes: number
-        _raw: string
+        _hint: string
       }
 
       expect(result._truncated).toBe(true)
       expect(result._originalSizeBytes).toBeGreaterThan(1024)
-      expect(result._raw).toContain("...")
+      expect(result._hint).toContain("Request specific fields")
     })
   })
 
@@ -253,7 +262,7 @@ describe("isTruncated", () => {
 
   it("returns true for truncated object results", () => {
     expect(
-      isTruncated({ _truncated: true, _originalSizeBytes: 200000, _raw: "..." })
+      isTruncated({ _truncated: true, _originalSizeBytes: 200000, _hint: "..." })
     ).toBe(true)
   })
 
@@ -291,7 +300,7 @@ describe("wrapToolsWithTruncation", () => {
 
     expect(typeof result).toBe("string")
     expect((result as string).length).toBeLessThan(2000)
-    expect(result).toContain("[truncated — result exceeded size limit]")
+    expect(result).toContain("[truncated — showing first")
   })
 
   it("passes through results that are under the limit", async () => {
@@ -361,9 +370,62 @@ describe("wrapToolsWithTruncation", () => {
     const resultB = await toolB.execute()
 
     // Tool A should be truncated (2000 chars > 100 bytes)
-    expect(resultA).toContain("[truncated — result exceeded size limit]")
+    expect(resultA).toContain("[truncated — showing first")
 
     // Tool B should pass through unchanged
     expect(resultB).toBe("small result")
+  })
+})
+
+describe("structured tool errors", () => {
+  it("enrichToolError returns ToolExecutionError with taxonomy code", () => {
+    const err = enrichToolError(new Error("429 rate limit exceeded"), "web_search")
+    expect(err).toBeInstanceOf(ToolExecutionError)
+    const typed = err as ToolExecutionError
+    expect(typed.code).toBe("rate_limit")
+    expect(typed.retryable).toBe(true)
+    expect(typed.message).toContain("web_search failed")
+  })
+
+  it("enrichToolError passes policy errors through unchanged", () => {
+    const policyError = new ToolPolicyError(
+      "TOOL_BUDGET_EXCEEDED: Retry after approximately 10 seconds.",
+      {
+        code: "TOOL_BUDGET_EXCEEDED",
+        retryAfterSeconds: 10,
+        keyMode: "platform",
+        budgetDenied: true,
+      }
+    )
+    expect(enrichToolError(policyError, "web_search")).toBe(policyError)
+  })
+
+  it("wrapToolsWithTracing records taxonomy code for failures", async () => {
+    const traces = new ToolTraceCollector()
+    const tools = {
+      flaky_tool: {
+        description: "flaky",
+        execute: async () => {
+          throw new Error("fetch failed")
+        },
+      },
+    }
+
+    const wrapped = wrapToolsWithTracing(
+      tools as unknown as import("ai").ToolSet,
+      traces,
+      "req_1"
+    )
+
+    await expect(
+      (wrapped.flaky_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_network" }
+      )
+    ).rejects.toThrow("fetch failed")
+
+    const trace = traces.get("call_network")
+    expect(trace).toBeDefined()
+    expect(trace?.errorCode).toBe("network")
   })
 })

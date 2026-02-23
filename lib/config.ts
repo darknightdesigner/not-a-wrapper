@@ -228,6 +228,37 @@ export const PREPARE_STEP_THRESHOLD = 3
  */
 export const TOOL_EXECUTION_TIMEOUT_MS = 15_000
 
+/**
+ * Persistent bucket size for tool limit windows (domain + budget).
+ * Smaller buckets improve retry-after precision at the cost of more writes.
+ */
+export const TOOL_LIMIT_BUCKET_SIZE_MS = 60_000
+
+/**
+ * Sliding-window controls for extract_content domain abuse protection.
+ * Applies per actor + domain and is enforced only for uncached URL fetches.
+ */
+export const EXTRACT_CONTENT_DOMAIN_WINDOW_MS = 15 * 60_000
+export const EXTRACT_CONTENT_DOMAIN_MAX_REQUESTS = 6
+
+/**
+ * Centralized per-tool invocation budgets for server-executed layers.
+ * Platform-key budgets are stricter to protect shared infrastructure.
+ */
+export const TOOL_BUDGET_WINDOW_MS = 15 * 60_000
+export const TOOL_BUDGET_LIMITS = {
+  platform: {
+    default: 25,
+    web_search: 25,
+    extract_content: 20,
+  },
+  byok: {
+    default: 80,
+    web_search: 80,
+    extract_content: 60,
+  },
+} as const
+
 // ============================================================================
 // History Replay Compiler
 // ============================================================================

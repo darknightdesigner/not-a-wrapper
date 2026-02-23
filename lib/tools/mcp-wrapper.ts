@@ -10,6 +10,9 @@ import type { ToolSet } from "ai"
 import { ToolTraceCollector } from "./types"
 import type { ToolTrace } from "./types"
 import { truncateToolResult, enrichToolError } from "./utils"
+import { extractToolErrorData, type ToolErrorCode } from "./errors"
+import { extractPolicyErrorData } from "./policy"
+import type { ServerInfo } from "@/lib/mcp/load-tools"
 import {
   MAX_TOOL_RESULT_SIZE,
   MCP_TOOL_EXECUTION_TIMEOUT_MS,
@@ -44,15 +47,7 @@ export class ToolTimeoutError extends Error {
 
 type WrapMcpToolsConfig = {
   /** Map of namespaced tool names → server info for display names and audit */
-  toolServerMap: Map<
-    string,
-    {
-      displayName: string
-      serverName: string
-      serverId: string
-      readOnly?: boolean
-    }
-  >
+  toolServerMap: Map<string, ServerInfo>
   /** Trace collector — shared with onStepFinish/onFinish in route.ts */
   traceCollector: ToolTraceCollector
   /** Request-scoped correlation ID for grouping tool traces */
@@ -61,6 +56,8 @@ type WrapMcpToolsConfig = {
   timeoutMs?: number
   /** Max result size in bytes. Default: MAX_TOOL_RESULT_SIZE (100KB) */
   maxResultBytes?: number
+  /** Optional centralized budget enforcement hook */
+  enforceToolBudget?: (toolName: string) => Promise<void>
 }
 
 // ── Wrapper ────────────────────────────────────────────────
@@ -93,6 +90,7 @@ export function wrapMcpTools(
     requestId,
     timeoutMs = MCP_TOOL_EXECUTION_TIMEOUT_MS,
     maxResultBytes = MAX_TOOL_RESULT_SIZE,
+    enforceToolBudget,
   } = config
 
   const serverFailureCounts = new Map<string, number>()
@@ -138,8 +136,16 @@ export function wrapMcpTools(
         let success = true
         let error: string | undefined
         let resultSizeBytes: number | undefined
+        let errorCode: ToolErrorCode | undefined
+        let retryAfterSeconds: number | undefined
+        let budgetKeyMode: "platform" | "byok" | undefined
+        let budgetDenied: boolean | undefined
 
         try {
+          if (enforceToolBudget) {
+            await enforceToolBudget(name)
+          }
+
           // ── Timeout + Execution ────────────────────────
           // Promise.race: either the tool resolves or the timeout rejects.
           // When timeout wins, ToolTimeoutError is thrown → caught below →
@@ -173,6 +179,15 @@ export function wrapMcpTools(
         } catch (err) {
           success = false
           error = err instanceof Error ? err.message : String(err)
+          const errorData = extractToolErrorData(err, { toolName: displayName })
+          errorCode = errorData.code
+          retryAfterSeconds = errorData.retryAfterSeconds
+
+          const policyData = extractPolicyErrorData(err)
+          if (policyData) {
+            budgetKeyMode = policyData.keyMode
+            budgetDenied = policyData.budgetDenied
+          }
 
           const failKey = serverInfo?.serverId ?? "unknown"
           serverFailureCounts.set(failKey, (serverFailureCounts.get(failKey) ?? 0) + 1)
@@ -192,6 +207,10 @@ export function wrapMcpTools(
             success,
             error,
             resultSizeBytes,
+            errorCode,
+            retryAfterSeconds,
+            budgetKeyMode,
+            budgetDenied,
           })
         }
       },

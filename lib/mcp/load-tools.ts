@@ -34,6 +34,12 @@ export type ServerInfo = {
   serverId: string
   /** Whether this tool is read-only (from MCP tool annotations) */
   readOnly?: boolean
+  /** Whether this tool performs destructive actions (from MCP annotations) */
+  destructive?: boolean
+  /** Whether this tool is idempotent (from MCP annotations) */
+  idempotent?: boolean
+  /** Whether this tool operates in an open-world context (from MCP annotations) */
+  openWorld?: boolean
 }
 
 /** Result from loadUserMcpTools — everything the chat route needs */
@@ -68,6 +74,42 @@ function isToolDescriptor(value: unknown): boolean {
     "execute" in value &&
     typeof (value as Record<string, unknown>).execute === "function"
   )
+}
+
+type ToolAnnotationHints = {
+  readOnly?: boolean
+  destructive?: boolean
+  idempotent?: boolean
+  openWorld?: boolean
+}
+
+function extractToolAnnotationHints(tool: unknown): ToolAnnotationHints {
+  if (typeof tool !== "object" || tool === null) return {}
+
+  const toolRecord = tool as Record<string, unknown>
+  if (!("annotations" in toolRecord)) return {}
+
+  const annotations = toolRecord.annotations as Record<string, unknown> | undefined
+  if (!annotations) return {}
+
+  return {
+    readOnly:
+      typeof annotations.readOnlyHint === "boolean"
+        ? annotations.readOnlyHint
+        : undefined,
+    destructive:
+      typeof annotations.destructiveHint === "boolean"
+        ? annotations.destructiveHint
+        : undefined,
+    idempotent:
+      typeof annotations.idempotentHint === "boolean"
+        ? annotations.idempotentHint
+        : undefined,
+    openWorld:
+      typeof annotations.openWorldHint === "boolean"
+        ? annotations.openWorldHint
+        : undefined,
+  }
 }
 
 /**
@@ -340,19 +382,8 @@ export async function loadUserMcpTools(
           continue
         }
 
-        // 7. Read tool annotations (defensive — AI SDK may or may not pass these)
-        let toolReadOnly: boolean | undefined
-        const toolRecord = tool as Record<string, unknown>
-        if (
-          typeof toolRecord === "object" &&
-          toolRecord !== null &&
-          "annotations" in toolRecord
-        ) {
-          const annotations = toolRecord.annotations as Record<string, unknown> | undefined
-          if (annotations && typeof annotations.readOnlyHint === "boolean") {
-            toolReadOnly = annotations.readOnlyHint
-          }
-        }
+        // 7. Read MCP annotation hints (defensive — hints may be absent)
+        const annotationHints = extractToolAnnotationHints(tool)
 
         // 8. Namespace tool name: `${serverSlug}_${toolName}`
         const namespacedName = `${serverSlug}_${toolName}`
@@ -361,7 +392,10 @@ export async function loadUserMcpTools(
           displayName: toolName,
           serverName: server.name,
           serverId: server._id,
-          readOnly: toolReadOnly,
+          readOnly: annotationHints.readOnly,
+          destructive: annotationHints.destructive,
+          idempotent: annotationHints.idempotent,
+          openWorld: annotationHints.openWorld,
         })
         toolCount++
       }

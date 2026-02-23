@@ -190,11 +190,74 @@ describe("loadUserMcpTools", () => {
 
       // Tool server map should have entries
       const issueInfo = result.toolServerMap.get("github_create_issue")
-      expect(issueInfo).toEqual({
+      expect(issueInfo).toMatchObject({
         displayName: "create_issue",
         serverName: "GitHub",
         serverId: "server_1",
       })
+    })
+
+    it("maps MCP annotation hints when present", async () => {
+      const server = mockServer({ name: "GitHub" })
+      const client = mockClient({
+        create_issue: {
+          ...mockTool("create_issue"),
+          annotations: {
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: false,
+            openWorldHint: true,
+          },
+        },
+      })
+
+      mockFetchQuery
+        .mockResolvedValueOnce([server])
+        .mockResolvedValueOnce([])
+
+      mockCreateMCPClient.mockResolvedValue(client)
+
+      const result = await loadUserMcpTools("test-token")
+      const issueInfo = result.toolServerMap.get("github_create_issue")
+
+      expect(issueInfo).toMatchObject({
+        displayName: "create_issue",
+        serverName: "GitHub",
+        serverId: "server_1",
+        readOnly: false,
+        destructive: true,
+        idempotent: false,
+        openWorld: true,
+      })
+    })
+
+    it("keeps annotation fields undefined when hints are missing", async () => {
+      const server = mockServer({ name: "GitHub" })
+      const client = mockClient({
+        create_issue: {
+          ...mockTool("create_issue"),
+          annotations: {
+            readOnlyHint: true,
+            destructiveHint: "not-a-boolean",
+            idempotentHint: 1,
+          },
+        },
+      })
+
+      mockFetchQuery
+        .mockResolvedValueOnce([server])
+        .mockResolvedValueOnce([])
+
+      mockCreateMCPClient.mockResolvedValue(client)
+
+      const result = await loadUserMcpTools("test-token")
+      const issueInfo = result.toolServerMap.get("github_create_issue")
+
+      expect(issueInfo).toBeDefined()
+      expect(issueInfo?.readOnly).toBe(true)
+      expect(issueInfo?.destructive).toBeUndefined()
+      expect(issueInfo?.idempotent).toBeUndefined()
+      expect(issueInfo?.openWorld).toBeUndefined()
     })
   })
 

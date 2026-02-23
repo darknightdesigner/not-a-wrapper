@@ -5,6 +5,7 @@ import { z } from "zod"
 import type { ToolSet } from "ai"
 import type { ToolMetadata } from "./types"
 import { truncateToolResult, enrichToolError } from "./utils"
+import type { ToolPolicyGuard } from "./policy"
 import { TOOL_EXECUTION_TIMEOUT_MS } from "@/lib/config"
 
 // ── Content Extraction Cache ────────────────────────────────
@@ -275,11 +276,12 @@ export async function getThirdPartyTools(
  */
 export async function getContentExtractionTools(options: {
   exaKey?: string
+  policyGuard?: ToolPolicyGuard
 }): Promise<{
   tools: ToolSet
   metadata: Map<string, ToolMetadata>
 }> {
-  const { exaKey } = options
+  const { exaKey, policyGuard } = options
   const tools: Record<string, unknown> = {}
   const metadata = new Map<string, ToolMetadata>()
 
@@ -290,11 +292,6 @@ export async function getContentExtractionTools(options: {
   try {
     const Exa = (await import("exa-js")).default
     const exa = new Exa(exaKey)
-
-    // Per-request domain rate limiting — persists across tool invocations
-    // within the same streamText call but resets for each new API request.
-    const domainRequestCounts = new Map<string, number>()
-    const DOMAIN_RATE_LIMIT = 3
 
     tools.extract_content = tool({
       description:
@@ -314,36 +311,6 @@ export async function getContentExtractionTools(options: {
       execute: async ({ urls }) => {
         const startMs = Date.now()
         try {
-          // ── Per-domain rate limiting ────────────────────
-          const batchDomainCounts = new Map<string, number>()
-          for (const url of urls) {
-            try {
-              const domain = new URL(url).hostname.toLowerCase()
-              batchDomainCounts.set(
-                domain,
-                (batchDomainCounts.get(domain) ?? 0) + 1
-              )
-            } catch {
-              /* invalid URL — will fail in Exa */
-            }
-          }
-          for (const [domain, count] of batchDomainCounts) {
-            const existing = domainRequestCounts.get(domain) ?? 0
-            if (existing + count > DOMAIN_RATE_LIMIT) {
-              throw new Error(
-                `DOMAIN_RATE_LIMIT: Too many requests to ${domain} ` +
-                  `(${existing + count} exceeds ${DOMAIN_RATE_LIMIT} per-conversation limit). ` +
-                  `Reduce URLs for this domain or extract from different sources.`
-              )
-            }
-          }
-          for (const [domain, count] of batchDomainCounts) {
-            domainRequestCounts.set(
-              domain,
-              (domainRequestCounts.get(domain) ?? 0) + count
-            )
-          }
-
           // ── Cache check ────────────────────────────────
           const cached = new Map<string, CachedExtraction>()
           const uncachedUrls: string[] = []
@@ -372,6 +339,24 @@ export async function getContentExtractionTools(options: {
               cachedCount: cached.size,
             }))
             return truncateToolResult(mapped)
+          }
+
+          // ── Persistent per-domain limit (uncached only) ─
+          // Cache hits intentionally do NOT consume domain quota.
+          if (policyGuard) {
+            const uncachedDomainCounts = new Map<string, number>()
+            for (const url of uncachedUrls) {
+              try {
+                const domain = new URL(url).hostname.toLowerCase()
+                uncachedDomainCounts.set(
+                  domain,
+                  (uncachedDomainCounts.get(domain) ?? 0) + 1
+                )
+              } catch {
+                /* invalid URL — Exa will return an error */
+              }
+            }
+            await policyGuard.enforceExtractDomainLimit(uncachedDomainCounts)
           }
 
           // ── Fetch uncached URLs from Exa ───────────────

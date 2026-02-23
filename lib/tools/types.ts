@@ -1,5 +1,7 @@
 // lib/tools/types.ts
 
+import type { ToolErrorCode } from "./errors"
+
 /**
  * Tool Naming Convention
  *
@@ -118,6 +120,10 @@ export type ToolTrace = {
   success: boolean
   error?: string
   resultSizeBytes?: number
+  errorCode?: ToolErrorCode
+  retryAfterSeconds?: number
+  budgetKeyMode?: "platform" | "byok"
+  budgetDenied?: boolean
 }
 
 /**

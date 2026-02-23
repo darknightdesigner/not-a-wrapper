@@ -3,6 +3,17 @@
 import { MAX_TOOL_RESULT_SIZE } from "@/lib/config"
 import type { ToolSet } from "ai"
 import { ToolTraceCollector } from "./types"
+import {
+  ToolExecutionError,
+  type ToolErrorCode,
+  extractToolErrorData,
+  getToolRecoveryHint,
+  normalizeToolError,
+} from "./errors"
+import {
+  extractPolicyErrorData,
+  isToolPolicyError,
+} from "./policy"
 
 /**
  * Truncate a tool result to a maximum byte size.
@@ -159,7 +170,8 @@ export function wrapToolsWithTruncation(
 export function wrapToolsWithTracing(
   tools: ToolSet,
   traceCollector: ToolTraceCollector,
-  requestId?: string
+  requestId?: string,
+  enforceToolBudget?: (toolName: string) => Promise<void>
 ): ToolSet {
   const wrapped: Record<string, unknown> = {}
   for (const [name, t] of Object.entries(tools)) {
@@ -180,8 +192,16 @@ export function wrapToolsWithTracing(
           let success = true
           let error: string | undefined
           let resultSizeBytes: number | undefined
+          let errorCode: ToolErrorCode | undefined
+          let retryAfterSeconds: number | undefined
+          let budgetKeyMode: "platform" | "byok" | undefined
+          let budgetDenied: boolean | undefined
 
           try {
+            if (enforceToolBudget) {
+              await enforceToolBudget(name)
+            }
+
             const result = await origExec(params, options)
 
             try {
@@ -195,6 +215,15 @@ export function wrapToolsWithTracing(
           } catch (err) {
             success = false
             error = err instanceof Error ? err.message : String(err)
+            const errorData = extractToolErrorData(err, { toolName: name })
+            errorCode = errorData.code
+            retryAfterSeconds = errorData.retryAfterSeconds
+
+            const policyData = extractPolicyErrorData(err)
+            if (policyData) {
+              budgetKeyMode = policyData.keyMode
+              budgetDenied = policyData.budgetDenied
+            }
             throw err
           } finally {
             traceCollector.record({
@@ -205,6 +234,10 @@ export function wrapToolsWithTracing(
               success,
               error,
               resultSizeBytes,
+              errorCode,
+              retryAfterSeconds,
+              budgetKeyMode,
+              budgetDenied,
             })
           }
         },
@@ -227,45 +260,24 @@ export function wrapToolsWithTracing(
  * @returns A new Error with the original message plus a recovery hint
  */
 export function enrichToolError(err: unknown, toolName: string): Error {
-  const original = err instanceof Error ? err : new Error(String(err))
-  const message = original.message
+  if (isToolPolicyError(err)) return err
+  if (err instanceof Error && err.name === "ToolTimeoutError") return err
+  if (err instanceof ToolExecutionError) return err
 
-  let hint: string
-  if (
-    message.includes("timed out") ||
-    message.includes("timeout") ||
-    original.name === "ToolTimeoutError"
-  ) {
-    hint = "Try a shorter or more specific query, or skip this step."
-  } else if (
-    message.includes("429") ||
-    message.includes("rate limit") ||
-    message.includes("Rate limit")
-  ) {
-    hint = "Rate limit exceeded. Wait before trying again or use a different approach."
-  } else if (
-    message.includes("401") ||
-    message.includes("403") ||
-    message.includes("unauthorized") ||
-    message.includes("forbidden")
-  ) {
-    hint = "API key is invalid or expired. Cannot retry — inform the user."
-  } else if (
-    message.includes("ECONNREFUSED") ||
-    message.includes("ENOTFOUND") ||
-    message.includes("fetch failed") ||
-    message.includes("network")
-  ) {
-    hint = "Network error — the service may be temporarily unavailable. Try a different query or skip."
-  } else if (message.includes("DOMAIN_RATE_LIMIT")) {
-    hint = "Too many requests to the same domain. Use URLs from different sources."
-  } else {
-    hint = "If the error persists, try a different approach or skip this step."
-  }
-
-  const enriched = new Error(`${toolName} failed: ${message}. ${hint}`)
-  enriched.name = original.name
-  if (original.stack) enriched.stack = original.stack
+  const normalized = normalizeToolError(err, { toolName })
+  const hint = getToolRecoveryHint(normalized)
+  const enriched = new ToolExecutionError(
+    `${toolName} failed: ${normalized.message}. ${hint}`,
+    {
+      code: normalized.code,
+      retryable: normalized.retryable,
+      retryAfterSeconds: normalized.retryAfterSeconds,
+      statusCode: normalized.statusCode,
+      toolName: normalized.toolName ?? toolName,
+      details: normalized.details,
+    }
+  )
+  if (err instanceof Error && err.stack) enriched.stack = err.stack
   return enriched
 }
 

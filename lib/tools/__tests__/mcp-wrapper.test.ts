@@ -5,6 +5,7 @@ import {
   ToolTimeoutError,
 } from "../mcp-wrapper"
 import type { ToolSet } from "ai"
+import { ToolPolicyError } from "../policy"
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ describe("wrapMcpTools", () => {
     expect(trace).toBeDefined()
     expect(trace!.success).toBe(false)
     expect(trace!.error).toContain("timed out")
+    expect(trace!.errorCode).toBe("timeout")
     expect(trace!.durationMs).toBeLessThan(500) // Should fail fast
   })
 
@@ -112,6 +114,41 @@ describe("wrapMcpTools", () => {
     expect(trace).toBeDefined()
     expect(trace!.success).toBe(false)
     expect(trace!.error).toBe("API rate limited")
+    expect(trace!.errorCode).toBe("rate_limit")
+  })
+
+  it("maps policy errors to taxonomy while preserving budget metadata", async () => {
+    const config = makeConfig({ timeoutMs: 5000 })
+    const tools = {
+      test_tool: makeTool(async () => {
+        throw new ToolPolicyError(
+          "TOOL_BUDGET_EXCEEDED: Tool budget exceeded. Retry after approximately 60 seconds.",
+          {
+            code: "TOOL_BUDGET_EXCEEDED",
+            retryAfterSeconds: 60,
+            keyMode: "platform",
+            budgetDenied: true,
+          }
+        )
+      }),
+    } as unknown as ToolSet
+
+    const wrapped = wrapMcpTools(tools, config)
+
+    await expect(
+      (wrapped.test_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_policy" }
+      )
+    ).rejects.toThrow("TOOL_BUDGET_EXCEEDED")
+
+    const trace = config.traceCollector.get("call_policy")
+    expect(trace).toBeDefined()
+    expect(trace!.success).toBe(false)
+    expect(trace!.errorCode).toBe("policy_limit")
+    expect(trace!.retryAfterSeconds).toBe(60)
+    expect(trace!.budgetKeyMode).toBe("platform")
+    expect(trace!.budgetDenied).toBe(true)
   })
 
   it("passes through tools without execute unchanged", () => {

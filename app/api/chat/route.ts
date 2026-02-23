@@ -18,7 +18,7 @@ import {
   flushPostHog,
   getPostHogClient,
 } from "@/lib/posthog"
-import type { Provider } from "@/lib/user-keys"
+import type { Provider, ToolKeyMode } from "@/lib/user-keys"
 import {
   UIMessage as MessageAISDK,
   streamText,
@@ -311,13 +311,24 @@ export async function POST(req: Request) {
     // when the platform has an EXA_API_KEY configured (same as Layer 1).
     // -----------------------------------------------------------------------
     let resolvedExaKey: string | undefined
-    if (convexToken) {
-      const { getEffectiveToolKey } = await import("@/lib/user-keys")
-      resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
-    }
-    if (!resolvedExaKey) {
-      resolvedExaKey = process.env.EXA_API_KEY
-    }
+    let resolvedExaKeyMode: ToolKeyMode | undefined
+    const { getEffectiveToolKeyWithMode } = await import("@/lib/user-keys")
+    const resolvedExa = await getEffectiveToolKeyWithMode("exa", convexToken)
+    resolvedExaKey = resolvedExa.key
+    resolvedExaKeyMode = resolvedExa.keyMode
+
+    const { createConvexToolLimitStore, createToolPolicyGuard } = await import("@/lib/tools/policy")
+    const toolLimitStore = createConvexToolLimitStore({
+      convexToken,
+      anonymousId,
+    })
+    const makePolicyGuard = (keyMode: ToolKeyMode) =>
+      createToolPolicyGuard({ store: toolLimitStore, keyMode })
+
+    const mcpPolicyGuard = makePolicyGuard("platform")
+    const platformPolicyGuard = makePolicyGuard("platform")
+    const exaPolicyGuard =
+      resolvedExaKeyMode ? makePolicyGuard(resolvedExaKeyMode) : undefined
 
     // -----------------------------------------------------------------------
     // Third-Party Search Fallback (Layer 2 — Search)
@@ -360,6 +371,7 @@ export async function POST(req: Request) {
       const { getContentExtractionTools } = await import("@/lib/tools/third-party")
       const contentResult = await getContentExtractionTools({
         exaKey: resolvedExaKey,
+        policyGuard: exaPolicyGuard,
       })
       contentTools = contentResult.tools
       contentToolMetadata = contentResult.metadata
@@ -495,6 +507,9 @@ export async function POST(req: Request) {
         toolServerMap: mcpToolServerMap,
         traceCollector,
         requestId,
+        enforceToolBudget: async (toolName) => {
+          await mcpPolicyGuard.enforceToolBudget(toolName)
+        },
       }) as ToolSet
     }
 
@@ -503,13 +518,36 @@ export async function POST(req: Request) {
     // onStepFinish and onFinish can read them for ALL tool types.
     const { wrapToolsWithTracing } = await import("@/lib/tools/utils")
     if (Object.keys(thirdPartyTools).length > 0) {
-      thirdPartyTools = wrapToolsWithTracing(thirdPartyTools, traceCollector, requestId)
+      thirdPartyTools = wrapToolsWithTracing(
+        thirdPartyTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          if (!exaPolicyGuard) return
+          await exaPolicyGuard.enforceToolBudget(toolName)
+        }
+      )
     }
     if (Object.keys(contentTools).length > 0) {
-      contentTools = wrapToolsWithTracing(contentTools, traceCollector, requestId)
+      contentTools = wrapToolsWithTracing(
+        contentTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          if (!exaPolicyGuard) return
+          await exaPolicyGuard.enforceToolBudget(toolName)
+        }
+      )
     }
     if (Object.keys(platformTools).length > 0) {
-      platformTools = wrapToolsWithTracing(platformTools, traceCollector, requestId)
+      platformTools = wrapToolsWithTracing(
+        platformTools,
+        traceCollector,
+        requestId,
+        async (toolName) => {
+          await platformPolicyGuard.enforceToolBudget(toolName)
+        }
+      )
     }
 
     // Merge all tool layers:
@@ -870,6 +908,7 @@ export async function POST(req: Request) {
             ? !(result as { isError?: boolean }).isError
             : false
           const meta = allToolMetadata.get(call.toolName)
+          const trace = traceCollector.get(call.toolCallId)
 
           // Structured JSON log — parseable by Vercel log drain and grep.
           // Uses _tag for machine filtering without affecting human readability.
@@ -883,8 +922,12 @@ export async function POST(req: Request) {
               tool: meta?.displayName ?? call.toolName,
               source: meta?.source ?? "unknown",
               success,
-              durationMs: traceCollector.get(call.toolCallId)?.durationMs ?? null,
+              durationMs: trace?.durationMs ?? null,
               estimatedCostPer1k: meta?.estimatedCostPer1k ?? null,
+              errorCode: trace?.errorCode ?? null,
+              retryAfterSeconds: trace?.retryAfterSeconds ?? null,
+              budgetKeyMode: trace?.budgetKeyMode ?? null,
+              budgetDenied: trace?.budgetDenied ?? null,
               tokens: {
                 in: usage?.inputTokens ?? null,
                 out: usage?.outputTokens ?? null,
@@ -1043,6 +1086,7 @@ export async function POST(req: Request) {
                     const success = toolResult
                       ? !(toolResult as { isError?: boolean }).isError
                       : false
+                    const trace = traceCollector.get(toolCall.toolCallId)
 
                     phClient.capture({
                       distinctId: userId,
@@ -1055,7 +1099,11 @@ export async function POST(req: Request) {
                         success,
                         chatId,
                         // Phase C: Observability enrichment
-                        durationMs: traceCollector.get(toolCall.toolCallId)?.durationMs ?? undefined,
+                        durationMs: trace?.durationMs ?? undefined,
+                        errorCode: trace?.errorCode,
+                        retryAfterSeconds: trace?.retryAfterSeconds,
+                        budgetKeyMode: trace?.budgetKeyMode,
+                        budgetDenied: trace?.budgetDenied,
                         requestId,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
@@ -1127,6 +1175,10 @@ export async function POST(req: Request) {
                     outputTokens: step.usage?.outputTokens,
                     resultSizeBytes: trace?.resultSizeBytes,
                     requestId,
+                    errorCode: trace?.errorCode,
+                    retryAfterSeconds: trace?.retryAfterSeconds,
+                    budgetKeyMode: trace?.budgetKeyMode,
+                    budgetDenied: trace?.budgetDenied,
                   },
                   { token: convexToken }
                 ).catch(() => {
@@ -1187,6 +1239,10 @@ export async function POST(req: Request) {
                       outputTokens: step.usage?.outputTokens,
                       resultSizeBytes: trace?.resultSizeBytes,
                       requestId,
+                      errorCode: trace?.errorCode,
+                      retryAfterSeconds: trace?.retryAfterSeconds,
+                      budgetKeyMode: trace?.budgetKeyMode,
+                      budgetDenied: trace?.budgetDenied,
                     },
                     { token: convexToken }
                   ).catch(() => {

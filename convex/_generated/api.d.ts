@@ -20,6 +20,7 @@ import type * as shippingAddressDefaulting from "../shippingAddressDefaulting.js
 import type * as shippingAddressPatch from "../shippingAddressPatch.js";
 import type * as shippingAddresses from "../shippingAddresses.js";
 import type * as toolCallLog from "../toolCallLog.js";
+import type * as toolLimits from "../toolLimits.js";
 import type * as usage from "../usage.js";
 import type * as userKeys from "../userKeys.js";
 import type * as userPreferences from "../userPreferences.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   shippingAddressPatch: typeof shippingAddressPatch;
   shippingAddresses: typeof shippingAddresses;
   toolCallLog: typeof toolCallLog;
+  toolLimits: typeof toolLimits;
   usage: typeof usage;
   userKeys: typeof userKeys;
   userPreferences: typeof userPreferences;
