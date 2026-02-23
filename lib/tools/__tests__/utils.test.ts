@@ -206,6 +206,26 @@ describe("truncateToolResult", () => {
       expect(result._originalSizeBytes).toBeGreaterThan(1024)
       expect(result._hint).toContain("Request specific fields")
     })
+
+    it("preserves truncation metadata when input uses reserved metadata keys", () => {
+      const payload = {
+        _hint: "user supplied hint",
+        _truncated: false,
+        _originalSizeBytes: "not-a-number",
+        _keptKeys: "fake-count",
+        title: "Important title",
+        debugBlob: "x".repeat(5000),
+      }
+
+      const result = truncateToolResult(payload, 500) as Record<string, unknown>
+
+      expect(result._truncated).toBe(true)
+      expect(typeof result._hint).toBe("string")
+      expect(result._hint).not.toBe("user supplied hint")
+      expect(typeof result._originalSizeBytes).toBe("number")
+      expect((result._originalSizeBytes as number) > 500).toBe(true)
+      expect(serializedSize(result)).toBeLessThanOrEqual(500)
+    })
   })
 
   describe("priority-aware truncation v2", () => {

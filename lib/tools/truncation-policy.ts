@@ -171,12 +171,21 @@ export function findSemanticBoundary(text: string, maxChars: number): number {
   const windowStart = Math.max(0, hardLimit - 300)
   const chunk = text.slice(windowStart, hardLimit)
 
-  const paragraphBreak = Math.max(
-    chunk.lastIndexOf("\n\n"),
-    chunk.lastIndexOf("\r\n\r\n")
-  )
+  const paragraphMarkers = ["\n\n", "\r\n\r\n"] as const
+  let paragraphBreak = -1
+  let paragraphBreakLength = 0
+  for (const marker of paragraphMarkers) {
+    const idx = chunk.lastIndexOf(marker)
+    if (
+      idx > paragraphBreak ||
+      (idx === paragraphBreak && marker.length > paragraphBreakLength)
+    ) {
+      paragraphBreak = idx
+      paragraphBreakLength = marker.length
+    }
+  }
   if (paragraphBreak >= 0) {
-    return windowStart + paragraphBreak + 2
+    return windowStart + paragraphBreak + paragraphBreakLength
   }
 
   const sentenceBreakers = [". ", "! ", "? ", ".\n", "!\n", "?\n"]

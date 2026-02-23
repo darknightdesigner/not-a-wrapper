@@ -120,14 +120,28 @@ export function combineAbortSignals(
     }
   }
   if (!controller.signal.aborted) {
+    const listeners: Array<{
+      signal: AbortSignal
+      handler: () => void
+    }> = []
+    const cleanupListeners = () => {
+      for (const { signal, handler } of listeners) {
+        signal.removeEventListener("abort", handler)
+      }
+      listeners.length = 0
+    }
+
     for (const signal of active) {
+      const onAbort = () => {
+        cleanupListeners()
+        if (!controller.signal.aborted) {
+          controller.abort(signal.reason)
+        }
+      }
+      listeners.push({ signal, handler: onAbort })
       signal.addEventListener(
         "abort",
-        () => {
-          if (!controller.signal.aborted) {
-            controller.abort(signal.reason)
-          }
-        },
+        onAbort,
         { once: true }
       )
     }
@@ -589,6 +603,12 @@ function truncateOversizedObject(
     strategy: ReturnType<typeof resolveTruncationStrategy>
   }
 ): Record<string, unknown> {
+  const reservedMetadataKeys = new Set([
+    "_hint",
+    "_truncated",
+    "_originalSizeBytes",
+    "_keptKeys",
+  ])
   const entries = Object.entries(value)
   const ranked = entries
     .map(([key, entryValue], index) => ({
@@ -597,6 +617,7 @@ function truncateOversizedObject(
       index,
       score: scoreObjectKey(key, index, options.strategy),
     }))
+    .filter((entry) => !reservedMetadataKeys.has(entry.key))
     .sort((a, b) => b.score - a.score || a.index - b.index)
 
   const output: Record<string, unknown> = {

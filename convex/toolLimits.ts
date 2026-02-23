@@ -13,6 +13,16 @@ function toRetryAfterSeconds(retryAfterMs: number): number {
   return Math.max(1, Math.ceil(retryAfterMs / 1000))
 }
 
+function formatDomainLimitCode(toolName: string): `${string}_DOMAIN_LIMIT_EXCEEDED` {
+  const normalizedToolName = toolName
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase()
+
+  return `${normalizedToolName || "TOOL"}_DOMAIN_LIMIT_EXCEEDED`
+}
+
 export const checkAndConsume = mutation({
   args: {
     limitType: v.union(v.literal("domain"), v.literal("budget")),
@@ -128,9 +138,9 @@ export const checkAndConsume = mutation({
       if (limitType === "domain") {
         return {
           allowed: false,
-          code: "EXTRACT_CONTENT_DOMAIN_LIMIT_EXCEEDED",
+          code: formatDomainLimitCode(toolName),
           message:
-            `Too many extract_content requests for domain "${denied.scopeKey}" in the active window.`,
+            `Too many "${toolName}" requests for domain "${denied.scopeKey}" in the active window.`,
           retryAfterSeconds: toRetryAfterSeconds(retryAfterMs),
           scopeKey: denied.scopeKey,
           remaining: Math.max(0, maxCount - denied.total),

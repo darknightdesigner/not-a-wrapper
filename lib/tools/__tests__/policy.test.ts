@@ -227,6 +227,38 @@ describe("tool policy guardrails", () => {
     expect(typed.message).toContain("Retry after approximately")
   })
 
+  it("uses tool-specific domain limit codes for non-extract tools", async () => {
+    const store = new InMemoryToolLimitStore(() => 5_500_000)
+
+    const first = await store.checkAndConsume({
+      limitType: "domain",
+      toolName: "web_search",
+      keyMode: "platform",
+      scopeCounts: [{ scopeKey: "example.com", count: 1 }],
+      windowMs: 60_000,
+      maxCount: 1,
+      bucketSizeMs: 30_000,
+      consume: true,
+    })
+    expect(first.allowed).toBe(true)
+
+    const second = await store.checkAndConsume({
+      limitType: "domain",
+      toolName: "web_search",
+      keyMode: "platform",
+      scopeCounts: [{ scopeKey: "example.com", count: 1 }],
+      windowMs: 60_000,
+      maxCount: 1,
+      bucketSizeMs: 30_000,
+      consume: true,
+    })
+
+    expect(second.allowed).toBe(false)
+    expect(second.code).toBe("WEB_SEARCH_DOMAIN_LIMIT_EXCEEDED")
+    expect(second.message).toContain('"web_search"')
+    expect(second.message).toContain('domain "example.com"')
+  })
+
   it("degrades with a bounded request-local soft cap when policy backend is unavailable", async () => {
     const unavailableStore: ToolLimitStore = {
       async checkAndConsume() {

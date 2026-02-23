@@ -6,6 +6,7 @@ import {
 } from "../mcp-wrapper"
 import type { ToolSet } from "ai"
 import { ToolPolicyError } from "../policy"
+import { MCP_CIRCUIT_BREAKER_THRESHOLD } from "@/lib/config"
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -470,6 +471,46 @@ describe("wrapMcpTools", () => {
         )
       ).rejects.toThrow(/invalid input/i)
     }
+  })
+
+  it("isolates circuit state for tools without server metadata", async () => {
+    const flakyExecute = vi.fn().mockRejectedValue(new Error("fetch failed ECONNREFUSED"))
+    const healthyExecute = vi.fn().mockResolvedValue({ ok: true })
+
+    const wrapped = wrapMcpTools(
+      {
+        flaky_tool: makeTool(flakyExecute),
+        healthy_tool: makeTool(healthyExecute),
+      } as unknown as ToolSet,
+      {
+        toolServerMap: new Map(),
+        traceCollector: new ToolTraceCollector(),
+      }
+    )
+
+    for (let i = 0; i < MCP_CIRCUIT_BREAKER_THRESHOLD; i++) {
+      await expect(
+        (wrapped.flaky_tool as { execute: Function }).execute(
+          {},
+          { toolCallId: `call_flaky_${i}` }
+        )
+      ).rejects.toThrow(/fetch failed/i)
+    }
+
+    await expect(
+      (wrapped.flaky_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_flaky_circuit_open" }
+      )
+    ).rejects.toThrow(/circuit open/i)
+
+    await expect(
+      (wrapped.healthy_tool as { execute: Function }).execute(
+        {},
+        { toolCallId: "call_healthy_after_flaky_open" }
+      )
+    ).resolves.toEqual({ ok: true })
+    expect(healthyExecute).toHaveBeenCalledTimes(1)
   })
 
   it("passes through tools without execute unchanged", () => {

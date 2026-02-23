@@ -11,8 +11,9 @@ import {
 export type ToolKeyMode = "platform" | "byok"
 export type ToolLimitType = "domain" | "budget"
 
+export type ToolDomainLimitCode = `${string}_DOMAIN_LIMIT_EXCEEDED`
 export type ToolPolicyCode =
-  | "EXTRACT_CONTENT_DOMAIN_LIMIT_EXCEEDED"
+  | ToolDomainLimitCode
   | "TOOL_BUDGET_EXCEEDED"
   | "TOOL_POLICY_UNAVAILABLE"
 
@@ -309,6 +310,15 @@ function toRetryHint(retryAfterSeconds?: number): string {
   return `Retry after approximately ${retryAfterSeconds} seconds.`
 }
 
+function formatDomainLimitCode(toolName: string): ToolDomainLimitCode {
+  const normalizedToolName = toolName
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase()
+  return `${normalizedToolName || "TOOL"}_DOMAIN_LIMIT_EXCEEDED`
+}
+
 export type ToolPolicyGuard = {
   enforceToolBudget(toolName: string): Promise<void>
   enforceExtractDomainLimit(domainCounts: Map<string, number>): Promise<void>
@@ -462,11 +472,11 @@ export class InMemoryToolLimitStore implements ToolLimitStore {
           allowed: false,
           code:
             input.limitType === "domain"
-              ? "EXTRACT_CONTENT_DOMAIN_LIMIT_EXCEEDED"
+              ? formatDomainLimitCode(input.toolName)
               : "TOOL_BUDGET_EXCEEDED",
           message:
             input.limitType === "domain"
-              ? `Too many requests for "${scope.scopeKey}" in the active window.`
+              ? `Too many "${input.toolName}" requests for domain "${scope.scopeKey}" in the active window.`
               : `Budget exceeded for "${input.toolName}" in the active window.`,
           retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
           scopeKey: scope.scopeKey,

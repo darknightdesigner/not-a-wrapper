@@ -137,11 +137,14 @@ export function wrapMcpTools(
         options: { toolCallId: string; [k: string]: unknown }
       ): Promise<unknown> => {
         const upstreamAbortSignal = extractAbortSignalFromOptions(options)
-        const serverKey = serverInfo?.serverId ?? "unknown"
-        const failures = serverFailureCounts.get(serverKey) ?? 0
+        // Keep circuit state isolated when server metadata is missing.
+        const circuitKey = serverInfo?.serverId ?? `tool:${name}`
+        const failures = serverFailureCounts.get(circuitKey) ?? 0
         if (failures >= circuitThreshold) {
           throw enrichToolError(
-            new Error(`Server "${serverInfo?.serverName ?? serverKey}" circuit open — ${failures} consecutive transient tool failures in this request`),
+            new Error(
+              `Server "${serverInfo?.serverName ?? displayName}" circuit open — ${failures} consecutive transient tool failures in this request`
+            ),
             displayName
           )
         }
@@ -209,7 +212,7 @@ export function wrapMcpTools(
             toolName: name,
           })
 
-          serverFailureCounts.delete(serverKey)
+          serverFailureCounts.delete(circuitKey)
 
           return truncatedResult
         } catch (err) {
@@ -225,15 +228,14 @@ export function wrapMcpTools(
             budgetDenied = policyData.budgetDenied
           }
 
-          const failKey = serverInfo?.serverId ?? "unknown"
           if (isTransientCircuitFailure(errorCode)) {
             serverFailureCounts.set(
-              failKey,
-              (serverFailureCounts.get(failKey) ?? 0) + 1
+              circuitKey,
+              (serverFailureCounts.get(circuitKey) ?? 0) + 1
             )
           } else {
             // Circuit breaker tracks consecutive transient failures only.
-            serverFailureCounts.delete(failKey)
+            serverFailureCounts.delete(circuitKey)
           }
 
           console.error(
