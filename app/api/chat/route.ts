@@ -18,6 +18,7 @@ import {
   flushPostHog,
   getPostHogClient,
 } from "@/lib/posthog"
+import { scrubForAnalytics } from "@/lib/posthog/scrub"
 import type { Provider, ToolKeyMode } from "@/lib/user-keys"
 import {
   UIMessage as MessageAISDK,
@@ -1473,7 +1474,7 @@ export async function POST(req: Request) {
               traceId: chatId,
               model,
               provider,
-              input: messages,
+              input: scrubForAnalytics(messages),
               output: null,
               latencyMs,
               isError: true,
@@ -1553,8 +1554,8 @@ export async function POST(req: Request) {
               traceId: chatId,
               model,
               provider,
-              input: messages,
-              output: text,
+              input: scrubForAnalytics(messages),
+              output: scrubForAnalytics(text),
               inputTokens: usage?.inputTokens,
               outputTokens: usage?.outputTokens,
               latencyMs,
@@ -1684,8 +1685,17 @@ export async function POST(req: Request) {
                     budgetDenied: trace?.budgetDenied,
                   },
                   { token: convexToken }
-                ).catch(() => {
-                  // Intentionally swallowed — audit logging is best-effort
+                ).catch((err: unknown) => {
+                  console.warn(JSON.stringify({
+                    _tag: "tool_call_log_write_failed",
+                    requestId,
+                    chatId,
+                    toolCallId: toolCall.toolCallId,
+                    toolName: serverInfo.displayName,
+                    source: "mcp",
+                    stepNumber: finishStepNumber,
+                    error: err instanceof Error ? err.message : String(err),
+                  }))
                 })
               }
             }
@@ -1725,7 +1735,6 @@ export async function POST(req: Request) {
                     api.toolCallLog.log,
                     {
                       chatId: chatId as Id<"chats">,
-                      // No serverId for non-MCP tools
                       toolName: meta.displayName,
                       toolCallId: toolCall.toolCallId,
                       inputPreview: JSON.stringify(toolCall.input).slice(0, 500),
@@ -1748,8 +1757,17 @@ export async function POST(req: Request) {
                       budgetDenied: trace?.budgetDenied,
                     },
                     { token: convexToken }
-                  ).catch(() => {
-                    // Intentionally swallowed — audit logging is best-effort
+                  ).catch((err: unknown) => {
+                    console.warn(JSON.stringify({
+                      _tag: "tool_call_log_write_failed",
+                      requestId,
+                      chatId,
+                      toolCallId: toolCall.toolCallId,
+                      toolName: meta.displayName,
+                      source: meta.source,
+                      stepNumber: finishStepNumber,
+                      error: err instanceof Error ? err.message : String(err),
+                    }))
                   })
                 }
               }
