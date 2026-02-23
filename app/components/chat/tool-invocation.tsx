@@ -5,6 +5,7 @@ import type { ToolUIPart } from 'ai'
 import { getStaticToolName } from 'ai'
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
+  AlertCircleIcon,
   ArrowDown01Icon,
   CheckmarkCircle01Icon,
   SourceCodeIcon,
@@ -255,6 +256,7 @@ function SingleToolCard({
   const isLoading = state === "input-available" || state === "input-streaming"
   const isCompleted = state === "output-available"
   const result = isCompleted ? toolData.output : undefined
+  const isError = isCompleted && result != null && typeof result === "object" && "isError" in result && (result as Record<string, unknown>).isError === true
 
   // Parse the result JSON if available
   const { parsedResult, parseError } = useMemo(() => {
@@ -442,6 +444,19 @@ function SingleToolCard({
                 <div className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
                   <HugeiconsIcon icon={Loading01Icon} size={12} className="mr-1 h-3 w-3 animate-spin" />
                   Running
+                </div>
+              </motion.div>
+            ) : isError ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, filter: "blur(2px)" }}
+                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 0.9, filter: "blur(2px)" }}
+                transition={{ duration: 0.15 }}
+                key="error"
+              >
+                <div className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-0.5 text-xs text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-400">
+                  <HugeiconsIcon icon={AlertCircleIcon} size={12} className="mr-1 h-3 w-3" />
+                  Failed
                 </div>
               </motion.div>
             ) : (

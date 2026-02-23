@@ -7,12 +7,16 @@
 // Replaces wrapToolsWithTruncation(mcpTools) in route.ts:300-302.
 
 import type { ToolSet } from "ai"
-import type { ToolResultEnvelope } from "./types"
+import { ToolTraceCollector } from "./types"
+import type { ToolTrace } from "./types"
 import { truncateToolResult, enrichToolError } from "./utils"
 import {
   MAX_TOOL_RESULT_SIZE,
   MCP_TOOL_EXECUTION_TIMEOUT_MS,
 } from "@/lib/config"
+
+// Re-export trace types for backward compatibility (route.ts imports from here)
+export { ToolTraceCollector, type ToolTrace }
 
 // ── Error Types ────────────────────────────────────────────
 
@@ -36,44 +40,6 @@ export class ToolTimeoutError extends Error {
   }
 }
 
-// ── Trace Types ────────────────────────────────────────────
-
-export type ToolTrace = {
-  toolName: string
-  toolCallId: string
-  durationMs: number
-  success: boolean
-  error?: string
-  resultSizeBytes?: number
-}
-
-/**
- * Collects per-tool-call traces for a single streamText() request.
- * Created before streamText(), read in onStepFinish and onFinish.
- *
- * Lifecycle:
- *   1. Created in route.ts before streamText()
- *   2. wrapMcpTools() records traces during execute()
- *   3. onStepFinish reads traces for structured logging
- *   4. onFinish reads traces for Convex + PostHog enrichment
- *   5. Garbage collected when the request ends
- */
-export class ToolTraceCollector {
-  private traces = new Map<string, ToolTrace>()
-
-  record(trace: ToolTrace): void {
-    this.traces.set(trace.toolCallId, trace)
-  }
-
-  get(toolCallId: string): ToolTrace | undefined {
-    return this.traces.get(toolCallId)
-  }
-
-  getAll(): ToolTrace[] {
-    return Array.from(this.traces.values())
-  }
-}
-
 // ── Configuration ──────────────────────────────────────────
 
 type WrapMcpToolsConfig = {
@@ -84,10 +50,13 @@ type WrapMcpToolsConfig = {
       displayName: string
       serverName: string
       serverId: string
+      readOnly?: boolean
     }
   >
   /** Trace collector — shared with onStepFinish/onFinish in route.ts */
   traceCollector: ToolTraceCollector
+  /** Request-scoped correlation ID for grouping tool traces */
+  requestId?: string
   /** Per-tool timeout in ms. Default: MCP_TOOL_EXECUTION_TIMEOUT_MS (30s) */
   timeoutMs?: number
   /** Max result size in bytes. Default: MAX_TOOL_RESULT_SIZE (100KB) */
@@ -121,9 +90,13 @@ export function wrapMcpTools(
   const {
     toolServerMap,
     traceCollector,
+    requestId,
     timeoutMs = MCP_TOOL_EXECUTION_TIMEOUT_MS,
     maxResultBytes = MAX_TOOL_RESULT_SIZE,
   } = config
+
+  const serverFailureCounts = new Map<string, number>()
+  const circuitThreshold = 3
 
   const wrapped: Record<string, unknown> = {}
 
@@ -151,7 +124,16 @@ export function wrapMcpTools(
       execute: async (
         params: unknown,
         options: { toolCallId: string; [k: string]: unknown }
-      ): Promise<ToolResultEnvelope> => {
+      ): Promise<unknown> => {
+        const serverKey = serverInfo?.serverId ?? "unknown"
+        const failures = serverFailureCounts.get(serverKey) ?? 0
+        if (failures >= circuitThreshold) {
+          throw enrichToolError(
+            new Error(`Server "${serverInfo?.serverName ?? serverKey}" circuit open — ${failures} consecutive tool failures in this request`),
+            displayName
+          )
+        }
+
         const startMs = Date.now()
         let success = true
         let error: string | undefined
@@ -187,21 +169,13 @@ export function wrapMcpTools(
           // ── Truncation ─────────────────────────────────
           const truncatedResult = truncateToolResult(rawResult, maxResultBytes)
 
-          // ── Envelope ───────────────────────────────────
-          return {
-            ok: true,
-            data: truncatedResult,
-            error: null,
-            meta: {
-              tool: displayName,
-              source: "mcp",
-              durationMs: Date.now() - startMs,
-              serverName: serverInfo?.serverName ?? "unknown",
-            },
-          }
+          return truncatedResult
         } catch (err) {
           success = false
           error = err instanceof Error ? err.message : String(err)
+
+          const failKey = serverInfo?.serverId ?? "unknown"
+          serverFailureCounts.set(failKey, (serverFailureCounts.get(failKey) ?? 0) + 1)
 
           console.error(
             `[tools/mcp] ${displayName} failed after ${Date.now() - startMs}ms:`,
@@ -213,6 +187,7 @@ export function wrapMcpTools(
           traceCollector.record({
             toolName: name,
             toolCallId: options.toolCallId,
+            requestId,
             durationMs: Date.now() - startMs,
             success,
             error,
@@ -226,22 +201,3 @@ export function wrapMcpTools(
   return wrapped as ToolSet
 }
 
-// ── Type Guard ─────────────────────────────────────────────
-
-/**
- * Check if a tool result is a ToolResultEnvelope.
- * Used in onFinish audit logging to extract `data` from envelopes
- * before generating output previews — ensures the preview contains
- * actual result data instead of envelope metadata.
- */
-export function isToolResultEnvelope(
-  value: unknown
-): value is ToolResultEnvelope {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "ok" in value &&
-    "data" in value &&
-    "meta" in value
-  )
-}

@@ -53,7 +53,6 @@ import { shouldInjectSearchTools } from "./search-tools"
 import {
   ToolTraceCollector,
   wrapMcpTools,
-  isToolResultEnvelope,
 } from "@/lib/tools/mcp-wrapper"
 import type { ShippingAddress } from "@/lib/payclaw/schemas"
 
@@ -421,7 +420,7 @@ export async function POST(req: Request) {
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
     let userCardId: string | undefined
-    if (isAuthenticated) {
+    if (isAuthenticated && capabilities.platform) {
       if (convexToken) {
         try {
           userAddresses = (await fetchQuery(
@@ -488,13 +487,29 @@ export async function POST(req: Request) {
     // Single wrapper handles all Layer 3 concerns — follows the Exa gold
     // standard pattern (lib/tools/third-party.ts:82-119).
     // Replaces the previous wrapToolsWithTruncation(mcpTools) call.
+    const requestId = crypto.randomUUID()
     const traceCollector = new ToolTraceCollector()
 
     if (Object.keys(mcpTools).length > 0) {
       mcpTools = wrapMcpTools(mcpTools, {
         toolServerMap: mcpToolServerMap,
         traceCollector,
+        requestId,
       }) as ToolSet
+    }
+
+    // Wrap non-builtin tools with tracing (Layer 2 + Layer 4).
+    // Records durationMs and resultSizeBytes into traceCollector so
+    // onStepFinish and onFinish can read them for ALL tool types.
+    const { wrapToolsWithTracing } = await import("@/lib/tools/utils")
+    if (Object.keys(thirdPartyTools).length > 0) {
+      thirdPartyTools = wrapToolsWithTracing(thirdPartyTools, traceCollector, requestId)
+    }
+    if (Object.keys(contentTools).length > 0) {
+      contentTools = wrapToolsWithTracing(contentTools, traceCollector, requestId)
+    }
+    if (Object.keys(platformTools).length > 0) {
+      platformTools = wrapToolsWithTracing(platformTools, traceCollector, requestId)
     }
 
     // Merge all tool layers:
@@ -770,9 +785,11 @@ export async function POST(req: Request) {
     // The header is safe to apply: @ai-sdk/anthropic@3.0.41 comma-merges
     // user and inferred betas (getBetasFromHeaders + Array.from(betas).join(",")).
     // -----------------------------------------------------------------------
+    const isTokenEfficient =
+      process.env.ANTHROPIC_TOKEN_EFFICIENT_TOOLS !== "false"
     const requestHeaders: Record<string, string> = {}
 
-    if (provider === "anthropic" && hasAnyTools) {
+    if (provider === "anthropic" && hasAnyTools && isTokenEfficient) {
       requestHeaders["anthropic-beta"] = ANTHROPIC_BETA_HEADERS.tokenEfficient
     }
 
@@ -808,9 +825,8 @@ export async function POST(req: Request) {
 
       // Restrict tools after PREPARE_STEP_THRESHOLD to prevent runaway
       // tool chains. Only tools explicitly marked readOnly: true remain
-      // available. MCP tools are conservatively included (can't classify
-      // read/write yet). Unclassified non-MCP tools are restricted
-      // (fail closed — new tools must opt in via readOnly: true).
+      // available. MCP tools with readOnlyHint annotation are classified;
+      // MCP tools without annotations are restricted (fail closed).
       prepareStep: hasAnyTools
         ? async ({ stepNumber }) => {
             if (stepNumber <= PREPARE_STEP_THRESHOLD) return {}
@@ -821,9 +837,14 @@ export async function POST(req: Request) {
             for (const [name, meta] of allToolMetadata) {
               if (meta.readOnly === true) safeTools.push(name)
             }
-            // Include all MCP tools (can't classify read/write yet)
             for (const name of Object.keys(mcpTools)) {
-              if (!safeTools.includes(name)) safeTools.push(name)
+              if (safeTools.includes(name)) continue
+              const mcpInfo = mcpToolServerMap.get(name)
+              if (mcpInfo?.readOnly === true) {
+                safeTools.push(name)
+              }
+              // MCP tools without readOnly annotation or with readOnly: false
+              // are restricted after the threshold (fail closed).
             }
 
             // Fail closed: if no safe tools found, no tools available.
@@ -855,12 +876,15 @@ export async function POST(req: Request) {
           console.log(
             JSON.stringify({
               _tag: "tool_trace",
+              requestId,
               chatId,
+              userId,
               step: stepCounter,
               tool: meta?.displayName ?? call.toolName,
               source: meta?.source ?? "unknown",
               success,
               durationMs: traceCollector.get(call.toolCallId)?.durationMs ?? null,
+              estimatedCostPer1k: meta?.estimatedCostPer1k ?? null,
               tokens: {
                 in: usage?.inputTokens ?? null,
                 out: usage?.outputTokens ?? null,
@@ -969,7 +993,7 @@ export async function POST(req: Request) {
           console.log(
             `[chat] Anthropic tool usage — inputTokens: ${usage?.inputTokens ?? "?"}, ` +
             `toolCount: ${Object.keys(allTools).length}, ` +
-            `tokenEfficient: true`
+            `tokenEfficient: ${isTokenEfficient}`
           )
         }
 
@@ -998,14 +1022,6 @@ export async function POST(req: Request) {
             // PostHog: unified tool call events — one event per tool invocation (all sources)
             // Replaces the previous MCP-only mcp_tool_call event.
             if (steps) {
-              // Combine all metadata maps for source identification
-              const allToolMetadata = new Map([
-                ...builtInToolMetadata,
-                ...thirdPartyToolMetadata,
-                ...contentToolMetadata,
-                ...platformToolMetadata,
-              ])
-
               for (const step of steps) {
                 if (step.toolCalls) {
                   for (const toolCall of step.toolCalls) {
@@ -1040,6 +1056,7 @@ export async function POST(req: Request) {
                         chatId,
                         // Phase C: Observability enrichment
                         durationMs: traceCollector.get(toolCall.toolCallId)?.durationMs ?? undefined,
+                        requestId,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -1085,12 +1102,7 @@ export async function POST(req: Request) {
                   ? !(toolResult as { isError?: boolean }).isError
                   : false
 
-                // Extract data from envelope for preview — avoids wasting
-                // 500 chars on envelope metadata ({"ok":true,"data":...}).
-                const output = toolResult?.output
-                const previewData = isToolResultEnvelope(output)
-                  ? output.data
-                  : output
+                const previewData = toolResult?.output
                 const trace = traceCollector.get(toolCall.toolCallId)
 
                 void fetchMutation(
@@ -1114,6 +1126,7 @@ export async function POST(req: Request) {
                     inputTokens: step.usage?.inputTokens,
                     outputTokens: step.usage?.outputTokens,
                     resultSizeBytes: trace?.resultSizeBytes,
+                    requestId,
                   },
                   { token: convexToken }
                 ).catch(() => {
@@ -1127,15 +1140,7 @@ export async function POST(req: Request) {
         // Audit log: persist built-in + third-party tool calls (fire-and-forget).
         // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
         if (convexToken && steps) {
-          // Combine built-in, third-party, content, and platform metadata maps
-          const nonMcpMetadata = new Map([
-            ...builtInToolMetadata,
-            ...thirdPartyToolMetadata,
-            ...contentToolMetadata,
-            ...platformToolMetadata,
-          ])
-
-          if (nonMcpMetadata.size > 0) {
+          if (allToolMetadata.size > 0) {
             let finishStepNumber = 0
 
             for (const step of steps) {
@@ -1146,7 +1151,7 @@ export async function POST(req: Request) {
                   // Skip MCP tools (already logged above)
                   if (mcpToolServerMap.get(toolCall.toolName)) continue
 
-                  const meta = nonMcpMetadata.get(toolCall.toolName)
+                  const meta = allToolMetadata.get(toolCall.toolName)
                   if (!meta) continue // Unknown tool — skip
 
                   const toolResult = step.toolResults?.find(
@@ -1157,11 +1162,9 @@ export async function POST(req: Request) {
                     ? !(toolResult as { isError?: boolean }).isError
                     : false
 
-                  // For non-MCP tools, check if result is enveloped (Exa uses envelopes)
-                  const output = toolResult?.output
-                  const previewData = isToolResultEnvelope(output)
-                    ? output.data
-                    : output
+                  const previewData = toolResult?.output
+
+                  const trace = traceCollector.get(toolCall.toolCallId)
 
                   void fetchMutation(
                     api.toolCallLog.log,
@@ -1175,18 +1178,15 @@ export async function POST(req: Request) {
                         ? JSON.stringify(previewData).slice(0, 500)
                         : undefined,
                       success,
-                      // FIX: Use actual per-tool duration instead of total stream duration.
-                      // For Exa, the envelope's meta.durationMs has the real timing.
-                      // For builtin tools, we don't have per-tool timing (no trace collector).
-                      durationMs: isToolResultEnvelope(output)
-                        ? output.meta.durationMs
-                        : undefined,
+                      durationMs: trace?.durationMs,
                       source: meta.source,
                       serviceName: meta.serviceName,
                       // Phase C: Observability enrichment
                       stepNumber: finishStepNumber,
                       inputTokens: step.usage?.inputTokens,
                       outputTokens: step.usage?.outputTokens,
+                      resultSizeBytes: trace?.resultSizeBytes,
+                      requestId,
                     },
                     { token: convexToken }
                   ).catch(() => {

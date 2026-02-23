@@ -194,7 +194,8 @@ export default defineSchema({
     source: v.union(
       v.literal("builtin"),
       v.literal("third-party"),
-      v.literal("mcp")
+      v.literal("mcp"),
+      v.literal("platform")
     ),
     // Service name for display and filtering (e.g., "OpenAI", "Exa", "my-mcp-server")
     serviceName: v.optional(v.string()),
@@ -213,6 +214,10 @@ export default defineSchema({
     // Original result size in bytes before truncation.
     // Helps identify tools that consistently return large results.
     resultSizeBytes: v.optional(v.number()),
+
+    // Request-level correlation ID (crypto.randomUUID() from the chat route).
+    // Enables joining tool calls, PostHog events, and console logs for a single request.
+    requestId: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_chat", ["chatId"])

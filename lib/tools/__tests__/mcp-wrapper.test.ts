@@ -3,10 +3,8 @@ import {
   wrapMcpTools,
   ToolTraceCollector,
   ToolTimeoutError,
-  isToolResultEnvelope,
 } from "../mcp-wrapper"
 import type { ToolSet } from "ai"
-import type { ToolResultEnvelope } from "../types"
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -56,17 +54,9 @@ describe("wrapMcpTools", () => {
     const result = await (wrapped.test_tool as { execute: Function }).execute(
       {},
       { toolCallId: "call_1" }
-    ) as ToolResultEnvelope
+    )
 
-    // Envelope structure
-    expect(result.ok).toBe(true)
-    expect(result.data).toEqual({ answer: 42 })
-    expect(result.error).toBeNull()
-    expect(result.meta.tool).toBe("Test Tool")
-    expect(result.meta.source).toBe("mcp")
-    expect(result.meta.serverName).toBe("test-server")
-    expect(typeof result.meta.durationMs).toBe("number")
-    expect(result.meta.durationMs).toBeGreaterThanOrEqual(0)
+    expect(result).toEqual({ answer: 42 })
 
     // Trace recorded
     const trace = config.traceCollector.get("call_1")
@@ -146,12 +136,11 @@ describe("wrapMcpTools", () => {
     const result = await (wrapped.test_tool as { execute: Function }).execute(
       {},
       { toolCallId: "call_large" }
-    ) as ToolResultEnvelope
+    )
 
-    expect(result.ok).toBe(true)
-    // The data should be truncated (contains truncation marker)
-    const dataStr = typeof result.data === "string" ? result.data : JSON.stringify(result.data)
-    expect(dataStr.length).toBeLessThan(1000)
+    // Raw string result should be truncated (contains truncation marker)
+    const resultStr = typeof result === "string" ? result : JSON.stringify(result)
+    expect(resultStr.length).toBeLessThan(1000)
 
     // Trace should record original size
     const trace = config.traceCollector.get("call_large")
@@ -209,30 +198,6 @@ describe("ToolTraceCollector", () => {
     expect(all.map((t) => t.toolName)).toEqual(
       expect.arrayContaining(["a", "b"])
     )
-  })
-})
-
-// ── isToolResultEnvelope ─────────────────────────────────
-
-describe("isToolResultEnvelope", () => {
-  it("returns true for valid envelopes", () => {
-    const envelope: ToolResultEnvelope = {
-      ok: true,
-      data: { result: "hello" },
-      error: null,
-      meta: { tool: "test", source: "mcp", durationMs: 100 },
-    }
-    expect(isToolResultEnvelope(envelope)).toBe(true)
-  })
-
-  it("returns false for non-envelope objects", () => {
-    expect(isToolResultEnvelope({ result: "hello" })).toBe(false)
-    expect(isToolResultEnvelope({ ok: true })).toBe(false)
-    expect(isToolResultEnvelope({ ok: true, data: null })).toBe(false)
-    expect(isToolResultEnvelope(null)).toBe(false)
-    expect(isToolResultEnvelope(undefined)).toBe(false)
-    expect(isToolResultEnvelope("string")).toBe(false)
-    expect(isToolResultEnvelope(42)).toBe(false)
   })
 })
 

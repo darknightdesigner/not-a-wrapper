@@ -49,7 +49,8 @@ export const log = mutation({
     source: v.union(
       v.literal("builtin"),
       v.literal("third-party"),
-      v.literal("mcp")
+      v.literal("mcp"),
+      v.literal("platform")
     ),
     serviceName: v.optional(v.string()),
     // Phase C: Observability enrichment
@@ -57,6 +58,7 @@ export const log = mutation({
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),
     resultSizeBytes: v.optional(v.number()),
+    requestId: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
@@ -95,6 +97,7 @@ export const log = mutation({
       inputTokens: args.inputTokens,
       outputTokens: args.outputTokens,
       resultSizeBytes: args.resultSizeBytes,
+      requestId: args.requestId,
       createdAt: Date.now(),
     })
   },

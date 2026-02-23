@@ -55,6 +55,48 @@ function setCachedExtraction(inputUrl: string, data: CachedExtraction): void {
   extractionCache.set(normalizeUrl(inputUrl), { data, fetchedAt: Date.now() })
 }
 
+// ── Search Result Cache ─────────────────────────────────────
+// Process-level LRU cache for search results.
+// Same query in multi-turn conversations avoids re-fetching from Exa.
+// TTL: 15 min. Max entries: 500. Shared across requests.
+
+type CachedSearchResult = {
+  title?: string
+  url: string
+  content?: string
+  publishedDate?: string
+}
+
+const searchCache = new Map<
+  string,
+  { data: CachedSearchResult[]; fetchedAt: number }
+>()
+const SEARCH_CACHE_TTL_MS = 15 * 60 * 1000
+const SEARCH_CACHE_MAX_ENTRIES = 500
+
+function normalizeQuery(query: string): string {
+  return query.toLowerCase().trim().replace(/\s+/g, " ")
+}
+
+function getCachedSearch(query: string): CachedSearchResult[] | null {
+  const key = normalizeQuery(query)
+  const entry = searchCache.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.fetchedAt > SEARCH_CACHE_TTL_MS) {
+    searchCache.delete(key)
+    return null
+  }
+  return entry.data
+}
+
+function setCachedSearch(query: string, data: CachedSearchResult[]): void {
+  if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) {
+    const oldestKey = searchCache.keys().next().value
+    if (oldestKey) searchCache.delete(oldestKey)
+  }
+  searchCache.set(normalizeQuery(query), { data, fetchedAt: Date.now() })
+}
+
 /**
  * Configuration for third-party tool loading.
  * The coordinator (route.ts) determines which capabilities to skip
@@ -143,6 +185,20 @@ export async function getThirdPartyTools(
         execute: async ({ query }) => {
           const startMs = Date.now()
           try {
+            // ── Cache check ──────────────────────────────
+            const cached = getCachedSearch(query)
+            if (cached) {
+              console.log(JSON.stringify({
+                _tag: "tool_exec",
+                tool: "web_search",
+                source: "exa",
+                durationMs: Date.now() - startMs,
+                resultCount: cached.length,
+                cached: true,
+              }))
+              return truncateToolResult(cached)
+            }
+
             // Timeout via Promise.race — the exa-js SDK does not accept
             // AbortSignal, so the underlying HTTP request may continue after
             // timeout. On serverless this is bounded by function lifetime.
@@ -153,17 +209,15 @@ export async function getThirdPartyTools(
                 text: { maxCharacters: 2000 },
                 livecrawl: "fallback",
               }),
-              new Promise<never>((_, reject) =>
-                setTimeout(
-                  () =>
-                    reject(
-                      new Error(
-                        `Exa search timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
-                      )
-                    ),
-                  TOOL_EXECUTION_TIMEOUT_MS
+              new Promise<never>((_, reject) => {
+                AbortSignal.timeout(TOOL_EXECUTION_TIMEOUT_MS).addEventListener(
+                  "abort",
+                  () => reject(new Error(
+                    `Exa search timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
+                  )),
+                  { once: true }
                 )
-              ),
+              }),
             ])
             const mapped = results.map((r) => ({
               title: r.title ?? undefined,
@@ -171,17 +225,15 @@ export async function getThirdPartyTools(
               content: r.text?.slice(0, 2000),
               publishedDate: r.publishedDate ?? undefined,
             }))
-            return {
-              ok: true,
-              data: truncateToolResult(mapped),
-              error: null,
-              meta: {
-                tool: "web_search",
-                source: "exa",
-                durationMs: Date.now() - startMs,
-                resultCount: results.length,
-              },
-            }
+            setCachedSearch(query, mapped)
+            console.log(JSON.stringify({
+              _tag: "tool_exec",
+              tool: "web_search",
+              source: "exa",
+              durationMs: Date.now() - startMs,
+              resultCount: results.length,
+            }))
+            return truncateToolResult(mapped)
           } catch (err) {
             console.error(
               `[tools/exa] Search failed after ${Date.now() - startMs}ms:`,
@@ -309,20 +361,17 @@ export async function getContentExtractionTools(options: {
             const mapped = urls.map(
               (url) => cached.get(url) ?? { url, error: "CACHE_MISS" }
             )
-            return {
-              ok: true,
-              data: truncateToolResult(mapped),
-              error: null,
-              meta: {
-                tool: "extract_content",
-                source: "exa",
-                durationMs: Date.now() - startMs,
-                urlCount: urls.length,
-                successCount: cached.size,
-                failedCount: 0,
-                cached: true,
-              },
-            }
+            console.log(JSON.stringify({
+              _tag: "tool_exec",
+              tool: "extract_content",
+              source: "exa",
+              durationMs: Date.now() - startMs,
+              urlCount: urls.length,
+              successCount: cached.size,
+              failedCount: 0,
+              cachedCount: cached.size,
+            }))
+            return truncateToolResult(mapped)
           }
 
           // ── Fetch uncached URLs from Exa ───────────────
@@ -331,17 +380,15 @@ export async function getContentExtractionTools(options: {
             exa.getContents(uncachedUrls, {
               text: { maxCharacters: 10000 },
             }),
-            new Promise<never>((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(
-                      `Exa getContents timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
-                    )
-                  ),
-                TOOL_EXECUTION_TIMEOUT_MS
+            new Promise<never>((_, reject) => {
+              AbortSignal.timeout(TOOL_EXECUTION_TIMEOUT_MS).addEventListener(
+                "abort",
+                () => reject(new Error(
+                  `Exa getContents timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
+                )),
+                { once: true }
               )
-            ),
+            }),
           ])
 
           // SDK types for Status are minimal ({ id, status, source }) but the
@@ -422,20 +469,17 @@ export async function getContentExtractionTools(options: {
             return { url, error: "NO_RESULT_RETURNED" }
           })
 
-          return {
-            ok: true,
-            data: truncateToolResult(mapped),
-            error: null,
-            meta: {
-              tool: "extract_content",
-              source: "exa",
-              durationMs: Date.now() - startMs,
-              urlCount: urls.length,
-              successCount,
-              failedCount,
-              cachedCount: cached.size,
-            },
-          }
+          console.log(JSON.stringify({
+            _tag: "tool_exec",
+            tool: "extract_content",
+            source: "exa",
+            durationMs: Date.now() - startMs,
+            urlCount: urls.length,
+            successCount,
+            failedCount,
+            cachedCount: cached.size,
+          }))
+          return truncateToolResult(mapped)
         } catch (err) {
           console.error(
             `[tools/exa] Content extraction failed after ${Date.now() - startMs}ms:`,

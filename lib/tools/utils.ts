@@ -2,6 +2,7 @@
 
 import { MAX_TOOL_RESULT_SIZE } from "@/lib/config"
 import type { ToolSet } from "ai"
+import { ToolTraceCollector } from "./types"
 
 /**
  * Truncate a tool result to a maximum byte size.
@@ -70,15 +71,31 @@ export function truncateToolResult(
     }
   }
 
-  // Object: serialize and truncate the string representation
+  // Object: keep as many top-level keys as fit within the budget
   if (typeof result === "object" && result !== null) {
-    const truncatedStr = serialized.slice(0, maxBytes * 0.9)
-    return {
-      _truncated: true,
-      _originalSizeBytes: sizeBytes,
-      _hint: `Object was truncated at ${maxBytes} bytes (original: ${sizeBytes} bytes). Request specific fields instead of the full object.`,
-      _raw: truncatedStr + "...",
+    const entries = Object.entries(result as Record<string, unknown>)
+    const totalKeys = entries.length
+    const budget = maxBytes * 0.85
+
+    const output: Record<string, unknown> = { _truncated: true }
+    let currentSize = new TextEncoder().encode(
+      safeStringify(output)
+    ).length
+
+    let keptKeys = 0
+    for (const [key, value] of entries) {
+      const entrySize = new TextEncoder().encode(
+        safeStringify({ [key]: value })
+      ).length
+      if (currentSize + entrySize > budget) break
+      output[key] = value
+      currentSize += entrySize
+      keptKeys++
     }
+
+    output._originalSizeBytes = sizeBytes
+    output._hint = `Object was truncated from ${totalKeys} to ${keptKeys} keys (original: ${sizeBytes} bytes). Request specific fields instead of the full object.`
+    return output
   }
 
   // Primitive types: return as-is (unlikely to exceed limits)
@@ -119,6 +136,77 @@ export function wrapToolsWithTruncation(
         execute: async (...args: unknown[]) => {
           const result = await origExec(...args)
           return truncateToolResult(result, maxBytes)
+        },
+      }
+    } else {
+      wrapped[name] = original
+    }
+  }
+  return wrapped as ToolSet
+}
+
+/**
+ * Wrap all tools in a ToolSet with timing + trace recording.
+ * Records start/end time around each execute() call and writes
+ * the trace to the shared ToolTraceCollector so onStepFinish
+ * and onFinish can read durationMs for ALL tool types.
+ *
+ * Structural twin of wrapToolsWithTruncation — same iteration
+ * and casting pattern. Applied SEPARATELY (not composed) because
+ * truncation is an MCP-only concern while tracing applies to
+ * Layer 2 (third-party) and Layer 4 (platform) tools.
+ */
+export function wrapToolsWithTracing(
+  tools: ToolSet,
+  traceCollector: ToolTraceCollector,
+  requestId?: string
+): ToolSet {
+  const wrapped: Record<string, unknown> = {}
+  for (const [name, t] of Object.entries(tools)) {
+    const original = t as Record<string, unknown>
+    if (typeof original.execute === "function") {
+      const origExec = original.execute as (
+        params: unknown,
+        options: { toolCallId: string; [k: string]: unknown }
+      ) => Promise<unknown>
+
+      wrapped[name] = {
+        ...original,
+        execute: async (
+          params: unknown,
+          options: { toolCallId: string; [k: string]: unknown }
+        ): Promise<unknown> => {
+          const startMs = Date.now()
+          let success = true
+          let error: string | undefined
+          let resultSizeBytes: number | undefined
+
+          try {
+            const result = await origExec(params, options)
+
+            try {
+              const serialized = JSON.stringify(result)
+              resultSizeBytes = new TextEncoder().encode(serialized).length
+            } catch {
+              // Non-serializable — skip measurement
+            }
+
+            return result
+          } catch (err) {
+            success = false
+            error = err instanceof Error ? err.message : String(err)
+            throw err
+          } finally {
+            traceCollector.record({
+              toolName: name,
+              toolCallId: options.toolCallId,
+              requestId,
+              durationMs: Date.now() - startMs,
+              success,
+              error,
+              resultSizeBytes,
+            })
+          }
         },
       }
     } else {
