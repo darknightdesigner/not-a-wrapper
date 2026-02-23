@@ -301,17 +301,34 @@ export async function POST(req: Request) {
     }
 
     // -----------------------------------------------------------------------
-    // Third-Party Tool Loading (Layer 2)
+    // Exa API Key Resolution (shared by Layer 2 capabilities)
+    //
+    // Resolved once, used by both search fallback and content extraction.
+    // Key resolution: user BYOK key → platform env var → undefined.
+    // The exa-js SDK accepts keys in its constructor, so BYOK keys
+    // are passed directly — no env var manipulation needed.
+    //
+    // NOT gated on isAuthenticated — anonymous users get Exa-powered tools
+    // when the platform has an EXA_API_KEY configured (same as Layer 1).
+    // -----------------------------------------------------------------------
+    let resolvedExaKey: string | undefined
+    if (convexToken) {
+      const { getEffectiveToolKey } = await import("@/lib/user-keys")
+      resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
+    }
+    if (!resolvedExaKey) {
+      resolvedExaKey = process.env.EXA_API_KEY
+    }
+
+    // -----------------------------------------------------------------------
+    // Third-Party Search Fallback (Layer 2 — Search)
     // Universal search fallback for providers without native search tools.
     // Only loaded when enableSearch is true AND Layer 1 didn't provide search.
     //
     // The coordination model is simple:
     //   - enableSearch === true: route.ts injects search tools
-    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2
+    //   - Layer 1 provided search (builtInHasSearch): skip Layer 2 search
     //   - Layer 1 did NOT provide search: load Layer 2 Exa fallback
-    //
-    // NOT gated on isAuthenticated — anonymous users get search when
-    // the platform has an EXA_API_KEY configured (same as Layer 1).
     // -----------------------------------------------------------------------
     let thirdPartyTools: ToolSet = {} as ToolSet
     let thirdPartyToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
@@ -319,31 +336,37 @@ export async function POST(req: Request) {
     if (shouldInjectSearch) {
       const builtInHasSearch = Object.keys(builtInTools).length > 0
 
-      // Only load Layer 2 when Layer 1 didn't provide search.
-      // This is the sole coordination point — third-party.ts does not
-      // know about providers. It just receives a skipSearch flag.
       if (!builtInHasSearch) {
         const { getThirdPartyTools } = await import("@/lib/tools/third-party")
-
-        // Key resolution: user BYOK key → platform env var → undefined
-        // The exa-js SDK accepts keys in its constructor, so BYOK keys
-        // are passed directly — no env var manipulation needed.
-        let resolvedExaKey: string | undefined
-        if (convexToken) {
-          const { getEffectiveToolKey } = await import("@/lib/user-keys")
-          resolvedExaKey = await getEffectiveToolKey("exa", convexToken)
-        }
-        if (!resolvedExaKey) {
-          resolvedExaKey = process.env.EXA_API_KEY
-        }
-
         const thirdPartyResult = await getThirdPartyTools({
-          skipSearch: false, // We already know we need search (builtInHasSearch is false)
+          skipSearch: false,
           exaKey: resolvedExaKey,
         })
         thirdPartyTools = thirdPartyResult.tools
         thirdPartyToolMetadata = thirdPartyResult.metadata
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Content Extraction Tools (Layer 2 — Content)
+    // Independent capability — NOT gated on shouldInjectSearch or
+    // builtInHasSearch. Available whenever an Exa key exists, ensuring
+    // content extraction works for ALL providers including those with
+    // native Layer 1 search (OpenAI, Anthropic, Google, xAI).
+    //
+    // Currently returns empty tools — the actual content_extract tool
+    // will be added in a follow-up. See .agents/plans/phase-7-future-tool-integrations.md
+    // -----------------------------------------------------------------------
+    let contentTools: ToolSet = {} as ToolSet
+    let contentToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
+
+    if (resolvedExaKey) {
+      const { getContentExtractionTools } = await import("@/lib/tools/third-party")
+      const contentResult = await getContentExtractionTools({
+        exaKey: resolvedExaKey,
+      })
+      contentTools = contentResult.tools
+      contentToolMetadata = contentResult.metadata
     }
 
     // -----------------------------------------------------------------------
@@ -477,15 +500,18 @@ export async function POST(req: Request) {
       }) as ToolSet
     }
 
-    // Merge all tool layers: search (Layer 1 OR Layer 2) + platform (Layer 4) + MCP (Layer 3)
-    // Search tools are mutually exclusive: Layer 1 XOR Layer 2 (never both).
-    // MCP tools are always independent and additive.
-    // Spread order matters for conflict resolution:
-    //   1. Built-in/third-party search tools (lowest priority)
-    //   2. Platform tools (middle priority)
-    //   3. MCP tools (highest priority — user-configured, namespaced)
+    // Merge all tool layers:
+    //   - Search: Layer 1 (built-in) XOR Layer 2 (Exa fallback) — never both
+    //   - Content: Layer 2 content extraction — independent of search gating
+    //   - Platform: Layer 4 (Flowglad Pay, etc.)
+    //   - MCP: Layer 3 (user-configured servers)
+    // Spread order = conflict resolution priority (last wins):
+    //   1. Search tools (lowest priority)
+    //   2. Content extraction tools (same priority tier as search)
+    //   3. Platform tools (middle priority)
+    //   4. MCP tools (highest priority — user-configured, namespaced)
     const searchTools = { ...builtInTools, ...thirdPartyTools }
-    const allTools = { ...searchTools, ...platformTools, ...mcpTools } as ToolSet
+    const allTools = { ...searchTools, ...contentTools, ...platformTools, ...mcpTools } as ToolSet
 
     // Dev-mode collision detection: warn when duplicate keys are found
     if (process.env.NODE_ENV !== "production") {
@@ -754,11 +780,12 @@ export async function POST(req: Request) {
     }
 
     // Collect all tool metadata for prepareStep tool restriction.
-    // Merge built-in + third-party metadata (MCP metadata not available here —
-    // MCP tools are conservatively included in the safe list).
+    // Merge built-in + third-party + content + platform metadata (MCP metadata
+    // not available here — MCP tools are conservatively included in the safe list).
     const allToolMetadata = new Map([
       ...builtInToolMetadata,
       ...thirdPartyToolMetadata,
+      ...contentToolMetadata,
       ...platformToolMetadata,
     ])
     let enrichedSystemPrompt = effectiveSystemPrompt
@@ -978,6 +1005,7 @@ export async function POST(req: Request) {
               const allToolMetadata = new Map([
                 ...builtInToolMetadata,
                 ...thirdPartyToolMetadata,
+                ...contentToolMetadata,
                 ...platformToolMetadata,
               ])
 
@@ -1102,10 +1130,11 @@ export async function POST(req: Request) {
         // Audit log: persist built-in + third-party tool calls (fire-and-forget).
         // Identifies non-MCP tools by checking if the tool name is NOT in mcpToolServerMap.
         if (convexToken && steps) {
-          // Combine built-in and third-party metadata maps
+          // Combine built-in, third-party, content, and platform metadata maps
           const nonMcpMetadata = new Map([
             ...builtInToolMetadata,
             ...thirdPartyToolMetadata,
+            ...contentToolMetadata,
             ...platformToolMetadata,
           ])
 

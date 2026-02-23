@@ -12,6 +12,7 @@ import {
   NutIcon,
   Loading01Icon,
   Search01Icon,
+  FileSearchIcon,
   Wrench01Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { AnimatePresence, motion } from "framer-motion"
@@ -36,6 +37,7 @@ const BUILTIN_TOOL_DISPLAY: Record<
 > = {
   web_search: { name: "Web Search", icon: "search" },
   google_search: { name: "Web Search", icon: "search" },
+  content_extract: { name: "Read Page", icon: "extract" },
   // Future built-in tools:
   // code_execution: { name: "Code Execution", icon: "code" },
   // image_generation: { name: "Image Generation", icon: "image" },
@@ -46,6 +48,8 @@ function getToolIcon(iconId: "search" | "code" | "image" | "extract") {
   switch (iconId) {
     case "search":
       return Search01Icon
+    case "extract":
+      return FileSearchIcon
     default:
       return Wrench01Icon
   }

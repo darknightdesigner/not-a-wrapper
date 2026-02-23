@@ -148,3 +148,157 @@ export async function getThirdPartyTools(
 
   return { tools: tools as ToolSet, metadata }
 }
+
+/**
+ * Returns content extraction tools powered by the Exa API.
+ *
+ * Loaded independently of search tools — not gated on `shouldInjectSearch`
+ * or `builtInHasSearch`. This ensures content extraction is available for
+ * ALL providers, including those with native Layer 1 search (OpenAI,
+ * Anthropic, Google, xAI).
+ *
+ * Follows the same { tools, metadata } return contract as getThirdPartyTools
+ * and getProviderTools (Layer 1).
+ *
+ * @param options.exaKey - Resolved Exa API key (BYOK or platform). Undefined → empty tools.
+ * @returns A ToolSet with content extraction tools, or empty object when no key
+ */
+export async function getContentExtractionTools(options: {
+  exaKey?: string
+}): Promise<{
+  tools: ToolSet
+  metadata: Map<string, ToolMetadata>
+}> {
+  const { exaKey } = options
+  const tools: Record<string, unknown> = {}
+  const metadata = new Map<string, ToolMetadata>()
+
+  if (!exaKey) {
+    return { tools: tools as ToolSet, metadata }
+  }
+
+  try {
+    const Exa = (await import("exa-js")).default
+    const exa = new Exa(exaKey)
+
+    tools.content_extract = tool({
+      description:
+        "Fetch and extract clean, readable content from web page URLs as markdown. " +
+        "Use when the user provides URLs to read, analyze, or summarize, or when you need " +
+        "the full content of a URL found via web search. " +
+        "Do NOT use for URLs appearing in code snippets, import statements, or reference links " +
+        "unless the user explicitly asks to read them. " +
+        "Returns the page title, URL, and extracted markdown content for each URL.",
+      inputSchema: z.object({
+        urls: z
+          .array(z.string().url())
+          .min(1)
+          .max(5)
+          .describe("URLs to extract content from (1-5 URLs per call)"),
+      }),
+      execute: async ({ urls }) => {
+        const startMs = Date.now()
+        try {
+          const response = await Promise.race([
+            exa.getContents(urls, {
+              text: { maxCharacters: 10000 },
+            }),
+            new Promise<never>((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      `Exa getContents timed out after ${TOOL_EXECUTION_TIMEOUT_MS}ms`
+                    )
+                  ),
+                TOOL_EXECUTION_TIMEOUT_MS
+              )
+            ),
+          ])
+
+          // SDK types for Status are minimal ({ id, status, source }) but the
+          // API returns error details (tag, httpStatusCode) on failures.
+          type StatusEntry = {
+            id: string
+            status: string
+            error?: { tag: string; httpStatusCode?: number }
+          }
+          const statusMap = new Map<string, StatusEntry>()
+          if (response.statuses) {
+            for (const s of response.statuses) {
+              statusMap.set(s.id, s as unknown as StatusEntry)
+            }
+          }
+
+          const resultMap = new Map<string, (typeof response.results)[number]>()
+          for (const r of response.results) {
+            resultMap.set(r.url, r)
+          }
+
+          let successCount = 0
+          let failedCount = 0
+
+          const mapped = urls.map((url) => {
+            const status = statusMap.get(url)
+            const result = resultMap.get(url)
+
+            if (status?.status === "error") {
+              failedCount++
+              return {
+                url,
+                error: status.error?.tag ?? "UNKNOWN_ERROR",
+                ...(status.error?.httpStatusCode != null && {
+                  httpStatusCode: status.error.httpStatusCode,
+                }),
+              }
+            }
+
+            if (result) {
+              successCount++
+              return {
+                url: result.url,
+                title: result.title ?? undefined,
+                content: result.text?.slice(0, 10000),
+              }
+            }
+
+            failedCount++
+            return { url, error: "NO_RESULT_RETURNED" }
+          })
+
+          return {
+            ok: true,
+            data: truncateToolResult(mapped),
+            error: null,
+            meta: {
+              tool: "content_extract",
+              source: "exa",
+              durationMs: Date.now() - startMs,
+              urlCount: urls.length,
+              successCount,
+              failedCount,
+            },
+          }
+        } catch (err) {
+          console.error(
+            `[tools/exa] Content extraction failed after ${Date.now() - startMs}ms:`,
+            err instanceof Error ? err.message : String(err)
+          )
+          throw err
+        }
+      },
+    })
+    metadata.set("content_extract", {
+      displayName: "Read Page",
+      source: "third-party",
+      serviceName: "Exa",
+      icon: "extract",
+      estimatedCostPer1k: 1,
+      readOnly: true,
+    })
+  } catch (err) {
+    console.error("[tools/third-party] Failed to load content extraction tools:", err)
+  }
+
+  return { tools: tools as ToolSet, metadata }
+}
