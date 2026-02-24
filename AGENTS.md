@@ -123,3 +123,32 @@ Load only when needed:
 1. Run `git fetch origin` before branch comparisons.
 2. Diff and log against `origin/main` (not local `main`).
 3. Scope PR descriptions to commits in `origin/main..HEAD`.
+
+## Cursor Cloud specific instructions
+
+### Services
+
+| Service | How to run | Notes |
+|---------|-----------|-------|
+| Next.js dev server | `bun run dev:next` | Runs on port 3000. Requires `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` env vars. |
+| Convex dev sync | `bun run dev:convex` | Requires `CONVEX_DEPLOYMENT` env var and Convex account. |
+| Both (default) | `bun run dev` | Runs Next.js + Convex concurrently. |
+
+### Standard commands
+
+See `package.json` scripts: `bun run lint`, `bun run typecheck`, `bun run test`.
+
+### HugeIcons Pro stubs
+
+`@hugeicons-pro/core-stroke-rounded` and `@hugeicons-pro/core-solid-rounded` are private packages requiring `HUGEICONS_LICENSE_KEY`. Without this key, `bun install` will fail with 401 errors. The update script automatically generates stub packages via `scripts/setup-hugeicons-stubs.js` so that lint, typecheck, tests, and the dev server all work. If the real license key is provided, set up `.npmrc` before `bun install`:
+
+```
+@hugeicons-pro:registry=https://npm.hugeicons.com
+//npm.hugeicons.com/:_authToken=$HUGEICONS_LICENSE_KEY
+```
+
+### Gotchas
+
+- `bun install` exits non-zero when HugeIcons Pro packages cannot be fetched, but it still installs all other packages. The stub script must run after `bun install` to fill in the missing packages.
+- The app requires cloud services (Clerk for auth, Convex for DB) and will show runtime errors without valid credentials. This is expected in environments without secrets configured.
+- Next.js 16 Turbopack performs static ESM analysis; Proxy-based module stubs do not work. Stubs must explicitly export every icon name used in the codebase.
