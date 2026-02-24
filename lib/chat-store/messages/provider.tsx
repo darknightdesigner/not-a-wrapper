@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel"
 import type { UIMessage } from "ai"
 import { useMutation, useQuery } from "convex/react"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
+import { getCachedMessages } from "./api"
 import { writeToIndexedDB } from "../persist"
 import { useChatSession } from "../session/provider"
 
@@ -198,19 +199,28 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     const effectiveChatId = overrideChatId || chatId
     if (!effectiveChatId) return
 
+    // Ensure createdAt exists for correct cache sort order (AI SDK v6
+    // UIMessages don't include createdAt; without it the message sorts to
+    // epoch-0 and getLastMessagesFromDb can't find it for reconciliation).
+    const messageToCache: ExtendedUIMessage = message.createdAt
+      ? message
+      : { ...message, createdAt: new Date() }
+
     // Optimistic update - add to pending messages (use effectiveChatId for map key)
     if (effectiveChatId === chatId) {
       // Only update optimistic state if we're in the same chat context
       // Guard against duplicate IDs from rapid submissions or re-renders
       updateOptimisticMessages((prev) =>
-        prev.some((m) => m.id === message.id) ? prev : [...prev, message]
+        prev.some((m) => m.id === messageToCache.id) ? prev : [...prev, messageToCache]
       )
     }
 
-    // Cache locally (works for both guest and authenticated users)
-    // Deduplicate by ID to prevent duplicate key errors when optimistic messages
-    // overlap with server messages that have been assigned Convex IDs
-    const allMessages = [...serverMessages, ...optimisticMessages, message]
+    // Read the current IndexedDB cache and append — avoids overwriting data
+    // from a prior cacheAndAddMessage call in the same async chain.  The old
+    // approach ([...serverMessages, ...optimisticMessages, message]) used stale
+    // closure values, causing the second call to drop the first call's message.
+    const cached = await getCachedMessages(effectiveChatId)
+    const allMessages = [...cached, messageToCache]
     const seenIds = new Set<string>()
     const updated = allMessages.filter((m) => {
       if (seenIds.has(m.id)) return false
@@ -224,20 +234,20 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     if (!effectiveChatId.startsWith("optimistic-") && !effectiveChatId.startsWith("local-")) {
       try {
         // Extract content from parts for storage (v5 compatibility)
-        const textContent = message.parts
+        const textContent = messageToCache.parts
           ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
           .map((p) => p.text)
-          .join("") || message.content || ""
+          .join("") || messageToCache.content || ""
 
         await addMessageMutation({
           chatId: effectiveChatId as Id<"chats">,
-          role: message.role as "user" | "assistant" | "system",
+          role: messageToCache.role as "user" | "assistant" | "system",
           content: textContent,
-          parts: message.parts,
-          attachments: getAttachmentsFromParts(message.parts),
-          model: message.model,
-          messageGroupId: message.messageGroupId
-            ?? (message as unknown as { message_group_id?: string }).message_group_id,
+          parts: messageToCache.parts,
+          attachments: getAttachmentsFromParts(messageToCache.parts),
+          model: messageToCache.model,
+          messageGroupId: messageToCache.messageGroupId
+            ?? (messageToCache as unknown as { message_group_id?: string }).message_group_id,
         })
       } catch (error) {
         // Silently fail for guests (no auth) - they only get local storage
@@ -246,7 +256,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         console.debug("Message persistence skipped:", error)
       }
     }
-  }, [chatId, serverMessages, optimisticMessages, updateOptimisticMessages, addMessageMutation])
+  }, [chatId, updateOptimisticMessages, addMessageMutation])
 
   const saveAllMessages = useCallback(async (newMessages: ExtendedUIMessage[]) => {
     if (!chatId || chatId.startsWith("optimistic-") || chatId.startsWith("local-")) return

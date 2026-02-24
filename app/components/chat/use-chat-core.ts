@@ -68,6 +68,21 @@ export function useChatCore({
   const [isSubmitting, setIsSubmitting] = useState(false)
   // Ref-based guard prevents concurrent sends (state updates are batched and can lag)
   const isSendingRef = useRef(false)
+
+  // Deferred edit persistence: stores the edited user message so onFinish can
+  // persist it AFTER the stream completes, avoiding provider state mutations
+  // during the same React batch as sendMessage/setMessages.
+  const pendingEditUserMsgRef = useRef<{
+    message: UIMessage & { createdAt?: Date }
+    chatId: string
+  } | null>(null)
+
+  const setPendingEditUserMessage = useCallback(
+    (message: UIMessage, chatId: string) => {
+      pendingEditUserMsgRef.current = { message, chatId }
+    },
+    []
+  )
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   const { preferences, setWebSearchEnabled } = useUserPreferences()
   const [enableSearch, setEnableSearchState] = useState(() =>
@@ -166,6 +181,14 @@ export function useChatCore({
           : null)
 
       if (effectiveChatId) {
+        // Persist the edited user message first (if any) so the user→assistant
+        // pair is written in order before ID reconciliation.
+        const pendingEdit = pendingEditUserMsgRef.current
+        if (pendingEdit) {
+          pendingEditUserMsgRef.current = null
+          await cacheAndAddMessage(pendingEdit.message, pendingEdit.chatId)
+        }
+
         // Await persistence so the DB has the latest messages before ID reconciliation
         await cacheAndAddMessage(message, effectiveChatId)
       }
@@ -458,6 +481,7 @@ export function useChatCore({
     enableSearch,
     sendMessage,
     setMessages,
+    setPendingEditUserMessage,
     bumpChat,
     updateTitle,
     isSubmitting,

@@ -169,6 +169,13 @@ export function MessageAssistant({
   >("hidden")
   const showActiveContentCaret = Boolean(isLast && status === "streaming" && hasContent)
 
+  // Track whether this message was actively streamed (vs loaded from history)
+  // so we can animate the toolbar reveal only on fresh stream completion.
+  const didStreamRef = useRef(false)
+  if (isLast && status === "streaming") {
+    didStreamRef.current = true
+  }
+
   if (showActiveContentCaret && contentCaretPhase !== "visible") {
     setContentCaretPhase("visible")
   } else if (
@@ -295,20 +302,30 @@ export function MessageAssistant({
           <MessageActions
             className={cn(
               "-ml-2 flex gap-0",
-              "pointer-events-none",
-              "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
-              "[mask-size:300%_100%]",
-              "[mask-position:100%_0%]",
-              "motion-safe:transition-[mask-position]",
-              "duration-[1.5s]",
-              "group-hover/turn-messages:pointer-events-auto",
-              "group-hover/turn-messages:[mask-position:0_0]",
-              "group-focus-within/turn-messages:pointer-events-auto",
-              "group-focus-within/turn-messages:[mask-position:0_0]",
-              "has-[[data-state=open]]:pointer-events-auto",
-              "has-[[data-state=open]]:[mask-position:0_0]",
-              "pointer-coarse:pointer-events-auto",
-              "pointer-coarse:[mask-image:none]"
+              isLast && didStreamRef.current
+                ? [
+                    "pointer-events-auto",
+                    "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+                    "[mask-size:300%_100%]",
+                    "motion-safe:[animation:mask-reveal_1.5s_ease_forwards]",
+                    "motion-reduce:[mask-image:none]",
+                  ]
+                : [
+                    "pointer-events-none",
+                    "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+                    "[mask-size:300%_100%]",
+                    "[mask-position:100%_0%]",
+                    "motion-safe:transition-[mask-position]",
+                    "duration-[1.5s]",
+                    "group-hover/turn-messages:pointer-events-auto",
+                    "group-hover/turn-messages:[mask-position:0_0]",
+                    "group-focus-within/turn-messages:pointer-events-auto",
+                    "group-focus-within/turn-messages:[mask-position:0_0]",
+                    "has-[[data-state=open]]:pointer-events-auto",
+                    "has-[[data-state=open]]:[mask-position:0_0]",
+                    "pointer-coarse:pointer-events-auto",
+                    "pointer-coarse:[mask-image:none]",
+                  ]
             )}
           >
             <MessageAction
