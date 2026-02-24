@@ -7,45 +7,22 @@ globs: ["**/*.ts", "**/*.tsx"]
 
 ## API Key Encryption
 
-```typescript
-// lib/encryption.ts
-// ENCRYPTION_KEY must be exactly 32 bytes (base64)
-// IV must be random per encryption (NEVER reuse)
-// Format: encrypted:authTag (colon separator)
-```
-
-**Never:**
-- Log decrypted API keys
-- Return encrypted keys to client
-- Reuse initialization vectors
-
-## Streaming Responses (CRITICAL)
-
-```typescript
-// app/api/chat/route.ts
-// MUST return toUIMessageStreamResponse (AI SDK v6), never regular Response
-
-const result = streamText({ ... })
-
-return result.toUIMessageStreamResponse({
-  sendReasoning: true,
-  sendSources: true,
-  onError: (error) => extractErrorMessage(error),  // Sanitize errors
-})
-```
+- `ENCRYPTION_KEY` must be exactly 32 bytes (base64)
+- IV must be random per encryption (NEVER reuse)
+- Format: `encrypted:authTag` (colon separator)
+- Never log decrypted API keys or return encrypted keys to client
 
 ## Rate Limiting Order
 
 ```typescript
-// CORRECT ORDER:
+// CORRECT ORDER in API routes:
 // 1. Validate request
 // 2. Check rate limit
 // 3. Increment usage
 // 4. THEN call streamText()
-
-await checkServerSideUsage()      // Check first
-await incrementServerSideUsage()  // Increment before expensive operation
-const result = streamText({ ... }) // Then stream
+await checkServerSideUsage()
+await incrementServerSideUsage()
+const result = streamText({ ... })
 ```
 
 ## CSRF Protection
@@ -56,10 +33,7 @@ const result = streamText({ ... }) // Then stream
 
 ## Never Log
 
-- OAuth tokens
-- API keys (even encrypted)
-- Session tokens
-- User credentials
+OAuth tokens, API keys (even encrypted), session tokens, user credentials.
 
 ## Data Access Rules
 
