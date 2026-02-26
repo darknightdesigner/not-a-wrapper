@@ -1,6 +1,7 @@
 "use client"
 
 import { ChatActionsMenu } from "@/app/components/layout/chat-actions-menu"
+import { useBreakpoint } from "@/app/hooks/use-breakpoint"
 import { useKeyShortcut } from "@/app/hooks/use-key-shortcut"
 import { Button } from "@/components/ui/button"
 import { useChats } from "@/lib/chat-store/chats/provider"
@@ -15,6 +16,7 @@ export function ButtonNewChat() {
   const { chatId } = useChatSession()
   const { getChatById } = useChats()
   const chat = chatId ? getChatById(chatId) : undefined
+  const isMobile = useBreakpoint(768)
 
   useKeyShortcut(
     (e) => (e.key === "u" || e.key === "U") && e.metaKey && e.shiftKey,
@@ -39,6 +41,7 @@ export function ButtonNewChat() {
       }
       contentSide="bottom"
       contentAlign="end"
+      showShare={isMobile}
     />
   )
 }

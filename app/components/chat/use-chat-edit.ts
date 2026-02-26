@@ -34,6 +34,8 @@ type UseChatEditProps = {
   setMessages: (
     messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])
   ) => void
+  /** Stage a user message for deferred persistence in onFinish (avoids mutating provider state during sendMessage). */
+  setPendingEditUserMessage: (message: UIMessage, chatId: string) => void
   bumpChat: (chatId: string) => void
   updateTitle: (chatId: string, title: string) => Promise<void>
   isSubmitting: boolean
@@ -54,6 +56,7 @@ export function useChatEdit({
   enableSearch,
   sendMessage,
   setMessages,
+  setPendingEditUserMessage,
   bumpChat,
   updateTitle,
   isSubmitting,
@@ -200,6 +203,10 @@ export function useChatEdit({
         // Remove optimistic message (sendMessage will add the real one)
         setMessages((prev) => prev.filter((msg) => msg.id !== optimisticId))
 
+        // Stage for deferred persistence in onFinish (avoids provider state
+        // mutation during the same batch as sendMessage/setMessages)
+        setPendingEditUserMessage(optimisticEditedMessage, currentChatId)
+
         bumpChat(currentChatId)
       } catch (error) {
         console.error("Edit failed:", error)
@@ -219,6 +226,7 @@ export function useChatEdit({
       enableSearch,
       sendMessage,
       setMessages,
+      setPendingEditUserMessage,
       bumpChat,
       updateTitle,
       isSubmitting,

@@ -7,62 +7,28 @@ globs: ["**/*.ts", "**/*.tsx"]
 
 ## File Naming
 
-```typescript
-// Files: kebab-case
-chat-input.tsx
-use-chat-core.ts
-button-copy.tsx
-
-// Components: PascalCase
-export function ChatInput() {}
-export function ButtonCopy() {}
-
-// Hooks: use-[name].ts
-use-chat-core.ts
-use-file-upload.ts
-```
+- Files: `kebab-case.ts` / `kebab-case.tsx`
+- Components: `PascalCase` exports
+- Hooks: `use-[name].ts`
 
 ## Type Safety
 
 ```typescript
-// ✅ Explicit types for exports
+// Explicit types for exports
 export function calculateTotal(items: CartItem[]): number {
   return items.reduce((sum, item) => sum + item.price, 0)
 }
 
-// ✅ Use unknown with type guards
+// Use unknown with type guards, never any
 function handleError(error: unknown): string {
   if (error instanceof Error) return error.message
   return String(error)
 }
-
-// ❌ Never use any
-function bad(data: any) { }  // FORBIDDEN
 ```
 
 ## Import Order
 
-```typescript
-// 1. React/Next.js
-import { useState, useCallback } from "react"
-import { useRouter } from "next/navigation"
-
-// 2. External libraries
-import { z } from "zod"
-import { toast } from "sonner"
-
-// 3. Absolute imports (@/)
-import { Button } from "@/components/ui/button"
-import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
-
-// 4. Relative imports
-import { ChatMessage } from "./message"
-import type { ChatProps } from "./types"
-```
-
-## Forbidden
-
-- `// @ts-ignore` — Never acceptable
-- `// @ts-expect-error` — Only with linked issue
-- `any` type — Use `unknown` with type guards
-- Disabling ESLint rules without documented reason
+1. React / Next.js
+2. External libraries
+3. Absolute imports (`@/`)
+4. Relative imports

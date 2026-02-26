@@ -9,35 +9,13 @@ globs: ["app/api/**/*.ts"]
 
 ```typescript
 // Success
-return new Response(
-  JSON.stringify({ data: result }),
-  { status: 200 }
-)
+return new Response(JSON.stringify({ data: result }), { status: 200 })
 
-// Error (code is optional but recommended)
+// Error
 return new Response(
   JSON.stringify({ error: "Message", code: "ERROR_CODE" }),
   { status: 400 }
 )
-```
-
-## Streaming Response
-
-```typescript
-// For AI chat - use Vercel AI SDK v6
-import { streamText } from "ai"
-
-const result = streamText({
-  model: modelConfig.apiSdk(apiKey),
-  system: systemPrompt,
-  messages,
-})
-
-return result.toUIMessageStreamResponse({
-  sendReasoning: true,
-  sendSources: true,
-  onError: (error) => extractErrorMessage(error),
-})
 ```
 
 ## Authentication
@@ -47,50 +25,23 @@ import { auth } from "@clerk/nextjs/server"
 
 export async function POST(req: Request) {
   const { userId } = await auth()
-  
   if (!userId) {
-    return new Response(
-      JSON.stringify({ error: "Unauthorized" }),
-      { status: 401 }
-    )
+    return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 })
   }
-  
-  // Continue with authenticated request
+  // ...
 }
 ```
 
 ## Validation
 
-```typescript
-import { z } from "zod"
+Use Zod schemas with `safeParse`. Return 400 with `code: "VALIDATION_ERROR"` on failure.
 
-const schema = z.object({
-  messages: z.array(z.object({
-    role: z.enum(["user", "assistant", "system"]),
-    content: z.string(),
-  })),
-  chatId: z.string(),
-})
+## Streaming Responses
 
-export async function POST(req: Request) {
-  const body = await req.json()
-  const result = schema.safeParse(body)
-  
-  if (!result.success) {
-    return new Response(
-      JSON.stringify({ error: "Invalid request", code: "VALIDATION_ERROR" }),
-      { status: 400 }
-    )
-  }
-  
-  const { messages, chatId } = result.data
-  // ...
-}
-```
+Use the `toUIMessageStreamResponse` pattern from AGENTS.md. Always pass `sendReasoning`, `sendSources`, and `onError`.
 
 ## Long-Running Routes
 
 ```typescript
-// Export maxDuration for routes that may take longer
 export const maxDuration = 60  // seconds
 ```

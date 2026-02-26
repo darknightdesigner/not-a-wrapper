@@ -89,7 +89,7 @@ export function ChatsProvider({
     )
   }, [convexChats])
 
-  const isLoading = convexChats === undefined
+  const isLoading = convexChats === undefined || isConvexAuthLoading
 
   // Track optimistic operations (adds, updates, deletes)
   const [optimisticOps, setOptimisticOps] = useState<OptimisticOperation[]>([])

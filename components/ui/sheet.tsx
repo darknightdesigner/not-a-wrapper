@@ -31,6 +31,7 @@ function SheetPortal({
 
 function SheetOverlay({
   className,
+  style,
   ...props
 }: SheetPrimitive.Backdrop.Props) {
   return (
@@ -40,7 +41,7 @@ function SheetOverlay({
         "fixed inset-0 z-50 bg-black/50 data-[starting-style]:opacity-0 data-[ending-style]:opacity-0",
         className
       )}
-      style={{ transition: "opacity 100ms ease-out" }}
+      style={{ transition: "opacity 200ms ease-out", ...style }}
       {...props}
     />
   )
@@ -50,6 +51,7 @@ function SheetContent({
   className,
   children,
   side = "right",
+  style,
   ...props
 }: SheetPrimitive.Popup.Props & {
   side?: "top" | "right" | "bottom" | "left"
@@ -71,7 +73,7 @@ function SheetContent({
             "inset-x-0 bottom-0 h-auto border-t data-[starting-style]:translate-y-full data-[ending-style]:translate-y-full",
           className
         )}
-        style={{ transition: "translate 100ms ease-out, opacity 100ms ease-out" }}
+        style={{ transition: "translate 250ms cubic-bezier(.2,0,0,1), opacity 200ms ease-out", ...style }}
         {...props}
       >
         {children}

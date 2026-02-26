@@ -11,17 +11,24 @@ import { useChats } from "@/lib/chat-store/chats/provider"
 import { useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import type { Chat } from "@/lib/chat-store/types"
+import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
+import { useMutation } from "convex/react"
+import { cn } from "@/lib/utils"
 import { Pin, PinOff } from "@/lib/icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Delete01Icon,
+  Loading01Icon,
   MoreHorizontalIcon,
   PencilEdit01Icon,
+  Share03Icon,
 } from "@hugeicons-pro/core-stroke-rounded"
 import { useRouter } from "next/navigation"
 import type React from "react"
 import { useState } from "react"
 import { DialogDeleteChat } from "./sidebar/dialog-delete-chat"
+import { SharePublishDrawer } from "./share-publish-drawer"
 
 type ChatActionsMenuProps = {
   chat: Chat
@@ -30,6 +37,7 @@ type ChatActionsMenuProps = {
   trigger?: React.ReactElement
   contentAlign?: "start" | "center" | "end"
   contentSide?: "top" | "right" | "bottom" | "left"
+  showShare?: boolean
 }
 
 export function ChatActionsMenu({
@@ -39,17 +47,33 @@ export function ChatActionsMenu({
   trigger,
   contentAlign = "start",
   contentSide = "bottom",
+  showShare,
 }: ChatActionsMenuProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [isShareDrawerOpen, setIsShareDrawerOpen] = useState(false)
+  const [isShareLoading, setIsShareLoading] = useState(false)
   const { deleteMessages } = useMessages()
   const { deleteChat, togglePinned, updateTitle } = useChats()
   const { chatId } = useChatSession()
   const router = useRouter()
   const isMobile = useBreakpoint(768)
+  const makePublicMutation = useMutation(api.chats.makePublic)
 
   const handleConfirmDelete = async () => {
     await deleteMessages()
     await deleteChat(chat.id, chatId || undefined, () => router.push("/"))
+  }
+
+  const handleShare = async () => {
+    setIsShareLoading(true)
+    try {
+      await makePublicMutation({ chatId: chat.id as Id<"chats"> })
+      setIsShareDrawerOpen(true)
+    } catch (error) {
+      console.error("Failed to make chat public:", error)
+    } finally {
+      setIsShareLoading(false)
+    }
   }
 
   const handleRename = () => {
@@ -92,6 +116,22 @@ export function ChatActionsMenu({
           className="w-40"
           animated={false}
         >
+          {showShare && (
+            <DropdownMenuItem
+              disabled={isShareLoading}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleShare()
+              }}
+            >
+              <HugeiconsIcon
+                icon={isShareLoading ? Loading01Icon : Share03Icon}
+                size={16}
+                className={cn("mr-2", isShareLoading && "animate-spin")}
+              />
+              Share
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             onClick={(e) => {
               e.stopPropagation()
@@ -133,6 +173,14 @@ export function ChatActionsMenu({
         chatTitle={chat.title || "Untitled chat"}
         onConfirmDelete={handleConfirmDelete}
       />
+
+      {showShare && (
+        <SharePublishDrawer
+          open={isShareDrawerOpen}
+          onOpenChange={setIsShareDrawerOpen}
+          chatId={chat.id}
+        />
+      )}
     </>
   )
 }

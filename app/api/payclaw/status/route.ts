@@ -1,3 +1,8 @@
+// DEPRECATED: This HTTP route is superseded by the `pay_status` platform tool
+// (lib/tools/platform.ts) which is the canonical status path.
+// Kept functional for backward compatibility. Do not add new consumers.
+// Planned removal: when no external callers remain.
+
 import { auth } from '@clerk/nextjs/server'
 import { NextResponse } from 'next/server'
 import { getJob, getJobEvents, PayClawApiError } from '@/lib/payclaw/client'
@@ -6,6 +11,13 @@ import { getPayClawConfig } from '@/lib/payclaw/config'
 const TERMINAL_JOB_STATUSES = new Set(['completed', 'failed', 'cancelled'])
 
 export async function GET(request: Request) {
+  console.warn(JSON.stringify({
+    _tag: "deprecated_route_hit",
+    route: "/api/payclaw/status",
+    canonical: "pay_status tool (lib/tools/platform.ts)",
+    method: "GET",
+  }))
+
   try {
     const { userId } = await auth()
     if (!userId) {
@@ -27,12 +39,17 @@ export async function GET(request: Request) {
     const latestMessage = events.length > 0 ? events[events.length - 1].message : 'Waiting for updates...'
     const isTerminal = TERMINAL_JOB_STATUSES.has(job.status)
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       job,
       events,
       latestMessage,
       isTerminal,
     })
+
+    response.headers.set("Deprecation", "true")
+    response.headers.set("Link", '</docs/pay_status>; rel="successor-version"')
+
+    return response
   } catch (error) {
     if (error instanceof PayClawApiError) {
       return NextResponse.json(

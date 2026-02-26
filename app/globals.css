@@ -251,6 +251,15 @@
       opacity: 0.3;
     }
   }
+
+  @keyframes mask-reveal {
+    from {
+      mask-position: 100% 0%;
+    }
+    to {
+      mask-position: 0 0;
+    }
+  }
 }
 
 @theme inline {
