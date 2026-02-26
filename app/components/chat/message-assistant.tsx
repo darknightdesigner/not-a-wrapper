@@ -169,12 +169,7 @@ export function MessageAssistant({
   >("hidden")
   const showActiveContentCaret = Boolean(isLast && status === "streaming" && hasContent)
 
-  // Track whether this message was actively streamed (vs loaded from history)
-  // so we can animate the toolbar reveal only on fresh stream completion.
-  const didStreamRef = useRef(false)
-  if (isLast && status === "streaming") {
-    didStreamRef.current = true
-  }
+  const didStreamInSession = Boolean(isLast && finishReason)
 
   if (showActiveContentCaret && contentCaretPhase !== "visible") {
     setContentCaretPhase("visible")
@@ -302,7 +297,7 @@ export function MessageAssistant({
           <MessageActions
             className={cn(
               "-ml-2 flex gap-0",
-              isLast && didStreamRef.current
+              didStreamInSession
                 ? [
                     "pointer-events-auto",
                     "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
