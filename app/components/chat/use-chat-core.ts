@@ -169,8 +169,25 @@ export function useChatCore({
       // Track finish reason for truncation detection
       setLastFinishReason(finishReason)
 
-      // Skip processing for aborted, disconnected, or errored responses
-      if (isAbort || isDisconnect || isError) return
+      // If a stream aborts/errors, still try to persist any pending edited user
+      // message so edit truncation is not lost from persistence.
+      if (isAbort || isDisconnect || isError) {
+        const pendingEdit = pendingEditUserMsgRef.current
+        if (pendingEdit) {
+          pendingEditUserMsgRef.current = null
+          try {
+            await cacheAndAddMessage(pendingEdit.message, pendingEdit.chatId)
+          } catch (error) {
+            // Re-stage for a future retry rather than dropping the edit.
+            pendingEditUserMsgRef.current = pendingEdit
+            console.error(
+              "Failed to persist pending edited message on abort/error:",
+              error
+            )
+          }
+        }
+        return
+      }
 
       // Use effectiveChatId to handle stale closures during chat creation
       const effectiveChatId =

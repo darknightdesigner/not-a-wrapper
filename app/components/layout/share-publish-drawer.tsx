@@ -37,7 +37,8 @@ export function SharePublishDrawer({
   const shareOnX = () => {
     onOpenChange(false)
     const text = `Check out this conversation I shared with Not A Wrapper! ${publicLink}`
-    window.open(`https://x.com/intent/tweet?text=${text}`, "_blank")
+    const encodedText = encodeURIComponent(text)
+    window.open(`https://x.com/intent/tweet?text=${encodedText}`, "_blank")
   }
 
   const copyLink = () => {

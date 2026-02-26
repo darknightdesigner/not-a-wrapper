@@ -65,10 +65,9 @@ export function ChatActionsMenu({
   }
 
   const handleShare = async () => {
-    if (!chatId) return
     setIsShareLoading(true)
     try {
-      await makePublicMutation({ chatId: chatId as Id<"chats"> })
+      await makePublicMutation({ chatId: chat.id as Id<"chats"> })
       setIsShareDrawerOpen(true)
     } catch (error) {
       console.error("Failed to make chat public:", error)
@@ -175,11 +174,11 @@ export function ChatActionsMenu({
         onConfirmDelete={handleConfirmDelete}
       />
 
-      {showShare && chatId && (
+      {showShare && (
         <SharePublishDrawer
           open={isShareDrawerOpen}
           onOpenChange={setIsShareDrawerOpen}
-          chatId={chatId}
+          chatId={chat.id}
         />
       )}
     </>
