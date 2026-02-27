@@ -121,6 +121,113 @@ describe("replay compiler matrix", () => {
     ).toBe(true)
   })
 
+  // ── Platform tool continuity ──────────────────────────────────────────────
+  // Verifies that pay_purchase / pay_status tool parts in history are
+  // downgraded to text continuity summaries rather than replayed as tool calls.
+  // This guards against the payment status replay incident class.
+
+  it("pay_purchase in history is downgraded to text continuity on Anthropic replay", async () => {
+    const history: UIMessage[] = [
+      {
+        id: "msg-matrix-pay-user",
+        role: "user",
+        parts: [{ type: "text", text: "Buy me the ergonomic mouse" }],
+      } as UIMessage,
+      {
+        id: "msg-matrix-pay-assistant",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-pay_purchase",
+            state: "output-available",
+            toolCallId: "tc_pay_1",
+            toolName: "pay_purchase",
+            providerExecuted: false,
+            input: { url: "https://store.example.com/mouse", maxSpend: 4800 },
+            output: {
+              jobId: "job_replay_test_1",
+              status: "created",
+              message: "Provisioning job created.",
+            },
+            callProviderMetadata: {
+              openai: { responseId: "msg_pay_openai" },
+            },
+          },
+          { type: "text", text: "Your purchase is being processed." },
+        ],
+      } as UIMessage,
+    ]
+
+    const result = await adaptHistoryForProvider(
+      history,
+      "anthropic",
+      { targetModelId: "claude-opus-4-6", hasTools: true },
+      { useReplayCompiler: true },
+    )
+    const assistant = findAssistant(result.messages)
+
+    // The pay_purchase tool part should NOT be replayed as a tool invocation
+    const toolPart = assistant?.parts.find(
+      (part) => part.type === "tool-pay_purchase" || part.type === "dynamic-tool",
+    )
+    expect(toolPart).toBeUndefined()
+
+    // The assistant message should still contain text (original + continuity summary)
+    expect(assistant?.parts.some((part) => part.type === "text")).toBe(true)
+  })
+
+  it("pay_status in history is downgraded to text continuity on OpenAI replay", async () => {
+    const history: UIMessage[] = [
+      {
+        id: "msg-matrix-status-user",
+        role: "user",
+        parts: [{ type: "text", text: "What is the status of my order?" }],
+      } as UIMessage,
+      {
+        id: "msg-matrix-status-assistant",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-pay_status",
+            state: "output-available",
+            toolCallId: "tc_status_1",
+            toolName: "pay_status",
+            providerExecuted: false,
+            input: { jobId: "job_replay_test_2" },
+            output: {
+              jobId: "job_replay_test_2",
+              status: "completed",
+              isTerminal: true,
+              latestMessage: "Order delivered.",
+              eventCount: 5,
+            },
+            callProviderMetadata: {
+              anthropic: { requestId: "req_status_anthropic" },
+            },
+          },
+          { type: "text", text: "Your order has been delivered." },
+        ],
+      } as UIMessage,
+    ]
+
+    const result = await adaptHistoryForProvider(
+      history,
+      "openai",
+      { targetModelId: "gpt-5.2", hasTools: true },
+      { useReplayCompiler: true },
+    )
+    const assistant = findAssistant(result.messages)
+
+    // The pay_status tool part should NOT be replayed as a tool invocation
+    const toolPart = assistant?.parts.find(
+      (part) => part.type === "tool-pay_status" || part.type === "dynamic-tool",
+    )
+    expect(toolPart).toBeUndefined()
+
+    // The assistant message should still contain text
+    expect(assistant?.parts.some((part) => part.type === "text")).toBe(true)
+  })
+
   it("OpenAI -> Google falls back to legacy adapter when no replay compiler is registered", async () => {
     const history: UIMessage[] = [
       {

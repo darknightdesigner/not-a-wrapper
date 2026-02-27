@@ -196,6 +196,7 @@ export function useChatEdit({
               isAuthenticated,
               systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
               enableSearch,
+              chatVersion: trimmedMessages.length + 1, // monotonic: messages remaining after truncation + 1 for new message
             },
           }
         )

@@ -268,6 +268,27 @@ export const deleteFromTimestamp = mutation({
       await ctx.db.delete(msg._id)
     }
 
+    // Truncate chatToolState if it exists for messages at or after the truncation point.
+    // This is a best-effort cleanup — the state may not exist for legacy chats.
+    try {
+      const toolState = await ctx.db
+        .query("chatToolState")
+        .withIndex("by_chat", (q) => q.eq("chatId", chatId))
+        .unique()
+
+      if (toolState && toolState.userId === user._id) {
+        // If the tool state's source message would have been deleted, remove the state
+        if (
+          toolState.sourceMessageTimestamp &&
+          toolState.sourceMessageTimestamp >= timestamp
+        ) {
+          await ctx.db.delete(toolState._id)
+        }
+      }
+    } catch {
+      // Best-effort: don't fail message truncation if state cleanup fails
+    }
+
     return toDelete.length
   },
 })

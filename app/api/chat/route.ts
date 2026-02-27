@@ -9,6 +9,9 @@ import {
   ANTHROPIC_BETA_HEADERS,
   PREPARE_STEP_THRESHOLD,
   HISTORY_REPLAY_COMPILER_V1,
+  PAYMENT_STATUS_GUARDRAILS_V1,
+  PAYMENT_GUARDRAIL_MODE,
+  PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -560,6 +563,10 @@ export async function POST(req: Request) {
     let platformTools: ToolSet = {} as ToolSet
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
+    // Payment policy: set to true after intent classification when pay_purchase is denied.
+    // The closure is read lazily at execution time by getPlatformTools (defense-in-depth).
+    let purchaseBlockedByPolicy = false
+
     let userCardId: string | undefined
     if (isAuthenticated && capabilities.platform) {
       if (convexToken) {
@@ -619,9 +626,126 @@ export async function POST(req: Request) {
         userName: userName || undefined,
         defaultShippingAddress: cleanDefaultShippingAddress,
         defaultCardId: userCardId,
+        isPurchaseBlocked: () => purchaseBlockedByPolicy,
       })
       platformTools = platformResult.tools
       platformToolMetadata = platformResult.metadata
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment Intent + State-Driven Tool Policy (Phase 3 Guardrails)
+    // -----------------------------------------------------------------------
+    let paymentPolicyDenyTools: string[] = []
+
+    if (PAYMENT_STATUS_GUARDRAILS_V1 && isAuthenticated && convexToken) {
+      try {
+        // 1. Read canonical payment state
+        let chatToolState = await fetchQuery(
+          api.chatToolState.getByChat,
+          { chatId: chatId as Id<"chats"> },
+          { token: convexToken }
+        )
+
+        // 2. Lazy backfill for legacy chats
+        if (!chatToolState && PAYMENT_CHAT_STATE_BACKFILL_V1) {
+          try {
+            await fetchMutation(
+              api.chatToolStateBackfill.hydrateFromToolCallLog,
+              { chatId: chatId as Id<"chats"> },
+              { token: convexToken }
+            )
+            chatToolState = await fetchQuery(
+              api.chatToolState.getByChat,
+              { chatId: chatId as Id<"chats"> },
+              { token: convexToken }
+            )
+          } catch (backfillErr) {
+            console.warn(
+              JSON.stringify({
+                _tag: "payment_state_backfill_error",
+                requestId,
+                chatId,
+                error: backfillErr instanceof Error ? backfillErr.message : String(backfillErr),
+              })
+            )
+          }
+        }
+
+        // 3. Classify payment intent from latest user message
+        const latestUserMessage = messages
+          .filter((m) => m.role === "user")
+          .pop()
+        const userMessageText = latestUserMessage?.parts
+          ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+          .map((p) => p.text)
+          .join(" ") ?? ""
+
+        const { classifyPaymentIntent } = await import("@/app/api/chat/intent/payment-intent")
+        const { computePaymentPolicyOverrides } = await import("@/lib/tools/capability-policy")
+
+        const hasActiveJob = !!chatToolState?.activePurchaseJobId
+        const hasAnyJob = !!chatToolState?.latestPurchaseJobId
+
+        const intentResult = classifyPaymentIntent({
+          userMessage: userMessageText,
+          hasActiveJob,
+          hasAnyJob,
+          latestStatus: chatToolState?.latestStatus ?? undefined,
+          latestStatusIsTerminal: chatToolState?.latestStatusIsTerminal ?? undefined,
+        })
+
+        const policyOverrides = computePaymentPolicyOverrides(
+          intentResult,
+          chatToolState ? { hasActiveJob, hasAnyJob } : null,
+          PAYMENT_GUARDRAIL_MODE,
+        )
+
+        if (policyOverrides) {
+          console.log(
+            JSON.stringify({
+              _tag: "payment_intent_policy",
+              requestId,
+              chatId,
+              intent: intentResult.intent,
+              confidence: intentResult.confidence,
+              reason: intentResult.reason,
+              policyReason: policyOverrides.reason,
+              mode: policyOverrides.mode,
+              denyTools: policyOverrides.denyTools ?? [],
+              allowTools: policyOverrides.allowTools ?? [],
+              hasActiveJob,
+              hasAnyJob,
+            })
+          )
+
+          if (policyOverrides.mode === "enforce" && policyOverrides.denyTools) {
+            paymentPolicyDenyTools = policyOverrides.denyTools
+          }
+        }
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            _tag: "payment_guardrail_error",
+            requestId,
+            chatId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
+      }
+    }
+
+    // Apply payment policy deny list to platform tools
+    if (paymentPolicyDenyTools.length > 0) {
+      for (const toolName of paymentPolicyDenyTools) {
+        if (toolName in platformTools) {
+          delete (platformTools as Record<string, unknown>)[toolName]
+          platformToolMetadata.delete(toolName)
+        }
+      }
+      // Activate defense-in-depth: flag for the lazy isPurchaseBlocked callback
+      if (paymentPolicyDenyTools.includes("pay_purchase")) {
+        purchaseBlockedByPolicy = true
+      }
     }
 
     const toolPolicyInputs: ToolPolicyInput[] = [

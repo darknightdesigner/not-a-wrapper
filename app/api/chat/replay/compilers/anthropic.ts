@@ -68,6 +68,26 @@ function synthesizeWebSearchFallback(tool: ReplayToolExchange): string | null {
   return `Replay context from prior web_search${queryLabel}:\n${lines.join("\n")}`
 }
 
+function synthesizePlatformToolFallback(tool: ReplayToolExchange): string | null {
+  const ctx = tool.platformToolContext
+  if (!ctx) return null
+
+  if (ctx.toolKey === "pay_purchase") {
+    const jobPart = ctx.jobId ? ` (job: ${ctx.jobId})` : ""
+    const urlPart = ctx.url ? ` for ${ctx.url}` : ""
+    return `Replay context: A purchase was initiated${urlPart}${jobPart}.`
+  }
+
+  if (ctx.toolKey === "pay_status") {
+    const jobPart = ctx.jobId ? ` for job ${ctx.jobId}` : ""
+    const statusPart = ctx.status ? `: ${ctx.status}` : ""
+    const terminalPart = ctx.isTerminal ? " (completed)" : " (in progress)"
+    return `Replay context: Purchase status check${jobPart}${statusPart}${terminalPart}.`
+  }
+
+  return null
+}
+
 function compileWebSearchToolPart(tool: ReplayToolExchange, messageId: string, partIndex: number) {
   if (!tool.webSearch) return null
 
@@ -175,11 +195,19 @@ function compileMessageParts(
 
     if (tool.toolName !== "web_search") {
       stats.toolExchangesDropped += 1
+
+      const platformFallback = synthesizePlatformToolFallback(tool)
+      if (platformFallback) {
+        nextParts.push({ type: "text", text: platformFallback } as MessagePart)
+      }
+
       warnings.push({
         code: "tool_non_replayable",
         messageIndex,
         partIndex,
-        detail: `Dropped unsupported replay tool "${tool.toolName}" for Anthropic compiler`,
+        detail: platformFallback
+          ? `Dropped platform tool "${tool.toolName}" with continuity summary for Anthropic compiler`
+          : `Dropped unsupported replay tool "${tool.toolName}" for Anthropic compiler`,
       })
       return
     }
