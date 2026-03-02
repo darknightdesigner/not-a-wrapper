@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
+  computePaymentPolicyOverrides,
   filterMetadataMapByPolicy,
   filterToolSetByPolicy,
   getActiveToolsForStep,
@@ -10,6 +11,15 @@ import {
   buildStartToolInvocationStreamMetadata,
   resolveToolInvocationMetadata,
 } from "../ui-metadata"
+import type { PaymentIntentResult } from "@/app/api/chat/intent/payment-intent"
+
+// Enable payment guardrails for the policy override tests.
+// These config values are only consumed by computePaymentPolicyOverrides,
+// so existing resolveCapabilityPolicy tests are unaffected.
+vi.mock("@/lib/config", () => ({
+  PAYMENT_STATUS_GUARDRAILS_V1: true,
+  PAYMENT_GUARDRAIL_MODE: "enforce" as const,
+}))
 
 describe("route/policy integration helpers", () => {
   it("uses centralized policy output for early filtering and late-step gating", () => {
@@ -144,5 +154,97 @@ describe("route/policy integration helpers", () => {
       },
     })
     expect(resolved?.displayName).toBe("Web Search")
+  })
+})
+
+// ── Payment policy override regression tests ────────────────────────────────
+// Guards against the payment status replay incident class: a status-check
+// message must never trigger pay_purchase.
+
+describe("computePaymentPolicyOverrides", () => {
+  it("status_check intent denies pay_purchase", () => {
+    const intent: PaymentIntentResult = {
+      intent: "status_check",
+      confidence: "high",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(
+      intent,
+      { hasActiveJob: true, hasAnyJob: true },
+      "enforce"
+    )
+    expect(result?.denyTools).toContain("pay_purchase")
+    expect(result?.reason).toBe("status_intent_blocks_pay_purchase")
+  })
+
+  it("returns null when state is null", () => {
+    const intent: PaymentIntentResult = {
+      intent: "status_check",
+      confidence: "high",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(intent, null, "enforce")
+    expect(result).toBeNull()
+  })
+
+  it("unknown intent with active job in enforce mode denies pay_purchase", () => {
+    const intent: PaymentIntentResult = {
+      intent: "unknown",
+      confidence: "low",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(
+      intent,
+      { hasActiveJob: true, hasAnyJob: true },
+      "enforce"
+    )
+    expect(result?.denyTools).toContain("pay_purchase")
+  })
+
+  it("unknown intent with active job in observe mode returns log-only override", () => {
+    const intent: PaymentIntentResult = {
+      intent: "unknown",
+      confidence: "low",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(
+      intent,
+      { hasActiveJob: true, hasAnyJob: true },
+      "observe"
+    )
+    expect(result).toEqual({
+      reason: "status_intent_blocks_pay_purchase",
+      mode: "observe",
+    })
+  })
+
+  it("new_purchase with active job is safety-reclassified to deny pay_purchase", () => {
+    const intent: PaymentIntentResult = {
+      intent: "new_purchase",
+      confidence: "high",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(
+      intent,
+      { hasActiveJob: true, hasAnyJob: true },
+      "enforce"
+    )
+    expect(result?.denyTools).toContain("pay_purchase")
+    expect(result?.allowTools).toContain("pay_status")
+    expect(result?.reason).toBe("status_intent_blocks_pay_purchase")
+  })
+
+  it("new_purchase without active job returns null (no override needed)", () => {
+    const intent: PaymentIntentResult = {
+      intent: "new_purchase",
+      confidence: "high",
+      reason: "test",
+    }
+    const result = computePaymentPolicyOverrides(
+      intent,
+      { hasActiveJob: false, hasAnyJob: false },
+      "enforce"
+    )
+    expect(result).toBeNull()
   })
 })

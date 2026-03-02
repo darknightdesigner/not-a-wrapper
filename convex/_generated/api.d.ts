@@ -8,6 +8,8 @@
  * @module
  */
 
+import type * as chatToolState from "../chatToolState.js";
+import type * as chatToolStateBackfill from "../chatToolStateBackfill.js";
 import type * as chats from "../chats.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
@@ -33,6 +35,8 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  chatToolState: typeof chatToolState;
+  chatToolStateBackfill: typeof chatToolStateBackfill;
   chats: typeof chats;
   feedback: typeof feedback;
   files: typeof files;

@@ -43,7 +43,10 @@ type UseChatCoreProps = {
   selectedModel: string
   clearDraft: () => void
   bumpChat: (chatId: string) => void
-  deleteMessagesFromTimestamp: (timestamp: number) => Promise<void>
+  deleteMessagesFromTimestamp: (
+    timestamp: number,
+    minVersion?: number
+  ) => Promise<void>
 }
 
 export function useChatCore({
@@ -463,6 +466,7 @@ export function useChatCore({
       bodyExtras: {
         systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
         enableSearch,
+        chatVersion: messages.length + 1, // current messages + 1 for the new message being sent
       },
       onSuccess: (currentChatId) => {
         debouncedSetDraftValue.cancel()
@@ -512,10 +516,13 @@ export function useChatCore({
     async (suggestion: string) => {
       await executeSend({
         text: suggestion,
+        bodyExtras: {
+          chatVersion: messages.length + 1, // current messages + 1 for the new message being sent
+        },
         errorMessage: "Failed to send suggestion",
       })
     },
-    [executeSend]
+    [executeSend, messages.length]
   )
 
   // Handle reload (v6: renamed to regenerate)
@@ -532,11 +539,12 @@ export function useChatCore({
         model: selectedModel,
         isAuthenticated,
         systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
+        chatVersion: messages.length, // same count since we're regenerating, not adding
       },
     }
 
     regenerate(options)
-  }, [user, chatId, selectedModel, isAuthenticated, systemPrompt, regenerate])
+  }, [user, chatId, selectedModel, isAuthenticated, systemPrompt, regenerate, messages.length])
 
   // Flush pending draft on tab close; also flush on unmount (navigation)
   useEffect(() => {

@@ -12,6 +12,8 @@ export async function getPlatformTools(options?: {
   userName?: string
   defaultShippingAddress?: ShippingAddress
   defaultCardId?: string
+  /** Callback checked at execution time — returns true to block pay_purchase. Defense-in-depth. */
+  isPurchaseBlocked?: () => boolean
 }): Promise<{
   tools: ToolSet
   metadata: Map<string, ToolMetadata>
@@ -74,6 +76,18 @@ export async function getPlatformTools(options?: {
       },
     ],
     execute: async (input, toolOptions) => {
+      // Defense-in-depth: even if the route didn't remove the tool, block
+      // execution when the payment policy indicates purchase is not allowed.
+      if (options?.isPurchaseBlocked?.()) {
+        throw enrichToolError(
+          new Error(
+            "Purchase is not available for this request. " +
+            "A status check intent was detected. Use pay_status instead."
+          ),
+          "pay_purchase"
+        )
+      }
+
       const startMs = Date.now()
       try {
         const resolvedInput = { ...input }

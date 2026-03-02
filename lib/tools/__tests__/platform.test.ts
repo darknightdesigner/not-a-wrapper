@@ -140,3 +140,69 @@ describe("platform tool cancellation propagation", () => {
     expect(traceCollector.get("call_purchase_timeout")?.errorCode).toBe("timeout")
   })
 })
+
+// ── Defense-in-depth: isPurchaseBlocked callback ─────────────────────────────
+// Regression guard: even if the route fails to strip pay_purchase from the
+// tool set, the execution-time callback prevents the tool from running.
+
+describe("platform tool isPurchaseBlocked guard", () => {
+  beforeEach(() => {
+    // resetAllMocks (not clearAllMocks) to flush unconsumed mockResolvedValueOnce
+    // queues from previous tests (e.g. when isPurchaseBlocked short-circuits).
+    vi.resetAllMocks()
+    mockGetPayClawConfig.mockReturnValue({
+      apiKey: "pc_test",
+      appBaseUrl: "https://payclaw.test",
+      defaultCardId: "card_default",
+    })
+  })
+
+  it("isPurchaseBlocked callback blocks pay_purchase at execution time", async () => {
+    // createJob should never be reached — the guard fires first
+    mockCreateJob.mockResolvedValueOnce({ jobId: "job_should_not_exist", status: "created" })
+
+    const { tools } = await getPlatformTools({
+      isPurchaseBlocked: () => true,
+    })
+
+    await expect(
+      (tools.pay_purchase as { execute: Function }).execute(
+        { url: "https://vendor.example.com", maxSpend: 2500 },
+        { toolCallId: "call_blocked" }
+      )
+    ).rejects.toThrow(/not available|status check/i)
+
+    // Verify createJob was never called — the guard short-circuited execution
+    expect(mockCreateJob).not.toHaveBeenCalled()
+  })
+
+  it("isPurchaseBlocked returning false allows normal execution", async () => {
+    mockCreateJob.mockResolvedValueOnce({ jobId: "job_allowed", status: "created" })
+
+    const { tools } = await getPlatformTools({
+      isPurchaseBlocked: () => false,
+    })
+
+    const result = await (tools.pay_purchase as { execute: Function }).execute(
+      { url: "https://vendor.example.com", maxSpend: 2500 },
+      { toolCallId: "call_allowed" }
+    )
+
+    expect(result.jobId).toBe("job_allowed")
+    expect(mockCreateJob).toHaveBeenCalledTimes(1)
+  })
+
+  it("omitting isPurchaseBlocked allows normal execution (backwards compat)", async () => {
+    mockCreateJob.mockResolvedValueOnce({ jobId: "job_no_guard", status: "created" })
+
+    const { tools } = await getPlatformTools()
+
+    const result = await (tools.pay_purchase as { execute: Function }).execute(
+      { url: "https://vendor.example.com", maxSpend: 2500 },
+      { toolCallId: "call_no_guard" }
+    )
+
+    expect(result.jobId).toBe("job_no_guard")
+    expect(mockCreateJob).toHaveBeenCalledTimes(1)
+  })
+})

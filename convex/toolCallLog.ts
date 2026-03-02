@@ -65,6 +65,12 @@ export const log = mutation({
       v.union(v.literal("platform"), v.literal("byok"))
     ),
     budgetDenied: v.optional(v.boolean()),
+    // Payment guardrail observability (Phase 6)
+    intentClass: v.optional(v.string()),
+    policyDecision: v.optional(v.string()),
+    chatVersion: v.optional(v.number()),
+    toolKey: v.optional(v.string()),
+    stateMutationKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity()
@@ -108,6 +114,12 @@ export const log = mutation({
       retryAfterSeconds: args.retryAfterSeconds,
       budgetKeyMode: args.budgetKeyMode,
       budgetDenied: args.budgetDenied,
+      // Payment guardrail observability (Phase 6)
+      intentClass: args.intentClass,
+      policyDecision: args.policyDecision,
+      chatVersion: args.chatVersion,
+      toolKey: args.toolKey,
+      stateMutationKey: args.stateMutationKey,
       createdAt: Date.now(),
     })
   },

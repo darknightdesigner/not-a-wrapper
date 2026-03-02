@@ -164,4 +164,48 @@ describe("normalizeReplayMessages", () => {
     })
     expect(result.warnings.some((warning) => warning.code === "tool_non_replayable")).toBe(true)
   })
+
+  it("captures pay_purchase URL from tool input for continuity fallback", () => {
+    const messages = [
+      {
+        id: "msg-pay-purchase-1",
+        role: "assistant",
+        parts: [
+          {
+            type: "tool-pay_purchase",
+            toolName: "pay_purchase",
+            toolCallId: "tc-pay-1",
+            state: "output-available",
+            input: { url: "https://store.example.com/mouse", maxSpend: 4800 },
+            output: {
+              jobId: "job_123",
+              status: "created",
+              message: "Purchase job created",
+            },
+          },
+        ],
+      } as unknown as UIMessage,
+    ]
+
+    const result = normalizeReplayMessages(messages)
+    expect(result.warnings.some((warning) => warning.code === "tool_non_replayable")).toBe(true)
+    expect(result.messages[0]?.parts[0]).toEqual({
+      type: "tool-exchange",
+      tool: {
+        toolName: "pay_purchase",
+        toolCallId: "tc-pay-1",
+        state: "output-available",
+        replayable: false,
+        nonReplayableReason:
+          'Platform tool "pay_purchase" is non-replayable (side-effect safety).',
+        platformToolContext: {
+          toolKey: "pay_purchase",
+          jobId: "job_123",
+          status: "created",
+          url: "https://store.example.com/mouse",
+          isTerminal: undefined,
+        },
+      },
+    })
+  })
 })

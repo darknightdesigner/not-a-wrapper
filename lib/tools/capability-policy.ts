@@ -1,6 +1,11 @@
 import type { ToolKeyMode } from "@/lib/user-keys"
 import type { ToolSet } from "ai"
 import {
+  PAYMENT_GUARDRAIL_MODE,
+  PAYMENT_STATUS_GUARDRAILS_V1,
+} from "@/lib/config"
+import type { PaymentIntentResult } from "@/app/api/chat/intent/payment-intent"
+import {
   resolveToolCapabilities,
   type ToolCapabilities,
   type ToolSource,
@@ -282,4 +287,73 @@ export function filterMetadataMapByPolicy<T>(
   return new Map(
     Array.from(metadata.entries()).filter(([name]) => allowed.has(name))
   )
+}
+
+// ── Payment Policy Overrides ────────────────────────────────
+
+/** Policy reason codes for payment guardrails */
+export type PaymentPolicyReason =
+  | "status_intent_requires_pay_status"
+  | "status_intent_blocks_pay_purchase"
+  | "no_active_job_blocks_status"
+  | "payment_guardrails_disabled"
+
+/** Request-scoped policy overrides for payment intent */
+export type PaymentPolicyOverrides = {
+  denyTools?: string[]
+  allowTools?: string[]
+  reason: PaymentPolicyReason
+  mode: "observe" | "enforce"
+}
+
+/**
+ * Compute payment-specific tool policy overrides based on intent + state.
+ * Returns null if no payment guardrails apply.
+ */
+export function computePaymentPolicyOverrides(
+  intent: PaymentIntentResult,
+  state: { hasActiveJob: boolean; hasAnyJob: boolean } | null,
+  mode: "observe" | "enforce" = PAYMENT_GUARDRAIL_MODE
+): PaymentPolicyOverrides | null {
+  if (!PAYMENT_STATUS_GUARDRAILS_V1) return null
+
+  // Null state means we can't evaluate payment context
+  if (!state) return null
+
+  if (intent.intent === "status_check") {
+    return {
+      denyTools: ["pay_purchase"],
+      allowTools: state.hasActiveJob ? ["pay_status"] : undefined,
+      reason: "status_intent_blocks_pay_purchase",
+      mode,
+    }
+  }
+
+  // Safety-first: new_purchase with active job -> treat as status_check
+  if (intent.intent === "new_purchase" && state.hasActiveJob) {
+    return {
+      denyTools: ["pay_purchase"],
+      allowTools: ["pay_status"],
+      reason: "status_intent_blocks_pay_purchase",
+      mode,
+    }
+  }
+
+  // Unknown intent with active job
+  if (intent.intent === "unknown" && state.hasActiveJob) {
+    if (mode === "enforce") {
+      return {
+        denyTools: ["pay_purchase"],
+        reason: "status_intent_blocks_pay_purchase",
+        mode,
+      }
+    }
+    // Observe mode: return override for logging but no deny effect.
+    return {
+      reason: "status_intent_blocks_pay_purchase",
+      mode,
+    }
+  }
+
+  return null
 }

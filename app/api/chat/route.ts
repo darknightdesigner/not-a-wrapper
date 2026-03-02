@@ -9,6 +9,10 @@ import {
   ANTHROPIC_BETA_HEADERS,
   PREPARE_STEP_THRESHOLD,
   HISTORY_REPLAY_COMPILER_V1,
+  PAYMENT_STATUS_GUARDRAILS_V1,
+  PAYMENT_CHAT_STATE_V1,
+  PAYMENT_GUARDRAIL_MODE,
+  PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
@@ -81,8 +85,85 @@ type ChatRequest = {
   model: string
   systemPrompt: string
   enableSearch: boolean
+  chatVersion?: number
   message_group_id?: string
   userId?: string // Client-provided userId (for anonymous users)
+}
+
+const TERMINAL_PAYMENT_STATUSES = new Set([
+  "completed",
+  "delivered",
+  "cancelled",
+  "refunded",
+  "failed",
+  "expired",
+])
+
+function normalizeChatVersion(
+  chatVersion: unknown,
+  fallbackMessages: MessageAISDK[]
+): number {
+  if (
+    typeof chatVersion === "number" &&
+    Number.isFinite(chatVersion) &&
+    chatVersion >= 0
+  ) {
+    return Math.floor(chatVersion)
+  }
+  return fallbackMessages.length
+}
+
+function parseTimestampMs(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === "string") {
+    const parsed = Date.parse(value)
+    return Number.isNaN(parsed) ? undefined : parsed
+  }
+  if (value instanceof Date) {
+    return value.getTime()
+  }
+  return undefined
+}
+
+function getLatestUserMessageTimestamp(messages: MessageAISDK[]): number | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i]
+    if (message.role !== "user") continue
+    const withCreatedAt = message as MessageAISDK & { createdAt?: unknown }
+    return parseTimestampMs(withCreatedAt.createdAt)
+  }
+  return undefined
+}
+
+function getRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null
+  return value as Record<string, unknown>
+}
+
+function getStringField(
+  value: Record<string, unknown> | null,
+  field: string
+): string | undefined {
+  if (!value) return undefined
+  const candidate = value[field]
+  return typeof candidate === "string" && candidate.length > 0
+    ? candidate
+    : undefined
+}
+
+function getBooleanField(
+  value: Record<string, unknown> | null,
+  field: string
+): boolean | undefined {
+  if (!value) return undefined
+  const candidate = value[field]
+  return typeof candidate === "boolean" ? candidate : undefined
+}
+
+function inferTerminalStatus(status: string): boolean {
+  return TERMINAL_PAYMENT_STATUSES.has(status.toLowerCase())
 }
 
 function isReplayShapeError(message: string): boolean {
@@ -180,6 +261,7 @@ export async function POST(req: Request) {
       model,
       systemPrompt,
       enableSearch,
+      chatVersion,
       message_group_id,
       userId: clientUserId,
     } = (await req.json()) as ChatRequest
@@ -198,6 +280,9 @@ export async function POST(req: Request) {
         { status: 400 }
       )
     }
+
+    const normalizedChatVersion = normalizeChatVersion(chatVersion, messages)
+    const latestUserMessageTimestamp = getLatestUserMessageTimestamp(messages)
 
     // For anonymous users, require a guest ID for usage tracking
     // The client must provide a stable guest ID (format: "guest_<uuid>") from localStorage
@@ -560,6 +645,10 @@ export async function POST(req: Request) {
     let platformTools: ToolSet = {} as ToolSet
     let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
 
+    // Payment policy: set to true after intent classification when pay_purchase is denied.
+    // The closure is read lazily at execution time by getPlatformTools (defense-in-depth).
+    let purchaseBlockedByPolicy = false
+
     let userCardId: string | undefined
     if (isAuthenticated && capabilities.platform) {
       if (convexToken) {
@@ -619,9 +708,130 @@ export async function POST(req: Request) {
         userName: userName || undefined,
         defaultShippingAddress: cleanDefaultShippingAddress,
         defaultCardId: userCardId,
+        isPurchaseBlocked: () => purchaseBlockedByPolicy,
       })
       platformTools = platformResult.tools
       platformToolMetadata = platformResult.metadata
+    }
+
+    // -----------------------------------------------------------------------
+    // Payment Intent + State-Driven Tool Policy (Phase 3 Guardrails)
+    // -----------------------------------------------------------------------
+    let paymentPolicyDenyTools: string[] = []
+
+    if (PAYMENT_STATUS_GUARDRAILS_V1 && isAuthenticated && convexToken) {
+      try {
+        let chatToolState: Doc<"chatToolState"> | null = null
+
+        // 1. Read canonical payment state (explicitly gated by PAYMENT_CHAT_STATE_V1)
+        if (PAYMENT_CHAT_STATE_V1) {
+          chatToolState = await fetchQuery(
+            api.chatToolState.getByChat,
+            { chatId: chatId as Id<"chats"> },
+            { token: convexToken }
+          )
+
+          // 2. Lazy backfill for legacy chats
+          if (!chatToolState && PAYMENT_CHAT_STATE_BACKFILL_V1) {
+            try {
+              await fetchMutation(
+                api.chatToolStateBackfill.hydrateFromToolCallLog,
+                { chatId: chatId as Id<"chats"> },
+                { token: convexToken }
+              )
+              chatToolState = await fetchQuery(
+                api.chatToolState.getByChat,
+                { chatId: chatId as Id<"chats"> },
+                { token: convexToken }
+              )
+            } catch (backfillErr) {
+              console.warn(
+                JSON.stringify({
+                  _tag: "payment_state_backfill_error",
+                  requestId,
+                  chatId,
+                  error: backfillErr instanceof Error ? backfillErr.message : String(backfillErr),
+                })
+              )
+            }
+          }
+        }
+
+        // 3. Classify payment intent from latest user message
+        const latestUserMessage = messages
+          .filter((m) => m.role === "user")
+          .pop()
+        const userMessageText = latestUserMessage?.parts
+          ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+          .map((p) => p.text)
+          .join(" ") ?? ""
+
+        const { classifyPaymentIntent } = await import("@/app/api/chat/intent/payment-intent")
+        const { computePaymentPolicyOverrides } = await import("@/lib/tools/capability-policy")
+
+        const hasActiveJob = !!chatToolState?.activePurchaseJobId
+        const hasAnyJob = !!chatToolState?.latestPurchaseJobId
+
+        const intentResult = classifyPaymentIntent({
+          userMessage: userMessageText,
+          hasActiveJob,
+          hasAnyJob,
+          latestStatus: chatToolState?.latestStatus ?? undefined,
+          latestStatusIsTerminal: chatToolState?.latestStatusIsTerminal ?? undefined,
+        })
+
+        const policyOverrides = computePaymentPolicyOverrides(
+          intentResult,
+          chatToolState ? { hasActiveJob, hasAnyJob } : null,
+          PAYMENT_GUARDRAIL_MODE,
+        )
+
+        if (policyOverrides) {
+          console.log(
+            JSON.stringify({
+              _tag: "payment_intent_policy",
+              requestId,
+              chatId,
+              intent: intentResult.intent,
+              confidence: intentResult.confidence,
+              reason: intentResult.reason,
+              policyReason: policyOverrides.reason,
+              mode: policyOverrides.mode,
+              denyTools: policyOverrides.denyTools ?? [],
+              allowTools: policyOverrides.allowTools ?? [],
+              hasActiveJob,
+              hasAnyJob,
+            })
+          )
+
+          if (policyOverrides.mode === "enforce" && policyOverrides.denyTools) {
+            paymentPolicyDenyTools = policyOverrides.denyTools
+          }
+        }
+      } catch (err) {
+        console.warn(
+          JSON.stringify({
+            _tag: "payment_guardrail_error",
+            requestId,
+            chatId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
+      }
+    }
+
+    // Apply payment policy deny list to platform tools
+    if (paymentPolicyDenyTools.length > 0) {
+      for (const toolName of paymentPolicyDenyTools) {
+        if (toolName in platformTools) {
+          delete (platformTools as Record<string, unknown>)[toolName]
+          platformToolMetadata.delete(toolName)
+        }
+      }
+      // Activate defense-in-depth: flag for the lazy isPurchaseBlocked callback
+      if (paymentPolicyDenyTools.includes("pay_purchase")) {
+        purchaseBlockedByPolicy = true
+      }
     }
 
     const toolPolicyInputs: ToolPolicyInput[] = [
@@ -1591,6 +1801,11 @@ export async function POST(req: Request) {
                       ? !(toolResult as { isError?: boolean }).isError
                       : false
                     const trace = traceCollector.get(toolCall.toolCallId)
+                    const stateMutationKey =
+                      toolCall.toolName === "pay_purchase" ||
+                      toolCall.toolName === "pay_status"
+                        ? `${requestId}:${toolCall.toolCallId}:${toolCall.toolName}`
+                        : undefined
 
                     phClient.capture({
                       distinctId: userId,
@@ -1602,6 +1817,7 @@ export async function POST(req: Request) {
                         serviceName,
                         success,
                         chatId,
+                        chatVersion: normalizedChatVersion,
                         // Phase C: Observability enrichment
                         durationMs: trace?.durationMs ?? undefined,
                         errorCode: trace?.errorCode,
@@ -1609,6 +1825,7 @@ export async function POST(req: Request) {
                         budgetKeyMode: trace?.budgetKeyMode,
                         budgetDenied: trace?.budgetDenied,
                         requestId,
+                        stateMutationKey,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -1683,6 +1900,8 @@ export async function POST(req: Request) {
                     retryAfterSeconds: trace?.retryAfterSeconds,
                     budgetKeyMode: trace?.budgetKeyMode,
                     budgetDenied: trace?.budgetDenied,
+                    chatVersion: normalizedChatVersion,
+                    toolKey: toolCall.toolName,
                   },
                   { token: convexToken }
                 ).catch((err: unknown) => {
@@ -1755,6 +1974,13 @@ export async function POST(req: Request) {
                       retryAfterSeconds: trace?.retryAfterSeconds,
                       budgetKeyMode: trace?.budgetKeyMode,
                       budgetDenied: trace?.budgetDenied,
+                      chatVersion: normalizedChatVersion,
+                      toolKey: toolCall.toolName,
+                      stateMutationKey:
+                        toolCall.toolName === "pay_purchase" ||
+                        toolCall.toolName === "pay_status"
+                          ? `${requestId}:${toolCall.toolCallId}:${toolCall.toolName}`
+                          : undefined,
                     },
                     { token: convexToken }
                   ).catch((err: unknown) => {
@@ -1769,6 +1995,82 @@ export async function POST(req: Request) {
                       error: err instanceof Error ? err.message : String(err),
                     }))
                   })
+
+                  if (!PAYMENT_CHAT_STATE_V1 || !success) continue
+
+                  if (toolCall.toolName === "pay_purchase") {
+                    const outputRecord = getRecord(toolResult?.output)
+                    const inputRecord = getRecord(toolCall.input)
+                    const jobId = getStringField(outputRecord, "jobId")
+                    const url = getStringField(inputRecord, "url")
+                    if (!jobId || !url) continue
+
+                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_purchase`
+                    void fetchMutation(
+                      api.chatToolState.upsertFromPurchase,
+                      {
+                        chatId: chatId as Id<"chats">,
+                        jobId,
+                        url,
+                        chatVersion: normalizedChatVersion,
+                        sourceMessageTimestamp: latestUserMessageTimestamp,
+                        mutationKey,
+                        toolCallId: toolCall.toolCallId,
+                        requestId,
+                      },
+                      { token: convexToken }
+                    ).catch((err: unknown) => {
+                      console.warn(JSON.stringify({
+                        _tag: "payment_state_write_failed",
+                        requestId,
+                        chatId,
+                        toolCallId: toolCall.toolCallId,
+                        toolName: toolCall.toolName,
+                        mutation: "upsertFromPurchase",
+                        error: err instanceof Error ? err.message : String(err),
+                      }))
+                    })
+                  }
+
+                  if (toolCall.toolName === "pay_status") {
+                    const outputRecord = getRecord(toolResult?.output)
+                    const jobId = getStringField(outputRecord, "jobId")
+                    const statusText = getStringField(outputRecord, "status")
+                    if (!jobId || !statusText) continue
+
+                    const isTerminalExplicit = getBooleanField(
+                      outputRecord,
+                      "isTerminal"
+                    )
+                    const isTerminal =
+                      isTerminalExplicit ?? inferTerminalStatus(statusText)
+                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_status`
+
+                    void fetchMutation(
+                      api.chatToolState.upsertFromStatus,
+                      {
+                        chatId: chatId as Id<"chats">,
+                        jobId,
+                        status: statusText,
+                        isTerminal,
+                        chatVersion: normalizedChatVersion,
+                        mutationKey,
+                        toolCallId: toolCall.toolCallId,
+                        requestId,
+                      },
+                      { token: convexToken }
+                    ).catch((err: unknown) => {
+                      console.warn(JSON.stringify({
+                        _tag: "payment_state_write_failed",
+                        requestId,
+                        chatId,
+                        toolCallId: toolCall.toolCallId,
+                        toolName: toolCall.toolName,
+                        mutation: "upsertFromStatus",
+                        error: err instanceof Error ? err.message : String(err),
+                      }))
+                    })
+                  }
                 }
               }
             }
