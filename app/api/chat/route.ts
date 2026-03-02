@@ -10,6 +10,7 @@ import {
   PREPARE_STEP_THRESHOLD,
   HISTORY_REPLAY_COMPILER_V1,
   PAYMENT_STATUS_GUARDRAILS_V1,
+  PAYMENT_CHAT_STATE_V1,
   PAYMENT_GUARDRAIL_MODE,
   PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
@@ -639,35 +640,39 @@ export async function POST(req: Request) {
 
     if (PAYMENT_STATUS_GUARDRAILS_V1 && isAuthenticated && convexToken) {
       try {
-        // 1. Read canonical payment state
-        let chatToolState = await fetchQuery(
-          api.chatToolState.getByChat,
-          { chatId: chatId as Id<"chats"> },
-          { token: convexToken }
-        )
+        let chatToolState: Doc<"chatToolState"> | null = null
 
-        // 2. Lazy backfill for legacy chats
-        if (!chatToolState && PAYMENT_CHAT_STATE_BACKFILL_V1) {
-          try {
-            await fetchMutation(
-              api.chatToolStateBackfill.hydrateFromToolCallLog,
-              { chatId: chatId as Id<"chats"> },
-              { token: convexToken }
-            )
-            chatToolState = await fetchQuery(
-              api.chatToolState.getByChat,
-              { chatId: chatId as Id<"chats"> },
-              { token: convexToken }
-            )
-          } catch (backfillErr) {
-            console.warn(
-              JSON.stringify({
-                _tag: "payment_state_backfill_error",
-                requestId,
-                chatId,
-                error: backfillErr instanceof Error ? backfillErr.message : String(backfillErr),
-              })
-            )
+        // 1. Read canonical payment state (explicitly gated by PAYMENT_CHAT_STATE_V1)
+        if (PAYMENT_CHAT_STATE_V1) {
+          chatToolState = await fetchQuery(
+            api.chatToolState.getByChat,
+            { chatId: chatId as Id<"chats"> },
+            { token: convexToken }
+          )
+
+          // 2. Lazy backfill for legacy chats
+          if (!chatToolState && PAYMENT_CHAT_STATE_BACKFILL_V1) {
+            try {
+              await fetchMutation(
+                api.chatToolStateBackfill.hydrateFromToolCallLog,
+                { chatId: chatId as Id<"chats"> },
+                { token: convexToken }
+              )
+              chatToolState = await fetchQuery(
+                api.chatToolState.getByChat,
+                { chatId: chatId as Id<"chats"> },
+                { token: convexToken }
+              )
+            } catch (backfillErr) {
+              console.warn(
+                JSON.stringify({
+                  _tag: "payment_state_backfill_error",
+                  requestId,
+                  chatId,
+                  error: backfillErr instanceof Error ? backfillErr.message : String(backfillErr),
+                })
+              )
+            }
           }
         }
 

@@ -52,8 +52,20 @@ function normalizeMessage(message: string): string {
   return message.toLowerCase().trim()
 }
 
-function containsAny(text: string, keywords: readonly string[]): boolean {
-  return keywords.some((kw) => text.includes(kw))
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
+function buildKeywordBoundaryRegex(keyword: string): RegExp {
+  const escaped = escapeRegExp(keyword.trim()).replace(/\s+/g, "\\s+")
+  return new RegExp(`\\b${escaped}\\b`)
+}
+
+const STATUS_PATTERNS = STATUS_KEYWORDS.map(buildKeywordBoundaryRegex)
+const PURCHASE_PATTERNS = PURCHASE_KEYWORDS.map(buildKeywordBoundaryRegex)
+
+function containsAny(text: string, patterns: readonly RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text))
 }
 
 // ── Classifier ──────────────────────────────────────────────
@@ -66,8 +78,8 @@ export function classifyPaymentIntent(
   ctx: PaymentIntentContext
 ): PaymentIntentResult {
   const normalized = normalizeMessage(ctx.userMessage)
-  const hasStatusKeyword = containsAny(normalized, STATUS_KEYWORDS)
-  const hasPurchaseKeyword = containsAny(normalized, PURCHASE_KEYWORDS)
+  const hasStatusKeyword = containsAny(normalized, STATUS_PATTERNS)
+  const hasPurchaseKeyword = containsAny(normalized, PURCHASE_PATTERNS)
 
   // Edge case: both status and purchase keywords with an active job -> safety-first
   if (hasStatusKeyword && hasPurchaseKeyword && ctx.hasActiveJob) {

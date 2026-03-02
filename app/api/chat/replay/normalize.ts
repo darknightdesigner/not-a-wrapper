@@ -136,13 +136,20 @@ function extractPlatformToolContext(
 
   if (!toolKey) return undefined
 
+  const input = isRecord(part.input) ? part.input : undefined
   const output = isRecord(part.output) ? part.output : undefined
+  const purchaseUrl =
+    typeof input?.url === "string"
+      ? input.url
+      : typeof output?.url === "string"
+        ? output.url
+        : undefined
 
   return {
     toolKey,
     jobId: typeof output?.jobId === "string" ? output.jobId : undefined,
     status: typeof output?.status === "string" ? output.status : undefined,
-    url: typeof output?.url === "string" ? output.url : undefined,
+    url: purchaseUrl,
     isTerminal: typeof output?.isTerminal === "boolean" ? output.isTerminal : undefined,
   }
 }

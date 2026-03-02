@@ -200,8 +200,12 @@ export const upsertFromStatus = mutation({
         chatVersion: args.chatVersion,
         latestStatus: args.status,
         latestStatusIsTerminal: args.isTerminal,
-        // Clear active job if terminal — the purchase lifecycle is complete
-        activePurchaseJobId: args.isTerminal ? undefined : existing.activePurchaseJobId,
+        // Clear active job only when terminal status matches current active job.
+        // This avoids out-of-order status updates for older jobs wiping active state.
+        activePurchaseJobId:
+          args.isTerminal && existing.activePurchaseJobId === args.jobId
+            ? undefined
+            : existing.activePurchaseJobId,
         lastMutationKey: args.mutationKey,
         lastToolCallId: args.toolCallId,
         lastRequestId: args.requestId,

@@ -165,6 +165,10 @@ describe("replay compiler matrix", () => {
       { useReplayCompiler: true },
     )
     const assistant = findAssistant(result.messages)
+    const replayText = assistant?.parts
+      .filter((part): part is { type: "text"; text: string } => part.type === "text")
+      .map((part) => part.text)
+      .join("\n")
 
     // The pay_purchase tool part should NOT be replayed as a tool invocation
     const toolPart = assistant?.parts.find(
@@ -174,6 +178,8 @@ describe("replay compiler matrix", () => {
 
     // The assistant message should still contain text (original + continuity summary)
     expect(assistant?.parts.some((part) => part.type === "text")).toBe(true)
+    expect(replayText).toContain("https://store.example.com/mouse")
+    expect(replayText).toContain("job_replay_test_1")
   })
 
   it("pay_status in history is downgraded to text continuity on OpenAI replay", async () => {

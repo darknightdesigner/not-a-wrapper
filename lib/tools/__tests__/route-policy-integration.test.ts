@@ -201,7 +201,7 @@ describe("computePaymentPolicyOverrides", () => {
     expect(result?.denyTools).toContain("pay_purchase")
   })
 
-  it("unknown intent with active job in observe mode returns null", () => {
+  it("unknown intent with active job in observe mode returns log-only override", () => {
     const intent: PaymentIntentResult = {
       intent: "unknown",
       confidence: "low",
@@ -212,7 +212,10 @@ describe("computePaymentPolicyOverrides", () => {
       { hasActiveJob: true, hasAnyJob: true },
       "observe"
     )
-    expect(result).toBeNull()
+    expect(result).toEqual({
+      reason: "status_intent_blocks_pay_purchase",
+      mode: "observe",
+    })
   })
 
   it("new_purchase with active job is safety-reclassified to deny pay_purchase", () => {

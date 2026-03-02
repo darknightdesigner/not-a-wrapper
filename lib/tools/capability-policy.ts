@@ -348,8 +348,11 @@ export function computePaymentPolicyOverrides(
         mode,
       }
     }
-    // Observe mode: return override for logging but no deny effect
-    return null
+    // Observe mode: return override for logging but no deny effect.
+    return {
+      reason: "status_intent_blocks_pay_purchase",
+      mode,
+    }
   }
 
   return null

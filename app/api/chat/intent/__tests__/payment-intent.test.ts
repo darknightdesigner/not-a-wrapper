@@ -85,4 +85,27 @@ describe("classifyPaymentIntent", () => {
     expect(result.intent).toBe("unknown")
     expect(result.confidence).toBe("low")
   })
+
+  test("does not match purchase keywords as substrings within larger words", () => {
+    const result = classifyPaymentIntent({
+      ...baseContext,
+      userMessage: "Goodbye and thanks for your help!",
+    })
+    expect(result.intent).toBe("unknown")
+    expect(result.confidence).toBe("low")
+  })
+
+  test("checkout does not trigger status keyword substring collision", () => {
+    const result = classifyPaymentIntent({
+      ...baseContext,
+      userMessage: "Go ahead and checkout now",
+      hasActiveJob: true,
+      hasAnyJob: true,
+    })
+    // If "check" matched as a substring in "checkout", this would be
+    // classified as ambiguous_with_active_job_safety_first instead.
+    expect(result.intent).toBe("status_check")
+    expect(result.confidence).toBe("medium")
+    expect(result.reason).toBe("purchase_intent_overridden_by_active_job")
+  })
 })

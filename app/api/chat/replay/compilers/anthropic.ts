@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai"
 import { z } from "zod"
 import type { ReplayMessage, ReplayToolExchange } from "../types"
+import { synthesizePlatformToolFallback } from "./platform-tool-fallback"
 import type {
   ReplayCompileResult,
   ReplayCompileContext,
@@ -66,26 +67,6 @@ function synthesizeWebSearchFallback(tool: ReplayToolExchange): string | null {
   })
 
   return `Replay context from prior web_search${queryLabel}:\n${lines.join("\n")}`
-}
-
-function synthesizePlatformToolFallback(tool: ReplayToolExchange): string | null {
-  const ctx = tool.platformToolContext
-  if (!ctx) return null
-
-  if (ctx.toolKey === "pay_purchase") {
-    const jobPart = ctx.jobId ? ` (job: ${ctx.jobId})` : ""
-    const urlPart = ctx.url ? ` for ${ctx.url}` : ""
-    return `Replay context: A purchase was initiated${urlPart}${jobPart}.`
-  }
-
-  if (ctx.toolKey === "pay_status") {
-    const jobPart = ctx.jobId ? ` for job ${ctx.jobId}` : ""
-    const statusPart = ctx.status ? `: ${ctx.status}` : ""
-    const terminalPart = ctx.isTerminal ? " (completed)" : " (in progress)"
-    return `Replay context: Purchase status check${jobPart}${statusPart}${terminalPart}.`
-  }
-
-  return null
 }
 
 function compileWebSearchToolPart(tool: ReplayToolExchange, messageId: string, partIndex: number) {

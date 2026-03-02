@@ -169,28 +169,40 @@ export const hydrateFromToolCallLog = mutation({
     }
 
     // 4. Derive state from entries.
-    //    Strategy: walk from most recent to oldest to find the latest purchase
-    //    and latest status check.
+    //    Strategy: walk from most recent to oldest to find the latest purchase,
+    //    then only consider status calls that reference the same jobId.
 
     // Find the most recent purchase call
     const latestPurchase = paymentLogs.find((log) => isPurchaseTool(log.toolName))
-    // Find the most recent status call
-    const latestStatusCall = paymentLogs.find((log) => isStatusTool(log.toolName))
-
     // Extract jobId from the latest purchase
     const purchaseJobId = latestPurchase
       ? extractJobId(latestPurchase.outputPreview)
-      : undefined
-
-    // Extract status from the latest status call
-    const derivedStatus = latestStatusCall
-      ? extractStatus(latestStatusCall.outputPreview)
       : undefined
 
     // FAIL-SAFE: If we found purchase log entries but cannot extract a jobId,
     // the data is ambiguous. Do not create state that could enable pay_purchase.
     if (latestPurchase && !purchaseJobId) {
       return null
+    }
+
+    // Extract status only when it references the same jobId as latest purchase.
+    // This prevents cross-job contamination (e.g. status for job_A affecting job_B).
+    let derivedStatus: string | undefined
+    if (purchaseJobId) {
+      const latestStatusForPurchase = paymentLogs.find((log) => {
+        if (!isStatusTool(log.toolName)) return false
+        return extractJobId(log.outputPreview) === purchaseJobId
+      })
+
+      derivedStatus = latestStatusForPurchase
+        ? extractStatus(latestStatusForPurchase.outputPreview)
+        : undefined
+    } else {
+      // No purchase context available; keep best-effort status-only hydration.
+      const latestStatusCall = paymentLogs.find((log) => isStatusTool(log.toolName))
+      derivedStatus = latestStatusCall
+        ? extractStatus(latestStatusCall.outputPreview)
+        : undefined
     }
 
     // If there are no purchase entries and no extractable status, nothing useful to backfill.
@@ -202,19 +214,22 @@ export const hydrateFromToolCallLog = mutation({
     const isTerminal = derivedStatus ? isTerminalStatus(derivedStatus) : undefined
 
     // Determine activePurchaseJobId:
-    // - If status is terminal, the job is done — no active job
-    // - If status is non-terminal and we have a jobId, it may still be active
-    // - If no status info and we have a jobId, treat as ambiguous and do NOT
-    //   set activePurchaseJobId (fail-safe: don't enable purchase tool on
-    //   stale data without confirmation from a status check)
+    // - If status is terminal for the same jobId, the job is done.
+    // - If status is non-terminal for the same jobId, the job is active.
+    // - If we have a purchase jobId but no correlated status, assume active
+    //   (safety-first: blocks accidental duplicate purchases on legacy chats).
     let activePurchaseJobId: string | undefined = undefined
 
-    if (purchaseJobId && derivedStatus) {
-      // We have both a purchase jobId and status info — use isTerminal to decide
-      activePurchaseJobId = isTerminal ? undefined : purchaseJobId
+    if (purchaseJobId) {
+      if (derivedStatus) {
+        // We have correlated status for this purchase jobId.
+        activePurchaseJobId = isTerminal ? undefined : purchaseJobId
+      } else {
+        // No correlated status found; keep the latest purchase active by default.
+        activePurchaseJobId = purchaseJobId
+      }
     }
-    // If we have purchaseJobId but no status — leave activePurchaseJobId undefined (fail-safe).
-    // If we have derivedStatus but no purchaseJobId — also leave undefined.
+    // If we have derivedStatus but no purchaseJobId — leave undefined.
 
     // 5. Create the chatToolState row with backfill provenance
     const now = Date.now()
