@@ -43,7 +43,10 @@ type UseChatCoreProps = {
   selectedModel: string
   clearDraft: () => void
   bumpChat: (chatId: string) => void
-  deleteMessagesFromTimestamp: (timestamp: number) => Promise<void>
+  deleteMessagesFromTimestamp: (
+    timestamp: number,
+    minVersion?: number
+  ) => Promise<void>
 }
 
 export function useChatCore({

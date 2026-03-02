@@ -71,7 +71,10 @@ type MessagesContextType = {
   cacheAndAddMessage: (message: ExtendedUIMessage, overrideChatId?: string) => Promise<void>
   resetMessages: () => Promise<void>
   deleteMessages: () => Promise<void>
-  deleteMessagesFromTimestamp: (timestamp: number) => Promise<void>
+  deleteMessagesFromTimestamp: (
+    timestamp: number,
+    minVersion?: number
+  ) => Promise<void>
 }
 
 const MessagesContext = createContext<MessagesContextType | null>(null)
@@ -100,6 +103,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const addBatchMutation = useMutation(api.messages.addBatch)
   const clearMessagesMutation = useMutation(api.messages.clearForChat)
   const deleteFromTimestampMutation = useMutation(api.messages.deleteFromTimestamp)
+  const truncateChatToolStateMutation = useMutation(api.chatToolState.truncateFromVersion)
 
   // Convert Convex messages to AI SDK format
   const serverMessages: ExtendedUIMessage[] = useMemo(() => {
@@ -319,16 +323,31 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     updateOptimisticMessages(() => [])
   }, [updateOptimisticMessages])
 
-  const deleteMessagesFromTimestamp = useCallback(async (timestamp: number) => {
+  const deleteMessagesFromTimestamp = useCallback(async (
+    timestamp: number,
+    minVersion?: number
+  ) => {
     if (!chatId || chatId.startsWith("optimistic-") || chatId.startsWith("local-")) return
 
     await deleteFromTimestampMutation({
       chatId: chatId as Id<"chats">,
       timestamp,
     })
+
+    if (
+      typeof minVersion === "number" &&
+      Number.isFinite(minVersion) &&
+      minVersion >= 0
+    ) {
+      await truncateChatToolStateMutation({
+        chatId: chatId as Id<"chats">,
+        minVersion: Math.floor(minVersion),
+      })
+    }
+
     // Local state is already trimmed by useChatCore, Convex will reactively update
     // Errors propagate to submitEdit which handles rollback and user notification
-  }, [chatId, deleteFromTimestampMutation])
+  }, [chatId, deleteFromTimestampMutation, truncateChatToolStateMutation])
 
   // setMessages for backward compatibility - updates optimistic messages
   const setMessages = useCallback((action: React.SetStateAction<ExtendedUIMessage[]>) => {

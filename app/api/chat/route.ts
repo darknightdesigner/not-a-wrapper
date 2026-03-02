@@ -1995,6 +1995,82 @@ export async function POST(req: Request) {
                       error: err instanceof Error ? err.message : String(err),
                     }))
                   })
+
+                  if (!PAYMENT_CHAT_STATE_V1 || !success) continue
+
+                  if (toolCall.toolName === "pay_purchase") {
+                    const outputRecord = getRecord(toolResult?.output)
+                    const inputRecord = getRecord(toolCall.input)
+                    const jobId = getStringField(outputRecord, "jobId")
+                    const url = getStringField(inputRecord, "url")
+                    if (!jobId || !url) continue
+
+                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_purchase`
+                    void fetchMutation(
+                      api.chatToolState.upsertFromPurchase,
+                      {
+                        chatId: chatId as Id<"chats">,
+                        jobId,
+                        url,
+                        chatVersion: normalizedChatVersion,
+                        sourceMessageTimestamp: latestUserMessageTimestamp,
+                        mutationKey,
+                        toolCallId: toolCall.toolCallId,
+                        requestId,
+                      },
+                      { token: convexToken }
+                    ).catch((err: unknown) => {
+                      console.warn(JSON.stringify({
+                        _tag: "payment_state_write_failed",
+                        requestId,
+                        chatId,
+                        toolCallId: toolCall.toolCallId,
+                        toolName: toolCall.toolName,
+                        mutation: "upsertFromPurchase",
+                        error: err instanceof Error ? err.message : String(err),
+                      }))
+                    })
+                  }
+
+                  if (toolCall.toolName === "pay_status") {
+                    const outputRecord = getRecord(toolResult?.output)
+                    const jobId = getStringField(outputRecord, "jobId")
+                    const statusText = getStringField(outputRecord, "status")
+                    if (!jobId || !statusText) continue
+
+                    const isTerminalExplicit = getBooleanField(
+                      outputRecord,
+                      "isTerminal"
+                    )
+                    const isTerminal =
+                      isTerminalExplicit ?? inferTerminalStatus(statusText)
+                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_status`
+
+                    void fetchMutation(
+                      api.chatToolState.upsertFromStatus,
+                      {
+                        chatId: chatId as Id<"chats">,
+                        jobId,
+                        status: statusText,
+                        isTerminal,
+                        chatVersion: normalizedChatVersion,
+                        mutationKey,
+                        toolCallId: toolCall.toolCallId,
+                        requestId,
+                      },
+                      { token: convexToken }
+                    ).catch((err: unknown) => {
+                      console.warn(JSON.stringify({
+                        _tag: "payment_state_write_failed",
+                        requestId,
+                        chatId,
+                        toolCallId: toolCall.toolCallId,
+                        toolName: toolCall.toolName,
+                        mutation: "upsertFromStatus",
+                        error: err instanceof Error ? err.message : String(err),
+                      }))
+                    })
+                  }
                 }
               }
             }

@@ -40,7 +40,10 @@ type UseChatEditProps = {
   updateTitle: (chatId: string, title: string) => Promise<void>
   isSubmitting: boolean
   status: string
-  deleteMessagesFromTimestamp: (timestamp: number) => Promise<void>
+  deleteMessagesFromTimestamp: (
+    timestamp: number,
+    minVersion?: number
+  ) => Promise<void>
   prevChatIdRef: RefObject<string | null>
 }
 
@@ -161,7 +164,7 @@ export function useChatEdit({
 
         // Delete messages from the edit point in Convex database
         // This ensures subsequent messages are removed from persistent storage
-        await deleteMessagesFromTimestamp(cutoffTimestamp)
+        await deleteMessagesFromTimestamp(cutoffTimestamp, trimmedMessages.length + 1)
 
         // If this is an edit of the very first user message, update chat title
         if (editIndex === 0 && target.role === "user") {

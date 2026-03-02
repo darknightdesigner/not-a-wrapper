@@ -263,6 +263,10 @@ export const deleteFromTimestamp = mutation({
       .collect()
 
     const toDelete = messages.filter((m) => m._creationTime >= timestamp)
+    const remainingMessageCount = messages.length - toDelete.length
+    // Mirror client-side version semantics so server-side truncation can safely
+    // clean payment state even when sourceMessageTimestamp is unavailable.
+    const truncationMinVersion = remainingMessageCount + 1
 
     for (const msg of toDelete) {
       await ctx.db.delete(msg._id)
@@ -277,11 +281,16 @@ export const deleteFromTimestamp = mutation({
         .unique()
 
       if (toolState && toolState.userId === user._id) {
-        // If the tool state's source message would have been deleted, remove the state
-        if (
-          toolState.sourceMessageTimestamp &&
+        // Prefer source timestamp when available, but also fall back to
+        // chatVersion-based truncation so legacy/backfilled rows (which may not
+        // carry sourceMessageTimestamp) don't survive an edit branch.
+        const sourceTimestampWasTruncated =
+          typeof toolState.sourceMessageTimestamp === "number" &&
           toolState.sourceMessageTimestamp >= timestamp
-        ) {
+        const versionWasTruncated =
+          toDelete.length > 0 && toolState.chatVersion >= truncationMinVersion
+
+        if (sourceTimestampWasTruncated || versionWasTruncated) {
           await ctx.db.delete(toolState._id)
         }
       }
