@@ -323,6 +323,21 @@ export const clearForChat = mutation({
       await ctx.db.delete(msg._id)
     }
 
+    // Clear canonical chatToolState as well so a fully cleared chat
+    // does not retain stale payment lifecycle context.
+    try {
+      const toolState = await ctx.db
+        .query("chatToolState")
+        .withIndex("by_chat", (q) => q.eq("chatId", chatId))
+        .unique()
+
+      if (toolState && toolState.userId === user._id) {
+        await ctx.db.delete(toolState._id)
+      }
+    } catch {
+      // Best-effort: don't fail message clearing if state cleanup fails
+    }
+
     return messages.length
   },
 })

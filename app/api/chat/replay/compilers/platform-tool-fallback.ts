@@ -13,7 +13,12 @@ export function synthesizePlatformToolFallback(tool: ReplayToolExchange): string
   if (ctx.toolKey === "pay_status") {
     const jobPart = ctx.jobId ? ` for job ${ctx.jobId}` : ""
     const statusPart = ctx.status ? `: ${ctx.status}` : ""
-    const terminalPart = ctx.isTerminal ? " (completed)" : " (in progress)"
+    const terminalPart =
+      ctx.isTerminal === true
+        ? " (completed)"
+        : ctx.isTerminal === false
+          ? " (in progress)"
+          : ""
     return `Replay context: Purchase status check${jobPart}${statusPart}${terminalPart}.`
   }
 
