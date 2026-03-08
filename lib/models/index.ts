@@ -7,6 +7,7 @@ import { mistralModels } from "./data/mistral"
 import { openaiModels } from "./data/openai"
 import { openrouterModels } from "./data/openrouter"
 import { perplexityModels } from "./data/perplexity"
+import { resolveModelId } from "./model-id-migration"
 import { ModelConfig } from "./types"
 
 // Static models (always available)
@@ -76,7 +77,8 @@ export async function getModelsForUserProviders(
 
 // Synchronous function to get model info for simple lookups
 export function getModelInfo(modelId: string): ModelConfig | undefined {
-  return STATIC_MODELS.find((model) => model.id === modelId)
+  const resolvedModelId = resolveModelId(modelId)
+  return STATIC_MODELS.find((model) => model.id === resolvedModelId)
 }
 
 // For backward compatibility - static models only

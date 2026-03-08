@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
+import * as Sentry from "@sentry/nextjs"
 import { after } from "next/server"
 import {
   SYSTEM_PROMPT_DEFAULT,
@@ -15,8 +16,8 @@ import {
   PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
-import type { SupportedModel } from "@/lib/openproviders/types"
 import {
   captureGeneration,
   flushPostHog,
@@ -76,6 +77,10 @@ import {
   wrapMcpTools,
 } from "@/lib/tools/mcp-wrapper"
 import type { ShippingAddress } from "@/lib/payclaw/schemas"
+import {
+  classifyChatError,
+  type ChatErrorType,
+} from "@/lib/observability/chat-error-taxonomy"
 
 export const maxDuration = 60
 
@@ -111,6 +116,64 @@ function normalizeChatVersion(
     return Math.floor(chatVersion)
   }
   return fallbackMessages.length
+}
+
+function bucketChatVersion(chatVersion: number): string {
+  if (chatVersion <= 1) return "0-1"
+  if (chatVersion <= 5) return "2-5"
+  if (chatVersion <= 20) return "6-20"
+  return "21+"
+}
+
+function getToolDimensionForError(errorType: ChatErrorType): "yes" | "no" {
+  return errorType === "tool_timeout" || errorType === "tool_execution"
+    ? "yes"
+    : "no"
+}
+
+type ToolExecutionOutcome =
+  | "none"
+  | "success"
+  | "failure"
+  | "timeout"
+  | "budget_denied"
+
+function bucketLatencyMs(latencyMs: number): string {
+  if (latencyMs <= 1000) return "le_1s"
+  if (latencyMs <= 3000) return "1s_3s"
+  if (latencyMs <= 8000) return "3s_8s"
+  if (latencyMs <= 15000) return "8s_15s"
+  return "gt_15s"
+}
+
+function isTimeoutSignal(value: string | undefined): boolean {
+  if (!value) return false
+  const normalized = value.toLowerCase()
+  return (
+    normalized.includes("timeout") ||
+    normalized.includes("timed out") ||
+    normalized.includes("deadline exceeded") ||
+    normalized.includes("aborterror")
+  )
+}
+
+function getSlowRequestThresholdMs(): number {
+  const fallback = 15000
+  const parsed = Number.parseInt(
+    process.env.SENTRY_CHAT_SLOW_REQUEST_MS ?? "",
+    10
+  )
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function setChatConversationCorrelation(chatId: string): void {
+  const sentryWithConversationApi = Sentry as typeof Sentry & {
+    setConversationId?: (conversationId: string) => void
+  }
+  if (typeof sentryWithConversationApi.setConversationId === "function") {
+    sentryWithConversationApi.setConversationId(chatId)
+  }
+  Sentry.setContext("chat_conversation", { id: chatId })
 }
 
 function parseTimestampMs(value: unknown): number | undefined {
@@ -244,11 +307,23 @@ export async function POST(req: Request) {
   // MCP state — declared outside try for cleanup in both after() and catch
   let mcpClients: LoadToolsResult["clients"] = []
   let mcpToolServerMap: LoadToolsResult["toolServerMap"] = new Map()
+  const requestId = crypto.randomUUID()
+  let telemetryChatId: string | undefined
+  let telemetryModel: string | undefined
+  let telemetryProvider: string | undefined
+  let telemetryIsAuthenticated: boolean | undefined
+  let telemetryMessageCount: number | undefined
+  const slowRequestThresholdMs = getSlowRequestThresholdMs()
 
   try {
+    Sentry.setTag("route", "api/chat")
+    Sentry.setTag("chat_route", "/api/chat")
+    Sentry.setTag("chat_operation", "stream_text")
+
     // Server-side authentication - derive userId from Clerk session
     const { userId: authUserId, getToken } = await auth()
     const isAuthenticated = !!authUserId
+    telemetryIsAuthenticated = isAuthenticated
 
     // Get Convex token for authenticated usage tracking
     const convexToken = isAuthenticated
@@ -258,13 +333,37 @@ export async function POST(req: Request) {
     const {
       messages,
       chatId,
-      model,
+      model: requestedModel,
       systemPrompt,
       enableSearch,
       chatVersion,
       message_group_id,
       userId: clientUserId,
     } = (await req.json()) as ChatRequest
+    const model = resolveModelId(requestedModel)
+    telemetryChatId = chatId
+    telemetryModel = model
+    telemetryMessageCount = Array.isArray(messages) ? messages.length : undefined
+    setChatConversationCorrelation(chatId)
+    Sentry.setTag("chat_model", model)
+    Sentry.setTag("chat_is_authenticated", String(isAuthenticated))
+    Sentry.setContext("chat_request", {
+      requestId,
+      chatId,
+      requestedModel,
+      resolvedModel: model,
+      messageCount: telemetryMessageCount,
+    })
+    if (requestedModel !== model) {
+      console.warn(
+        JSON.stringify({
+          _tag: "model_id_migrated",
+          requestId,
+          from: requestedModel,
+          to: model,
+        })
+      )
+    }
 
     if (!messages || !chatId || !model) {
       return new Response(
@@ -307,19 +406,35 @@ export async function POST(req: Request) {
 
     // Server-side usage check - enforces rate limits before processing
     // For anonymous users, pass the anonymousId for tracking
-    await checkServerSideUsage(convexToken, model, anonymousId)
+    await Sentry.startSpan(
+      {
+        name: "chat.usage_checks",
+        op: "chat.validation",
+        attributes: {
+          "chat.id": chatId,
+          "chat.model": model,
+          "chat.is_authenticated": isAuthenticated,
+        },
+      },
+      async () => {
+        await checkServerSideUsage(convexToken, model, anonymousId)
 
-    await validateAndTrackUsage({
-      userId,
-      model,
-      isAuthenticated,
-      token: convexToken,
-    })
+        await validateAndTrackUsage({
+          userId,
+          model,
+          isAuthenticated,
+          token: convexToken,
+        })
 
-    // Increment usage count server-side with Convex
-    await incrementServerSideUsage(convexToken, model, anonymousId)
+        // Increment usage count server-side with Convex
+        await incrementServerSideUsage(convexToken, model, anonymousId)
+      }
+    )
 
-    const allModels = await getAllModels()
+    const allModels = await Sentry.startSpan(
+      { name: "chat.load_models", op: "chat.config" },
+      async () => getAllModels()
+    )
     const modelConfig = allModels.find((m) => m.id === model)
 
     if (!modelConfig || !modelConfig.apiSdk) {
@@ -328,7 +443,9 @@ export async function POST(req: Request) {
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
-    const provider = getProviderForModel(model as SupportedModel)
+    const provider = getProviderForModel(model)
+    telemetryProvider = provider
+    Sentry.setTag("chat_provider", provider)
     let userAddresses: Array<Doc<"shippingAddresses">> = []
 
     let apiKey: string | undefined
@@ -398,8 +515,6 @@ export async function POST(req: Request) {
     })
     const capabilities = initialCapabilityPolicy.capabilities
     const shouldInjectSearch = enableSearch && capabilities.search
-    const requestId = crypto.randomUUID()
-
     console.log(
       JSON.stringify({
         _tag: "tool_capability_policy",
@@ -1484,6 +1599,7 @@ export async function POST(req: Request) {
     // arrives (reasoning is done) or onFinish fires, we compute elapsed ms.
     let reasoningStartMs: number | null = null
     let reasoningDurationMs: number | null = null
+    let firstChunkLatencyMs: number | null = null
     let loggedLateStepPolicy = false
 
     const result = streamText({
@@ -1492,6 +1608,21 @@ export async function POST(req: Request) {
       messages: modelMessages,
       tools: allTools,
       stopWhen: stepCountIs(maxSteps),
+      experimental_telemetry: {
+        isEnabled: true,
+        functionId: "api.chat.streamText",
+        metadata: {
+          route: "api/chat",
+          operation: "stream_text",
+          conversationId: chatId,
+          provider,
+          model,
+          isAuthenticated,
+          hasTools: hasAnyTools,
+          enableSearch: shouldInjectSearch,
+          chatVersionBucket: bucketChatVersion(normalizedChatVersion),
+        },
+      },
 
       // Centralized step gating from the capability policy resolver.
       // After PREPARE_STEP_THRESHOLD, only late-step-safe tools remain
@@ -1644,6 +1775,9 @@ export async function POST(req: Request) {
       ...(Object.keys(requestHeaders).length > 0 && { headers: requestHeaders }),
 
       onChunk: ({ chunk }) => {
+        if (firstChunkLatencyMs === null) {
+          firstChunkLatencyMs = Date.now() - streamStartMs
+        }
         if (chunk.type === "reasoning-delta" && reasoningStartMs === null) {
           reasoningStartMs = Date.now()
         }
@@ -1718,6 +1852,100 @@ export async function POST(req: Request) {
         // (e.g. reasoning-only responses with no text output, or errors)
         if (reasoningStartMs !== null && reasoningDurationMs === null) {
           reasoningDurationMs = Date.now() - reasoningStartMs
+        }
+
+        let totalToolCalls = 0
+        let failedToolCalls = 0
+        let timeoutToolCalls = 0
+        let budgetDeniedToolCalls = 0
+
+        for (const step of steps ?? []) {
+          for (const toolCall of step.toolCalls ?? []) {
+            totalToolCalls++
+            const trace = traceCollector.get(toolCall.toolCallId)
+            const result = step.toolResults?.find(
+              (r: { toolCallId: string }) => r.toolCallId === toolCall.toolCallId
+            )
+            const failed = result ? Boolean((result as { isError?: boolean }).isError) : true
+            if (failed) failedToolCalls++
+            if (trace?.budgetDenied) budgetDeniedToolCalls++
+            if (
+              isTimeoutSignal(trace?.errorCode) ||
+              isTimeoutSignal(trace?.error) ||
+              isTimeoutSignal(
+                result &&
+                  typeof (result as { output?: unknown }).output === "string"
+                  ? ((result as { output?: unknown }).output as string)
+                  : undefined
+              )
+            ) {
+              timeoutToolCalls++
+            }
+          }
+        }
+
+        const toolOutcome: ToolExecutionOutcome =
+          totalToolCalls === 0
+            ? "none"
+            : budgetDeniedToolCalls > 0
+              ? "budget_denied"
+              : timeoutToolCalls > 0
+                ? "timeout"
+                : failedToolCalls > 0
+                  ? "failure"
+                  : "success"
+
+        const totalLatencyMs = Date.now() - streamStartMs
+        Sentry.setTag("chat_finish_reason", finishReason ?? "unknown")
+        Sentry.setTag("chat_error_type", "none")
+        Sentry.setTag("chat_tool_outcome", toolOutcome)
+        Sentry.setTag("chat_total_latency_bucket", bucketLatencyMs(totalLatencyMs))
+        if (firstChunkLatencyMs !== null) {
+          Sentry.setTag(
+            "chat_first_token_latency_bucket",
+            bucketLatencyMs(firstChunkLatencyMs)
+          )
+        }
+        Sentry.setContext("chat_response", {
+          requestId,
+          finishReason,
+          toolOutcome,
+          totalToolCalls,
+          failedToolCalls,
+          timeoutToolCalls,
+          budgetDeniedToolCalls,
+          firstTokenLatencyMs: firstChunkLatencyMs,
+          totalLatencyMs,
+          reasoningDurationMs,
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
+        })
+        if (totalLatencyMs >= slowRequestThresholdMs) {
+          Sentry.captureMessage("chat_slow_request", {
+            level: "warning",
+            tags: {
+              route: "api/chat",
+              chat_provider: provider,
+              chat_model: model,
+              chat_tool_outcome: toolOutcome,
+              chat_finish_reason: finishReason ?? "unknown",
+              chat_error_type: "none",
+            },
+            extra: {
+              requestId,
+              chatId,
+              totalLatencyMs,
+              firstTokenLatencyMs: firstChunkLatencyMs,
+              thresholdMs: slowRequestThresholdMs,
+              totalToolCalls,
+              failedToolCalls,
+              timeoutToolCalls,
+              budgetDeniedToolCalls,
+              inputTokens: usage?.inputTokens,
+              outputTokens: usage?.outputTokens,
+              isAuthenticated,
+            },
+          })
         }
 
         // ---------------------------------------------------------------
@@ -2096,6 +2324,27 @@ export async function POST(req: Request) {
       },
       onError: (error: unknown) => {
         console.error("Error forwarded to client:", error)
+        const errorType = classifyChatError(error)
+        Sentry.captureException(error, {
+          tags: {
+            route: "api/chat",
+            chat_model: model,
+            chat_provider: provider,
+            chat_is_authenticated: String(isAuthenticated),
+            chat_error_type: errorType,
+            chat_error_has_tool_signal: getToolDimensionForError(errorType),
+          },
+          extra: {
+            requestId,
+            chatId,
+            model,
+            provider,
+            errorType,
+            isAuthenticated,
+            messageCount: messages.length,
+            chatVersion: normalizedChatVersion,
+          },
+        })
         return extractErrorMessage(error)
       },
     });
@@ -2109,6 +2358,31 @@ export async function POST(req: Request) {
       message?: string
       statusCode?: number
     }
+    const errorType = classifyChatError(err)
+
+    Sentry.captureException(err, {
+      tags: {
+        route: "api/chat",
+        ...(telemetryModel ? { chat_model: telemetryModel } : {}),
+        ...(telemetryProvider ? { chat_provider: telemetryProvider } : {}),
+        chat_is_authenticated:
+          telemetryIsAuthenticated === undefined
+            ? "unknown"
+            : String(telemetryIsAuthenticated),
+        chat_error_type: errorType,
+        chat_error_has_tool_signal: getToolDimensionForError(errorType),
+      },
+      extra: {
+        requestId,
+        chatId: telemetryChatId,
+        model: telemetryModel,
+        provider: telemetryProvider,
+        errorType,
+        isAuthenticated: telemetryIsAuthenticated,
+        messageCount: telemetryMessageCount,
+        mcpClientCount: mcpClients.length,
+      },
+    })
 
     return createErrorResponse(error)
   }

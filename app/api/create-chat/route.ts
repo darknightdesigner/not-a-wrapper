@@ -1,8 +1,11 @@
 import { createChatInDb } from "./api"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 
 export async function POST(request: Request) {
   try {
     const { userId, title, model, projectId } = await request.json()
+    const normalizedModel =
+      typeof model === "string" ? resolveModelId(model) : model
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -13,7 +16,7 @@ export async function POST(request: Request) {
     const chat = await createChatInDb({
       userId,
       title,
-      model,
+      model: normalizedModel,
       projectId,
     })
 

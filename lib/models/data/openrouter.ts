@@ -1,7 +1,20 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import { ModelConfig } from "../types"
 
-export const openrouterModels: ModelConfig[] = [
+const OPENROUTER_DUPLICATE_IDS = new Set<string>([
+  "openrouter:anthropic/claude-sonnet-4",
+  "openrouter:google/gemini-2.5-pro",
+  "openrouter:google/gemini-2.5-flash",
+  "openrouter:openai/gpt-4.1",
+  "openrouter:openai/o4-mini",
+  "openrouter:perplexity/sonar",
+  "openrouter:perplexity/sonar-reasoning",
+  "openrouter:perplexity/sonar-reasoning-pro",
+  "openrouter:perplexity/sonar-pro",
+  "openrouter:perplexity/sonar-deep-research",
+])
+
+const openrouterModelsRaw: ModelConfig[] = [
   {
     id: "openrouter:deepseek/deepseek-r1:free",
     name: "DeepSeek R1",
@@ -65,38 +78,6 @@ export const openrouterModels: ModelConfig[] = [
       createOpenRouter({
         apiKey: apiKey || process.env.OPENROUTER_API_KEY,
       }).chat("anthropic/claude-sonnet-4"),
-  },
-  {
-    id: "openrouter:anthropic/claude-3.7-sonnet:thinking",
-    name: "Claude 3.7 Sonnet (Thinking)",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "Claude",
-    baseProviderId: "claude",
-    description:
-      "Claude's latest model with transparent reasoning mode, excellent for complex problem-solving and coding tasks.",
-    tags: ["flagship", "reasoning", "transparent", "coding"],
-    contextWindow: 200000,
-    inputCost: 3.0,
-    outputCost: 15.0,
-    priceUnit: "per 1M tokens",
-    vision: true,
-    tools: true,
-    audio: false,
-    reasoningText: true,
-    webSearch: true,
-    openSource: false,
-    speed: "Medium",
-    intelligence: "High",
-    website: "https://openrouter.ai",
-    apiDocs: "https://openrouter.ai/anthropic/claude-3.7-sonnet:thinking",
-    modelPage: "https://www.anthropic.com/claude",
-    releasedAt: "2025-02-24",
-    icon: "claude",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-      }).chat("anthropic/claude-3.7-sonnet:thinking"),
   },
   {
     id: "openrouter:google/gemini-2.5-pro",
@@ -419,70 +400,6 @@ export const openrouterModels: ModelConfig[] = [
       }).chat("anthropic/claude-3.5-sonnet"),
   },
   {
-    id: "openrouter:google/gemini-2.0-flash-001",
-    name: "Gemini 2.0 Flash",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "Gemini",
-    baseProviderId: "gemini",
-    description:
-      "Google's next-generation multimodal model with enhanced speed and reasoning capabilities.",
-    tags: ["fast", "multimodal", "reasoning", "coding"],
-    contextWindow: 1048576,
-    inputCost: 0.1,
-    outputCost: 0.4,
-    priceUnit: "per 1M tokens",
-    vision: true,
-    tools: true,
-    audio: true,
-    reasoningText: true,
-    webSearch: true,
-    openSource: false,
-    speed: "Fast",
-    intelligence: "High",
-    website: "https://openrouter.ai",
-    apiDocs: "https://openrouter.ai/google/gemini-2.0-flash-001",
-    modelPage: "https://ai.google.dev",
-    releasedAt: "2024-12-11",
-    icon: "gemini",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-      }).chat("google/gemini-2.0-flash-001"),
-  },
-  {
-    id: "openrouter:google/gemini-2.0-flash-lite-001",
-    name: "Gemini 2.0 Flash Lite",
-    provider: "OpenRouter",
-    providerId: "openrouter",
-    modelFamily: "Gemini",
-    baseProviderId: "gemini",
-    description:
-      "Lightweight version of Gemini 2.0 Flash optimized for speed and cost-efficiency.",
-    tags: ["fast", "lite", "efficient", "cost-effective"],
-    contextWindow: 1048576,
-    inputCost: 0.075,
-    outputCost: 0.3,
-    priceUnit: "per 1M tokens",
-    vision: true,
-    tools: true,
-    audio: false,
-    reasoningText: true,
-    webSearch: true,
-    openSource: false,
-    speed: "Fast",
-    intelligence: "Medium",
-    website: "https://openrouter.ai",
-    apiDocs: "https://openrouter.ai/google/gemini-2.0-flash-lite-001",
-    modelPage: "https://ai.google.dev",
-    releasedAt: "2024-12-11",
-    icon: "gemini",
-    apiSdk: (apiKey?: string) =>
-      createOpenRouter({
-        apiKey: apiKey || process.env.OPENROUTER_API_KEY,
-      }).chat("google/gemini-2.0-flash-lite-001"),
-  },
-  {
     id: "openrouter:perplexity/sonar",
     name: "Perplexity Sonar",
     provider: "OpenRouter",
@@ -643,3 +560,7 @@ export const openrouterModels: ModelConfig[] = [
       }).chat("perplexity/sonar-deep-research"),
   },
 ]
+
+export const openrouterModels = openrouterModelsRaw.filter(
+  (model) => !OPENROUTER_DUPLICATE_IDS.has(model.id)
+)

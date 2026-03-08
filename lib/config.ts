@@ -27,8 +27,8 @@ export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini", "gpt-5.2"]
 export const FREE_MODELS_IDS = [
   "openrouter:deepseek/deepseek-r1:free",
   "openrouter:meta-llama/llama-3.3-8b-instruct:free",
-  "pixtral-large-latest",
-  "mistral-large-latest",
+  "pixtral-large-2411",
+  "mistral-large-2512",
   "gpt-5-mini",
 ]
 

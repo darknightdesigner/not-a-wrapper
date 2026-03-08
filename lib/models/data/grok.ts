@@ -2,6 +2,7 @@ import { openproviders } from "@/lib/openproviders"
 import { ModelConfig } from "../types"
 
 const grokModels: ModelConfig[] = [
+  // Legacy IDs retained pending runtime validation of upstream alias support.
   {
     id: "grok-2",
     name: "Grok 2",
@@ -60,7 +61,7 @@ const grokModels: ModelConfig[] = [
       openproviders("grok-2-vision", undefined, apiKey),
   },
   {
-    id: "grok-4",
+    id: "grok-4-0709",
     name: "Grok 4",
     provider: "xAI",
     providerId: "xai",
@@ -84,7 +85,7 @@ const grokModels: ModelConfig[] = [
     apiDocs: "https://docs.x.ai/docs/models",
     releasedAt: "2025-07-09",
     icon: "xai",
-    apiSdk: (apiKey?: string) => openproviders("grok-4", undefined, apiKey),
+    apiSdk: (apiKey?: string) => openproviders("grok-4-0709", undefined, apiKey),
   },
   {
     id: "grok-4-1-fast-reasoning",
@@ -114,6 +115,34 @@ const grokModels: ModelConfig[] = [
     icon: "xai",
     apiSdk: (apiKey?: string) =>
       openproviders("grok-4-1-fast-reasoning", undefined, apiKey),
+  },
+  {
+    id: "grok-4-1-fast-non-reasoning",
+    name: "Grok 4.1 Fast (Non-Reasoning)",
+    provider: "xAI",
+    providerId: "xai",
+    modelFamily: "Grok",
+    baseProviderId: "xai",
+    description:
+      "xAI's fast tool-calling model without explicit reasoning token output.",
+    tags: ["fast", "agents", "tools", "cheap", "non-reasoning"],
+    contextWindow: 2000000,
+    inputCost: 0.20,
+    outputCost: 0.50,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoningText: false,
+    webSearch: true,
+    openSource: false,
+    speed: "Fast",
+    intelligence: "High",
+    website: "https://x.ai",
+    apiDocs: "https://docs.x.ai/docs/models",
+    icon: "xai",
+    apiSdk: (apiKey?: string) =>
+      openproviders("grok-4-1-fast-non-reasoning", undefined, apiKey),
   },
   {
     id: "grok-code-fast-1",

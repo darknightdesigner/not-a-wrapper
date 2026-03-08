@@ -4,6 +4,7 @@ import { ModelSelector } from "@/components/common/model-selector/base"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { MODEL_DEFAULT } from "@/lib/config"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { useMultiModelSelection } from "@/lib/model-store/multi-model-provider"
 import { useModel } from "@/lib/model-store/provider"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
@@ -38,10 +39,12 @@ export function ModelSelectorHeader() {
 
   const effectiveModel = useMemo(
     () =>
+      resolveModelId(
       currentChat?.model ||
-      lastUsedModel ||
-      favoriteModels[0] ||
-      MODEL_DEFAULT,
+        lastUsedModel ||
+        favoriteModels[0] ||
+        MODEL_DEFAULT
+      ),
     [currentChat?.model, lastUsedModel, favoriteModels]
   )
 
