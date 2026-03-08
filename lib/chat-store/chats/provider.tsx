@@ -6,6 +6,7 @@ import type { Id } from "@/convex/_generated/dataModel"
 import { useMutation, useQuery, useConvexAuth } from "convex/react"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
 import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "../../config"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import type { Chats } from "../types"
 
 // Types for optimistic updates
@@ -75,7 +76,7 @@ export function ChatsProvider({
         id: chat._id,
         user_id: chat.userId,
         title: chat.title ?? null,
-        model: chat.model ?? null,
+        model: chat.model ? resolveModelId(chat.model) : null,
         system_prompt: chat.systemPrompt ?? null,
         project_id: chat.projectId ?? null,
         public: chat.public,
@@ -174,6 +175,7 @@ export function ChatsProvider({
     projectId?: string
   ): Promise<Chats | undefined> => {
     if (!userId) return
+    const normalizedModel = resolveModelId(model || MODEL_DEFAULT)
 
     // For guest users, create a local-only chat (not persisted to Convex)
     // This allows unauthenticated users to send messages without database errors
@@ -183,7 +185,7 @@ export function ChatsProvider({
         id: localChatId,
         title: title || "New chat",
         created_at: new Date().toISOString(),
-        model: model || MODEL_DEFAULT,
+        model: normalizedModel,
         system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
         user_id: userId,
         public: false,
@@ -212,7 +214,7 @@ export function ChatsProvider({
       id: optimisticId,
       title: title || "New chat",
       created_at: new Date().toISOString(),
-      model: model || MODEL_DEFAULT,
+      model: normalizedModel,
       system_prompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
       user_id: userId,
       public: false,
@@ -228,7 +230,7 @@ export function ChatsProvider({
     try {
       const chatId = await createChatMutation({
         title: title || "New chat",
-        model: model || MODEL_DEFAULT,
+        model: normalizedModel,
         systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
         projectId: projectId as Id<"projects"> | undefined,
       })
@@ -269,16 +271,17 @@ export function ChatsProvider({
   }, [chats])
 
   const updateChatModel = useCallback(async (id: string, model: string) => {
-    const changes = { model }
+    const normalizedModel = resolveModelId(model)
+    const changes = { model: normalizedModel }
 
     // Optimistic update
     setOptimisticOps((prev) => [...prev, { type: "update", id, changes }])
 
     try {
-      await updateModelMutation({ chatId: id as Id<"chats">, model })
-      removeOp((op) => op.type === "update" && op.id === id && op.changes.model === model)
+      await updateModelMutation({ chatId: id as Id<"chats">, model: normalizedModel })
+      removeOp((op) => op.type === "update" && op.id === id && op.changes.model === normalizedModel)
     } catch {
-      removeOp((op) => op.type === "update" && op.id === id && op.changes.model === model)
+      removeOp((op) => op.type === "update" && op.id === id && op.changes.model === normalizedModel)
       toast({ title: "Failed to update model", status: "error" })
     }
   }, [updateModelMutation, removeOp])

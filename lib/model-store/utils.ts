@@ -6,26 +6,25 @@ import { ModelConfig } from "@/lib/models/types"
  * Models not in this list preserve their original array-declaration order.
  */
 export const DEFAULT_MODEL_ORDER: string[] = [
-  // Top 3 Anthropic (most recent first)
+  // Top Anthropic (most recent first)
   "claude-opus-4-6",
+  "claude-sonnet-4-6",
   "claude-sonnet-4-5",
-  "claude-haiku-4-5",
   // Top 3 OpenAI (most recent first)
+  "gpt-5.4",
   "gpt-5.2",
   "o4-mini",
-  "gpt-5",
   // Top 1 Google
-  "gemini-3-pro-preview",
+  "gemini-2.5-pro",
   // Top 1 Grok
   "grok-4-1-fast-reasoning",
   // Remaining popular models
-  "gemini-2.5-pro",
   "gemini-2.5-flash",
   "gpt-5-mini",
-  "deepseek-r1",
-  "grok-4",
-  "mistral-large-latest",
-  "pixtral-large-latest",
+  "openrouter:deepseek/deepseek-r1:free",
+  "grok-4-0709",
+  "mistral-large-2512",
+  "pixtral-large-2411",
 ]
 
 /**

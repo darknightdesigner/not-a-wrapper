@@ -1,4 +1,5 @@
-import type { Provider, SupportedModel } from "./types"
+import { resolveModelId } from "@/lib/models/model-id-migration"
+import type { Provider } from "./types"
 
 // map each model ID to its provider
 const MODEL_PROVIDER_MAP: Record<string, Provider> = {
@@ -43,6 +44,10 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "o4-mini-2025-04-16": "openai",
   "gpt-5.2": "openai",
   "gpt-5.2-2025-12-11": "openai",
+  "gpt-5.4": "openai",
+  "gpt-5.4-2026-03-05": "openai",
+  "gpt-5.4-pro": "openai",
+  "gpt-5.4-pro-2026-03-05": "openai",
   "gpt-5.1": "openai",
   "gpt-5.1-2025-11-13": "openai",
   "gpt-5.1-thinking": "openai",
@@ -55,22 +60,27 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
 
   // Mistral
   "codestral-latest": "mistral",
+  "codestral-2508": "mistral",
   "ministral-3b-latest": "mistral",
+  "ministral-3b-2512": "mistral",
   "ministral-8b-latest": "mistral",
+  "ministral-8b-2512": "mistral",
   "mistral-large-latest": "mistral",
+  "mistral-large-2512": "mistral",
   "mistral-small-latest": "mistral",
+  "mistral-small-2506": "mistral",
   "pixtral-large-latest": "mistral",
+  "pixtral-large-2411": "mistral",
   "pixtral-12b-2409": "mistral",
   "open-mistral-7b": "mistral",
   "open-mixtral-8x7b": "mistral",
   "open-mixtral-8x22b": "mistral",
 
   //Perplexity
-  "sonar":"perplexity",
+  sonar: "perplexity",
   "sonar-pro": "perplexity",
   "sonar-deep-research": "perplexity",
   "sonar-reasoning-pro": "perplexity",
-  "sonar-reasoning": "perplexity",
 
   // Google
   "gemini-2.0-flash-001": "google",
@@ -96,13 +106,13 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gemini-2.5-flash": "google",
   "gemini-2.5-flash-lite": "google",
   "gemini-2.5-pro": "google",
-  "gemini-3-pro-preview": "google",
 
   // Anthropic
   "claude-3-haiku-20240307": "anthropic",
   "claude-opus-4-20250514": "anthropic",
   "claude-sonnet-4-20250514": "anthropic",
   "claude-opus-4-6": "anthropic",
+  "claude-sonnet-4-6": "anthropic",
   "claude-sonnet-4-5": "anthropic",
   "claude-sonnet-4-5-20250929": "anthropic",
   "claude-haiku-4-5": "anthropic",
@@ -121,6 +131,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "grok-vision-beta": "xai",
   "grok-beta": "xai",
   "grok-4": "xai",
+  "grok-4-0709": "xai",
   "grok-4-fast-reasoning": "xai",
   "grok-4-fast-non-reasoning": "xai",
   "grok-4-1-fast-reasoning": "xai",
@@ -129,13 +140,15 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
 
 }
 
-export function getProviderForModel(model: SupportedModel): Provider {
-  if (model.startsWith("openrouter:")) {
+export function getProviderForModel(model: string): Provider {
+  const resolvedModel = resolveModelId(model)
+
+  if (resolvedModel.startsWith("openrouter:")) {
     return "openrouter"
   }
 
-  const provider = MODEL_PROVIDER_MAP[model]
+  const provider = MODEL_PROVIDER_MAP[resolvedModel]
   if (provider) return provider
 
-  throw new Error(`Unknown provider for model: ${model}`)
+  throw new Error(`Unknown provider for model: ${resolvedModel}`)
 }

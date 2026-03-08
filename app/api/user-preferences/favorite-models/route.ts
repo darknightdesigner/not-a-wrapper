@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server"
 import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 import { NextRequest, NextResponse } from "next/server"
+import { resolveModelIds } from "@/lib/models/model-id-migration"
 
 /**
  * Favorite Models API
@@ -52,17 +53,18 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+    const normalizedFavoriteModels = resolveModelIds(favorite_models)
 
     // Update favorite models in Convex with authenticated client
     const convex = getConvexClient()
     convex.setAuth(token)
     await convex.mutation(api.users.updateFavoriteModels, {
-      favoriteModels: favorite_models,
+      favoriteModels: normalizedFavoriteModels,
     })
 
     return NextResponse.json({
       success: true,
-      favorite_models,
+      favorite_models: normalizedFavoriteModels,
     })
   } catch (error) {
     console.error("Error in favorite-models API:", error)
@@ -94,9 +96,17 @@ export async function GET() {
     const convex = getConvexClient()
     convex.setAuth(token)
     const user = await convex.query(api.users.getCurrent, {})
+    const favoriteModels = user?.favoriteModels ?? []
+    const normalizedFavoriteModels = resolveModelIds(favoriteModels)
+
+    if (JSON.stringify(normalizedFavoriteModels) !== JSON.stringify(favoriteModels)) {
+      await convex.mutation(api.users.updateFavoriteModels, {
+        favoriteModels: normalizedFavoriteModels,
+      })
+    }
 
     return NextResponse.json({
-      favorite_models: user?.favoriteModels ?? [],
+      favorite_models: normalizedFavoriteModels,
     })
   } catch (error) {
     console.error("Error in favorite-models GET API:", error)

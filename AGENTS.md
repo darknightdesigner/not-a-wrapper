@@ -4,14 +4,7 @@ Open-source multi-AI chat app with a unified model interface across providers.
 
 ## Primary Objective
 
-Deliver correct, secure, maintainable changes with minimal, focused diffs.
-
-## Context File Contract (Paper-Aligned)
-
-- Keep this file minimal and high-signal.
-- Include only mandatory constraints and critical patterns.
-- Avoid broad repository overviews and generic checklists.
-- Load deeper guidance from `.agents/` only when task-relevant.
+Deliver correct, maintainable, well-researched, best practice changes.
 
 ## Implementation Philosophy (SHOULD)
 
@@ -34,7 +27,6 @@ Deliver correct, secure, maintainable changes with minimal, focused diffs.
 
 ### Security (MUST)
 
-- Never read/write `.env*` files.
 - Never log or expose secrets, tokens, or credentials.
 - Treat BYOK/API key data as encrypted-at-rest.
 
@@ -94,14 +86,6 @@ try {
   if (previous) setState(previous)
 }
 ```
-
-## Execution Defaults (SHOULD)
-
-1. Gather only the context needed for the current task.
-2. Plan small, testable edits.
-3. Implement focused changes.
-4. Run only relevant checks (`lint`, `typecheck`, targeted tests).
-5. Report key trade-offs and residual risks.
 
 ## On-Demand Context
 

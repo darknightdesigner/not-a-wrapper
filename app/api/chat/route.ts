@@ -16,8 +16,8 @@ import {
   PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
-import type { SupportedModel } from "@/lib/openproviders/types"
 import {
   captureGeneration,
   flushPostHog,
@@ -268,18 +268,30 @@ export async function POST(req: Request) {
     const {
       messages,
       chatId,
-      model,
+      model: requestedModel,
       systemPrompt,
       enableSearch,
       chatVersion,
       message_group_id,
       userId: clientUserId,
     } = (await req.json()) as ChatRequest
+    const model = resolveModelId(requestedModel)
     telemetryChatId = chatId
     telemetryModel = model
     telemetryMessageCount = Array.isArray(messages) ? messages.length : undefined
     Sentry.setTag("chat_model", model)
     Sentry.setTag("chat_is_authenticated", String(isAuthenticated))
+    if (requestedModel !== model) {
+      Sentry.setTag("chat_model_original", requestedModel)
+      console.warn(
+        JSON.stringify({
+          _tag: "model_id_migrated",
+          requestId,
+          from: requestedModel,
+          to: model,
+        })
+      )
+    }
 
     if (!messages || !chatId || !model) {
       return new Response(
@@ -359,7 +371,7 @@ export async function POST(req: Request) {
 
     const effectiveSystemPrompt = systemPrompt || SYSTEM_PROMPT_DEFAULT
 
-    const provider = getProviderForModel(model as SupportedModel)
+    const provider = getProviderForModel(model)
     let userAddresses: Array<Doc<"shippingAddresses">> = []
 
     let apiKey: string | undefined

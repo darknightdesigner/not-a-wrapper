@@ -1,6 +1,7 @@
 import { toast } from "@/components/ui/toast"
 import { Chats } from "@/lib/chat-store/types"
 import { MODEL_DEFAULT } from "@/lib/config"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { useModel as useModelProvider } from "@/lib/model-store/provider"
 import type { UserProfile } from "@/lib/user/types"
 import { useCallback, useState } from "react"
@@ -35,11 +36,11 @@ export function useModel({
   const getEffectiveModel = useCallback(() => {
     const hydratedLastUsedModel = modelPrefsHydrated ? lastUsedModel : null
     const firstFavoriteModel = modelPrefsHydrated ? favoriteModels[0] : null
-    return (
+    return resolveModelId(
       currentChat?.model ||
-      hydratedLastUsedModel ||
-      firstFavoriteModel ||
-      MODEL_DEFAULT
+        hydratedLastUsedModel ||
+        firstFavoriteModel ||
+        MODEL_DEFAULT
     )
   }, [currentChat?.model, favoriteModels, lastUsedModel, modelPrefsHydrated])
 

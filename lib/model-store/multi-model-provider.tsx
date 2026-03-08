@@ -1,6 +1,7 @@
 "use client"
 
 import { MODEL_DEFAULT } from "@/lib/config"
+import { resolveModelIds } from "@/lib/models/model-id-migration"
 import { useModel } from "@/lib/model-store/provider"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import {
@@ -58,9 +59,10 @@ export function MultiModelSelectionProvider({
   // Keep lastUsedModel in sync when selection changes
   const setSelectedModelIds = useCallback(
     (ids: string[]) => {
-      setSelectedModelIdsState(ids)
-      if (ids.length > 0) {
-        setLastUsedModel(ids[0])
+      const normalizedIds = resolveModelIds(ids)
+      setSelectedModelIdsState(normalizedIds)
+      if (normalizedIds.length > 0) {
+        setLastUsedModel(normalizedIds[0])
       }
     },
     [setLastUsedModel]

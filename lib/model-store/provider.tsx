@@ -3,6 +3,7 @@
 import { api } from "@/convex/_generated/api"
 import { fetchClient } from "@/lib/fetch"
 import { getModelInfo } from "@/lib/models"
+import { resolveModelId, resolveModelIds } from "@/lib/models/model-id-migration"
 import { ModelConfig } from "@/lib/models/types"
 import { useQuery } from "convex/react"
 import {
@@ -53,18 +54,19 @@ type ModelContextType = {
 const ModelContext = createContext<ModelContextType | undefined>(undefined)
 
 function isKnownModelId(modelId: string): boolean {
-  return getModelInfo(modelId) !== undefined
+  return getModelInfo(resolveModelId(modelId)) !== undefined
 }
 
 function normalizeFavoriteModels(value: unknown): string[] {
   if (!Array.isArray(value)) return []
 
-  const knownFavorites = value.filter(
+  const rawFavorites = value.filter(
     (entry): entry is string =>
-      typeof entry === "string" && isKnownModelId(entry)
+      typeof entry === "string"
   )
 
-  return [...new Set(knownFavorites)]
+  const resolvedFavorites = resolveModelIds(rawFavorites)
+  return resolvedFavorites.filter((entry) => isKnownModelId(entry))
 }
 
 export function ModelProvider({ children }: { children: React.ReactNode }) {
@@ -77,9 +79,11 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
   const [modelPrefsHydrated, setModelPrefsHydrated] = useState(false)
 
   const setLastUsedModel = useCallback((model: string) => {
-    setLastUsedModelState(model)
+    const resolvedModel = resolveModelId(model)
+    if (!isKnownModelId(resolvedModel)) return
+    setLastUsedModelState(resolvedModel)
     try {
-      localStorage.setItem("lastUsedModel", model)
+      localStorage.setItem("lastUsedModel", resolvedModel)
     } catch {}
   }, [])
 
@@ -136,12 +140,10 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
       )
       if (response.ok) {
         const data = await response.json()
-        setFavoriteModels(data.favorite_models || [])
+        const normalized = normalizeFavoriteModels(data.favorite_models)
+        setFavoriteModels(normalized)
         try {
-          localStorage.setItem(
-            "cachedFavoriteModels",
-            JSON.stringify(data.favorite_models || [])
-          )
+          localStorage.setItem("cachedFavoriteModels", JSON.stringify(normalized))
         } catch {}
       }
     } catch (error) {
@@ -214,8 +216,15 @@ export function ModelProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const cachedLastUsedModel = localStorage.getItem("lastUsedModel")
-      if (cachedLastUsedModel && isKnownModelId(cachedLastUsedModel)) {
-        setLastUsedModelState(cachedLastUsedModel)
+      const resolvedLastUsedModel = cachedLastUsedModel
+        ? resolveModelId(cachedLastUsedModel)
+        : null
+
+      if (resolvedLastUsedModel && isKnownModelId(resolvedLastUsedModel)) {
+        setLastUsedModelState(resolvedLastUsedModel)
+        if (resolvedLastUsedModel !== cachedLastUsedModel) {
+          localStorage.setItem("lastUsedModel", resolvedLastUsedModel)
+        }
       } else if (cachedLastUsedModel) {
         localStorage.removeItem("lastUsedModel")
       }

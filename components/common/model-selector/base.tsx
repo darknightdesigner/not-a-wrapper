@@ -20,11 +20,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import { useModel } from "@/lib/model-store/provider"
 import { filterAndSortModels } from "@/lib/model-store/utils"
 import { ModelConfig } from "@/lib/models/types"
@@ -377,12 +372,7 @@ export function ModelSelector(props: ModelSelectorProps) {
   if (!isUserAuthenticated) {
     return (
       <Popover>
-        <Tooltip disableHoverablePopup>
-          <TooltipTrigger render={<PopoverTrigger render={trigger} />} />
-          <TooltipContent side="right" hideArrow>
-            {mode === "single" ? "Select a model" : "Select models"}
-          </TooltipContent>
-        </Tooltip>
+        <PopoverTrigger render={trigger} />
         <PopoverContentAuth />
       </Popover>
     )
@@ -455,12 +445,6 @@ export function ModelSelector(props: ModelSelectorProps) {
     )
   }
 
-  // Desktop rendering
-  const tooltipText =
-    mode === "single"
-      ? "Switch model ⌘⇧P"
-      : `Select models ⌘⇧M ${selectedModelIds.length}/${maxModels}`
-
   return (
     <div>
       <ProModelDialog
@@ -468,125 +452,120 @@ export function ModelSelector(props: ModelSelectorProps) {
         setIsOpen={setIsProDialogOpen}
         currentModel={selectedProModel || ""}
       />
-      <Tooltip disableHoverablePopup>
-        <DropdownMenu
-          open={isDropdownOpen}
-          onOpenChange={(open) => {
-            setIsDropdownOpen(open)
-            if (!open) {
-              setSearchQuery("")
-            }
-          }}
+      <DropdownMenu
+        open={isDropdownOpen}
+        onOpenChange={(open) => {
+          setIsDropdownOpen(open)
+          if (!open) {
+            setSearchQuery("")
+          }
+        }}
+      >
+        <DropdownMenuTrigger render={trigger} />
+        <DropdownMenuContent
+          className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
+          align="start"
+          sideOffset={4}
+          animated={false}
+          side="top"
         >
-          <TooltipTrigger render={<DropdownMenuTrigger render={trigger} />} />
-          <TooltipContent side="right" hideArrow>
-            {tooltipText}
-          </TooltipContent>
-          <DropdownMenuContent
-            className="flex max-h-55 w-[300px] flex-col space-y-0.5 overflow-visible p-0"
-            align="start"
-            sideOffset={4}
-            animated={false}
-            side="top"
-          >
-            <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
-              <div className="relative">
-                <HugeiconsIcon
-                  icon={Search01Icon}
-                  size={16}
-                  className="text-muted-foreground absolute top-2.5 left-2.5"
-                />
-                <Input
-                  ref={searchInputRef}
-                  placeholder="Search models..."
-                  className="dark:bg-popover rounded-b-none border border-none pl-8 shadow-none focus-visible:ring-0"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                  onClick={(e) => e.stopPropagation()}
-                  onFocus={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </div>
+          <div className="bg-background sticky top-0 z-10 rounded-t-md border-b px-0 pt-0 pb-0">
+            <div className="relative">
+              <HugeiconsIcon
+                icon={Search01Icon}
+                size={16}
+                className="text-muted-foreground absolute top-2.5 left-2.5"
+              />
+              <Input
+                ref={searchInputRef}
+                placeholder="Search models..."
+                className="dark:bg-popover rounded-b-none border border-none pl-8 shadow-none focus-visible:ring-0"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              />
             </div>
-            <div className="flex h-full flex-col space-y-0 overflow-y-auto px-1 pt-0 pb-0">
-              {isLoadingModels ? (
-                <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                  <p className="text-muted-foreground mb-2 text-sm">
-                    Loading models...
-                  </p>
-                </div>
-              ) : filteredModels.length > 0 ? (
-                filteredModels.map((model) => {
-                  const isLocked = !model.accessible
-                  const isSelected =
-                    mode === "single"
-                      ? props.mode === "single" &&
-                        props.selectedModelId === model.id
-                      : selectedModelIds.includes(model.id)
-                  const provider = PROVIDERS.find(
-                    (provider) => provider.id === model.icon
-                  )
+          </div>
+          <div className="flex h-full flex-col space-y-0 overflow-y-auto px-1 pt-0 pb-0">
+            {isLoadingModels ? (
+              <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                <p className="text-muted-foreground mb-2 text-sm">
+                  Loading models...
+                </p>
+              </div>
+            ) : filteredModels.length > 0 ? (
+              filteredModels.map((model) => {
+                const isLocked = !model.accessible
+                const isSelected =
+                  mode === "single"
+                    ? props.mode === "single" &&
+                      props.selectedModelId === model.id
+                    : selectedModelIds.includes(model.id)
+                const provider = PROVIDERS.find(
+                  (provider) => provider.id === model.icon
+                )
 
-                  return (
-                    <DropdownMenuItem
-                      key={model.id}
-                      className={cn(
-                        "flex w-full items-center justify-between px-3 py-2",
-                        isSelected && "bg-accent"
+                return (
+                  <DropdownMenuItem
+                    key={model.id}
+                    className={cn(
+                      "flex w-full items-center justify-between px-3 py-2",
+                      isSelected && "bg-accent"
+                    )}
+                    closeOnClick={mode !== "multi"}
+                    onClick={() => handleSelect(model.id, isLocked)}
+                  >
+                    <div className="flex items-center gap-3">
+                      {provider?.icon && (
+                        <provider.icon className="size-5" />
                       )}
-                      closeOnClick={mode !== "multi"}
-                      onClick={() => handleSelect(model.id, isLocked)}
-                    >
-                      <div className="flex items-center gap-3">
-                        {provider?.icon && (
-                          <provider.icon className="size-5" />
-                        )}
-                        <div className="flex flex-col gap-0">
-                          <span className="text-sm">{model.name}</span>
-                        </div>
+                      <div className="flex flex-col gap-0">
+                        <span className="text-sm">{model.name}</span>
                       </div>
-                      {mode === "single" ? (
-                        isLocked ? (
+                    </div>
+                    {mode === "single" ? (
+                      isLocked ? (
+                        <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
+                          <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
+                          <span>Locked</span>
+                        </div>
+                      ) : null
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {isSelected && (
+                          <HugeiconsIcon icon={Tick02Icon} size={16} />
+                        )}
+                        {isLocked && (
                           <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
                             <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
                             <span>Locked</span>
                           </div>
-                        ) : null
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          {isSelected && (
-                            <HugeiconsIcon icon={Tick02Icon} size={16} />
-                          )}
-                          {isLocked && (
-                            <div className="border-input bg-accent text-muted-foreground flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
-                              <HugeiconsIcon icon={StarIcon} size={8} className="size-2" />
-                              <span>Locked</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </DropdownMenuItem>
-                  )
-                })
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center p-6 text-center">
-                  <p className="text-muted-foreground mb-1 text-sm">
-                    No results found.
-                  </p>
-                  <a
-                    href="https://github.com/batmn-dev/not-a-wrapper/issues/new?title=Model%20Request%3A%20"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-muted-foreground text-sm underline"
-                  >
-                    Request a new model
-                  </a>
-                </div>
-              )}
-            </div>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </Tooltip>
+                        )}
+                      </div>
+                    )}
+                  </DropdownMenuItem>
+                )
+              })
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center p-6 text-center">
+                <p className="text-muted-foreground mb-1 text-sm">
+                  No results found.
+                </p>
+                <a
+                  href="https://github.com/batmn-dev/not-a-wrapper/issues/new?title=Model%20Request%3A%20"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground text-sm underline"
+                >
+                  Request a new model
+                </a>
+              </div>
+            )}
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

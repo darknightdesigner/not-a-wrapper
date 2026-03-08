@@ -1,7 +1,7 @@
 import type { ChatApiParams } from "@/app/types/api.types"
 import { FREE_MODELS_IDS, NON_AUTH_ALLOWED_MODELS } from "@/lib/config"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { getProviderForModel } from "@/lib/openproviders/provider-map"
-import type { SupportedModel } from "@/lib/openproviders/types"
 import { hasUserKey } from "@/lib/user-keys"
 import { fetchQuery, fetchMutation } from "convex/nextjs"
 import { api } from "@/convex/_generated/api"
@@ -10,7 +10,7 @@ import { api } from "@/convex/_generated/api"
  * Check if a model is a "pro" model (requires more stringent limits)
  */
 export function isProModel(modelId: string): boolean {
-  return !FREE_MODELS_IDS.includes(modelId)
+  return !FREE_MODELS_IDS.includes(resolveModelId(modelId))
 }
 
 /**
@@ -79,23 +79,25 @@ export async function validateAndTrackUsage({
   isAuthenticated,
   token,
 }: ChatApiParams): Promise<null> {
+  const resolvedModel = resolveModelId(model)
+
   // Check if user is authenticated
   if (!isAuthenticated) {
     // For unauthenticated users, only allow specific models
-    if (!NON_AUTH_ALLOWED_MODELS.includes(model)) {
+    if (!NON_AUTH_ALLOWED_MODELS.includes(resolvedModel)) {
       throw new Error(
         "This model requires authentication. Please sign in to access more models."
       )
     }
   } else {
     // For authenticated users, check API key requirements
-    const provider = getProviderForModel(model as SupportedModel)
+    const provider = getProviderForModel(resolvedModel)
 
     // Check if user has their own API key for this provider
     const hasKey = await hasUserKey(provider, token)
 
     // If no API key and model is not in free list, deny access
-    if (!hasKey && !FREE_MODELS_IDS.includes(model)) {
+    if (!hasKey && !FREE_MODELS_IDS.includes(resolvedModel)) {
       throw new Error(
         `This model requires an API key for ${provider}. Please add your API key in settings or use a free model.`
       )
