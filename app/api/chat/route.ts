@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server"
+import * as Sentry from "@sentry/nextjs"
 import { after } from "next/server"
 import {
   SYSTEM_PROMPT_DEFAULT,
@@ -244,11 +245,20 @@ export async function POST(req: Request) {
   // MCP state — declared outside try for cleanup in both after() and catch
   let mcpClients: LoadToolsResult["clients"] = []
   let mcpToolServerMap: LoadToolsResult["toolServerMap"] = new Map()
+  const requestId = crypto.randomUUID()
+  let telemetryChatId: string | undefined
+  let telemetryModel: string | undefined
+  let telemetryIsAuthenticated: boolean | undefined
+  let telemetryMessageCount: number | undefined
 
   try {
+    Sentry.setTag("route", "api/chat")
+    Sentry.setTag("request_id", requestId)
+
     // Server-side authentication - derive userId from Clerk session
     const { userId: authUserId, getToken } = await auth()
     const isAuthenticated = !!authUserId
+    telemetryIsAuthenticated = isAuthenticated
 
     // Get Convex token for authenticated usage tracking
     const convexToken = isAuthenticated
@@ -265,6 +275,11 @@ export async function POST(req: Request) {
       message_group_id,
       userId: clientUserId,
     } = (await req.json()) as ChatRequest
+    telemetryChatId = chatId
+    telemetryModel = model
+    telemetryMessageCount = Array.isArray(messages) ? messages.length : undefined
+    Sentry.setTag("chat_model", model)
+    Sentry.setTag("chat_is_authenticated", String(isAuthenticated))
 
     if (!messages || !chatId || !model) {
       return new Response(
@@ -307,19 +322,35 @@ export async function POST(req: Request) {
 
     // Server-side usage check - enforces rate limits before processing
     // For anonymous users, pass the anonymousId for tracking
-    await checkServerSideUsage(convexToken, model, anonymousId)
+    await Sentry.startSpan(
+      {
+        name: "chat.usage_checks",
+        op: "chat.validation",
+        attributes: {
+          "chat.id": chatId,
+          "chat.model": model,
+          "chat.is_authenticated": isAuthenticated,
+        },
+      },
+      async () => {
+        await checkServerSideUsage(convexToken, model, anonymousId)
 
-    await validateAndTrackUsage({
-      userId,
-      model,
-      isAuthenticated,
-      token: convexToken,
-    })
+        await validateAndTrackUsage({
+          userId,
+          model,
+          isAuthenticated,
+          token: convexToken,
+        })
 
-    // Increment usage count server-side with Convex
-    await incrementServerSideUsage(convexToken, model, anonymousId)
+        // Increment usage count server-side with Convex
+        await incrementServerSideUsage(convexToken, model, anonymousId)
+      }
+    )
 
-    const allModels = await getAllModels()
+    const allModels = await Sentry.startSpan(
+      { name: "chat.load_models", op: "chat.config" },
+      async () => getAllModels()
+    )
     const modelConfig = allModels.find((m) => m.id === model)
 
     if (!modelConfig || !modelConfig.apiSdk) {
@@ -398,8 +429,6 @@ export async function POST(req: Request) {
     })
     const capabilities = initialCapabilityPolicy.capabilities
     const shouldInjectSearch = enableSearch && capabilities.search
-    const requestId = crypto.randomUUID()
-
     console.log(
       JSON.stringify({
         _tag: "tool_capability_policy",
@@ -2096,6 +2125,19 @@ export async function POST(req: Request) {
       },
       onError: (error: unknown) => {
         console.error("Error forwarded to client:", error)
+        Sentry.captureException(error, {
+          tags: {
+            route: "api/chat",
+            request_id: requestId,
+          },
+          extra: {
+            chatId,
+            model,
+            isAuthenticated,
+            messageCount: messages.length,
+            chatVersion: normalizedChatVersion,
+          },
+        })
         return extractErrorMessage(error)
       },
     });
@@ -2109,6 +2151,20 @@ export async function POST(req: Request) {
       message?: string
       statusCode?: number
     }
+
+    Sentry.captureException(err, {
+      tags: {
+        route: "api/chat",
+        request_id: requestId,
+      },
+      extra: {
+        chatId: telemetryChatId,
+        model: telemetryModel,
+        isAuthenticated: telemetryIsAuthenticated,
+        messageCount: telemetryMessageCount,
+        mcpClientCount: mcpClients.length,
+      },
+    })
 
     return createErrorResponse(error)
   }
