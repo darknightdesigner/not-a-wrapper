@@ -9,10 +9,12 @@ export type ChatErrorType =
   | "unknown"
 
 type ErrorLike = {
-  code?: string
-  statusCode?: number
-  message?: string
-  name?: string
+  code?: unknown
+  statusCode?: unknown
+  status?: unknown
+  message?: unknown
+  name?: unknown
+  error?: unknown
   cause?: unknown
 }
 
@@ -31,17 +33,75 @@ function getErrorLike(error: unknown): ErrorLike {
   return {}
 }
 
+function extractStatusCode(err: ErrorLike): number | undefined {
+  const candidates = [err.statusCode, err.status]
+  for (const candidate of candidates) {
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      return candidate
+    }
+    if (typeof candidate === "string") {
+      const parsed = Number.parseInt(candidate, 10)
+      if (Number.isFinite(parsed)) {
+        return parsed
+      }
+    }
+  }
+  return undefined
+}
+
+function collectErrorChain(error: unknown): ErrorLike[] {
+  const queue: Array<{ value: unknown; depth: number }> = [{ value: error, depth: 0 }]
+  const seen = new Set<object>()
+  const collected: ErrorLike[] = []
+
+  while (queue.length > 0) {
+    const current = queue.shift()
+    if (!current || !current.value || typeof current.value !== "object") {
+      continue
+    }
+
+    if (seen.has(current.value)) continue
+    seen.add(current.value)
+
+    const err = current.value as ErrorLike
+    collected.push(err)
+
+    if (current.depth >= 3) continue
+    if (err.error && typeof err.error === "object") {
+      queue.push({ value: err.error, depth: current.depth + 1 })
+    }
+    if (err.cause && typeof err.cause === "object") {
+      queue.push({ value: err.cause, depth: current.depth + 1 })
+    }
+  }
+
+  return collected
+}
+
+function matchesAnyIn(values: string[], needles: string[]): boolean {
+  return values.some((value) => matchesAny(value, needles))
+}
+
+function hasStatus(statuses: number[], status: number): boolean {
+  return statuses.includes(status)
+}
+
 export function classifyChatError(error: unknown): ChatErrorType {
-  const err = getErrorLike(error)
-  const code = toLowerString(err.code)
-  const name = toLowerString(err.name)
-  const message = toLowerString(err.message)
-  const status = err.statusCode
+  const chain = collectErrorChain(error)
+  const fallback = getErrorLike(error)
+  if (chain.length === 0) chain.push(fallback)
+
+  const codes = chain.map((err) => toLowerString(err.code)).filter(Boolean)
+  const names = chain.map((err) => toLowerString(err.name)).filter(Boolean)
+  const messages = chain.map((err) => toLowerString(err.message)).filter(Boolean)
+  const statuses = chain
+    .map((err) => extractStatusCode(err))
+    .filter((status): status is number => typeof status === "number")
 
   if (
-    status === 400 ||
-    matchesAny(code, ["invalid_request", "bad_request", "validation"]) ||
-    matchesAny(message, [
+    hasStatus(statuses, 400) ||
+    matchesAnyIn(codes, ["invalid_request", "bad_request", "validation"]) ||
+    matchesAnyIn(messages, [
       "missing required",
       "invalid request",
       "validation",
@@ -52,10 +112,15 @@ export function classifyChatError(error: unknown): ChatErrorType {
   }
 
   if (
-    status === 401 ||
-    status === 403 ||
-    matchesAny(code, ["not_authenticated", "unauthorized", "forbidden", "missing_api_key"]) ||
-    matchesAny(message, [
+    hasStatus(statuses, 401) ||
+    hasStatus(statuses, 403) ||
+    matchesAnyIn(codes, [
+      "not_authenticated",
+      "unauthorized",
+      "forbidden",
+      "missing_api_key",
+    ]) ||
+    matchesAnyIn(messages, [
       "not authenticated",
       "requires authentication",
       "api key",
@@ -67,24 +132,21 @@ export function classifyChatError(error: unknown): ChatErrorType {
   }
 
   if (
-    status === 429 ||
-    matchesAny(code, ["rate_limit", "too_many_requests", "quota_exceeded"]) ||
-    matchesAny(message, ["rate limit", "too many requests", "quota exceeded"])
+    hasStatus(statuses, 429) ||
+    matchesAnyIn(codes, ["rate_limit", "too_many_requests", "quota_exceeded"]) ||
+    matchesAnyIn(messages, ["rate limit", "too many requests", "quota exceeded"])
   ) {
     return "rate_limit"
   }
 
-  const toolSignals = matchesAny(code, ["tool"]) || matchesAny(message, [
-    "tool",
-    "mcp",
-    "function call",
-    "tool_call",
-  ])
+  const toolSignals =
+    matchesAnyIn(codes, ["tool"]) ||
+    matchesAnyIn(messages, ["tool", "mcp", "function call", "tool_call"])
   if (
     toolSignals &&
-    (name.includes("timeout") ||
-      code.includes("timeout") ||
-      matchesAny(message, ["timeout", "timed out", "deadline exceeded", "aborterror"]))
+    (matchesAnyIn(names, ["timeout"]) ||
+      matchesAnyIn(codes, ["timeout"]) ||
+      matchesAnyIn(messages, ["timeout", "timed out", "deadline exceeded", "aborterror"]))
   ) {
     return "tool_timeout"
   }
@@ -93,11 +155,11 @@ export function classifyChatError(error: unknown): ChatErrorType {
   }
 
   if (
-    status === 502 ||
-    status === 503 ||
-    status === 504 ||
-    matchesAny(code, ["provider", "upstream"]) ||
-    matchesAny(message, [
+    hasStatus(statuses, 502) ||
+    hasStatus(statuses, 503) ||
+    hasStatus(statuses, 504) ||
+    matchesAnyIn(codes, ["provider", "upstream"]) ||
+    matchesAnyIn(messages, [
       "openai",
       "anthropic",
       "google",
@@ -113,7 +175,7 @@ export function classifyChatError(error: unknown): ChatErrorType {
     return "provider_api"
   }
 
-  if (status && status >= 500) {
+  if (statuses.some((status) => status >= 500)) {
     return "internal"
   }
 

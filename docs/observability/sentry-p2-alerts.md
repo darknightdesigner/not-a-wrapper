@@ -21,16 +21,19 @@ If credentials are available:
 - `SENTRY_ORG_SLUG`
 - `SENTRY_PROJECT_SLUG`
 
-Create alerts using:
+Create alerts using the template envelope:
 
 ```bash
-curl -X POST "https://sentry.io/api/0/organizations/${SENTRY_ORG_SLUG}/alert-rules/" \
-  -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
-  -H "Content-Type: application/json" \
-  --data @docs/observability/sentry-p2-alerts.json
+jq -c ".alerts[]" docs/observability/sentry-p2-alerts.json \
+  | while read -r alert; do
+      curl -X POST "https://sentry.io/api/0/organizations/${SENTRY_ORG_SLUG}/alert-rules/" \
+        -H "Authorization: Bearer ${SENTRY_AUTH_TOKEN}" \
+        -H "Content-Type: application/json" \
+        --data "${alert}"
+    done
 ```
 
-If your Sentry plan/API requires one rule per request, split the JSON array and POST each entry.
+If your Sentry plan/API requires one rule per request, iterate `alerts[]` and POST each alert object individually.
 
 Idempotent upsert workflow (template):
 

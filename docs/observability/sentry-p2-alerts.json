@@ -63,7 +63,7 @@
       "dataset": "events",
       "environment": "production",
       "queries": {
-        "numerator": "event.type:error tags[route]:api/chat (tags[chat_error_type]:tool_timeout OR tags[chat_error_type]:tool_execution OR tags[chat_tool_outcome]:timeout OR tags[chat_tool_outcome]:failure OR tags[chat_tool_outcome]:budget_denied)",
+        "numerator": "event.type:transaction transaction:\"POST /api/chat\" (tags[chat_tool_outcome]:timeout OR tags[chat_tool_outcome]:failure OR tags[chat_tool_outcome]:budget_denied)",
         "denominator": "event.type:transaction transaction:\"POST /api/chat\" tags[chat_tool_outcome]:!none"
       },
       "formula": "A / B",

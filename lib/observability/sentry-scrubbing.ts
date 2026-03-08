@@ -56,12 +56,19 @@ function scrubValue(
   }
 
   if (Array.isArray(value)) {
-    if (pathHasSensitivePrefix(path)) {
-      return REDACTED_VALUE
+    const cachedArray = seen.get(value)
+    if (cachedArray !== undefined) {
+      return cachedArray
     }
-    return value.map((item, index) =>
-      scrubValue(item, [...path, String(index)], seen)
-    )
+
+    const outputArray: unknown[] = []
+    seen.set(value, outputArray)
+
+    for (const [index, item] of value.entries()) {
+      outputArray[index] = scrubValue(item, [...path, String(index)], seen)
+    }
+
+    return outputArray
   }
 
   if (typeof value !== "object") {

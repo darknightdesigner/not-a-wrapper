@@ -8,4 +8,4 @@ Docs are the source of truth.
   - `docs/observability/sentry-p2-queries.md`
   - `docs/observability/sentry-p2-alerts.json`
 - Agent workflow helper:
-  - `.cursor/skills/sentry-p2-operations/SKILL.md`
+  - `.agents/skills/sentry-p2-operations/SKILL.md`

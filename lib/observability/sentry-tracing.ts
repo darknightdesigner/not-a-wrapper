@@ -28,6 +28,12 @@ type SentrySamplingContext = {
   inheritOrSampleWith?: (sampleRate: number) => boolean | number
 }
 
+type SentryTransactionEvent = {
+  transaction?: string
+  contexts?: Record<string, unknown>
+  tags?: Record<string, unknown>
+}
+
 function clampRate(value: number): number {
   if (!Number.isFinite(value)) return 0
   if (value < 0) return 0
@@ -85,13 +91,66 @@ function getTransactionName(samplingContext: SentrySamplingContext): string {
   return route.toLowerCase()
 }
 
-function getStatusCode(samplingContext: SentrySamplingContext): number | undefined {
-  const status = samplingContext.attributes?.["http.response.status_code"]
-  if (typeof status === "number") return status
-  if (typeof status === "string" && status.length > 0) {
-    const parsed = Number.parseInt(status, 10)
+function parseNumericStatus(value: unknown): number | undefined {
+  if (typeof value === "number") return value
+  if (typeof value === "string" && value.length > 0) {
+    const parsed = Number.parseInt(value, 10)
     return Number.isNaN(parsed) ? undefined : parsed
   }
+  return undefined
+}
+
+function getEnvelopeChatRate(): number {
+  return Math.max(
+    traceSamplerConfig.chatHealthyRate,
+    traceSamplerConfig.chatClientErrorRate,
+    traceSamplerConfig.chatFailureRate
+  )
+}
+
+function getChatTargetRateForStatus(statusCode: number | undefined): number {
+  if (typeof statusCode === "number" && statusCode >= 500) {
+    return traceSamplerConfig.chatFailureRate
+  }
+  if (typeof statusCode === "number" && statusCode >= 400) {
+    return traceSamplerConfig.chatClientErrorRate
+  }
+  return traceSamplerConfig.chatHealthyRate
+}
+
+function shouldKeepWithRate(sampleRate: number): boolean {
+  if (sampleRate <= 0) return false
+  if (sampleRate >= 1) return true
+  return Math.random() < sampleRate
+}
+
+function getTransactionNameFromEvent(event: SentryTransactionEvent): string {
+  if (typeof event.transaction === "string") {
+    return event.transaction.toLowerCase()
+  }
+  const routeTag = event.tags?.["http.route"]
+  if (typeof routeTag === "string") {
+    return routeTag.toLowerCase()
+  }
+  return ""
+}
+
+function getStatusCodeFromTransactionEvent(
+  event: SentryTransactionEvent
+): number | undefined {
+  const responseContext =
+    event.contexts?.["response"] as { status_code?: unknown } | undefined
+  const statusFromContext = parseNumericStatus(responseContext?.status_code)
+  if (typeof statusFromContext === "number") return statusFromContext
+
+  const tags = event.tags
+  const statusFromTags = parseNumericStatus(
+    tags?.["http.response.status_code"] ??
+      tags?.["http.status_code"] ??
+      tags?.["status_code"]
+  )
+  if (typeof statusFromTags === "number") return statusFromTags
+
   return undefined
 }
 
@@ -107,8 +166,6 @@ export function sentryTracesSampler(
   }
 
   const transactionName = getTransactionName(samplingContext)
-  const statusCode = getStatusCode(samplingContext)
-
   // Health checks and assets are low-value and often high-volume.
   if (hasAnyPattern(transactionName, HEALTHCHECK_ROUTE_PATTERNS)) {
     return sampleWithInheritance(samplingContext, traceSamplerConfig.healthcheckRate)
@@ -119,16 +176,10 @@ export function sentryTracesSampler(
 
   // High-fidelity chat traces for reliability SLOs and release regression detection.
   if (transactionName.includes(CHAT_ROUTE_PATTERN)) {
-    if (typeof statusCode === "number" && statusCode >= 500) {
-      return sampleWithInheritance(samplingContext, traceSamplerConfig.chatFailureRate)
-    }
-    if (typeof statusCode === "number" && statusCode >= 400) {
-      return sampleWithInheritance(
-        samplingContext,
-        traceSamplerConfig.chatClientErrorRate
-      )
-    }
-    return sampleWithInheritance(samplingContext, traceSamplerConfig.chatHealthyRate)
+    // Response status is not available when tracesSampler executes.
+    // We sample at the max chat rate, then down-sample by final status
+    // inside sentryBeforeSendTransaction once status_code is known.
+    return sampleWithInheritance(samplingContext, getEnvelopeChatRate())
   }
 
   // Keep strong fidelity for other chat-critical API routes.
@@ -143,4 +194,28 @@ export function sentryTracesSampler(
 
   // Lowest baseline for frontend/navigation traces.
   return sampleWithInheritance(samplingContext, traceSamplerConfig.frontendRate)
+}
+
+export function sentryBeforeSendTransaction<T extends SentryTransactionEvent>(
+  event: T
+): T | null {
+  if (process.env.NODE_ENV !== "production") {
+    return event
+  }
+
+  const transactionName = getTransactionNameFromEvent(event)
+  if (!transactionName.includes(CHAT_ROUTE_PATTERN)) {
+    return event
+  }
+
+  const envelopeRate = getEnvelopeChatRate()
+  if (envelopeRate <= 0) {
+    return null
+  }
+
+  const statusCode = getStatusCodeFromTransactionEvent(event)
+  const targetRate = getChatTargetRateForStatus(statusCode)
+  const keepRate = clampRate(targetRate / envelopeRate)
+
+  return shouldKeepWithRate(keepRate) ? event : null
 }

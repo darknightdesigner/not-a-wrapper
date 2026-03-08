@@ -41,9 +41,9 @@ Use environment filter `environment:production` unless debugging non-prod.
 
 ## 4) Tool Failure + Timeout Rate
 
-- Dataset: errors + transactions
+- Dataset: transactions
 - Numerator query:
-  - `event.type:error tags[route]:api/chat (tags[chat_error_type]:tool_timeout OR tags[chat_error_type]:tool_execution OR tags[chat_tool_outcome]:timeout OR tags[chat_tool_outcome]:failure OR tags[chat_tool_outcome]:budget_denied)`
+  - `event.type:transaction transaction:"POST /api/chat" (tags[chat_tool_outcome]:timeout OR tags[chat_tool_outcome]:failure OR tags[chat_tool_outcome]:budget_denied)`
 - Denominator query:
   - `event.type:transaction transaction:"POST /api/chat" tags[chat_tool_outcome]:!none`
 - Formula:

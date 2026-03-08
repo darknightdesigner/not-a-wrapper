@@ -8,6 +8,10 @@ function scrubValue(value: unknown, seen: WeakSet<object>): unknown {
   }
 
   if (Array.isArray(value)) {
+    if (seen.has(value)) {
+      return value
+    }
+    seen.add(value)
     return value.map((item) => scrubValue(item, seen))
   }
 

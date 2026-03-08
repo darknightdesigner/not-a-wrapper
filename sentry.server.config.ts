@@ -4,7 +4,10 @@ import {
   sentryBeforeSend,
   sentryBeforeSendSpan,
 } from "./lib/observability/sentry-scrubbing"
-import { sentryTracesSampler } from "./lib/observability/sentry-tracing"
+import {
+  sentryBeforeSendTransaction,
+  sentryTracesSampler,
+} from "./lib/observability/sentry-tracing"
 
 const isProduction = process.env.NODE_ENV === "production"
 const includeLocalVariables =
@@ -16,6 +19,7 @@ Sentry.init({
   release: process.env.SENTRY_RELEASE,
   sendDefaultPii: false,
   tracesSampler: sentryTracesSampler,
+  beforeSendTransaction: sentryBeforeSendTransaction,
   includeLocalVariables,
   beforeSend: sentryBeforeSend,
   beforeSendSpan: sentryBeforeSendSpan,

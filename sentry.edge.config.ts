@@ -4,7 +4,10 @@ import {
   sentryBeforeSend,
   sentryBeforeSendSpan,
 } from "./lib/observability/sentry-scrubbing"
-import { sentryTracesSampler } from "./lib/observability/sentry-tracing"
+import {
+  sentryBeforeSendTransaction,
+  sentryTracesSampler,
+} from "./lib/observability/sentry-tracing"
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN ?? process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -12,6 +15,7 @@ Sentry.init({
   release: process.env.SENTRY_RELEASE,
   sendDefaultPii: false,
   tracesSampler: sentryTracesSampler,
+  beforeSendTransaction: sentryBeforeSendTransaction,
   beforeSend: sentryBeforeSend,
   beforeSendSpan: sentryBeforeSendSpan,
   beforeBreadcrumb: sentryBeforeBreadcrumb,
