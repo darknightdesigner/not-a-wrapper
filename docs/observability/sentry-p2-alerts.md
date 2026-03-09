@@ -79,10 +79,15 @@ echo "${EXISTING}" | jq -e ".[] | select(.name == \"P2 Chat Error Rate High\")" 
    - `chat_provider`, `chat_model`, `chat_tool_outcome`
 3. Inspect slow warnings:
    - `message:"chat_slow_request" tags[route]:api/chat`
-4. Validate first-token vs total latency split:
+4. Inspect stream lifecycle warnings:
+   - `message:"chat_client_abort" tags[route]:api/chat`
+   - `message:"chat_stalled_continuation" tags[route]:api/chat`
+5. Validate first-token vs total latency split:
    - first-token increase implies provider/network/model queuing
    - total-only increase implies tool fanout or long generation tails
-5. Mitigation options:
+6. If `chat_stalled_continuation` clusters on `tags[chat_stream_phase]:post_tool_continue`:
+   - investigate post-tool continuation or client disconnect handling before blaming tools
+7. Mitigation options:
    - lower max step count or tool breadth for affected segment
    - shift traffic off degraded provider/model
 

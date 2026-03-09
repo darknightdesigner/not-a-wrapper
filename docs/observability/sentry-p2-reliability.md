@@ -75,6 +75,33 @@ Configurable threshold:
 
 - `SENTRY_CHAT_SLOW_REQUEST_MS` (default `15000`)
 
+### Stream lifecycle warning signals
+
+When a chat stream ends abnormally from the browser side or appears to stop making
+progress after a tool step, additional warning events are captured:
+
+- `chat_client_abort`
+- `chat_stalled_continuation`
+
+These warnings include:
+
+- provider/model/auth status
+- `requestId` and `chatId` in `extra`
+- step/tool context (`stepCounter`, `observedToolCalls`, `lastToolNames`)
+- progress timing (`firstTokenLatencyMs`, `timeSinceLastChunkMs`, `timeSinceLastProgressMs`)
+- bounded phase tag: `chat_stream_phase`
+
+`chat_stream_phase` values:
+
+- `pre_first_chunk`
+- `post_tool_continue`
+- `post_first_chunk`
+- `unknown`
+
+Configurable threshold:
+
+- `SENTRY_CHAT_STALLED_CONTINUATION_MS` (default `30000`)
+
 ## Dynamic Sampling Strategy
 
 `lib/observability/sentry-tracing.ts` uses `tracesSampler` with env-driven rates.

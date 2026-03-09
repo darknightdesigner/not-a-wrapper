@@ -60,7 +60,9 @@ export function ChatActionsMenu({
   const makePublicMutation = useMutation(api.chats.makePublic)
 
   const handleConfirmDelete = async () => {
-    await deleteMessages()
+    if (chat.id === chatId) {
+      await deleteMessages()
+    }
     await deleteChat(chat.id, chatId || undefined, () => router.push("/"))
   }
 

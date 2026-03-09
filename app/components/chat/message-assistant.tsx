@@ -170,6 +170,12 @@ export function MessageAssistant({
   const showActiveContentCaret = Boolean(isLast && status === "streaming" && hasContent)
 
   const didStreamInSession = Boolean(isLast && finishReason)
+  const showFooterCaret = hasContent && contentCaretPhase !== "hidden"
+  const showFooterActions =
+    hasContent &&
+    !isLastStreaming &&
+    (!isLast || contentCaretPhase === "hidden")
+  const showFooterSlot = showFooterCaret || showFooterActions
 
   if (showActiveContentCaret && contentCaretPhase !== "visible") {
     setContentCaretPhase("visible")
@@ -272,14 +278,6 @@ export function MessageAssistant({
             {children}
           </MessageContent>
         )}
-        {contentCaretPhase !== "hidden" && (
-          <StreamingCaret
-            visible={contentCaretPhase === "visible"}
-            variant={STREAMING_INDICATOR_VARIANT}
-            className="-mt-1 ml-px"
-            onFadeOutComplete={() => setContentCaretPhase("hidden")}
-          />
-        )}
 
         {sources && sources.length > 0 && <SourcesList sources={sources} />}
 
@@ -293,70 +291,85 @@ export function MessageAssistant({
           </SystemMessage>
         )}
 
-        {Boolean(isLastStreaming || contentNullOrEmpty) ? null : (
-          <MessageActions
-            className={cn(
-              "-ml-2 flex gap-0",
-              didStreamInSession
-                ? [
-                    "pointer-events-auto",
-                    "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
-                    "[mask-size:300%_100%]",
-                    "motion-safe:[animation:mask-reveal_1.5s_ease_forwards]",
-                    "motion-reduce:[mask-image:none]",
-                  ]
-                : [
-                    "pointer-events-none",
-                    "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
-                    "[mask-size:300%_100%]",
-                    "[mask-position:100%_0%]",
-                    "motion-safe:transition-[mask-position]",
-                    "duration-[1.5s]",
-                    "group-hover/turn-messages:pointer-events-auto",
-                    "group-hover/turn-messages:[mask-position:0_0]",
-                    "group-focus-within/turn-messages:pointer-events-auto",
-                    "group-focus-within/turn-messages:[mask-position:0_0]",
-                    "has-[[data-state=open]]:pointer-events-auto",
-                    "has-[[data-state=open]]:[mask-position:0_0]",
-                    "pointer-coarse:pointer-events-auto",
-                    "pointer-coarse:[mask-image:none]",
-                  ]
+        {showFooterSlot && (
+          <div className="relative min-h-8 pointer-coarse:min-h-10">
+            {showFooterCaret && (
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center">
+                <StreamingCaret
+                  visible={contentCaretPhase === "visible"}
+                  variant={STREAMING_INDICATOR_VARIANT}
+                  className="ml-px"
+                  onFadeOutComplete={() => setContentCaretPhase("hidden")}
+                />
+              </div>
             )}
-          >
-            <MessageAction
-              tooltip={copied ? "Copied!" : "Copy text"}
-              side="bottom"
-            >
-              <button
-                className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
-                aria-label="Copy text"
-                onClick={copyToClipboard}
-                type="button"
-              >
-                {copied ? (
-                  <HugeiconsIcon icon={Tick02Icon} size={20} className="size-5" />
-                ) : (
-                  <HugeiconsIcon icon={Copy01Icon} size={20} className="size-5" />
+
+            {showFooterActions && (
+              <MessageActions
+                className={cn(
+                  "-ml-2 min-h-8 gap-0 pointer-coarse:min-h-10",
+                  didStreamInSession
+                    ? [
+                        "pointer-events-auto",
+                        "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+                        "[mask-size:300%_100%]",
+                        "motion-safe:[animation:mask-reveal_1.5s_ease_forwards]",
+                        "motion-reduce:[mask-image:none]",
+                      ]
+                    : [
+                        "pointer-events-none",
+                        "[mask-image:linear-gradient(to_right,black_33%,transparent_66%)]",
+                        "[mask-size:300%_100%]",
+                        "[mask-position:100%_0%]",
+                        "motion-safe:transition-[mask-position]",
+                        "duration-[1.5s]",
+                        "group-hover/turn-messages:pointer-events-auto",
+                        "group-hover/turn-messages:[mask-position:0_0]",
+                        "group-focus-within/turn-messages:pointer-events-auto",
+                        "group-focus-within/turn-messages:[mask-position:0_0]",
+                        "has-[[data-state=open]]:pointer-events-auto",
+                        "has-[[data-state=open]]:[mask-position:0_0]",
+                        "pointer-coarse:pointer-events-auto",
+                        "pointer-coarse:[mask-image:none]",
+                      ]
                 )}
-              </button>
-            </MessageAction>
-            {isLast ? (
-              <MessageAction
-                tooltip="Regenerate"
-                side="bottom"
-                delay={0}
               >
-                <button
-                  className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
-                  aria-label="Regenerate"
-                  onClick={onReload}
-                  type="button"
+                <MessageAction
+                  tooltip={copied ? "Copied!" : "Copy text"}
+                  side="bottom"
                 >
-                  <HugeiconsIcon icon={RefreshIcon} size={20} className="size-5" />
-                </button>
-              </MessageAction>
-            ) : null}
-          </MessageActions>
+                  <button
+                    className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
+                    aria-label="Copy text"
+                    onClick={copyToClipboard}
+                    type="button"
+                  >
+                    {copied ? (
+                      <HugeiconsIcon icon={Tick02Icon} size={20} className="size-5" />
+                    ) : (
+                      <HugeiconsIcon icon={Copy01Icon} size={20} className="size-5" />
+                    )}
+                  </button>
+                </MessageAction>
+                {isLast ? (
+                  <MessageAction
+                    tooltip="Regenerate"
+                    side="bottom"
+                    delay={0}
+                  >
+                    <button
+                      className="hover:bg-accent/60 text-muted-foreground hover:text-foreground flex h-8 w-8 items-center justify-center rounded-lg bg-transparent transition pointer-coarse:h-10 pointer-coarse:w-10"
+                      aria-label="Regenerate"
+                      onClick={onReload}
+                      type="button"
+                    >
+                      <HugeiconsIcon icon={RefreshIcon} size={20} className="size-5" />
+                    </button>
+                  </MessageAction>
+                ) : null}
+              </MessageActions>
+            )}
+          </div>
         )}
 
         {isQuoteEnabled && selectionInfo && selectionInfo.messageId && (
