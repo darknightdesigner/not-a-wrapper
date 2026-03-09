@@ -8,8 +8,9 @@ import { getOrCreateGuestUserId } from "@/lib/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { ExtendedUIMessage, useMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
+import { SYSTEM_PROMPT_DEFAULT } from "@/lib/config"
 import { useModel } from "@/lib/model-store/provider"
+import { resolvePreferredModelId } from "@/lib/model-store/utils"
 import {
   persistWebSearchToggle,
   resolveWebSearchEnabled,
@@ -79,6 +80,7 @@ export function MultiChat() {
   const { user } = useUser()
   const { models, lastUsedModel } = useModel()
   const { preferences, setWebSearchEnabled } = useUserPreferences()
+  const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
   const [enableSearch, setEnableSearchState] = useState(() =>
     resolveWebSearchEnabled(preferences.webSearchEnabled)
   )
@@ -188,8 +190,22 @@ export function MultiChat() {
       setSelectedModelIds(modelsFromLastGroup)
       return
     }
-    setSelectedModelIds([lastUsedModel || MODEL_DEFAULT])
-  }, [selectedModelIds.length, messagesLoading, modelsFromLastGroup, lastUsedModel, setSelectedModelIds])
+    setSelectedModelIds([
+      resolvePreferredModelId({
+        models,
+        isAuthenticated,
+        preferredModelIds: [lastUsedModel],
+      }),
+    ])
+  }, [
+    isAuthenticated,
+    lastUsedModel,
+    messagesLoading,
+    models,
+    modelsFromLastGroup,
+    selectedModelIds.length,
+    setSelectedModelIds,
+  ])
 
   // Refs to avoid stale closures in onFinish callback (stream may finish after chatId/groupId change)
   const chatIdRef = useRef<string | null>(multiChatId || chatId)
@@ -304,7 +320,6 @@ export function MultiChat() {
     () => user?.system_prompt || SYSTEM_PROMPT_DEFAULT,
     [user?.system_prompt]
   )
-  const isAuthenticated = useMemo(() => !!user?.id, [user?.id])
 
   const createPersistedGroups = useCallback(() => {
     const persistedGroups: { [key: string]: GroupedMessage } = {}

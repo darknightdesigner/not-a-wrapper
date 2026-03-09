@@ -1,22 +1,16 @@
 "use client"
 
 import { useBreakpoint } from "@/app/hooks/use-breakpoint"
-import { useChats } from "@/lib/chat-store/chats/provider"
-import { useMessages } from "@/lib/chat-store/messages/provider"
-import { useChatSession } from "@/lib/chat-store/session/provider"
 import { cn } from "@/lib/utils"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { SearchList01Icon } from "@hugeicons-pro/core-stroke-rounded"
-import { useRouter } from "next/navigation"
 import {
   cloneElement,
   isValidElement,
-  useState,
   type MouseEvent,
   type ReactElement,
 } from "react"
-import { CommandHistory } from "./command-history"
-import { DrawerHistory } from "./drawer-history"
+import { useHistorySearch } from "./history-search-provider"
 
 type HistoryTriggerElementProps = {
   onClick?: (event: MouseEvent<HTMLElement>) => void
@@ -41,28 +35,9 @@ export function HistoryTrigger({
   icon,
   label,
   trailing,
-  hasPopover = true,
 }: HistoryTriggerProps) {
   const isMobile = useBreakpoint(768)
-  const router = useRouter()
-  const { chats, updateTitle, deleteChat } = useChats()
-  const { deleteMessages } = useMessages()
-  const [isOpen, setIsOpen] = useState(false)
-  const { chatId } = useChatSession()
-
-  const handleSaveEdit = async (id: string, newTitle: string) => {
-    await updateTitle(id, newTitle)
-  }
-
-  const handleConfirmDelete = async (id: string) => {
-    if (id === chatId) {
-      setIsOpen(false)
-    }
-    await deleteMessages()
-    await deleteChat(id, chatId!, () => router.push("/"))
-  }
-
-  const handleOpen = () => setIsOpen(true)
+  const { openHistory } = useHistorySearch()
   const hasCustomTriggerClass = !!classNameTrigger
   const defaultTrigger = trigger && isValidElement(trigger)
     ? cloneElement(trigger, {
@@ -70,7 +45,7 @@ export function HistoryTrigger({
           if (typeof trigger.props.onClick === "function") {
             trigger.props.onClick(event)
           }
-          handleOpen()
+          openHistory()
         },
         "aria-label": trigger.props["aria-label"] ?? "Search",
         tabIndex: isMobile ? -1 : trigger.props.tabIndex,
@@ -84,7 +59,7 @@ export function HistoryTrigger({
           classNameTrigger
         )}
         type="button"
-        onClick={handleOpen}
+        onClick={openHistory}
         aria-label="Search"
         tabIndex={isMobile ? -1 : 0}
       >
@@ -93,30 +68,5 @@ export function HistoryTrigger({
         {trailing}
       </button>
     )
-
-  if (isMobile) {
-    return (
-      <DrawerHistory
-        chatHistory={chats}
-        onSaveEdit={handleSaveEdit}
-        onConfirmDelete={handleConfirmDelete}
-        trigger={defaultTrigger}
-        isOpen={isOpen}
-        setIsOpen={setIsOpen}
-      />
-    )
-  }
-
-  return (
-    <CommandHistory
-      chatHistory={chats}
-      onSaveEdit={handleSaveEdit}
-      onConfirmDelete={handleConfirmDelete}
-      trigger={defaultTrigger}
-      isOpen={isOpen}
-      setIsOpen={setIsOpen}
-      onOpenChange={setIsOpen}
-      hasPopover={hasPopover}
-    />
-  )
+  return defaultTrigger
 }

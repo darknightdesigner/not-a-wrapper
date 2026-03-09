@@ -93,4 +93,10 @@ Use these filters for rapid segmentation:
   - `tags[chat_tool_outcome]:budget_denied`
 - Slow path:
   - `message:"chat_slow_request" tags[route]:api/chat`
+- Client-aborted streams:
+  - `message:"chat_client_abort" tags[route]:api/chat`
+- Post-tool stalls:
+  - `message:"chat_stalled_continuation" tags[route]:api/chat`
+- Continuation stalls only:
+  - `message:"chat_stalled_continuation" tags[chat_stream_phase]:post_tool_continue`
 

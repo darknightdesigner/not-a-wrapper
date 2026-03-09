@@ -3,9 +3,8 @@
 import { ModelSelector } from "@/components/common/model-selector/base"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
-import { MODEL_DEFAULT } from "@/lib/config"
-import { resolveModelId } from "@/lib/models/model-id-migration"
 import { useMultiModelSelection } from "@/lib/model-store/multi-model-provider"
+import { resolvePreferredModelId } from "@/lib/model-store/utils"
 import { useModel } from "@/lib/model-store/provider"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { useUser } from "@/lib/user-store/provider"
@@ -21,7 +20,7 @@ import { useCallback, useMemo } from "react"
  *   `MultiModelSelectionProvider`, keeping the header and input area in sync.
  */
 export function ModelSelectorHeader() {
-  const { lastUsedModel, setLastUsedModel, favoriteModels } = useModel()
+  const { models, lastUsedModel, setLastUsedModel, favoriteModels } = useModel()
   const { user } = useUser()
   const { preferences } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
@@ -39,13 +38,16 @@ export function ModelSelectorHeader() {
 
   const effectiveModel = useMemo(
     () =>
-      resolveModelId(
-      currentChat?.model ||
-        lastUsedModel ||
-        favoriteModels[0] ||
-        MODEL_DEFAULT
-      ),
-    [currentChat?.model, lastUsedModel, favoriteModels]
+      resolvePreferredModelId({
+        models,
+        isAuthenticated,
+        currentModelId: currentChat?.model,
+        preferredModelIds: [
+          lastUsedModel,
+          favoriteModels[0],
+        ],
+      }),
+    [currentChat?.model, favoriteModels, isAuthenticated, lastUsedModel, models]
   )
 
   const handleSingleModelChange = useCallback(

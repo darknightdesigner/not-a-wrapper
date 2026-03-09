@@ -22,29 +22,33 @@ const STATIC_MODELS: ModelConfig[] = [
   ...openrouterModels,
 ]
 
+function withBaseAccessFlags(models: ModelConfig[]): ModelConfig[] {
+  return models.map((model) => ({
+    ...model,
+    accessible: FREE_MODELS_IDS.includes(model.id),
+  }))
+}
+
+export function isVisibleModel(model: Pick<ModelConfig, "catalogStatus">): boolean {
+  return model.catalogStatus === "visible"
+}
+
 // Function to get all models
 export async function getAllModels(): Promise<ModelConfig[]> {
   return STATIC_MODELS
 }
 
-export async function getModelsWithAccessFlags(): Promise<ModelConfig[]> {
+export async function getRoutableModelsWithAccessFlags(): Promise<ModelConfig[]> {
+  return withBaseAccessFlags(await getAllModels())
+}
+
+export async function getVisibleModels(): Promise<ModelConfig[]> {
   const models = await getAllModels()
+  return models.filter((model) => isVisibleModel(model))
+}
 
-  const freeModels = models
-    .filter((model) => FREE_MODELS_IDS.includes(model.id))
-    .map((model) => ({
-      ...model,
-      accessible: true,
-    }))
-
-  const proModels = models
-    .filter((model) => !freeModels.map((m) => m.id).includes(model.id))
-    .map((model) => ({
-      ...model,
-      accessible: false,
-    }))
-
-  return [...freeModels, ...proModels]
+export async function getVisibleModelsWithAccessFlags(): Promise<ModelConfig[]> {
+  return withBaseAccessFlags(await getVisibleModels())
 }
 
 export async function getModelsForProvider(

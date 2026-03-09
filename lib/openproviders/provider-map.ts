@@ -1,8 +1,10 @@
+import { getModelInfo } from "@/lib/models"
 import { resolveModelId } from "@/lib/models/model-id-migration"
 import type { Provider } from "./types"
 
-// map each model ID to its provider
-const MODEL_PROVIDER_MAP: Record<string, Provider> = {
+// Keep previously routable historical IDs working even when they are no longer
+// represented in the curated model catalog.
+const FALLBACK_PROVIDER_MAP: Record<string, Provider> = {
   o1: "openai",
   "o1-2024-12-17": "openai",
   "o1-preview": "openai",
@@ -40,9 +42,7 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gpt-3.5-turbo-instruct": "openai",
   o3: "openai",
   "o3-2025-04-16": "openai",
-  "o4-mini": "openai",
   "o4-mini-2025-04-16": "openai",
-  "gpt-5.2": "openai",
   "gpt-5.2-2025-12-11": "openai",
   "gpt-5.4": "openai",
   "gpt-5.4-2026-03-05": "openai",
@@ -57,32 +57,20 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gpt-5-mini-2025-08-07": "openai",
   "gpt-5-nano": "openai",
   "gpt-5-nano-2025-08-07": "openai",
-
-  // Mistral
-  "codestral-latest": "mistral",
   "codestral-2508": "mistral",
-  "ministral-3b-latest": "mistral",
   "ministral-3b-2512": "mistral",
-  "ministral-8b-latest": "mistral",
   "ministral-8b-2512": "mistral",
-  "mistral-large-latest": "mistral",
   "mistral-large-2512": "mistral",
-  "mistral-small-latest": "mistral",
   "mistral-small-2506": "mistral",
-  "pixtral-large-latest": "mistral",
   "pixtral-large-2411": "mistral",
   "pixtral-12b-2409": "mistral",
   "open-mistral-7b": "mistral",
   "open-mixtral-8x7b": "mistral",
   "open-mixtral-8x22b": "mistral",
-
-  //Perplexity
   sonar: "perplexity",
   "sonar-pro": "perplexity",
   "sonar-deep-research": "perplexity",
   "sonar-reasoning-pro": "perplexity",
-
-  // Google
   "gemini-2.0-flash-001": "google",
   "gemini-1.5-flash": "google",
   "gemini-1.5-flash-latest": "google",
@@ -106,19 +94,13 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "gemini-2.5-flash": "google",
   "gemini-2.5-flash-lite": "google",
   "gemini-2.5-pro": "google",
-
-  // Anthropic
   "claude-3-haiku-20240307": "anthropic",
   "claude-opus-4-20250514": "anthropic",
   "claude-sonnet-4-20250514": "anthropic",
   "claude-opus-4-6": "anthropic",
   "claude-sonnet-4-6": "anthropic",
-  "claude-sonnet-4-5": "anthropic",
   "claude-sonnet-4-5-20250929": "anthropic",
-  "claude-haiku-4-5": "anthropic",
   "claude-haiku-4-5-20251001": "anthropic",
-
-  // XAI
   "grok-2-vision-1212": "xai",
   "grok-2-vision": "xai",
   "grok-2-vision-latest": "xai",
@@ -130,14 +112,12 @@ const MODEL_PROVIDER_MAP: Record<string, Provider> = {
   "grok-2-latest": "xai",
   "grok-vision-beta": "xai",
   "grok-beta": "xai",
-  "grok-4": "xai",
   "grok-4-0709": "xai",
   "grok-4-fast-reasoning": "xai",
   "grok-4-fast-non-reasoning": "xai",
   "grok-4-1-fast-reasoning": "xai",
   "grok-4-1-fast-non-reasoning": "xai",
   "grok-code-fast-1": "xai",
-
 }
 
 export function getProviderForModel(model: string): Provider {
@@ -147,7 +127,9 @@ export function getProviderForModel(model: string): Provider {
     return "openrouter"
   }
 
-  const provider = MODEL_PROVIDER_MAP[resolvedModel]
+  const provider =
+    getModelInfo(resolvedModel)?.providerId ??
+    FALLBACK_PROVIDER_MAP[resolvedModel]
   if (provider) return provider
 
   throw new Error(`Unknown provider for model: ${resolvedModel}`)

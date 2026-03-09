@@ -22,7 +22,7 @@ export const REMAINING_QUERY_ALERT_THRESHOLD = 2
 export const DAILY_FILE_UPLOAD_LIMIT = 5
 export const DAILY_LIMIT_PRO_MODELS = 500
 
-export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini", "gpt-5.2"]
+export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini"]
 
 export const FREE_MODELS_IDS = [
   "openrouter:deepseek/deepseek-r1:free",
@@ -32,7 +32,17 @@ export const FREE_MODELS_IDS = [
   "gpt-5-mini",
 ]
 
-export const MODEL_DEFAULT = "gpt-5.2"
+export const MODEL_DEFAULT_ANONYMOUS = "gpt-5-mini"
+export const MODEL_DEFAULT_AUTHENTICATED = "gpt-5-mini"
+
+// Legacy alias retained for call sites that still import a single default.
+export const MODEL_DEFAULT = MODEL_DEFAULT_AUTHENTICATED
+
+export function getDefaultModelForUser(isAuthenticated: boolean): string {
+  return isAuthenticated
+    ? MODEL_DEFAULT_AUTHENTICATED
+    : MODEL_DEFAULT_ANONYMOUS
+}
 
 export const APP_NAME = "Not A Wrapper"
 export const APP_DOMAIN = "https://not-a-wrapper.com"

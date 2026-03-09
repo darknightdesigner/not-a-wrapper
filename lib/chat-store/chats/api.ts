@@ -1,6 +1,6 @@
 import { readFromIndexedDB, writeToIndexedDB } from "@/lib/chat-store/persist"
 import type { Chat, Chats } from "@/lib/chat-store/types"
-import { MODEL_DEFAULT } from "../../config"
+import { getDefaultModelForUser } from "../../config"
 import { fetchClient } from "../../fetch"
 
 // ============================================================================
@@ -144,7 +144,7 @@ export async function createNewChat(
     } = {
       userId,
       title: title || "New chat",
-      model: model || MODEL_DEFAULT,
+      model: model || getDefaultModelForUser(!!isAuthenticated),
       isAuthenticated,
     }
 

@@ -7,6 +7,9 @@ const geminiModels: ModelConfig[] = [
     name: "Gemini 2.5 Flash-Lite",
     provider: "Google",
     providerId: "google",
+    catalogStatus: "visible",
+    idKind: "stable",
+    lastVerifiedAt: "2026-03-08",
     modelFamily: "Gemini",
     baseProviderId: "google",
     description:
@@ -35,6 +38,9 @@ const geminiModels: ModelConfig[] = [
     name: "Gemini 2.5 Flash",
     provider: "Google",
     providerId: "google",
+    catalogStatus: "visible",
+    idKind: "stable",
+    lastVerifiedAt: "2026-03-08",
     modelFamily: "Gemini",
     baseProviderId: "google",
     description:
@@ -63,6 +69,9 @@ const geminiModels: ModelConfig[] = [
     name: "Gemini 2.5 Pro",
     provider: "Google",
     providerId: "google",
+    catalogStatus: "visible",
+    idKind: "stable",
+    lastVerifiedAt: "2026-03-08",
     modelFamily: "Gemini",
     baseProviderId: "google",
     description:
@@ -91,6 +100,8 @@ const geminiModels: ModelConfig[] = [
     name: "Gemma 3 27B",
     provider: "Google",
     providerId: "google",
+    catalogStatus: "hidden",
+    idKind: "stable",
     modelFamily: "Gemma",
     baseProviderId: "google",
     description:

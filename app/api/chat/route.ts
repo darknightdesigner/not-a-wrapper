@@ -166,6 +166,21 @@ function getSlowRequestThresholdMs(): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+function getStalledContinuationThresholdMs(): number {
+  const fallback = 30000
+  const parsed = Number.parseInt(
+    process.env.SENTRY_CHAT_STALLED_CONTINUATION_MS ?? "",
+    10
+  )
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+type ChatStreamPhase =
+  | "pre_first_chunk"
+  | "post_tool_continue"
+  | "post_first_chunk"
+  | "unknown"
+
 function setChatConversationCorrelation(chatId: string): void {
   const sentryWithConversationApi = Sentry as typeof Sentry & {
     setConversationId?: (conversationId: string) => void
@@ -314,6 +329,7 @@ export async function POST(req: Request) {
   let telemetryIsAuthenticated: boolean | undefined
   let telemetryMessageCount: number | undefined
   const slowRequestThresholdMs = getSlowRequestThresholdMs()
+  const stalledContinuationThresholdMs = getStalledContinuationThresholdMs()
 
   try {
     Sentry.setTag("route", "api/chat")
@@ -1601,6 +1617,118 @@ export async function POST(req: Request) {
     let reasoningDurationMs: number | null = null
     let firstChunkLatencyMs: number | null = null
     let loggedLateStepPolicy = false
+    let lastChunkAtMs: number | null = null
+    let lastProgressAtMs = streamStartMs
+    let observedToolCalls = 0
+    let lastStepFinishReason: string | null = null
+    let lastToolStepNumber: number | null = null
+    let lastToolNames: string[] = []
+    let awaitingPostToolContinuation = false
+    let postToolContinuationArmedAtMs: number | null = null
+    let stalledContinuationTimer: ReturnType<typeof setTimeout> | null = null
+    let stalledContinuationCaptured = false
+    let abortCaptured = false
+    let streamCompleted = false
+
+    const clearStalledContinuationTimer = () => {
+      if (stalledContinuationTimer !== null) {
+        clearTimeout(stalledContinuationTimer)
+        stalledContinuationTimer = null
+      }
+    }
+
+    const getStreamPhase = (): ChatStreamPhase => {
+      if (awaitingPostToolContinuation) return "post_tool_continue"
+      if (firstChunkLatencyMs !== null) return "post_first_chunk"
+      if (stepCounter > 0 || observedToolCalls > 0) return "unknown"
+      return "pre_first_chunk"
+    }
+
+    const captureChatLifecycleSignal = (
+      signalName: "chat_client_abort" | "chat_stalled_continuation",
+      phase: ChatStreamPhase = getStreamPhase()
+    ) => {
+      const now = Date.now()
+      Sentry.captureMessage(signalName, {
+        level: "warning",
+        tags: {
+          route: "api/chat",
+          chat_route: "/api/chat",
+          chat_operation: "stream_text",
+          chat_provider: provider,
+          chat_model: model,
+          chat_is_authenticated: String(isAuthenticated),
+          chat_error_type: "none",
+          chat_stream_phase: phase,
+        },
+        extra: {
+          requestId,
+          chatId,
+          model,
+          provider,
+          isAuthenticated,
+          messageCount: messages.length,
+          chatVersion: normalizedChatVersion,
+          elapsedMs: now - streamStartMs,
+          firstTokenLatencyMs: firstChunkLatencyMs,
+          timeSinceLastChunkMs: lastChunkAtMs === null ? null : now - lastChunkAtMs,
+          timeSinceLastProgressMs: now - lastProgressAtMs,
+          stalledThresholdMs: stalledContinuationThresholdMs,
+          stepCounter,
+          observedToolCalls,
+          lastStepFinishReason,
+          lastToolStepNumber,
+          lastToolNames,
+          awaitingPostToolContinuation,
+          postToolContinuationDelayMs:
+            postToolContinuationArmedAtMs === null
+              ? null
+              : now - postToolContinuationArmedAtMs,
+          mcpClientCount: mcpClients.length,
+        },
+      })
+    }
+
+    const armStalledContinuationTimer = () => {
+      clearStalledContinuationTimer()
+      if (stalledContinuationCaptured || abortCaptured || streamCompleted) {
+        return
+      }
+      awaitingPostToolContinuation = true
+      postToolContinuationArmedAtMs = Date.now()
+      stalledContinuationTimer = setTimeout(() => {
+        if (stalledContinuationCaptured || abortCaptured || streamCompleted) {
+          return
+        }
+        stalledContinuationCaptured = true
+        captureChatLifecycleSignal(
+          "chat_stalled_continuation",
+          "post_tool_continue"
+        )
+      }, stalledContinuationThresholdMs)
+    }
+
+    const resolvePostToolContinuation = () => {
+      awaitingPostToolContinuation = false
+      postToolContinuationArmedAtMs = null
+      clearStalledContinuationTimer()
+    }
+
+    const handleRequestAbort = () => {
+      if (abortCaptured || streamCompleted) return
+      abortCaptured = true
+      resolvePostToolContinuation()
+      captureChatLifecycleSignal("chat_client_abort")
+    }
+
+    if (req.signal.aborted) {
+      handleRequestAbort()
+    } else {
+      req.signal.addEventListener("abort", handleRequestAbort, { once: true })
+      after(() => {
+        req.signal.removeEventListener("abort", handleRequestAbort)
+      })
+    }
 
     const result = streamText({
       model: aiModel,
@@ -1675,6 +1803,9 @@ export async function POST(req: Request) {
       // and future trace-based evaluation.
       onStepFinish: async ({ toolCalls, toolResults, usage, finishReason }) => {
         stepCounter++
+        observedToolCalls += toolCalls.length
+        lastProgressAtMs = Date.now()
+        lastStepFinishReason = finishReason ?? null
         if (toolCalls.length === 0) return
 
         for (const call of toolCalls) {
@@ -1769,17 +1900,29 @@ export async function POST(req: Request) {
             })
           )
         }
+
+        if (finishReason === "tool-calls") {
+          lastToolStepNumber = stepCounter
+          lastToolNames = toolCalls.map((call) => call.toolName)
+          armStalledContinuationTimer()
+        } else {
+          resolvePostToolContinuation()
+        }
       },
 
       ...(Object.keys(providerOptions).length > 0 && { providerOptions }),
       ...(Object.keys(requestHeaders).length > 0 && { headers: requestHeaders }),
 
       onChunk: ({ chunk }) => {
+        const now = Date.now()
+        lastChunkAtMs = now
+        lastProgressAtMs = now
+        resolvePostToolContinuation()
         if (firstChunkLatencyMs === null) {
-          firstChunkLatencyMs = Date.now() - streamStartMs
+          firstChunkLatencyMs = now - streamStartMs
         }
         if (chunk.type === "reasoning-delta" && reasoningStartMs === null) {
-          reasoningStartMs = Date.now()
+          reasoningStartMs = now
         }
         // When text-delta arrives after reasoning, reasoning is done
         if (
@@ -1787,11 +1930,13 @@ export async function POST(req: Request) {
           reasoningStartMs !== null &&
           reasoningDurationMs === null
         ) {
-          reasoningDurationMs = Date.now() - reasoningStartMs
+          reasoningDurationMs = now - reasoningStartMs
         }
       },
 
       onError: (err: unknown) => {
+        streamCompleted = true
+        resolvePostToolContinuation()
         console.error("Streaming error occurred:", err)
         const errorMessage = extractErrorMessage(err)
 
@@ -1835,6 +1980,9 @@ export async function POST(req: Request) {
       },
 
       onFinish: ({ text, usage, steps, finishReason }) => {
+        streamCompleted = true
+        lastProgressAtMs = Date.now()
+        resolvePostToolContinuation()
         if (steps) {
           const resolvedByCallId: ToolInvocationMetadataByCallId = {}
           for (const step of steps) {

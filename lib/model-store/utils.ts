@@ -1,3 +1,6 @@
+import { getDefaultModelForUser } from "@/lib/config"
+import { getModelInfo } from "@/lib/models"
+import { resolveModelId } from "@/lib/models/model-id-migration"
 import { ModelConfig } from "@/lib/models/types"
 
 /**
@@ -6,26 +9,31 @@ import { ModelConfig } from "@/lib/models/types"
  * Models not in this list preserve their original array-declaration order.
  */
 export const DEFAULT_MODEL_ORDER: string[] = [
-  // Top Anthropic (most recent first)
   "claude-opus-4-6",
   "claude-sonnet-4-6",
-  "claude-sonnet-4-5",
-  // Top 3 OpenAI (most recent first)
+  "claude-haiku-4-5-20251001",
   "gpt-5.4",
-  "gpt-5.2",
-  "o4-mini",
-  // Top 1 Google
-  "gemini-2.5-pro",
-  // Top 1 Grok
-  "grok-4-1-fast-reasoning",
-  // Remaining popular models
-  "gemini-2.5-flash",
+  "gpt-5.4-pro",
   "gpt-5-mini",
-  "openrouter:deepseek/deepseek-r1:free",
-  "grok-4-0709",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "grok-4-1-fast-reasoning",
+  "grok-code-fast-1",
   "mistral-large-2512",
-  "pixtral-large-2411",
+  "mistral-small-2506",
+  "codestral-2508",
+  "sonar",
+  "sonar-reasoning-pro",
+  "openrouter:deepseek/deepseek-r1:free",
+  "openrouter:meta-llama/llama-3.3-8b-instruct:free",
 ]
+
+export function isModelVisibleInSelector(
+  model: Pick<ModelConfig, "catalogStatus">
+): boolean {
+  return model.catalogStatus === "visible"
+}
 
 /**
  * Utility function to filter and sort models based on favorites, search, and visibility
@@ -41,28 +49,31 @@ export function filterAndSortModels(
   searchQuery: string,
   isModelHidden: (modelId: string) => boolean
 ): ModelConfig[] {
-  return models
-    .filter((model) => !isModelHidden(model.id))
+  const selectorModels = models.filter(
+    (model) => isModelVisibleInSelector(model) && !isModelHidden(model.id)
+  )
+  const visibleFavoriteModels = favoriteModels.filter((favoriteModelId) =>
+    selectorModels.some((model) => model.id === favoriteModelId)
+  )
+  const shouldRestrictToFavorites = visibleFavoriteModels.length > 0
+
+  return selectorModels
     .filter((model) => {
-      // If user has favorite models, only show favorites
-      if (favoriteModels && favoriteModels.length > 0) {
-        return favoriteModels.includes(model.id)
+      if (shouldRestrictToFavorites) {
+        return visibleFavoriteModels.includes(model.id)
       }
-      // If no favorites, show all models
       return true
     })
     .filter((model) =>
       model.name.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .sort((a, b) => {
-      // If user has favorite models, maintain their order
-      if (favoriteModels && favoriteModels.length > 0) {
-        const aIndex = favoriteModels.indexOf(a.id)
-        const bIndex = favoriteModels.indexOf(b.id)
+      if (shouldRestrictToFavorites) {
+        const aIndex = visibleFavoriteModels.indexOf(a.id)
+        const bIndex = visibleFavoriteModels.indexOf(b.id)
         return aIndex - bIndex
       }
 
-      // Fallback: curated showcase order
       const aOrder = DEFAULT_MODEL_ORDER.indexOf(a.id)
       const bOrder = DEFAULT_MODEL_ORDER.indexOf(b.id)
       const aInList = aOrder !== -1
@@ -73,4 +84,73 @@ export function filterAndSortModels(
       if (bInList) return 1
       return 0 // preserve original array-declaration order
     })
+}
+
+type ResolvePreferredModelIdOptions = {
+  models: ModelConfig[]
+  isAuthenticated: boolean
+  currentModelId?: string | null
+  preferredModelIds?: Array<string | null | undefined>
+}
+
+export function resolvePreferredModelId({
+  models,
+  isAuthenticated,
+  currentModelId,
+  preferredModelIds = [],
+}: ResolvePreferredModelIdOptions): string {
+  const accessibleVisibleModelIds = new Set(
+    models
+      .filter((model) => model.accessible && isModelVisibleInSelector(model))
+      .map((model) => model.id)
+  )
+
+  const normalizeVisibleModelId = (
+    modelId: string | null | undefined
+  ): string | null => {
+    if (!modelId) return null
+    const resolvedModelId = resolveModelId(modelId)
+    return models.some((model) => model.id === resolvedModelId)
+      ? resolvedModelId
+      : null
+  }
+
+  const normalizeRoutableModelId = (
+    modelId: string | null | undefined
+  ): string | null => {
+    if (!modelId) return null
+    const resolvedModelId = resolveModelId(modelId)
+    return getModelInfo(resolvedModelId) ? resolvedModelId : null
+  }
+
+  const normalizedCurrentModelId = normalizeRoutableModelId(currentModelId)
+  if (normalizedCurrentModelId) return normalizedCurrentModelId
+
+  for (const preferredModelId of preferredModelIds) {
+    const normalizedPreferredModelId = normalizeVisibleModelId(preferredModelId)
+    if (
+      normalizedPreferredModelId &&
+      accessibleVisibleModelIds.has(normalizedPreferredModelId)
+    ) {
+      return normalizedPreferredModelId
+    }
+  }
+
+  const defaultModelId = normalizeVisibleModelId(
+    getDefaultModelForUser(isAuthenticated)
+  )
+  if (defaultModelId && accessibleVisibleModelIds.has(defaultModelId)) {
+    return defaultModelId
+  }
+
+  const firstAccessibleVisibleModelId = models.find(
+    (model) => model.accessible && isModelVisibleInSelector(model)
+  )?.id
+  if (firstAccessibleVisibleModelId) return firstAccessibleVisibleModelId
+
+  const firstVisibleModelId = models.find(isModelVisibleInSelector)?.id
+  if (firstVisibleModelId) return firstVisibleModelId
+
+  if (defaultModelId) return defaultModelId
+  return models[0]?.id ?? resolveModelId(getDefaultModelForUser(isAuthenticated))
 }

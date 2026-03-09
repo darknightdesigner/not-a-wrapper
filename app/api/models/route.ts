@@ -1,6 +1,6 @@
 import {
   getAllModels,
-  getModelsWithAccessFlags,
+  getVisibleModelsWithAccessFlags,
 } from "@/lib/models"
 import { NextResponse } from "next/server"
 
@@ -11,10 +11,10 @@ import { NextResponse } from "next/server"
  */
 export async function GET() {
   try {
-    // Return models with base access flags
+    // Return the curated selector catalog with base access flags.
     // Free models (from FREE_MODELS_IDS) are marked accessible
     // Paid/provider-specific models are locked until client verifies user has API keys
-    const models = await getModelsWithAccessFlags()
+    const models = await getVisibleModelsWithAccessFlags()
 
     return new Response(JSON.stringify({ models }), {
       status: 200,
@@ -35,13 +35,17 @@ export async function GET() {
 
 export async function POST() {
   try {
-    const models = await getAllModels()
+    const [models, allModels] = await Promise.all([
+      getVisibleModelsWithAccessFlags(),
+      getAllModels(),
+    ])
 
     return NextResponse.json({
       message: "Models refreshed",
       models,
       timestamp: new Date().toISOString(),
       count: models.length,
+      routableCount: allModels.length,
     })
   } catch (error) {
     console.error("Failed to refresh models:", error)

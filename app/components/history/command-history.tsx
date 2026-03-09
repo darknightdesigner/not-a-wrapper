@@ -49,11 +49,12 @@ type CommandHistoryProps = {
   chatHistory: Chats[]
   onSaveEdit: (id: string, newTitle: string) => Promise<void>
   onConfirmDelete: (id: string) => Promise<void>
-  trigger: React.ReactElement
+  trigger?: React.ReactElement
   isOpen: boolean
   setIsOpen: (open: boolean) => void
   onOpenChange?: (open: boolean) => void
   hasPopover?: boolean
+  enableShortcut?: boolean
 }
 
 type CommandItemEditProps = {
@@ -357,6 +358,7 @@ export function CommandHistory({
   setIsOpen,
   onOpenChange,
   hasPopover = true,
+  enableShortcut = true,
 }: CommandHistoryProps) {
   const { chatId } = useChatSession()
   const router = useRouter()
@@ -403,7 +405,8 @@ export function CommandHistory({
 
   useKeyShortcut(
     (e: KeyboardEvent) => e.key === "k" && (e.metaKey || e.ctrlKey),
-    () => handleOpenChange(!isOpen)
+    () => handleOpenChange(!isOpen),
+    enableShortcut
   )
 
   const handleChatHover = useCallback(
@@ -581,14 +584,15 @@ export function CommandHistory({
 
   return (
     <>
-      {hasPopover ? (
-        <Tooltip>
-          <TooltipTrigger render={trigger} />
-          <TooltipContent>History ⌘+K</TooltipContent>
-        </Tooltip>
-      ) : (
-        trigger
-      )}
+      {trigger &&
+        (hasPopover ? (
+          <Tooltip>
+            <TooltipTrigger render={trigger} />
+            <TooltipContent>History ⌘+K</TooltipContent>
+          </Tooltip>
+        ) : (
+          trigger
+        ))}
 
       <CustomCommandDialog
         onOpenChange={handleOpenChange}

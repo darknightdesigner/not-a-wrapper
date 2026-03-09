@@ -1,42 +1,151 @@
-const MODEL_ID_REPLACEMENTS: Record<string, string> = {
-  // Legacy IDs with provider-routing mismatches or invalid upstream IDs.
-  "deepseek-r1": "openrouter:deepseek/deepseek-r1:free",
-  "deepseek-v3": "openrouter:deepseek/deepseek-r1:free",
-  "codestral-latest": "codestral-2508",
-  "ministral-3b-latest": "ministral-3b-2512",
-  "ministral-8b-latest": "ministral-8b-2512",
-  "mistral-large-latest": "mistral-large-2512",
-  "mistral-small-latest": "mistral-small-2506",
-  "pixtral-large-latest": "pixtral-large-2411",
-  "mistral-small-2503": "mistral-small-2506",
+import type { ModelIdKind } from "./types"
 
-  // Removed upstream.
-  "sonar-reasoning": "sonar-reasoning-pro",
-  "grok-4": "grok-4-0709",
+type ModelIdAlias = {
+  sourceId: string
+  targetId: string
+  idKind: Extract<ModelIdKind, "alias">
+  verifiedAgainst?: string
+  lastVerifiedAt?: string
+}
 
-  // OpenRouter deprecations/sunset.
-  "openrouter:anthropic/claude-3.7-sonnet:thinking":
-    "claude-sonnet-4-20250514",
-  "openrouter:google/gemini-3-pro-preview": "gemini-2.5-pro",
-  "openrouter:google/gemini-2.0-flash-001": "gemini-2.5-flash",
-  "openrouter:google/gemini-2.0-flash-lite-001": "gemini-2.5-flash",
-  "openrouter:anthropic/claude-sonnet-4": "claude-sonnet-4-20250514",
-  "openrouter:google/gemini-2.5-pro": "gemini-2.5-pro",
-  "openrouter:google/gemini-2.5-flash": "gemini-2.5-flash",
-  "openrouter:openai/gpt-4.1": "gpt-4.1",
-  "openrouter:openai/o4-mini": "o4-mini",
-  "openrouter:perplexity/sonar": "sonar",
-  "openrouter:perplexity/sonar-reasoning": "sonar-reasoning-pro",
-  "openrouter:perplexity/sonar-reasoning-pro": "sonar-reasoning-pro",
-  "openrouter:perplexity/sonar-pro": "sonar-pro",
-  "openrouter:perplexity/sonar-deep-research": "sonar-deep-research",
+type ModelIdSuccessor = {
+  sourceId: string
+  targetId: string
+  replacementModelId: string
+  verifiedAgainst?: string
+  lastVerifiedAt?: string
+}
 
-  // Direct Google model sunset risk.
-  "gemini-3-pro-preview": "gemini-2.5-pro",
+const MODEL_ID_ALIASES = [
+  {
+    sourceId: "deepseek-r1",
+    targetId: "openrouter:deepseek/deepseek-r1:free",
+    idKind: "alias",
+    verifiedAgainst: "openrouter:deepseek/deepseek-r1:free",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "codestral-latest",
+    targetId: "codestral-2508",
+    idKind: "alias",
+    verifiedAgainst: "codestral-2508",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "ministral-3b-latest",
+    targetId: "ministral-3b-2512",
+    idKind: "alias",
+    verifiedAgainst: "ministral-3b-2512",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "ministral-8b-latest",
+    targetId: "ministral-8b-2512",
+    idKind: "alias",
+    verifiedAgainst: "ministral-8b-2512",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "mistral-large-latest",
+    targetId: "mistral-large-2512",
+    idKind: "alias",
+    verifiedAgainst: "mistral-large-2512",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "mistral-small-latest",
+    targetId: "mistral-small-2506",
+    idKind: "alias",
+    verifiedAgainst: "mistral-small-2506",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "pixtral-large-latest",
+    targetId: "pixtral-large-2411",
+    idKind: "alias",
+    verifiedAgainst: "pixtral-large-2411",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "o4-mini",
+    targetId: "gpt-5-mini",
+    idKind: "alias",
+    verifiedAgainst: "gpt-5-mini-2025-08-07",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "claude-sonnet-4-5",
+    targetId: "claude-sonnet-4-5-20250929",
+    idKind: "alias",
+    verifiedAgainst: "claude-sonnet-4-5-20250929",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "claude-haiku-4-5",
+    targetId: "claude-haiku-4-5-20251001",
+    idKind: "alias",
+    verifiedAgainst: "claude-haiku-4-5-20251001",
+    lastVerifiedAt: "2026-03-08",
+  },
+] as const satisfies readonly ModelIdAlias[]
+
+const MODEL_ID_SUCCESSIONS = [
+  {
+    sourceId: "deepseek-v3",
+    targetId: "openrouter:deepseek/deepseek-r1:free",
+    replacementModelId: "openrouter:deepseek/deepseek-r1:free",
+    verifiedAgainst: "openrouter:deepseek/deepseek-r1:free",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "mistral-small-2503",
+    targetId: "mistral-small-2506",
+    replacementModelId: "mistral-small-2506",
+    verifiedAgainst: "mistral-small-2506",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "sonar-reasoning",
+    targetId: "sonar-reasoning-pro",
+    replacementModelId: "sonar-reasoning-pro",
+    verifiedAgainst: "sonar-reasoning-pro",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "grok-4",
+    targetId: "grok-4-0709",
+    replacementModelId: "grok-4-0709",
+    verifiedAgainst: "grok-4-0709",
+    lastVerifiedAt: "2026-03-08",
+  },
+  {
+    sourceId: "gpt-5.2",
+    targetId: "gpt-5.4",
+    replacementModelId: "gpt-5.4",
+    verifiedAgainst: "gpt-5.4-2026-03-05",
+    lastVerifiedAt: "2026-03-08",
+  },
+] as const satisfies readonly ModelIdSuccessor[]
+
+const MODEL_ID_ALIAS_MAP = Object.fromEntries(
+  MODEL_ID_ALIASES.map((entry) => [entry.sourceId, entry.targetId])
+) as Record<string, string>
+
+const MODEL_ID_SUCCESSOR_MAP = Object.fromEntries(
+  MODEL_ID_SUCCESSIONS.map((entry) => [entry.sourceId, entry.targetId])
+) as Record<string, string>
+
+export function resolveLegacyAliasModelId(modelId: string): string {
+  return MODEL_ID_ALIAS_MAP[modelId] ?? modelId
+}
+
+export function resolveCompatibilityModelId(modelId: string): string {
+  const aliasResolvedModelId = resolveLegacyAliasModelId(modelId)
+  return MODEL_ID_SUCCESSOR_MAP[aliasResolvedModelId] ?? aliasResolvedModelId
 }
 
 export function resolveModelId(modelId: string): string {
-  return MODEL_ID_REPLACEMENTS[modelId] ?? modelId
+  return resolveCompatibilityModelId(modelId)
 }
 
 export function resolveModelIds(modelIds: readonly string[]): string[] {
