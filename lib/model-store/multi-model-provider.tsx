@@ -1,9 +1,10 @@
 "use client"
 
-import { MODEL_DEFAULT } from "@/lib/config"
 import { resolveModelIds } from "@/lib/models/model-id-migration"
+import { resolvePreferredModelId } from "@/lib/model-store/utils"
 import { useModel } from "@/lib/model-store/provider"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
+import { useUser } from "@/lib/user-store/provider"
 import {
   createContext,
   useCallback,
@@ -34,7 +35,8 @@ export function MultiModelSelectionProvider({
 }: {
   children: React.ReactNode
 }) {
-  const { lastUsedModel, setLastUsedModel } = useModel()
+  const { models, lastUsedModel, setLastUsedModel } = useModel()
+  const { user } = useUser()
   const { preferences } = useUserPreferences()
   const isMultiModelEnabled = preferences.multiModelEnabled
 
@@ -52,7 +54,13 @@ export function MultiModelSelectionProvider({
       setSelectedModelIdsState([])
     } else if (selectedModelIds.length === 0) {
       // Mode turned on — seed with last used model
-      setSelectedModelIdsState([lastUsedModel || MODEL_DEFAULT])
+      setSelectedModelIdsState([
+        resolvePreferredModelId({
+          models,
+          isAuthenticated: !!user?.id,
+          preferredModelIds: [lastUsedModel],
+        }),
+      ])
     }
   }
 

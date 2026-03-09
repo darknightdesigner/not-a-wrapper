@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverTrigger } from "@/components/ui/popover"
+import { getModelInfo } from "@/lib/models"
 import { useModel } from "@/lib/model-store/provider"
 import { filterAndSortModels } from "@/lib/model-store/utils"
 import { ModelConfig } from "@/lib/models/types"
@@ -74,11 +75,14 @@ export function ModelSelector(props: ModelSelectorProps) {
   // Mode-specific derived values
   const currentModel =
     props.mode === "single"
-      ? models.find((model) => model.id === props.selectedModelId)
+      ? models.find((model) => model.id === props.selectedModelId) ??
+        getModelInfo(props.selectedModelId)
       : undefined
   const selectedModels =
     props.mode === "multi"
-      ? models.filter((model) => props.selectedModelIds.includes(model.id))
+      ? props.selectedModelIds
+          .map((modelId) => models.find((model) => model.id === modelId) ?? getModelInfo(modelId))
+          .filter((model): model is ModelConfig => Boolean(model))
       : []
   const selectedModelIds =
     props.mode === "multi" ? props.selectedModelIds : ([] as string[])

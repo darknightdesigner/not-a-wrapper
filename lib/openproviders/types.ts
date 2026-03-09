@@ -46,7 +46,6 @@ export type OpenAIModel =
   | "gpt-5.4-pro-2026-03-05"
   | "gpt-5.1"
   | "gpt-5.1-2025-11-13"
-  | "gpt-5.1-thinking"
   | "gpt-5"
   | "gpt-5-2025-08-07"
   | "gpt-5-mini"
@@ -106,12 +105,10 @@ export type GeminiModel =
 export type AnthropicModel =
   | "claude-3-haiku-20240307"
   | "claude-opus-4-20250514"
-  | "claude-sonnet-4-20250514"
   | "claude-opus-4-6"
   | "claude-sonnet-4-6"
   | "claude-sonnet-4-5"
   | "claude-sonnet-4-5-20250929"
-  | "claude-haiku-4-5"
   | "claude-haiku-4-5-20251001"
 
 export type XaiModel =
@@ -136,22 +133,7 @@ export type XaiModel =
 
 export type OpenRouterModel =
   | "openrouter:deepseek/deepseek-r1:free"
-  | "openrouter:anthropic/claude-sonnet-4"
-  | "openrouter:anthropic/claude-3.5-sonnet"
-  | "openrouter:google/gemini-2.5-pro"
-  | "openrouter:google/gemini-2.5-flash"
-  | "openrouter:openai/gpt-4.1"
-  | "openrouter:openai/gpt-4.1-mini"
-  | "openrouter:openai/gpt-4.1-nano"
-  | "openrouter:openai/o4-mini"
-  | "openrouter:openai/o3-mini"
-  | "openrouter:x-ai/grok-3-mini-beta"
   | "openrouter:meta-llama/llama-3.3-8b-instruct:free"
-  | "openrouter:perplexity/sonar"
-  | "openrouter:perplexity/sonar-reasoning"
-  | "openrouter:perplexity/sonar-reasoning-pro"
-  | "openrouter:perplexity/sonar-pro"
-  | "openrouter:perplexity/sonar-deep-research"
 
 export type Provider =
   | "openai"

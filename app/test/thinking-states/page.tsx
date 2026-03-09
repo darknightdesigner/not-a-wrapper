@@ -883,7 +883,7 @@ export default function ThinkingStatesTestPage() {
               onFileRemove={noopFile}
               onSuggestion={noopStr}
               hasSuggestions={false}
-              selectedModel="gpt-5.2"
+              selectedModel="gpt-5.4"
               isUserAuthenticated={true}
               stop={noop}
               status="ready"

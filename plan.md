@@ -295,6 +295,13 @@ AGENTS.md            ← Rules & permissions
   - [ ] Implement checkout, upgrade/downgrade, and cancellation flows.
   - [ ] Add webhook handling for plan state synchronization.
 
+- [ ] **#48 Usage-based pricing + usage visibility** (`Not started`)  
+  Sources: `AGENTS.md`
+  - [ ] Define included-usage quotas, metering model, and overage pricing rules.
+  - [ ] Surface per-user usage in the app with a clear indicator once included usage exceeds 50%.
+  - [ ] Add plan enforcement behavior and user-facing upgrade/overage messaging.
+  - [ ] Add an option for users to bring their own API keys as an alternative to platform-billed usage.
+
 - [ ] **Audio experience roadmap (music + SFX)** (`Not started`)  
   Sources: `research/open-webui-analysis/SUMMARY.md`, `research/competitive-feature-analysis.md`
   - [ ] Continue investigating performant approaches for in-app music and sound effects.

@@ -7,6 +7,9 @@ const perplexityModels: ModelConfig[] = [
     name: "Perplexity Sonar",
     provider: "Perplexity",
     providerId: "perplexity",
+    catalogStatus: "visible",
+    idKind: "stable",
+    lastVerifiedAt: "2026-03-08",
     modelFamily: "Sonar",
     baseProviderId: "perplexity",
     description:
@@ -35,6 +38,9 @@ const perplexityModels: ModelConfig[] = [
     name: "Perplexity Sonar Reasoning Pro",
     provider: "Perplexity",
     providerId: "perplexity",
+    catalogStatus: "visible",
+    idKind: "stable",
+    lastVerifiedAt: "2026-03-08",
     modelFamily: "Sonar",
     baseProviderId: "perplexity",
     description:
@@ -64,6 +70,8 @@ const perplexityModels: ModelConfig[] = [
     name: "Perplexity Sonar Pro",
     provider: "Perplexity",
     providerId: "perplexity",
+    catalogStatus: "hidden",
+    idKind: "stable",
     modelFamily: "Sonar",
     baseProviderId: "perplexity",
     description:
@@ -92,6 +100,8 @@ const perplexityModels: ModelConfig[] = [
     name: "Perplexity Sonar Deep Research",
     provider: "Perplexity",
     providerId: "perplexity",
+    catalogStatus: "hidden",
+    idKind: "stable",
     modelFamily: "Sonar",
     baseProviderId: "perplexity",
     description:

@@ -1,7 +1,7 @@
 import { toast } from "@/components/ui/toast"
 import { Chats } from "@/lib/chat-store/types"
-import { MODEL_DEFAULT } from "@/lib/config"
 import { resolveModelId } from "@/lib/models/model-id-migration"
+import { resolvePreferredModelId } from "@/lib/model-store/utils"
 import { useModel as useModelProvider } from "@/lib/model-store/provider"
 import type { UserProfile } from "@/lib/user/types"
 import { useCallback, useState } from "react"
@@ -29,20 +29,28 @@ export function useModel({
   chatId,
 }: UseModelProps) {
   // Get favorite models and last-used model from ModelProvider
-  const { favoriteModels, lastUsedModel, modelPrefsHydrated, setLastUsedModel } =
+  const { models, favoriteModels, lastUsedModel, modelPrefsHydrated, setLastUsedModel } =
     useModelProvider()
 
-  // Calculate the effective model based on priority: chat model > last used > first favorite > default
+  // Calculate the effective model based on priority: chat model > accessible
+  // last used > accessible favorite > tier default.
   const getEffectiveModel = useCallback(() => {
     const hydratedLastUsedModel = modelPrefsHydrated ? lastUsedModel : null
     const firstFavoriteModel = modelPrefsHydrated ? favoriteModels[0] : null
-    return resolveModelId(
-      currentChat?.model ||
-        hydratedLastUsedModel ||
-        firstFavoriteModel ||
-        MODEL_DEFAULT
-    )
-  }, [currentChat?.model, favoriteModels, lastUsedModel, modelPrefsHydrated])
+    return resolvePreferredModelId({
+      models,
+      isAuthenticated: !!user?.id,
+      currentModelId: currentChat?.model,
+      preferredModelIds: [hydratedLastUsedModel, firstFavoriteModel],
+    })
+  }, [
+    currentChat?.model,
+    favoriteModels,
+    lastUsedModel,
+    modelPrefsHydrated,
+    models,
+    user?.id,
+  ])
 
   // Use local state only for temporary overrides, derive base value from props
   const [localSelectedModel, setLocalSelectedModel] = useState<string | null>(

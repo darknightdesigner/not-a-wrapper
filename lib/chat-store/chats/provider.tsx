@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { useMutation, useQuery, useConvexAuth } from "convex/react"
 import { createContext, useCallback, useContext, useMemo, useState } from "react"
-import { MODEL_DEFAULT, SYSTEM_PROMPT_DEFAULT } from "../../config"
+import { getDefaultModelForUser, SYSTEM_PROMPT_DEFAULT } from "../../config"
 import { resolveModelId } from "@/lib/models/model-id-migration"
 import type { Chats } from "../types"
 
@@ -175,7 +175,9 @@ export function ChatsProvider({
     projectId?: string
   ): Promise<Chats | undefined> => {
     if (!userId) return
-    const normalizedModel = resolveModelId(model || MODEL_DEFAULT)
+    const normalizedModel = resolveModelId(
+      model || getDefaultModelForUser(!!isAuthenticated)
+    )
 
     // For guest users, create a local-only chat (not persisted to Convex)
     // This allows unauthenticated users to send messages without database errors
