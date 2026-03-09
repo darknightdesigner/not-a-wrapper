@@ -158,7 +158,7 @@ function isTimeoutSignal(value: string | undefined): boolean {
 }
 
 function getSlowRequestThresholdMs(): number {
-  const fallback = 15000
+  const fallback = 30000
   const parsed = Number.parseInt(
     process.env.SENTRY_CHAT_SLOW_REQUEST_MS ?? "",
     10
