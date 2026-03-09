@@ -5,6 +5,8 @@ import { getProviderForModel } from "./provider-map"
 describe("getProviderForModel", () => {
   it("resolves migrated legacy IDs before provider lookup", () => {
     expect(getProviderForModel("deepseek-r1")).toBe("openrouter")
+    expect(getProviderForModel("codestral-latest")).toBe("mistral")
+    expect(getProviderForModel("mistral-large-latest")).toBe("mistral")
     expect(getProviderForModel("mistral-small-2503")).toBe("mistral")
     expect(getProviderForModel("sonar-reasoning")).toBe("perplexity")
     expect(getProviderForModel("grok-4")).toBe("xai")
