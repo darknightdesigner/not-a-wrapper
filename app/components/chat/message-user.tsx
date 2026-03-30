@@ -189,6 +189,10 @@ export function MessageUser({
       {isEditing ? (
         <div
           className="bg-accent relative flex w-full max-w-xl min-w-[180px] flex-col gap-2 rounded-[18px] px-4 py-2"
+          // TODO: contentRef.current is null here — MessageContent unmounts
+          // when isEditing flips, so offsetWidth always reads null. Consider
+          // capturing the width into a ref inside handleEditStart (before
+          // setIsEditing) and reading that ref here instead.
           style={{
             width: contentRef.current?.offsetWidth,
           }}
