@@ -5,7 +5,6 @@ const eslintConfig = [
   {
     ignores: [
       "convex/_generated/**",
-      "lib/payclaw.ts", // Auto-synced from provisioning-agent — upstream code style
     ],
   },
   {

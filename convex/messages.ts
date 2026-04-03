@@ -272,32 +272,6 @@ export const deleteFromTimestamp = mutation({
       await ctx.db.delete(msg._id)
     }
 
-    // Truncate chatToolState if it exists for messages at or after the truncation point.
-    // This is a best-effort cleanup — the state may not exist for legacy chats.
-    try {
-      const toolState = await ctx.db
-        .query("chatToolState")
-        .withIndex("by_chat", (q) => q.eq("chatId", chatId))
-        .unique()
-
-      if (toolState && toolState.userId === user._id) {
-        // Prefer source timestamp when available, but also fall back to
-        // chatVersion-based truncation so legacy/backfilled rows (which may not
-        // carry sourceMessageTimestamp) don't survive an edit branch.
-        const sourceTimestampWasTruncated =
-          typeof toolState.sourceMessageTimestamp === "number" &&
-          toolState.sourceMessageTimestamp >= timestamp
-        const versionWasTruncated =
-          toDelete.length > 0 && toolState.chatVersion >= truncationMinVersion
-
-        if (sourceTimestampWasTruncated || versionWasTruncated) {
-          await ctx.db.delete(toolState._id)
-        }
-      }
-    } catch {
-      // Best-effort: don't fail message truncation if state cleanup fails
-    }
-
     return toDelete.length
   },
 })
@@ -330,21 +304,6 @@ export const clearForChat = mutation({
 
     for (const msg of messages) {
       await ctx.db.delete(msg._id)
-    }
-
-    // Clear canonical chatToolState as well so a fully cleared chat
-    // does not retain stale payment lifecycle context.
-    try {
-      const toolState = await ctx.db
-        .query("chatToolState")
-        .withIndex("by_chat", (q) => q.eq("chatId", chatId))
-        .unique()
-
-      if (toolState && toolState.userId === user._id) {
-        await ctx.db.delete(toolState._id)
-      }
-    } catch {
-      // Best-effort: don't fail message clearing if state cleanup fails
     }
 
     return messages.length

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import { z } from "zod"
 import { getThirdPartyTools, getContentExtractionTools } from "../third-party"
-import { getPlatformTools } from "../platform"
 
 vi.mock("exa-js", () => {
   class MockExa {
@@ -16,21 +15,6 @@ vi.mock("exa-js", () => {
 
   return { default: MockExa }
 })
-
-vi.mock("@/lib/payclaw/config", () => ({
-  getPayClawConfig: () => ({
-    apiKey: "test_api_key",
-    baseUrl: "https://api.example.com",
-    defaultCardId: "card_default",
-  }),
-}))
-
-vi.mock("@/lib/payclaw/client", () => ({
-  createJob: vi.fn(),
-  getJob: vi.fn(),
-  getJobEvents: vi.fn(),
-  PayClawApiError: class extends Error {},
-}))
 
 type ToolDescriptor = {
   description?: unknown
@@ -145,24 +129,6 @@ describe("custom tool description quality gates", () => {
     expect(thirdPartyMetadata.get("web_search")?.openWorld).toBe(true)
     expect(contentMetadata.get("extract_content")?.openWorld).toBe(true)
   })
-
-  it("enforces quality for platform tools", async () => {
-    const { tools } = await getPlatformTools()
-
-    const payPurchase = getToolDescriptor(
-      tools as unknown as Record<string, unknown>,
-      "pay_purchase"
-    )
-    const payStatus = getToolDescriptor(
-      tools as unknown as Record<string, unknown>,
-      "pay_status"
-    )
-
-    assertDescriptionQuality("pay_purchase", payPurchase.description)
-    assertDescriptionQuality("pay_status", payStatus.description)
-    assertFieldDescriptions("pay_purchase", payPurchase.inputSchema)
-    assertFieldDescriptions("pay_status", payStatus.inputSchema)
-  })
 })
 
 describe("custom tool inputExamples", () => {
@@ -174,7 +140,6 @@ describe("custom tool inputExamples", () => {
     const { tools: contentTools } = await getContentExtractionTools({
       exaKey: "exa_test_key",
     })
-    const { tools: platformTools } = await getPlatformTools()
 
     const webSearch = getToolDescriptor(
       thirdPartyTools as unknown as Record<string, unknown>,
@@ -183,14 +148,6 @@ describe("custom tool inputExamples", () => {
     const extractContent = getToolDescriptor(
       contentTools as unknown as Record<string, unknown>,
       "extract_content"
-    )
-    const payPurchase = getToolDescriptor(
-      platformTools as unknown as Record<string, unknown>,
-      "pay_purchase"
-    )
-    const payStatus = getToolDescriptor(
-      platformTools as unknown as Record<string, unknown>,
-      "pay_status"
     )
 
     assertInputExamples(
@@ -202,16 +159,6 @@ describe("custom tool inputExamples", () => {
       "extract_content",
       extractContent.inputSchema,
       extractContent.inputExamples
-    )
-    assertInputExamples(
-      "pay_purchase",
-      payPurchase.inputSchema,
-      payPurchase.inputExamples
-    )
-    assertInputExamples(
-      "pay_status",
-      payStatus.inputSchema,
-      payStatus.inputExamples
     )
   })
 })
