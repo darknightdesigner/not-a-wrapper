@@ -310,30 +310,6 @@ export const HISTORY_REPLAY_COMPILER_V1 =
 export const HISTORY_REPLAY_NORMALIZER_VERSION = 1
 
 // ============================================================================
-// Payment Status Guardrails
-// ============================================================================
-
-export const PAYMENT_STATUS_GUARDRAILS_V1 =
-  process.env.PAYMENT_STATUS_GUARDRAILS_V1 === "1" ||
-  process.env.PAYMENT_STATUS_GUARDRAILS_V1 === "true"
-
-export const PAYMENT_CHAT_STATE_V1 =
-  process.env.PAYMENT_CHAT_STATE_V1 === "1" ||
-  process.env.PAYMENT_CHAT_STATE_V1 === "true"
-
-/** "observe" = evaluate/log only, "enforce" = block disallowed tools. */
-const paymentGuardrailModeEnv = process.env.PAYMENT_GUARDRAIL_MODE
-export const PAYMENT_GUARDRAIL_MODE: "observe" | "enforce" =
-  paymentGuardrailModeEnv === "observe" ||
-  paymentGuardrailModeEnv === "enforce"
-    ? paymentGuardrailModeEnv
-    : "observe"
-
-export const PAYMENT_CHAT_STATE_BACKFILL_V1 =
-  process.env.PAYMENT_CHAT_STATE_BACKFILL_V1 === "1" ||
-  process.env.PAYMENT_CHAT_STATE_BACKFILL_V1 === "true"
-
-// ============================================================================
 // Sub-Agent Model Configuration
 // ============================================================================
 

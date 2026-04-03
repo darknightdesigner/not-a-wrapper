@@ -10,10 +10,6 @@ import {
   ANTHROPIC_BETA_HEADERS,
   PREPARE_STEP_THRESHOLD,
   HISTORY_REPLAY_COMPILER_V1,
-  PAYMENT_STATUS_GUARDRAILS_V1,
-  PAYMENT_CHAT_STATE_V1,
-  PAYMENT_GUARDRAIL_MODE,
-  PAYMENT_CHAT_STATE_BACKFILL_V1,
 } from "@/lib/config"
 import { getAllModels } from "@/lib/models"
 import { resolveModelId } from "@/lib/models/model-id-migration"
@@ -76,7 +72,6 @@ import {
   ToolTraceCollector,
   wrapMcpTools,
 } from "@/lib/tools/mcp-wrapper"
-import type { ShippingAddress } from "@/lib/payclaw/schemas"
 import {
   classifyChatError,
   type ChatErrorType,
@@ -94,15 +89,6 @@ type ChatRequest = {
   message_group_id?: string
   userId?: string // Client-provided userId (for anonymous users)
 }
-
-const TERMINAL_PAYMENT_STATUSES = new Set([
-  "completed",
-  "delivered",
-  "cancelled",
-  "refunded",
-  "failed",
-  "expired",
-])
 
 function normalizeChatVersion(
   chatVersion: unknown,
@@ -240,10 +226,6 @@ function getBooleanField(
   return typeof candidate === "boolean" ? candidate : undefined
 }
 
-function inferTerminalStatus(status: string): boolean {
-  return TERMINAL_PAYMENT_STATUSES.has(status.toLowerCase())
-}
-
 function isReplayShapeError(message: string): boolean {
   const normalized = message.toLowerCase()
   return [
@@ -295,27 +277,6 @@ function summarizeReplayWarningDetails(
     counts[subcode] = (counts[subcode] ?? 0) + 1
   }
   return counts
-}
-
-function formatAddressContext(addresses: Array<Doc<"shippingAddresses">>): string {
-  if (addresses.length === 0) return ""
-
-  const lines = addresses.map((addr) => {
-    const prefix = addr.isDefault ? "★ Default" : "•"
-    const label = addr.label ? ` (${addr.label})` : ""
-    const line2 = addr.line2 ? `, ${addr.line2}` : ""
-    const contactInfo = [addr.email, addr.phone].filter(Boolean).join(", ")
-    const contactSuffix = contactInfo ? ` [${contactInfo}]` : ""
-    return `${prefix}${label}: ${addr.name}, ${addr.line1}${line2}, ${addr.city}, ${addr.state} ${addr.postalCode}${contactSuffix}`
-  })
-
-  return [
-    "\n\n---",
-    "User's shipping addresses on file:",
-    ...lines,
-    "When the user asks to buy a physical product, use their default shipping address unless they specify otherwise.",
-    "---",
-  ].join("\n")
 }
 
 export async function POST(req: Request) {
@@ -462,7 +423,6 @@ export async function POST(req: Request) {
     const provider = getProviderForModel(model)
     telemetryProvider = provider
     Sentry.setTag("chat_provider", provider)
-    let userAddresses: Array<Doc<"shippingAddresses">> = []
 
     let apiKey: string | undefined
     if (isAuthenticated && convexToken) {
@@ -587,12 +547,11 @@ export async function POST(req: Request) {
 
     const builtInPolicyGuard = makePolicyGuard(providerToolKeyMode)
     const mcpPolicyGuard = makePolicyGuard("platform")
-    const platformPolicyGuard = makePolicyGuard("platform")
     const exaPolicyGuard =
       resolvedExaKeyMode ? makePolicyGuard(resolvedExaKeyMode) : undefined
 
     const logOutageTolerantBudgetEvent = (
-      source: "third-party" | "content" | "platform" | "mcp",
+      source: "third-party" | "content" | "mcp",
       event: {
         type: "recovered" | "degraded_allow" | "degraded_block"
         toolName: string
@@ -660,13 +619,6 @@ export async function POST(req: Request) {
             onEvent: (event) => logOutageTolerantBudgetEvent("content", event),
           })
         : undefined
-
-    const platformBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
-      enforceToolBudget: (toolName) => platformPolicyGuard.enforceToolBudget(toolName),
-      keyMode: "platform",
-      maxCallsPerTool: PREPARE_STEP_THRESHOLD,
-      onEvent: (event) => logOutageTolerantBudgetEvent("platform", event),
-    })
 
     const mcpBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
       enforceToolBudget: (toolName) => mcpPolicyGuard.enforceToolBudget(toolName),
@@ -764,207 +716,6 @@ export async function POST(req: Request) {
       })
     }
 
-    // -----------------------------------------------------------------------
-    // Platform Tool Loading (Layer 4 — Experimental)
-    // Flowglad Pay: AI-powered purchase agent.
-    // Gated on: auth + env var presence (getPlatformTools returns empty if not configured).
-    // NOT loaded for anonymous users (has side effects — spends money).
-    //
-    // EXPERIMENTAL: This entire section can be removed to disable Flowglad Pay.
-    // See: .agents/plans/flowglad-pay-integration.md (Rollback instructions)
-    // -----------------------------------------------------------------------
-    let platformTools: ToolSet = {} as ToolSet
-    let platformToolMetadata = new Map<string, import("@/lib/tools/types").ToolMetadata>()
-
-    // Payment policy: set to true after intent classification when pay_purchase is denied.
-    // The closure is read lazily at execution time by getPlatformTools (defense-in-depth).
-    let purchaseBlockedByPolicy = false
-
-    let userCardId: string | undefined
-    if (isAuthenticated && capabilities.platform) {
-      if (convexToken) {
-        try {
-          userAddresses = (await fetchQuery(
-            api.shippingAddresses.list,
-            {},
-            { token: convexToken }
-          )) ?? []
-        } catch (err) {
-          console.warn("[chat] Failed to fetch shipping addresses:", err)
-        }
-
-        try {
-          const userDoc = await fetchQuery(
-            api.users.getByClerkId,
-            { clerkId: authUserId! },
-            { token: convexToken }
-          )
-          userCardId = userDoc?.payClawCardId ?? undefined
-        } catch (err) {
-          console.warn("[chat] Failed to fetch user card ID:", err)
-        }
-      }
-
-      const { currentUser } = await import("@clerk/nextjs/server")
-      const clerkUser = await currentUser()
-      const userName = clerkUser
-        ? [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ")
-        : undefined
-
-      const defaultAddress = userAddresses.find((address) => address.isDefault)
-      let cleanDefaultShippingAddress: ShippingAddress | undefined = defaultAddress
-        ? ({
-            name: defaultAddress.name,
-            line1: defaultAddress.line1,
-            line2: defaultAddress.line2,
-            city: defaultAddress.city,
-            state: defaultAddress.state,
-            postalCode: defaultAddress.postalCode,
-            country: defaultAddress.country,
-            phone: defaultAddress.phone,
-            email: defaultAddress.email,
-          } satisfies ShippingAddress)
-        : undefined
-
-      if (
-        cleanDefaultShippingAddress &&
-        !cleanDefaultShippingAddress.email &&
-        clerkUser?.primaryEmailAddress?.emailAddress
-      ) {
-        cleanDefaultShippingAddress.email = clerkUser.primaryEmailAddress.emailAddress
-      }
-
-      const { getPlatformTools } = await import("@/lib/tools/platform")
-      const platformResult = await getPlatformTools({
-        userName: userName || undefined,
-        defaultShippingAddress: cleanDefaultShippingAddress,
-        defaultCardId: userCardId,
-        isPurchaseBlocked: () => purchaseBlockedByPolicy,
-      })
-      platformTools = platformResult.tools
-      platformToolMetadata = platformResult.metadata
-    }
-
-    // -----------------------------------------------------------------------
-    // Payment Intent + State-Driven Tool Policy (Phase 3 Guardrails)
-    // -----------------------------------------------------------------------
-    let paymentPolicyDenyTools: string[] = []
-
-    if (PAYMENT_STATUS_GUARDRAILS_V1 && isAuthenticated && convexToken) {
-      try {
-        let chatToolState: Doc<"chatToolState"> | null = null
-
-        // 1. Read canonical payment state (explicitly gated by PAYMENT_CHAT_STATE_V1)
-        if (PAYMENT_CHAT_STATE_V1) {
-          chatToolState = await fetchQuery(
-            api.chatToolState.getByChat,
-            { chatId: chatId as Id<"chats"> },
-            { token: convexToken }
-          )
-
-          // 2. Lazy backfill for legacy chats
-          if (!chatToolState && PAYMENT_CHAT_STATE_BACKFILL_V1) {
-            try {
-              await fetchMutation(
-                api.chatToolStateBackfill.hydrateFromToolCallLog,
-                { chatId: chatId as Id<"chats"> },
-                { token: convexToken }
-              )
-              chatToolState = await fetchQuery(
-                api.chatToolState.getByChat,
-                { chatId: chatId as Id<"chats"> },
-                { token: convexToken }
-              )
-            } catch (backfillErr) {
-              console.warn(
-                JSON.stringify({
-                  _tag: "payment_state_backfill_error",
-                  requestId,
-                  chatId,
-                  error: backfillErr instanceof Error ? backfillErr.message : String(backfillErr),
-                })
-              )
-            }
-          }
-        }
-
-        // 3. Classify payment intent from latest user message
-        const latestUserMessage = messages
-          .filter((m) => m.role === "user")
-          .pop()
-        const userMessageText = latestUserMessage?.parts
-          ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-          .map((p) => p.text)
-          .join(" ") ?? ""
-
-        const { classifyPaymentIntent } = await import("@/app/api/chat/intent/payment-intent")
-        const { computePaymentPolicyOverrides } = await import("@/lib/tools/capability-policy")
-
-        const hasActiveJob = !!chatToolState?.activePurchaseJobId
-        const hasAnyJob = !!chatToolState?.latestPurchaseJobId
-
-        const intentResult = classifyPaymentIntent({
-          userMessage: userMessageText,
-          hasActiveJob,
-          hasAnyJob,
-          latestStatus: chatToolState?.latestStatus ?? undefined,
-          latestStatusIsTerminal: chatToolState?.latestStatusIsTerminal ?? undefined,
-        })
-
-        const policyOverrides = computePaymentPolicyOverrides(
-          intentResult,
-          chatToolState ? { hasActiveJob, hasAnyJob } : null,
-          PAYMENT_GUARDRAIL_MODE,
-        )
-
-        if (policyOverrides) {
-          console.log(
-            JSON.stringify({
-              _tag: "payment_intent_policy",
-              requestId,
-              chatId,
-              intent: intentResult.intent,
-              confidence: intentResult.confidence,
-              reason: intentResult.reason,
-              policyReason: policyOverrides.reason,
-              mode: policyOverrides.mode,
-              denyTools: policyOverrides.denyTools ?? [],
-              allowTools: policyOverrides.allowTools ?? [],
-              hasActiveJob,
-              hasAnyJob,
-            })
-          )
-
-          if (policyOverrides.mode === "enforce" && policyOverrides.denyTools) {
-            paymentPolicyDenyTools = policyOverrides.denyTools
-          }
-        }
-      } catch (err) {
-        console.warn(
-          JSON.stringify({
-            _tag: "payment_guardrail_error",
-            requestId,
-            chatId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        )
-      }
-    }
-
-    // Apply payment policy deny list to platform tools
-    if (paymentPolicyDenyTools.length > 0) {
-      for (const toolName of paymentPolicyDenyTools) {
-        if (toolName in platformTools) {
-          delete (platformTools as Record<string, unknown>)[toolName]
-          platformToolMetadata.delete(toolName)
-        }
-      }
-      // Activate defense-in-depth: flag for the lazy isPurchaseBlocked callback
-      if (paymentPolicyDenyTools.includes("pay_purchase")) {
-        purchaseBlockedByPolicy = true
-      }
-    }
-
     const toolPolicyInputs: ToolPolicyInput[] = [
       ...Object.keys(builtInTools).map((toolName) => {
         const meta = builtInToolMetadata.get(toolName)
@@ -996,18 +747,6 @@ export async function POST(req: Request) {
           toolName,
           source: meta?.source ?? "third-party",
           capability: "extract" as const,
-          readOnly: meta?.readOnly,
-          destructive: meta?.destructive,
-          idempotent: meta?.idempotent,
-          openWorld: meta?.openWorld,
-        }
-      }),
-      ...Object.keys(platformTools).map((toolName) => {
-        const meta = platformToolMetadata.get(toolName)
-        return {
-          toolName,
-          source: meta?.source ?? "platform",
-          capability: "platform" as const,
           readOnly: meta?.readOnly,
           destructive: meta?.destructive,
           idempotent: meta?.idempotent,
@@ -1078,7 +817,6 @@ export async function POST(req: Request) {
     builtInTools = filterToolSetByPolicy(builtInTools, toolPolicy)
     thirdPartyTools = filterToolSetByPolicy(thirdPartyTools, toolPolicy)
     contentTools = filterToolSetByPolicy(contentTools, toolPolicy)
-    platformTools = filterToolSetByPolicy(platformTools, toolPolicy)
     mcpTools = filterToolSetByPolicy(mcpTools, toolPolicy)
 
     builtInToolMetadata = filterMetadataMapByPolicy(builtInToolMetadata, toolPolicy)
@@ -1087,10 +825,6 @@ export async function POST(req: Request) {
       toolPolicy
     )
     contentToolMetadata = filterMetadataMapByPolicy(contentToolMetadata, toolPolicy)
-    platformToolMetadata = filterMetadataMapByPolicy(
-      platformToolMetadata,
-      toolPolicy
-    )
     mcpToolServerMap = filterMetadataMapByPolicy(mcpToolServerMap, toolPolicy)
 
     // Wrap MCP tools with timeout, timing, truncation, and envelope.
@@ -1138,33 +872,19 @@ export async function POST(req: Request) {
         contentToolMetadata
       )
     }
-    if (Object.keys(platformTools).length > 0) {
-      platformTools = wrapToolsWithTracing(
-        platformTools,
-        traceCollector,
-        requestId,
-        async (toolName) => {
-          await platformBudgetEnforcer(toolName)
-        },
-        platformToolMetadata
-      )
-    }
 
     // Merge all tool layers:
     //   - Search: Layer 1 (built-in) XOR Layer 2 (Exa fallback) — never both
     //   - Content: Layer 2 content extraction — independent of search gating
-    //   - Platform: Layer 4 (Flowglad Pay, etc.)
     //   - MCP: Layer 3 (user-configured servers)
     // Spread order = conflict resolution priority (last wins):
     //   1. Search tools (lowest priority)
     //   2. Content extraction tools (same priority tier as search)
-    //   3. Platform tools (middle priority)
-    //   4. MCP tools (highest priority — user-configured, namespaced)
+    //   3. MCP tools (highest priority — user-configured, namespaced)
     const toolLayers: ToolLayerMap = {
       "built-in": builtInTools,
       "third-party-search": thirdPartyTools,
       "content-extraction": contentTools,
-      platform: platformTools,
       mcp: mcpTools,
     }
 
@@ -1207,7 +927,6 @@ export async function POST(req: Request) {
       {}) as ToolSet
     contentTools = (namingResult.sanitizedLayers["content-extraction"] ??
       {}) as ToolSet
-    platformTools = (namingResult.sanitizedLayers.platform ?? {}) as ToolSet
     mcpTools = (namingResult.sanitizedLayers.mcp ?? {}) as ToolSet
 
     const filterMetadataByTools = <T>(
@@ -1226,10 +945,6 @@ export async function POST(req: Request) {
       thirdPartyTools
     )
     contentToolMetadata = filterMetadataByTools(contentToolMetadata, contentTools)
-    platformToolMetadata = filterMetadataByTools(
-      platformToolMetadata,
-      platformTools
-    )
     mcpToolServerMap = new Map(
       Array.from(mcpToolServerMap.entries()).filter(([name]) =>
         Object.prototype.hasOwnProperty.call(mcpTools, name)
@@ -1328,7 +1043,7 @@ export async function POST(req: Request) {
     }
 
     const searchTools = { ...builtInTools, ...thirdPartyTools }
-    const allTools = { ...searchTools, ...contentTools, ...platformTools, ...mcpTools } as ToolSet
+    const allTools = { ...searchTools, ...contentTools, ...mcpTools } as ToolSet
 
     const hasAnyTools = Object.keys(allTools).length > 0
 
@@ -1595,16 +1310,12 @@ export async function POST(req: Request) {
       ...builtInToolMetadata,
       ...thirdPartyToolMetadata,
       ...contentToolMetadata,
-      ...platformToolMetadata,
     ])
     const toolMetadataByName = buildToolInvocationMetadataByName({
       nonMcpMetadata: allToolMetadata,
       mcpToolServerMap,
     })
-    let enrichedSystemPrompt = effectiveSystemPrompt
-    if (isAuthenticated && userAddresses.length > 0) {
-      enrichedSystemPrompt += formatAddressContext(userAddresses)
-    }
+    const enrichedSystemPrompt = effectiveSystemPrompt
 
     const streamStartMs = Date.now()
     let stepCounter = 0
@@ -2177,11 +1888,6 @@ export async function POST(req: Request) {
                       ? !(toolResult as { isError?: boolean }).isError
                       : false
                     const trace = traceCollector.get(toolCall.toolCallId)
-                    const stateMutationKey =
-                      toolCall.toolName === "pay_purchase" ||
-                      toolCall.toolName === "pay_status"
-                        ? `${requestId}:${toolCall.toolCallId}:${toolCall.toolName}`
-                        : undefined
 
                     phClient.capture({
                       distinctId: userId,
@@ -2201,7 +1907,6 @@ export async function POST(req: Request) {
                         budgetKeyMode: trace?.budgetKeyMode,
                         budgetDenied: trace?.budgetDenied,
                         requestId,
-                        stateMutationKey,
                         // MCP-specific (optional)
                         ...(mcpServerInfo && {
                           serverId: mcpServerInfo.serverId,
@@ -2352,11 +2057,6 @@ export async function POST(req: Request) {
                       budgetDenied: trace?.budgetDenied,
                       chatVersion: normalizedChatVersion,
                       toolKey: toolCall.toolName,
-                      stateMutationKey:
-                        toolCall.toolName === "pay_purchase" ||
-                        toolCall.toolName === "pay_status"
-                          ? `${requestId}:${toolCall.toolCallId}:${toolCall.toolName}`
-                          : undefined,
                     },
                     { token: convexToken }
                   ).catch((err: unknown) => {
@@ -2371,82 +2071,6 @@ export async function POST(req: Request) {
                       error: err instanceof Error ? err.message : String(err),
                     }))
                   })
-
-                  if (!PAYMENT_CHAT_STATE_V1 || !success) continue
-
-                  if (toolCall.toolName === "pay_purchase") {
-                    const outputRecord = getRecord(toolResult?.output)
-                    const inputRecord = getRecord(toolCall.input)
-                    const jobId = getStringField(outputRecord, "jobId")
-                    const url = getStringField(inputRecord, "url")
-                    if (!jobId || !url) continue
-
-                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_purchase`
-                    void fetchMutation(
-                      api.chatToolState.upsertFromPurchase,
-                      {
-                        chatId: chatId as Id<"chats">,
-                        jobId,
-                        url,
-                        chatVersion: normalizedChatVersion,
-                        sourceMessageTimestamp: latestUserMessageTimestamp,
-                        mutationKey,
-                        toolCallId: toolCall.toolCallId,
-                        requestId,
-                      },
-                      { token: convexToken }
-                    ).catch((err: unknown) => {
-                      console.warn(JSON.stringify({
-                        _tag: "payment_state_write_failed",
-                        requestId,
-                        chatId,
-                        toolCallId: toolCall.toolCallId,
-                        toolName: toolCall.toolName,
-                        mutation: "upsertFromPurchase",
-                        error: err instanceof Error ? err.message : String(err),
-                      }))
-                    })
-                  }
-
-                  if (toolCall.toolName === "pay_status") {
-                    const outputRecord = getRecord(toolResult?.output)
-                    const jobId = getStringField(outputRecord, "jobId")
-                    const statusText = getStringField(outputRecord, "status")
-                    if (!jobId || !statusText) continue
-
-                    const isTerminalExplicit = getBooleanField(
-                      outputRecord,
-                      "isTerminal"
-                    )
-                    const isTerminal =
-                      isTerminalExplicit ?? inferTerminalStatus(statusText)
-                    const mutationKey = `${requestId}:${toolCall.toolCallId}:pay_status`
-
-                    void fetchMutation(
-                      api.chatToolState.upsertFromStatus,
-                      {
-                        chatId: chatId as Id<"chats">,
-                        jobId,
-                        status: statusText,
-                        isTerminal,
-                        chatVersion: normalizedChatVersion,
-                        mutationKey,
-                        toolCallId: toolCall.toolCallId,
-                        requestId,
-                      },
-                      { token: convexToken }
-                    ).catch((err: unknown) => {
-                      console.warn(JSON.stringify({
-                        _tag: "payment_state_write_failed",
-                        requestId,
-                        chatId,
-                        toolCallId: toolCall.toolCallId,
-                        toolName: toolCall.toolName,
-                        mutation: "upsertFromStatus",
-                        error: err instanceof Error ? err.message : String(err),
-                      }))
-                    })
-                  }
                 }
               }
             }

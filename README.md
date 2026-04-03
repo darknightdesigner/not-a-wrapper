@@ -115,8 +115,6 @@ convex/                     # Database schema, queries, mutations, file storage
 | Light/dark themes, layout options | Shipped |
 | PostHog analytics | Shipped |
 | Guest access with rate limiting | Shipped |
-| Usage-based billing (Flowglad) | Planned |
-| Flowglad Pay AI purchase agent | Planned |
 | Code execution tools | Planned |
 
 ## Development

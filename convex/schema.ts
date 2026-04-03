@@ -28,9 +28,6 @@ export default defineSchema({
     // Preferences stored directly on user
     favoriteModels: v.optional(v.array(v.string())),
     systemPrompt: v.optional(v.string()),
-
-    // PayClaw — per-user default card ID (plaintext, no encryption)
-    payClawCardId: v.optional(v.string()),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"]),
@@ -93,24 +90,6 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_provider", ["userId", "provider"]),
-
-  shippingAddresses: defineTable({
-    userId: v.id("users"),
-    label: v.string(),
-    name: v.string(),
-    email: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    line1: v.string(),
-    line2: v.optional(v.string()),
-    city: v.string(),
-    state: v.string(),
-    postalCode: v.string(),
-    country: v.string(),
-    isDefault: v.boolean(),
-    createdAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_user_default", ["userId", "isDefault"]),
 
   feedback: defineTable({
     userId: v.id("users"),
@@ -198,28 +177,6 @@ export default defineSchema({
     .index("by_server", ["serverId"])
     .index("by_user_server", ["userId", "serverId"])
     .index("by_user_server_tool", ["userId", "serverId", "toolName"]),
-
-  // Canonical payment state ledger — single source of truth for pay_purchase / pay_status
-  // lifecycle per chat. One row per chat, upserted idempotently by tool handlers.
-  chatToolState: defineTable({
-    chatId: v.id("chats"),
-    userId: v.id("users"),
-    // monotonic chat-local version used for edit/resend truncation safety
-    chatVersion: v.number(),
-    activePurchaseJobId: v.optional(v.string()),
-    latestPurchaseJobId: v.optional(v.string()),
-    latestPurchaseUrl: v.optional(v.string()),
-    latestStatus: v.optional(v.string()),
-    latestStatusIsTerminal: v.optional(v.boolean()),
-    sourceMessageTimestamp: v.optional(v.number()),
-    // Idempotency/correlation fields for OCC-safe writes.
-    lastMutationKey: v.optional(v.string()),
-    lastToolCallId: v.optional(v.string()),
-    lastRequestId: v.optional(v.string()),
-    updatedAt: v.number(),
-  })
-    .index("by_chat", ["chatId"])
-    .index("by_user_chat", ["userId", "chatId"]),
 
   toolCallLog: defineTable({
     userId: v.id("users"),

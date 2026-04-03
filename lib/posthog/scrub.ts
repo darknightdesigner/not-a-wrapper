@@ -4,7 +4,6 @@ const SENSITIVE_KEYS = new Set([
   "shippingaddress",
   "paymentmethod",
   "cardid",
-  "payclawcardid",
   "credentials",
   "email",
   "phone",

@@ -17,10 +17,8 @@ import type { ToolErrorCode } from "./errors"
  * Layer 3 (MCP): Namespaced automatically by the MCP client as
  * `{serverName}_{toolName}`. No manual naming needed.
  *
- * Layer 4 (platform): Use `{action}_{resource}` format with the service
- * implied by the action. Current: `pay_purchase`, `pay_status`.
- * If a second payment provider is added, migrate to `{service}_{action}`
- * (e.g., `flowglad_purchase`, `stripe_checkout`).
+ * Layer 4 (platform): Previously used for platform-level integrations.
+ * Currently empty after removal of experimental features.
  */
 
 /**

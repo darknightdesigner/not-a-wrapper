@@ -8,8 +8,6 @@
  * @module
  */
 
-import type * as chatToolState from "../chatToolState.js";
-import type * as chatToolStateBackfill from "../chatToolStateBackfill.js";
 import type * as chats from "../chats.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
@@ -18,9 +16,6 @@ import type * as mcpToolApprovals from "../mcpToolApprovals.js";
 import type * as mcpToolCallLog from "../mcpToolCallLog.js";
 import type * as messages from "../messages.js";
 import type * as projects from "../projects.js";
-import type * as shippingAddressDefaulting from "../shippingAddressDefaulting.js";
-import type * as shippingAddressPatch from "../shippingAddressPatch.js";
-import type * as shippingAddresses from "../shippingAddresses.js";
 import type * as toolCallLog from "../toolCallLog.js";
 import type * as toolLimits from "../toolLimits.js";
 import type * as usage from "../usage.js";
@@ -35,8 +30,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  chatToolState: typeof chatToolState;
-  chatToolStateBackfill: typeof chatToolStateBackfill;
   chats: typeof chats;
   feedback: typeof feedback;
   files: typeof files;
@@ -45,9 +38,6 @@ declare const fullApi: ApiFromModules<{
   mcpToolCallLog: typeof mcpToolCallLog;
   messages: typeof messages;
   projects: typeof projects;
-  shippingAddressDefaulting: typeof shippingAddressDefaulting;
-  shippingAddressPatch: typeof shippingAddressPatch;
-  shippingAddresses: typeof shippingAddresses;
   toolCallLog: typeof toolCallLog;
   toolLimits: typeof toolLimits;
   usage: typeof usage;

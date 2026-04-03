@@ -21,7 +21,6 @@ import { ThemeSelection } from "./appearance/theme-selection"
 import { DeveloperTools } from "./connections/developer-tools"
 import { McpServers } from "./connections/mcp-servers"
 import { AccountManagement } from "./general/account-management"
-import { ShippingAddresses } from "./general/shipping-addresses"
 import { UserProfile } from "./general/user-profile"
 import { ModelsSettings } from "./models/models-settings"
 import { ToolKeys } from "./tools/tool-keys"
@@ -107,7 +106,6 @@ export function SettingsContent({
             {/* Mobile tabs content */}
             <TabsContent value="general" className="space-y-6 px-6">
               <UserProfile />
-              <ShippingAddresses />
               <AccountManagement />
             </TabsContent>
 
@@ -190,7 +188,6 @@ export function SettingsContent({
             <div className="flex-1 overflow-auto px-6 pt-4">
               <TabsContent value="general" className="mt-0 space-y-6">
                 <UserProfile />
-                <ShippingAddresses />
                 <AccountManagement />
               </TabsContent>
 
