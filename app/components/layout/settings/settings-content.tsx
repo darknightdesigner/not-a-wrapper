@@ -188,7 +188,6 @@ export function SettingsContent({
             <div className="flex-1 overflow-auto px-6 pt-4">
               <TabsContent value="general" className="mt-0 space-y-6">
                 <UserProfile />
-                <ShippingAddresses />
                 <AccountManagement />
               </TabsContent>
 

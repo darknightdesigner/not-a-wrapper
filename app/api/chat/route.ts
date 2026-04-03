@@ -547,12 +547,11 @@ export async function POST(req: Request) {
 
     const builtInPolicyGuard = makePolicyGuard(providerToolKeyMode)
     const mcpPolicyGuard = makePolicyGuard("platform")
-    const platformPolicyGuard = makePolicyGuard("platform")
     const exaPolicyGuard =
       resolvedExaKeyMode ? makePolicyGuard(resolvedExaKeyMode) : undefined
 
     const logOutageTolerantBudgetEvent = (
-      source: "third-party" | "content" | "platform" | "mcp",
+      source: "third-party" | "content" | "mcp",
       event: {
         type: "recovered" | "degraded_allow" | "degraded_block"
         toolName: string
@@ -620,13 +619,6 @@ export async function POST(req: Request) {
             onEvent: (event) => logOutageTolerantBudgetEvent("content", event),
           })
         : undefined
-
-    const platformBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
-      enforceToolBudget: (toolName) => platformPolicyGuard.enforceToolBudget(toolName),
-      keyMode: "platform",
-      maxCallsPerTool: PREPARE_STEP_THRESHOLD,
-      onEvent: (event) => logOutageTolerantBudgetEvent("platform", event),
-    })
 
     const mcpBudgetEnforcer = createOutageTolerantToolBudgetEnforcer({
       enforceToolBudget: (toolName) => mcpPolicyGuard.enforceToolBudget(toolName),
@@ -825,7 +817,6 @@ export async function POST(req: Request) {
     builtInTools = filterToolSetByPolicy(builtInTools, toolPolicy)
     thirdPartyTools = filterToolSetByPolicy(thirdPartyTools, toolPolicy)
     contentTools = filterToolSetByPolicy(contentTools, toolPolicy)
-    platformTools = filterToolSetByPolicy(platformTools, toolPolicy)
     mcpTools = filterToolSetByPolicy(mcpTools, toolPolicy)
 
     builtInToolMetadata = filterMetadataMapByPolicy(builtInToolMetadata, toolPolicy)
@@ -834,10 +825,6 @@ export async function POST(req: Request) {
       toolPolicy
     )
     contentToolMetadata = filterMetadataMapByPolicy(contentToolMetadata, toolPolicy)
-    platformToolMetadata = filterMetadataMapByPolicy(
-      platformToolMetadata,
-      toolPolicy
-    )
     mcpToolServerMap = filterMetadataMapByPolicy(mcpToolServerMap, toolPolicy)
 
     // Wrap MCP tools with timeout, timing, truncation, and envelope.
@@ -885,33 +872,19 @@ export async function POST(req: Request) {
         contentToolMetadata
       )
     }
-    if (Object.keys(platformTools).length > 0) {
-      platformTools = wrapToolsWithTracing(
-        platformTools,
-        traceCollector,
-        requestId,
-        async (toolName) => {
-          await platformBudgetEnforcer(toolName)
-        },
-        platformToolMetadata
-      )
-    }
 
     // Merge all tool layers:
     //   - Search: Layer 1 (built-in) XOR Layer 2 (Exa fallback) — never both
     //   - Content: Layer 2 content extraction — independent of search gating
-    //   - Platform: Layer 4 (Flowglad Pay, etc.)
     //   - MCP: Layer 3 (user-configured servers)
     // Spread order = conflict resolution priority (last wins):
     //   1. Search tools (lowest priority)
     //   2. Content extraction tools (same priority tier as search)
-    //   3. Platform tools (middle priority)
-    //   4. MCP tools (highest priority — user-configured, namespaced)
+    //   3. MCP tools (highest priority — user-configured, namespaced)
     const toolLayers: ToolLayerMap = {
       "built-in": builtInTools,
       "third-party-search": thirdPartyTools,
       "content-extraction": contentTools,
-      platform: platformTools,
       mcp: mcpTools,
     }
 
@@ -954,7 +927,6 @@ export async function POST(req: Request) {
       {}) as ToolSet
     contentTools = (namingResult.sanitizedLayers["content-extraction"] ??
       {}) as ToolSet
-    platformTools = (namingResult.sanitizedLayers.platform ?? {}) as ToolSet
     mcpTools = (namingResult.sanitizedLayers.mcp ?? {}) as ToolSet
 
     const filterMetadataByTools = <T>(
@@ -973,10 +945,6 @@ export async function POST(req: Request) {
       thirdPartyTools
     )
     contentToolMetadata = filterMetadataByTools(contentToolMetadata, contentTools)
-    platformToolMetadata = filterMetadataByTools(
-      platformToolMetadata,
-      platformTools
-    )
     mcpToolServerMap = new Map(
       Array.from(mcpToolServerMap.entries()).filter(([name]) =>
         Object.prototype.hasOwnProperty.call(mcpTools, name)
@@ -1075,7 +1043,7 @@ export async function POST(req: Request) {
     }
 
     const searchTools = { ...builtInTools, ...thirdPartyTools }
-    const allTools = { ...searchTools, ...contentTools, ...platformTools, ...mcpTools } as ToolSet
+    const allTools = { ...searchTools, ...contentTools, ...mcpTools } as ToolSet
 
     const hasAnyTools = Object.keys(allTools).length > 0
 
@@ -1342,16 +1310,12 @@ export async function POST(req: Request) {
       ...builtInToolMetadata,
       ...thirdPartyToolMetadata,
       ...contentToolMetadata,
-      ...platformToolMetadata,
     ])
     const toolMetadataByName = buildToolInvocationMetadataByName({
       nonMcpMetadata: allToolMetadata,
       mcpToolServerMap,
     })
-    let enrichedSystemPrompt = effectiveSystemPrompt
-    if (isAuthenticated && userAddresses.length > 0) {
-      enrichedSystemPrompt += formatAddressContext(userAddresses)
-    }
+    const enrichedSystemPrompt = effectiveSystemPrompt
 
     const streamStartMs = Date.now()
     let stepCounter = 0
