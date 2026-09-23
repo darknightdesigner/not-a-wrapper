@@ -1,0 +1,89 @@
+/* Aqua shell: sidebar, activity panel, projects. */
+
+/* Sidebar surfaces follow --sidebar. Recolor the existing right border
+   instead of adding a second edge. */
+.aqua [data-slot="sidebar"] {
+  border-color: var(--aqua-edge);
+}
+
+/* Window pinstripes. Rows are transparent, so every opaque layer paints the
+   same 4px tile, phased to the sidebar top so seams never show. */
+.aqua
+  :is(
+    [data-slot="sidebar"],
+    [data-sidebar="sidebar"][data-mobile="true"],
+    [data-sidebar-layer]
+  ) {
+  background-color: var(--sidebar);
+  background-image: var(--aqua-pin-window);
+  background-size: 100% 4px;
+}
+
+/* Sticky layers sit a fixed offset below the sidebar top */
+.aqua [data-sidebar-layer="actions"] {
+  background-position: 0 calc(-1 * var(--sidebar-header-height));
+}
+
+.aqua [data-sidebar-layer="actions-mask"] {
+  background-position: 0
+    calc(
+      -1 *
+        (
+          var(--sidebar-header-height) +
+            var(--sidebar-section-first-margin-top) + var(--sidebar-row-height)
+        )
+    );
+}
+
+/* Bottom-stuck footers: phase from the full-height sidebar's bottom edge */
+.aqua [data-sidebar-layer="footer"] {
+  background-position: 0 calc(100% - mod(100dvh, 4px));
+}
+
+/* In-flow layers scroll with the rows, so they show the static tile below.
+   The actions group only sticks on tall viewports. */
+.aqua [data-sidebar-layer="signed-out-menu"] {
+  background-color: transparent;
+  background-image: none;
+}
+
+@media (max-height: 39.99rem) {
+  .aqua
+    :is([data-sidebar-layer="actions"], [data-sidebar-layer="actions-mask"]) {
+    background-color: transparent;
+    background-image: none;
+  }
+}
+
+/* Active row: Aqua selection. Scoped to the sidebar; settings tabs reuse
+   .sidebar-menu-row. Text tokens flip so labels, icons and trailing text
+   inherit white. */
+.aqua
+  :is([data-slot="sidebar"], [data-sidebar="sidebar"])
+  .sidebar-menu-row[data-active] {
+  --foreground: #fff;
+  --text-primary: #fff;
+  --text-secondary: #fff;
+  --text-tertiary: #fff;
+  --muted-foreground: #fff;
+  color: #fff;
+  background-color: var(--aqua-select);
+}
+
+/* Section headers. .__menu-label, not .sidebar-group-header: the organizer
+   menu also carries that class. */
+.aqua .__menu-label {
+  color: #555;
+  font-weight: 700;
+}
+
+/* Activity panel: white surface; the existing border-s becomes the edge. */
+.aqua [data-slot="activity-panel-dock"] {
+  --activity-panel-surface: #fff;
+  --activity-panel-border: var(--aqua-edge);
+}
+
+/* Projects: control fills are call-site vars on the view root. */
+.aqua :has(> [data-testid="projects-toolbar"]) {
+  --projects-control-fill: #e2e2e2;
+}

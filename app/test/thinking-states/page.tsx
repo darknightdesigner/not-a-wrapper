@@ -38,6 +38,7 @@ import { SystemMessage } from "@/components/ui/system-message"
 import { ThinkingBar } from "@/components/ui/thinking-bar"
 import { TooltipMultiline } from "@/components/ui/tooltip"
 import { MessagesProvider } from "@/lib/chat-store/messages/provider"
+import { APP_THEMES } from "@/lib/theme"
 import { cn } from "@/lib/utils"
 import { RiFileCopyLine, RiRefreshLine } from "@remixicon/react"
 import type { SourceUrlUIPart, ToolUIPart } from "ai"
@@ -588,8 +589,11 @@ export default function ThinkingStatesTestPage() {
                 className="text-foreground rounded-md bg-transparent text-sm outline-none"
               >
                 <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
+                {APP_THEMES.map((option) => (
+                  <option key={option} value={option}>
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </option>
+                ))}
               </select>
             </label>
             <button

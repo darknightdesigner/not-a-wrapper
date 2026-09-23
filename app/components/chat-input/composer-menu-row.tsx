@@ -48,6 +48,7 @@ function composerMenuRow({
       aria-disabled={disabled || undefined}
       aria-checked={selected}
       data-fill=""
+      data-composer-menu-row=""
       data-highlighted={highlighted ? "" : undefined}
       className={composerMenuRowClassName}
       role={selected === undefined ? undefined : "menuitemradio"}

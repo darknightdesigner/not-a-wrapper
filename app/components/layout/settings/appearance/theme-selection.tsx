@@ -1,22 +1,28 @@
 "use client"
 
+import type { ThemePreference } from "@/lib/theme"
 import { useTheme } from "next-themes"
 import { useState } from "react"
+
+const themes = [
+  { id: "system", name: "System", colors: ["#ffffff", "#1a1a1a"] },
+  { id: "light", name: "Light", colors: ["#ffffff"] },
+  { id: "dark", name: "Dark", colors: ["#1a1a1a"] },
+  { id: "aqua", name: "Aqua", colors: ["#4b87c7", "#dedede"] },
+] as const satisfies ReadonlyArray<{
+  id: ThemePreference
+  name: string
+  colors: readonly string[]
+}>
 
 export function ThemeSelection() {
   const { theme, setTheme } = useTheme()
   const [selectedTheme, setSelectedTheme] = useState(theme || "system")
 
-  const themes = [
-    { id: "system", name: "System", colors: ["#ffffff", "#1a1a1a"] },
-    { id: "light", name: "Light", colors: ["#ffffff"] },
-    { id: "dark", name: "Dark", colors: ["#1a1a1a"] },
-  ]
-
   return (
     <div>
       <h4 className="mb-3 text-sm font-medium text-balance">Theme</h4>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {themes.map((theme) => (
           <button
             key={theme.id}

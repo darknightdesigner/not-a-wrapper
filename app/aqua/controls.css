@@ -1,0 +1,766 @@
+/* Aqua controls (ADR 0042). Unlayered, so every state utility these rules
+   override is restated here. Paint only: no layout, motion, or pseudo hit areas.
+   Button skins use :where() so later lanes (composer, thread) win at equal
+   specificity. */
+
+/* Buttons: gel for default, outline, secondary, destructive. Composer
+   (variant and [data-intent] submit), ghost and link are excluded. */
+.aqua
+  [data-button]:where(
+    [data-variant="default"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ):where(:not([data-intent], [data-composer-control])) {
+  --aqua-btn-bg: #e2e2e2;
+  --aqua-btn-gel: var(--aqua-gel-white);
+  --aqua-btn-edge: rgb(0 0 0 / 0.38);
+  --aqua-btn-tint: rgb(0 0 0 / 0.04);
+  color: #000;
+  font-weight: 400;
+  border-color: transparent;
+  border-radius: 999px;
+  background-color: var(--aqua-btn-bg);
+  background-image: var(--aqua-gel-shine), var(--aqua-btn-gel);
+  box-shadow:
+    inset 0 0 0 1px var(--aqua-btn-edge),
+    var(--aqua-button-shadow);
+  backdrop-filter: none;
+}
+
+.aqua
+  [data-button]:where([data-variant="default"]):where(
+    :not([data-intent], [data-composer-control])
+  ) {
+  --aqua-btn-bg: #4b87c7;
+  --aqua-btn-gel: var(--aqua-gel-blue);
+  --aqua-btn-edge: rgb(20 55 125 / 0.6);
+  --aqua-btn-tint: rgb(255 255 255 / 0.08);
+}
+
+.aqua [data-button]:where([data-variant="destructive"]) {
+  color: #a40000;
+}
+
+/* Square icon-only small sizes read as 6px squares; the rest are capsules. */
+.aqua
+  [data-button]:where(
+    [data-variant="default"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ):where([data-size="icon-xs"], [data-size="icon-sm"]) {
+  border-radius: 6px;
+}
+
+@media (hover: hover) {
+  .aqua
+    [data-button]:where(
+      [data-variant="default"],
+      [data-variant="outline"],
+      [data-variant="secondary"],
+      [data-variant="destructive"]
+    ):where(:not([data-intent], [data-composer-control])):hover {
+    background-image:
+      linear-gradient(var(--aqua-btn-tint), var(--aqua-btn-tint)),
+      var(--aqua-gel-shine), var(--aqua-btn-gel);
+  }
+}
+
+/* opacity: 1 cancels the primitive's active opacity-80 */
+.aqua
+  [data-button]:where(
+    [data-variant="default"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ):where(:not([data-intent], [data-composer-control])):is(
+    :active,
+    [data-pressed],
+    [aria-pressed="true"]
+  ) {
+  color: #000;
+  background-color: #2f6ab5;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue-pressed);
+  box-shadow:
+    inset 0 0 0 1px rgb(20 55 125 / 0.7),
+    var(--aqua-button-shadow);
+  opacity: 1;
+}
+
+.aqua
+  [data-button]:where(
+    [data-variant="default"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ):where(:not([data-intent], [data-composer-control]))[aria-invalid="true"] {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    var(--aqua-button-shadow),
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+/* Last in the section so disabled never looks hovered or pressed */
+.aqua
+  [data-button]:where(
+    [data-variant="default"],
+    [data-variant="outline"],
+    [data-variant="secondary"],
+    [data-variant="destructive"]
+  ):where(:not([data-intent], [data-composer-control])):is(
+    :disabled,
+    [data-disabled],
+    [data-visually-disabled]
+  ) {
+  color: #8d8d8d;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    var(--aqua-button-shadow);
+  opacity: 0.6;
+}
+
+/* Ghost stays chromeless; its hover/active utilities read these tokens. */
+.aqua [data-button][data-variant="ghost"] {
+  --interactive-bg-hover: rgb(0 0 0 / 0.06);
+  --interactive-bg-pressed: rgb(0 0 0 / 0.12);
+}
+
+/* Button group: 5px outer corners, square inside. The end segment's
+   rounded-*-md! utility is !important and inlines calc(var(--radius) - 2px),
+   so --radius: 7px yields 5px there without an !important of our own. */
+.aqua
+  [data-slot="button-group"]:not([data-orientation="vertical"])
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ) {
+  border-radius: 0;
+}
+
+.aqua
+  [data-slot="button-group"]:not([data-orientation="vertical"])
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ):not([data-slot] ~ [data-slot]) {
+  border-top-left-radius: 5px;
+  border-bottom-left-radius: 5px;
+}
+
+.aqua
+  [data-slot="button-group"]:not([data-orientation="vertical"])
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ):not(:has(~ [data-slot])) {
+  --radius: 7px;
+  border-top-right-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+.aqua
+  [data-slot="button-group"][data-orientation="vertical"]
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ) {
+  border-radius: 0;
+}
+
+.aqua
+  [data-slot="button-group"][data-orientation="vertical"]
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ):not([data-slot] ~ [data-slot]) {
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+
+.aqua
+  [data-slot="button-group"][data-orientation="vertical"]
+  > :is(
+    [data-button],
+    [data-slot="select-trigger"],
+    [data-slot="button-group-text"]
+  ):not(:has(~ [data-slot])) {
+  --radius: 7px;
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
+}
+
+.aqua [data-slot="button-group-text"] {
+  color: #000;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-white);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.38);
+}
+
+.aqua [data-slot="button-group-separator"] {
+  background-color: rgb(0 0 0 / 0.38);
+}
+
+/* Toggles: outline toggles are gel buttons. Default toggles stay chromeless
+   and follow tokens. */
+.aqua
+  :is(
+    [data-slot="toggle"],
+    [data-slot="toggle-group-item"]
+  )[data-variant="outline"] {
+  color: #000;
+  border-color: rgb(0 0 0 / 0.38);
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow: var(--aqua-button-shadow);
+}
+
+/* Joined items share one group shadow */
+.aqua
+  [data-slot="toggle-group-item"][data-variant="outline"][data-spacing="0"] {
+  box-shadow: none;
+}
+
+.aqua [data-slot="toggle-group"][data-variant="outline"][data-spacing="0"] {
+  box-shadow: var(--aqua-button-shadow);
+}
+
+@media (hover: hover) {
+  .aqua
+    :is(
+      [data-slot="toggle"],
+      [data-slot="toggle-group-item"]
+    )[data-variant="outline"]:hover {
+    background-image:
+      linear-gradient(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.04)),
+      var(--aqua-gel-shine), var(--aqua-gel-white);
+  }
+}
+
+.aqua
+  :is(
+    [data-slot="toggle"],
+    [data-slot="toggle-group-item"]
+  )[data-variant="outline"]:is([data-pressed], :active) {
+  color: #000;
+  background-color: #2f6ab5;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue-pressed);
+}
+
+.aqua
+  :is(
+    [data-slot="toggle"],
+    [data-slot="toggle-group-item"]
+  )[data-variant="outline"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--aqua-focus);
+}
+
+.aqua
+  :is(
+    [data-slot="toggle"],
+    [data-slot="toggle-group-item"]
+  )[data-variant="outline"]:is(:disabled, [data-disabled]) {
+  color: #8d8d8d;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+}
+
+/* Text fields: white, square, inset top shadow. The edge is a box-shadow ring
+   because most fields use shadow-border; real borders go transparent. */
+.aqua [data-slot="input"],
+.aqua [data-slot="textarea"],
+.aqua [data-slot="input-group"],
+.aqua [data-slot="native-select"],
+.aqua :where(input[type="search"]:not([data-slot])) {
+  border-color: transparent;
+  border-radius: 0;
+  background-color: #fff;
+  background-image: none;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 1px 0 #949494,
+    inset 0 0 0 1px #a9a9a9,
+    inset 0 1px 2px rgb(0 0 0 / 0.16);
+  backdrop-filter: none;
+}
+
+.aqua
+  :is([data-slot="input"], input[type="search"]:not([data-slot])):is(
+    [type="search"],
+    [placeholder^="Search" i]
+  ) {
+  border-radius: 999px;
+}
+
+.aqua [data-slot="input"]:focus-visible,
+.aqua [data-slot="textarea"]:focus-visible,
+.aqua [data-slot="native-select"]:focus-visible,
+.aqua
+  [data-slot="input-group"]:has(
+    [data-slot="input-group-control"]:focus-visible
+  ),
+.aqua :where(input[type="search"]:not([data-slot])):focus-visible {
+  box-shadow:
+    inset 0 0 0 1px #4d83d2,
+    inset 0 1px 2px rgb(0 0 0 / 0.16),
+    0 0 0 3px var(--aqua-focus-glow);
+}
+
+/* The primitive drops the ring for the combobox popup's search field */
+.aqua [data-slot="combobox-content"] [data-slot="input-group"]:focus-within {
+  box-shadow:
+    inset 0 1px 0 #949494,
+    inset 0 0 0 1px #a9a9a9,
+    inset 0 1px 2px rgb(0 0 0 / 0.16);
+}
+
+.aqua [data-slot="input"][aria-invalid="true"],
+.aqua [data-slot="textarea"][aria-invalid="true"],
+.aqua [data-slot="native-select"][aria-invalid="true"],
+.aqua [data-slot="input-group"]:has([data-slot][aria-invalid="true"]) {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    inset 0 1px 2px rgb(0 0 0 / 0.16),
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+.aqua [data-slot="input"]:disabled,
+.aqua [data-slot="textarea"]:disabled,
+.aqua [data-slot="native-select"]:disabled,
+.aqua [data-slot="input-group"]:has([data-slot="input-group-control"]:disabled),
+.aqua :where(input[type="search"]:not([data-slot])):disabled {
+  color: #8d8d8d;
+  background-color: #f0f0f0;
+}
+
+/* Checkbox: no border, so the edge is a box-shadow. Never ::after (hit
+   area). Disabled keeps the primitive's opacity. */
+.aqua [data-slot="checkbox"] {
+  border-radius: 3px;
+  background-color: #e6e6e6;
+  background-image: linear-gradient(
+    to bottom,
+    #d7d7d7 0%,
+    #b9b9b9 27%,
+    #c7c7c7 36%,
+    #dcdcdc 55%,
+    #f3f3f3 73%,
+    #fff 91%
+  );
+  box-shadow:
+    inset 0 1px 0 #7c7c7c,
+    inset 0 0 0 1px #8f8f8f,
+    0 1px 1px rgb(0 0 0 / 0.15);
+}
+
+.aqua [data-slot="checkbox"]:is([data-checked], [data-indeterminate]) {
+  color: #000;
+  background-color: #5391da;
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgb(255 255 255 / 0.75),
+      rgb(255 255 255 / 0.25) 45%,
+      transparent 50%
+    ),
+    linear-gradient(
+      to bottom,
+      #a5c6f0 0%,
+      #5391da 20%,
+      #3c82cf 30%,
+      #64a3e9 42%,
+      #7cb3ee 55%,
+      #9fd3f5 75%,
+      #c8f1f3 92%
+    );
+  box-shadow:
+    inset 0 0 0 1px #2d4f95,
+    0 1px 1px rgb(0 0 0 / 0.15);
+}
+
+.aqua [data-slot="checkbox"] [data-slot="checkbox-indicator"] {
+  color: #000;
+}
+
+.aqua [data-slot="checkbox"]:focus-visible {
+  box-shadow:
+    inset 0 1px 0 #7c7c7c,
+    inset 0 0 0 1px #8f8f8f,
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua
+  [data-slot="checkbox"]:is(
+    [data-checked],
+    [data-indeterminate]
+  ):focus-visible {
+  box-shadow:
+    inset 0 0 0 1px #2d4f95,
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="checkbox"][aria-invalid="true"] {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+/* Radio: edge in box-shadow (shadow-border primitive). Disabled keeps the
+   primitive's opacity. */
+.aqua [data-slot="radio-group-item"] {
+  background-color: #c1c1c1;
+  background-image:
+    radial-gradient(
+      ellipse 60% 38% at 50% 22%,
+      rgb(255 255 255 / 0.85),
+      transparent
+    ),
+    linear-gradient(
+      to bottom,
+      #b3b3b3 0%,
+      #d3d3d3 12%,
+      #c1c1c1 35%,
+      #c1c1c1 45%,
+      #d4d4d4 55%,
+      #f0f0f0 72%,
+      #fff 92%
+    );
+  box-shadow:
+    inset 0 1px 0 #4a4a4a,
+    inset 0 -1px 0 #ababab,
+    inset 0 0 0 1px #8a8a8a;
+}
+
+.aqua [data-slot="radio-group-item"][data-checked] {
+  background-color: #5f99e0;
+  background-image:
+    radial-gradient(
+      ellipse 60% 38% at 50% 22%,
+      rgb(255 255 255 / 0.85),
+      transparent
+    ),
+    linear-gradient(
+      to bottom,
+      #354496 0%,
+      #3972bb 12%,
+      #4382cc 25%,
+      #5f99e0 40%,
+      #7cb3ee 52%,
+      #93c5fb 64%,
+      #b0ddfe 84%,
+      #b5e3ff 100%
+    );
+  box-shadow:
+    inset 0 1px 0 #1b1a5c,
+    inset 0 -1px 0 #617b92,
+    inset 0 0 0 1px #3d5b8f;
+}
+
+.aqua [data-slot="radio-group-dot"] {
+  background-color: #000;
+  background-image: radial-gradient(circle at 50% 35%, #3a3a3a, #000 70%);
+}
+
+.aqua [data-slot="radio-group-item"]:focus-visible {
+  box-shadow:
+    inset 0 1px 0 #4a4a4a,
+    inset 0 -1px 0 #ababab,
+    inset 0 0 0 1px #8a8a8a,
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="radio-group-item"][data-checked]:focus-visible {
+  box-shadow:
+    inset 0 1px 0 #1b1a5c,
+    inset 0 -1px 0 #617b92,
+    inset 0 0 0 1px #3d5b8f,
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="radio-group-item"][aria-invalid="true"] {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+/* Select trigger: white gel only. The chevron sits 8-24px from the right
+   edge, outside a 20px gem, so the gem is skipped. */
+.aqua [data-slot="select-trigger"] {
+  color: #000;
+  border-color: transparent;
+  border-radius: 5px;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    0 1px 2px rgb(0 0 0 / 0.25);
+}
+
+.aqua [data-slot="select-trigger"][data-placeholder] {
+  color: var(--text-placeholder);
+}
+
+.aqua [data-slot="select-trigger"] > [data-slot="icon"]:last-child {
+  color: #000;
+}
+
+@media (hover: hover) {
+  .aqua [data-slot="select-trigger"]:hover {
+    background-image:
+      linear-gradient(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.04)),
+      var(--aqua-gel-shine), var(--aqua-gel-white);
+  }
+}
+
+.aqua [data-slot="select-trigger"]:is(:active, [data-popup-open]) {
+  color: #000;
+  background-color: #2f6ab5;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue-pressed);
+  box-shadow:
+    inset 0 0 0 1px rgb(20 55 125 / 0.7),
+    0 1px 2px rgb(0 0 0 / 0.25);
+}
+
+.aqua [data-slot="select-trigger"]:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    0 1px 2px rgb(0 0 0 / 0.25),
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="select-trigger"][aria-invalid="true"] {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    0 1px 2px rgb(0 0 0 / 0.25),
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+.aqua [data-slot="select-trigger"]:is(:disabled, [data-disabled]) {
+  color: #8d8d8d;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+}
+
+/* Switch: white gel off, blue gel on. Disabled keeps the primitive's opacity. */
+.aqua [data-slot="switch"] {
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.38);
+}
+
+.aqua [data-slot="switch"][data-checked] {
+  background-color: #4b87c7;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue);
+  box-shadow: inset 0 0 0 1px rgb(20 55 125 / 0.6);
+}
+
+.aqua [data-slot="switch"]:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="switch"][data-checked]:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px rgb(20 55 125 / 0.6),
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="switch"][aria-invalid="true"] {
+  box-shadow:
+    inset 0 0 0 1px #c62828,
+    0 0 0 3px rgb(198 40 40 / 0.35);
+}
+
+.aqua [data-slot="switch-thumb"] {
+  background-color: #fff;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.35),
+    0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+/* Slider */
+.aqua [data-slot="slider-track"] {
+  background-color: #9a9a9a;
+  background-image: linear-gradient(to bottom, #535353, #cacaca);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.3);
+}
+
+.aqua [data-slot="slider-range"] {
+  background-color: rgb(53 112 210 / 0.55);
+  background-image: var(--aqua-shine);
+}
+
+.aqua [data-slot="slider-thumb"] {
+  border-color: #25589f;
+  background-color: #4b87c7;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+@media (hover: hover) {
+  .aqua [data-slot="slider-thumb"]:hover {
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.4),
+      0 0 0 3px var(--aqua-focus-glow);
+  }
+}
+
+.aqua [data-slot="slider-thumb"]:focus-visible {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.4),
+    0 0 0 2px var(--aqua-focus);
+}
+
+/* Tabs. Vertical lists are left alone (settings nav restyles them as rows). */
+.aqua
+  [data-slot="tabs-list"][data-variant="default"]:not(
+    [data-orientation="vertical"]
+  ) {
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-white);
+  box-shadow: inset 0 0 0 1px #8a8a8a;
+}
+
+.aqua
+  [data-slot="tabs-list"]:is(
+    [data-variant="default"],
+    [data-variant="ghost"],
+    [data-variant="pill"]
+  ):not([data-orientation="vertical"])
+  [data-slot="tabs-trigger"] {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+.aqua
+  [data-slot="tabs-list"]:is(
+    [data-variant="default"],
+    [data-variant="ghost"],
+    [data-variant="pill"]
+  ):not([data-orientation="vertical"])
+  [data-slot="tabs-trigger"][data-active] {
+  color: #000;
+  background-color: #8cb3db;
+  background-image: linear-gradient(
+    to bottom,
+    #9dbdde 4%,
+    #91b4db 17%,
+    #709dcd 21%,
+    #7ea8d3 29%,
+    #8cb3db 46%,
+    #9bc0e7 58%,
+    #aacdf4 71%,
+    #b5dbff 79%,
+    #c6f0ff 92%,
+    #d3ffff 100%
+  );
+  box-shadow: inset 0 0 0 1px #002d91;
+}
+
+.aqua
+  [data-slot="tabs-list"]:is(
+    [data-variant="default"],
+    [data-variant="ghost"],
+    [data-variant="pill"]
+  ):not([data-orientation="vertical"])
+  [data-slot="tabs-trigger"]:focus-visible {
+  box-shadow: 0 0 0 2px var(--aqua-focus);
+}
+
+.aqua
+  [data-slot="tabs-list"]:is(
+    [data-variant="default"],
+    [data-variant="ghost"],
+    [data-variant="pill"]
+  ):not([data-orientation="vertical"])
+  [data-slot="tabs-trigger"][data-active]:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px #002d91,
+    0 0 0 2px var(--aqua-focus);
+}
+
+/* Line variant: ::after is the underline, not a hit area */
+.aqua
+  [data-slot="tabs-list"][data-variant="line"]
+  [data-slot="tabs-trigger"]::after {
+  background-color: #3570d2;
+}
+
+/* Progress: static paint only. The indicator hides when indeterminate, so the
+   stripes go on the track. */
+.aqua [data-slot="progress-track"] {
+  background-color: #e6e6e6;
+  background-image: linear-gradient(to bottom, #b4b4b4, #e6e6e6 40%, #fff);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.3);
+}
+
+.aqua [data-slot="progress-track"][data-indeterminate] {
+  background-color: #4f8fe0;
+  background-image:
+    var(--aqua-shine),
+    repeating-linear-gradient(-45deg, #4f8fe0 0 7px, #b9d7ff 7px 14px);
+}
+
+.aqua [data-slot="progress-indicator"] {
+  background-color: #4a86d8;
+  background-image:
+    var(--aqua-shine), linear-gradient(to bottom, #2247b2, #4a86d8 45%, #6ab6ff);
+}
+
+/* Table: Finder list header, zebra body rows, blue selection */
+.aqua [data-slot="table-head"] {
+  color: #000;
+  font-weight: 400;
+  background-color: #e0e0e0;
+  background-image: linear-gradient(
+    to bottom,
+    #bebebe 0%,
+    #d3d3d3 12%,
+    #dddddd 24%,
+    #d3d3d3 35%,
+    #e0e0e0 47%,
+    #f3f3f3 59%,
+    #fefefe 71%,
+    #fff 100%
+  );
+  box-shadow:
+    inset 0 1px 0 #959595,
+    inset 0 -1px 0 #a8a8a8,
+    inset -1px 0 0 #b4b4b4;
+}
+
+.aqua [data-slot="table-body"] > [data-slot="table-row"]:nth-child(even) {
+  background-color: #edf3fe;
+}
+
+@media (hover: hover) {
+  .aqua [data-slot="table-body"] > [data-slot="table-row"]:hover {
+    background-color: var(--interactive-bg-hover);
+  }
+}
+
+.aqua
+  [data-slot="table-body"]
+  > [data-slot="table-row"][data-state="selected"] {
+  color: #fff;
+  background-color: var(--aqua-select);
+}
+
+.aqua
+  [data-slot="table-row"][data-state="selected"]
+  > :is([data-slot="table-cell"], [data-slot="table-head"]) {
+  color: #fff;
+}
+
+/* Kbd is skipped: it has no padding for a gel frame, and it only renders in
+   tooltips (overlays lane), sidebar rows, and composer hints. */

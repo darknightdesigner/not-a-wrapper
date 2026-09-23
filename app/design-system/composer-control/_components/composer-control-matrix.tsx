@@ -4,11 +4,12 @@ import { Button } from "@/components/ui/button"
 import { ComposerControl } from "@/components/ui/composer-control"
 import { ComposerIconButton } from "@/components/ui/composer-icon-button"
 import { Icon } from "@/components/ui/icon"
+import { APP_THEMES } from "@/lib/theme"
 import { RiAddLine, RiMicLine } from "@remixicon/react"
 import { useTheme } from "next-themes"
 import { useSyncExternalStore } from "react"
 
-const themeOptions = ["light", "dark", "system"] as const
+const themeOptions = [...APP_THEMES, "system"] as const
 type ThemeOption = (typeof themeOptions)[number]
 
 function readStoredTheme(): ThemeOption {

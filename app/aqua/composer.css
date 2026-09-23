@@ -1,0 +1,181 @@
+/* Aqua composer: input surface, send/stop, composer controls, mention pills.
+   Selection token and forced colors live in tokens.css; popups in overlays. */
+
+/* Surface: white inset field. Motion owns the 28px radius, so no radius here.
+   The message edit input reuses this surface and keeps its transparent reset. */
+.aqua [data-slot="prompt-input-surface"]:not(.user-message-edit-input *) {
+  background-color: #fff;
+  box-shadow:
+    inset 0 0 0 1px #a9a9a9,
+    inset 0 2px 2px -1px rgb(0 0 0 / 0.18);
+}
+
+.aqua
+  [data-slot="prompt-input-surface"]:not(.user-message-edit-input *):focus-within {
+  box-shadow:
+    inset 0 0 0 1px #4d83d2,
+    inset 0 2px 2px -1px rgb(0 0 0 / 0.18),
+    0 0 0 3px var(--aqua-focus-glow);
+}
+
+/* Composer controls (+, model, effort, search, expand): white gel. Call sites
+   own the segmented radii, so radius is never set. */
+.aqua [data-button][data-composer-control] {
+  color: #000;
+  font-weight: 400;
+  border-color: transparent;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    var(--aqua-button-shadow);
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .aqua [data-button][data-composer-control]:hover {
+    background-image:
+      linear-gradient(rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.05)),
+      var(--aqua-gel-shine), var(--aqua-gel-white);
+  }
+}
+
+/* Open, toggled, or pressed: blue pressed gel with black content. The opaque
+   gradient covers search's touch `aria-pressed` !important background-color. */
+.aqua
+  [data-button][data-composer-control]:is(
+    [aria-expanded="true"],
+    [aria-pressed="true"],
+    :active
+  ),
+.aqua [data-button][data-composer-control][data-web-search-control][aria-pressed="true"] {
+  color: #000;
+  background-color: #2f6ab5;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue-pressed);
+  box-shadow: inset 0 0 0 1px rgb(20 55 125 / 0.7);
+}
+
+/* Later than pressed at equal specificity, so disabled never looks pressed */
+.aqua
+  [data-button][data-composer-control]:is(
+    :disabled,
+    [data-disabled],
+    [data-visually-disabled]
+  ) {
+  color: #8d8d8d;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    var(--aqua-button-shadow);
+  opacity: 0.6;
+}
+
+.aqua
+  [data-button][data-composer-control]:is(
+    [aria-expanded="true"],
+    [aria-pressed="true"],
+    :active,
+    :disabled,
+    [data-disabled],
+    [data-visually-disabled]
+  )
+  * {
+  color: inherit;
+}
+
+/* Joined model + thinking pair. On hover devices the thinking half overlaps
+   the model half by 6px, so a square, rimless leading edge reads as one
+   capsule; the hover seam reveal exposes the model rim as the divider.
+   Pressed states outrank this and restore the full ring. Touch keeps a 2px
+   gap, so both halves stay whole there. */
+@media (hover: hover) {
+  .aqua [data-button][data-effort-control] {
+    border-start-start-radius: 0;
+    border-end-start-radius: 0;
+    box-shadow:
+      inset 0 1px 0 rgb(0 0 0 / 0.38),
+      inset 0 -1px 0 rgb(0 0 0 / 0.38),
+      inset -1px 0 0 rgb(0 0 0 / 0.38),
+      var(--aqua-button-shadow);
+  }
+}
+
+/* Search keeps full opacity when not toggleable (existing behavior). Always-on
+   search is pressed + visually disabled, so it stays blue (rule above wins by
+   specificity over the disabled rule). */
+.aqua [data-button][data-composer-control][data-web-search-control][data-visually-disabled] {
+  opacity: 1;
+}
+
+/* Submit: self-owned so it never depends on the generic button skins. The id
+   outranks any class-level default-variant rule. Circle shape is kept. */
+.aqua #composer-submit-button[data-intent="send"] {
+  color: #000;
+  border-color: transparent;
+  background-color: #4b87c7;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue);
+  box-shadow:
+    inset 0 0 0 1px rgb(20 55 125 / 0.6),
+    var(--aqua-button-shadow);
+  opacity: 1;
+}
+
+.aqua #composer-submit-button[data-intent="stop"] {
+  color: #000;
+  border-color: transparent;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    var(--aqua-button-shadow);
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .aqua #composer-submit-button[data-intent="send"]:hover {
+    background-image:
+      linear-gradient(rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.08)),
+      var(--aqua-gel-shine), var(--aqua-gel-blue);
+  }
+
+  .aqua #composer-submit-button[data-intent="stop"]:hover {
+    background-image:
+      linear-gradient(rgb(0 0 0 / 0.05), rgb(0 0 0 / 0.05)),
+      var(--aqua-gel-shine), var(--aqua-gel-white);
+  }
+}
+
+.aqua #composer-submit-button[data-intent]:active {
+  color: #000;
+  background-color: #2f6ab5;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-blue-pressed);
+  box-shadow: inset 0 0 0 1px rgb(20 55 125 / 0.7);
+}
+
+/* Disabled send is visually disabled (focusable); disabled stop is disabled */
+.aqua
+  #composer-submit-button[data-intent]:is(
+    :disabled,
+    [data-disabled],
+    [data-visually-disabled]
+  ) {
+  color: #8d8d8d;
+  background-color: #e2e2e2;
+  background-image: var(--aqua-gel-shine), var(--aqua-gel-white);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.38),
+    var(--aqua-button-shadow);
+  opacity: 0.6;
+}
+
+/* Mention pills in the editor */
+.aqua [data-inline-selection-pill] {
+  color: #0033cc;
+  border-radius: 4px;
+  background-color: rgb(53 112 210 / 0.14);
+}
+
+.aqua [data-inline-selection-pill][data-inline-selection-pill-selected] {
+  background-color: var(--composer-selection-background);
+}

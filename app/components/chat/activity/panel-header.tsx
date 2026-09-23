@@ -107,6 +107,7 @@ export function PanelHeader({
 }: PanelHeaderProps) {
   return (
     <div
+      data-slot="activity-panel-header"
       className={cn(
         "h-app-header flex shrink-0 items-center justify-between gap-2 bg-[var(--activity-panel-surface)] px-4 [box-shadow:var(--sharp-edge-top-shadow)]",
         className

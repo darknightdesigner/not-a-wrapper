@@ -1,0 +1,425 @@
+/* Aqua tokens, type, focus, selection, scrollbars, forced colors (ADR 0042). */
+
+:root.aqua {
+  color-scheme: light;
+
+  /* Materials */
+  --aqua-select: #3570d2;
+  /* Opaque focus ring: 3:1 or better on every Aqua gray and white. Text
+     fields keep the translucent glow; their rim and caret also mark focus. */
+  --aqua-focus: #3570d2;
+  --aqua-focus-glow: rgb(109 179 255 / 0.6);
+  --aqua-edge: #7f7f7f;
+  --aqua-gel-blue: linear-gradient(
+    to bottom,
+    #3c73c0 0%,
+    #4b87c7 40%,
+    #5a94d2 52%,
+    #72aae4 66%,
+    #86c1fb 84%,
+    #8ccbff 94%,
+    #74b4f5 100%
+  );
+  --aqua-gel-blue-pressed: linear-gradient(
+    to bottom,
+    #25589f 0%,
+    #2f6ab5 40%,
+    #3f7fca 55%,
+    #5c9ae0 80%,
+    #6aa7ec 100%
+  );
+  --aqua-gel-white: linear-gradient(
+    to bottom,
+    #c9c9c9 0%,
+    #d8d8d8 40%,
+    #e2e2e2 55%,
+    #f1f1f1 70%,
+    #fdfdfd 88%,
+    #f4f4f4 100%
+  );
+  --aqua-shine: linear-gradient(
+    to bottom,
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.45) 55%,
+    rgb(255 255 255 / 0.08)
+  );
+  --aqua-gel-shine: radial-gradient(
+    ellipse 46% 60% at 50% 0%,
+    rgb(255 255 255 / 0.9),
+    rgb(255 255 255 / 0.35) 70%,
+    transparent 71%
+  );
+  --aqua-button-shadow:
+    0 1px 2px rgb(0 0 0 / 0.35), 0 2px 4px rgb(0 0 0 / 0.15);
+  --aqua-pin-window: repeating-linear-gradient(
+    to bottom,
+    #dedede 0 1px,
+    #ebebeb 1px 2px,
+    #dedede 2px 3px,
+    #d7d7d7 3px 4px
+  );
+  --aqua-pin-menu: repeating-linear-gradient(
+    to bottom,
+    #fafafa 0 1px,
+    #e9e9e9 1px 2px,
+    #fafafa 2px 3px,
+    #fff 3px 4px
+  );
+  --aqua-pin-highlight: repeating-linear-gradient(
+    to bottom,
+    #336abd 0 1px,
+    #3973c1 1px 2px,
+    #336abd 2px 3px,
+    #285cb7 3px 4px
+  );
+  /* Scrollbar columns, 1px each, sampled left to right */
+  --aqua-thumb-stops:
+    #0039b3 0 1px, #76a5de 1px 2px, #97bfe9 2px 3px, #93bcea 3px 4px,
+    #8bb8ea 4px 5px, #5093e3 5px 6px, #63a5ef 6px 7px, #75b5fe 7px 8px,
+    #88c8ff 8px 9px, #96d9ff 9px 10px, #a2e4ff 10px 11px, #9adaff 11px 12px;
+  --aqua-track-stops:
+    #b8b8b8 0 1px, #c0c0c0 1px 2px, #c8c8c8 2px 3px, #d3d3d3 3px 4px,
+    #dbdbdb 4px 5px, #e4e4e4 5px 6px, #ebebeb 6px 7px, #f1f1f1 7px 8px,
+    #f6f6f6 8px 9px, #fafafa 9px 10px, #fbfbfb 10px 11px, #fcfcfc 11px 12px,
+    #f9f9f9 12px 13px, #f4f4f4 13px 14px, #efefef 14px 15px;
+  --aqua-arrow-stops:
+    #bbbbbb 0 1px, #d2d2d2 1px 2px, #f2f2f2 2px 3px, #f7f7f7 3px 4px,
+    #f6f6f6 4px 5px, #eaeaea 5px 6px, #dcdcdc 6px 7px, #e1e1e1 7px 8px,
+    #e8e8e8 8px 9px, #eeeeee 9px 10px, #f5f5f5 10px 11px, #fbfbfb 11px 12px,
+    #fefefe 12px 13px, #fafafa 13px 14px, #efefef 14px 15px;
+  --aqua-arrow-pressed-stops:
+    #1d6bc8 0 1px, #5454b8 1px 2px, #98a2dc 2px 3px, #a2b9e6 3px 4px,
+    #9abfe9 4px 5px, #6ea5de 5px 6px, #397fd2 6px 7px, #3f84d3 7px 8px,
+    #4c90d6 8px 9px, #5897db 9px 10px, #639ddf 10px 11px, #6eacec 11px 12px,
+    #81c1ff 12px 13px, #84caff 13px 14px, #6fc3ff 14px 15px;
+
+  /* Surfaces */
+  --background: #fff;
+  --foreground: #000;
+  --card: #fff;
+  --popover: #fafafa;
+  --floating-surface: #fafafa;
+  --floating-surface-foreground: #000;
+  --sidebar: #dedede;
+
+  /* Text */
+  --text-primary: #000;
+  --text-secondary: #555;
+  --text-tertiary: #666;
+  --text-placeholder: #8d8d8d;
+  --text-disabled: #8d8d8d;
+  --muted: #ececec;
+  --muted-foreground: #555;
+  --secondary: #e2e2e2;
+  --link: #0033cc;
+
+  /* Borders, inputs */
+  --border-subtle: rgb(0 0 0 / 0.1);
+  --border-default: rgb(0 0 0 / 0.18);
+  --border-strong: #a9a9a9;
+  --border-heavy: var(--aqua-edge);
+  --input-border: #a9a9a9;
+  --input-bg: #fff;
+
+  /* Primary, selection, focus */
+  --primary: var(--aqua-select);
+  --primary-foreground: #fff;
+  --accent: rgb(0 0 0 / 0.05);
+  --interactive-bg-selected: rgb(53 112 210 / 0.16);
+  --focus-ring: var(--aqua-focus);
+  --ring: var(--aqua-focus);
+  --composer-selection-background: #b5d5ff;
+
+  /* Hover tints that drift off the Aqua palette */
+  --primary-bg-hover: #2f6ab5;
+  --muted-bg-hover: #dcdcdc;
+  --row-hover-surface: rgb(0 0 0 / 0.05);
+  --link-hover: #00289e;
+
+  /* Menus, tooltips, modals */
+  --floating-surface-edge-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.16), 0 5px 14px rgb(0 0 0 / 0.32);
+  --floating-select-edge-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.16), 0 5px 14px rgb(0 0 0 / 0.32);
+  --floating-menu-radius: 5px;
+  --floating-menu-item-radius: 0;
+  --floating-menu-divider: rgb(0 0 0 / 0.14);
+  --floating-menu-item-active: rgb(53 112 210 / 0.14);
+  --tooltip-radius: 0;
+  --tooltip-multiline-radius: 0;
+  --tooltip-edge-shadow: 0 2px 5px rgb(0 0 0 / 0.28);
+  --modal-centered-backdrop-blur: 0px;
+  --modal-centered-scrim: rgb(0 0 0 / 0.12);
+  --scrim-modal: rgb(0 0 0 / 0.12);
+
+  /* Composer, messages, sidebar rows */
+  --composer-surface-primary: #fff;
+  --user-message-bg: #a8cbf7;
+  --sidebar-row-bg: rgb(0 0 0 / 0.06);
+  --sidebar-row-radius: 0;
+
+  /* Scrollbars */
+  --scrollbar-color: #5c95e0;
+  --scrollbar-color-hover: #3f7fca;
+}
+
+/* Type: next/font vars live on body */
+:root.aqua body {
+  --font-geist-sans:
+    "Lucida Grande", "Lucida Sans Unicode", "Lucida Sans", Geneva, Verdana,
+    sans-serif;
+  --font-geist-mono: Monaco, Menlo, "Andale Mono", ui-monospace, monospace;
+  --font-native-stack: var(--font-geist-sans);
+  font-family: var(--font-geist-sans);
+}
+
+/* Hard-coded system stacks */
+:root.aqua
+  :is(
+    .composer-prosemirror,
+    .sidebar-group-header,
+    [data-slot="tooltip-content"]
+  ) {
+  font-family: var(--font-geist-sans);
+}
+
+:root.aqua .markdown {
+  --markdown-code-font: var(--font-geist-mono);
+}
+
+/* Focus: recolor visible keyboard rings; hidden outlines stay hidden */
+.aqua [data-focus-mode="keyboard"]:focus-visible {
+  outline-color: var(--aqua-focus);
+  outline-width: 2px;
+  outline-offset: 0;
+}
+
+/* Sidebar rows keep an inset ring so the scroller cannot clip it */
+.aqua .sidebar-row-primary-control[data-focus-mode="keyboard"]:focus-visible {
+  outline-offset: -2px;
+}
+
+/* Sidebar chips draw the ring for their focused parent */
+.aqua
+  [data-focus-mode="keyboard"]:focus-visible
+  :is(.trailing-icon-chip, .sidebar-group-header-action-chip) {
+  outline-color: var(--aqua-focus);
+  outline-width: 2px;
+  outline-offset: 0;
+}
+
+/* The ring turns white on the blue selection (sidebar and settings rows) */
+.aqua .sidebar-menu-row[data-active][data-focus-mode="keyboard"]:focus-visible,
+.aqua .sidebar-menu-row[data-active] [data-focus-mode="keyboard"]:focus-visible,
+.aqua
+  .sidebar-menu-row[data-active]
+  [data-focus-mode="keyboard"]:focus-visible
+  :is(.trailing-icon-chip, .sidebar-group-header-action-chip) {
+  outline-color: #fff;
+}
+
+/* Selection: background only, text keeps its color */
+.aqua ::selection {
+  background-color: #b5d5ff;
+}
+
+/* #b5d5ff vanishes on the blue bubble */
+.aqua .user-message-bubble-color ::selection {
+  background-color: rgb(53 112 210 / 0.3);
+}
+
+/* Mention pills paint their own selected state */
+.aqua [data-inline-selection-pill]::selection,
+.aqua [data-inline-selection-pill] ::selection {
+  background-color: transparent;
+}
+
+:root.aqua .composer-prosemirror {
+  --composer-selection-background: #b5d5ff;
+}
+
+/* Scrollbars: main thread scroller only (width is a scoped exception). It
+   clips x, so only the vertical bar is skinned: split arrows, a cupped track,
+   and a gel capsule thumb with a drop shadow on the track. */
+@media screen and (pointer: fine) {
+  /* Chrome ignores ::-webkit-scrollbar unless both are auto. Always shown,
+     like an Aqua window: short content gets the track and arrows, no thumb.
+     The gutter is already reserved, so nothing shifts. */
+  .aqua [data-scroll-root] {
+    overflow-y: scroll;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+
+  /* Button material; also fills the corners outside the track's round ends */
+  .aqua [data-scroll-root]::-webkit-scrollbar {
+    width: 15px;
+    background: linear-gradient(to right, var(--aqua-arrow-stops));
+  }
+
+  .aqua [data-scroll-root]::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  .aqua [data-scroll-root]::-webkit-scrollbar-button:vertical:start:decrement,
+  .aqua [data-scroll-root]::-webkit-scrollbar-button:vertical:end:increment {
+    display: block;
+    height: 16px;
+  }
+
+  .aqua [data-scroll-root]::-webkit-scrollbar-button:vertical:start:decrement {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='16'%3E%3Cpath fill='%23434343' d='M7.5 5.3 10.9 11H4.1z'/%3E%3C/svg%3E")
+        no-repeat,
+      linear-gradient(
+        to bottom,
+        #bdbdbd 0 1px,
+        rgb(0 0 0 / 0.04) 1px 2px,
+        transparent 2px
+      );
+  }
+
+  .aqua [data-scroll-root]::-webkit-scrollbar-button:vertical:end:increment {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='16'%3E%3Cpath fill='%23434343' d='M4.1 5H10.9L7.5 10.7z'/%3E%3C/svg%3E")
+        no-repeat,
+      linear-gradient(
+        to top,
+        #bdbdbd 0 1px,
+        rgb(0 0 0 / 0.04) 1px 2px,
+        transparent 2px
+      );
+  }
+
+  /* Pressed arrow: blue gel, near-black glyph */
+  .aqua
+    [data-scroll-root]::-webkit-scrollbar-button:vertical:start:decrement:active {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='16'%3E%3Cpath fill='%23060d15' d='M7.5 5.3 10.9 11H4.1z'/%3E%3C/svg%3E")
+        no-repeat,
+      linear-gradient(to right, var(--aqua-arrow-pressed-stops));
+  }
+
+  .aqua
+    [data-scroll-root]::-webkit-scrollbar-button:vertical:end:increment:active {
+    background:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='16'%3E%3Cpath fill='%23060d15' d='M4.1 5H10.9L7.5 10.7z'/%3E%3C/svg%3E")
+        no-repeat,
+      linear-gradient(to right, var(--aqua-arrow-pressed-stops));
+  }
+
+  /* Cupped track: gray rims on slightly lopsided domes, a deep shade under the
+     top rim, a soft one above the bottom. The top shade is a radial layer, so
+     it pools in the dome and leaves the track edges light. */
+  .aqua [data-scroll-root]::-webkit-scrollbar-track {
+    border-radius: 6px 7px 7px 6px;
+    background:
+      radial-gradient(
+        9px 9px at 60% 0,
+        rgb(0 0 0 / 0.36),
+        rgb(0 0 0 / 0.28) 20%,
+        rgb(0 0 0 / 0.18) 35%,
+        rgb(0 0 0 / 0.11) 50%,
+        rgb(0 0 0 / 0.07) 75%,
+        transparent
+      ),
+      linear-gradient(to right, var(--aqua-track-stops));
+    box-shadow:
+      inset 0 1px 0 #969696,
+      inset 0 2px 1px -1px rgb(0 0 0 / 0.18),
+      inset 0 -1px 0 #969696,
+      inset 0 -4px 3px -3px rgb(0 0 0 / 0.15);
+  }
+
+  /* Thumb: a 12px gel capsule inside transparent borders. The borders carry
+     the shadow it casts on the track (1px left, 2px right); the gel layers
+     clip to the padding box. */
+  .aqua [data-scroll-root]::-webkit-scrollbar-thumb {
+    border: solid transparent;
+    border-width: 0 2px 0 1px;
+    border-radius: 7px 8px 8px 7px / 6px;
+    background:
+      linear-gradient(
+          to bottom,
+          rgb(0 80 192 / 0.9) 1px,
+          rgb(0 80 192 / 0.66) 2.5px,
+          rgb(0 80 192 / 0.33) 4.5px,
+          rgb(0 80 192 / 0.09) 6.5px,
+          transparent 8px
+        )
+        padding-box,
+      linear-gradient(
+          to top,
+          rgb(0 80 192 / 0.75) 1px,
+          rgb(0 80 192 / 0.5) 3.5px,
+          rgb(0 80 192 / 0.32) 6px,
+          rgb(0 80 192 / 0.18) 9px,
+          transparent 13px
+        )
+        padding-box,
+      linear-gradient(to right, var(--aqua-thumb-stops)) padding-box,
+      linear-gradient(
+          to right,
+          rgb(0 0 0 / 0.07) 0 1px,
+          transparent 1px calc(100% - 2px),
+          rgb(0 0 0 / 0.62) calc(100% - 2px) calc(100% - 1px),
+          rgb(0 0 0 / 0.28) calc(100% - 1px)
+        )
+        border-box;
+    box-shadow:
+      inset 0 1px 0 #0b3f9a,
+      inset 0 -1px 0 #0d4ea6;
+  }
+}
+
+/* Firefox has no scrollbar pseudo-elements */
+@supports not selector(::-webkit-scrollbar) {
+  .aqua [data-scroll-root] {
+    scrollbar-color: #5c95e0 #ececec;
+  }
+}
+
+/* Restore the expanded side pane's hidden scrollbar */
+.aqua .side-pane-shell-host[data-activity-expanded] [data-scroll-root] {
+  scrollbar-width: none;
+}
+
+.aqua
+  .side-pane-shell-host[data-activity-expanded]
+  [data-scroll-root]::-webkit-scrollbar {
+  display: none;
+}
+
+/* Forced colors: gradients and shadows are gone, so draw real edges */
+@media (forced-colors: active) {
+  :root.aqua
+    :is(
+      [data-button]:not([data-variant="ghost"], [data-variant="link"]),
+      [data-slot="select-trigger"],
+      [data-slot="prompt-input-surface"],
+      [data-slot="tabs-trigger"],
+      [data-slot="switch"],
+      [data-slot="checkbox"],
+      [data-slot="radio-group-item"],
+      [data-slot="toggle"],
+      [data-slot="toggle-group-item"]
+    ) {
+    outline: 1px solid ButtonText;
+    outline-offset: -1px;
+    background-image: none;
+  }
+
+  :root.aqua [data-slot="radio-group-item"] [data-slot="radio-group-dot"] {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+
+  /* Same specificity as the edge rule above, so focus wins on gel controls */
+  :root.aqua [data-focus-mode="keyboard"]:focus-visible,
+  :root.aqua
+    [data-focus-mode="keyboard"]:focus-visible
+    :is(.trailing-icon-chip, .sidebar-group-header-action-chip) {
+    outline-color: Highlight;
+    outline-width: 3px;
+  }
+}

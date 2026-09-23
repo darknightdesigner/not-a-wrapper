@@ -760,6 +760,7 @@ export const Composer = memo(
                       type="submit"
                       id="composer-submit-button"
                       data-testid="send-button"
+                      data-intent={primaryAction.mode}
                       onClick={
                         primaryAction.mode === "stop"
                           ? handlePrimaryActionClick

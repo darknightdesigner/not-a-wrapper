@@ -14,7 +14,7 @@
 - **Organization** — Group chats into projects and pin important chats or models
 - **Sharing** — Publish chats with shareable links and Open Graph metadata
 - **History search** — Search your full chat history by conversation title
-- **Personalization** — Choose light, dark, or system themes and sidebar or fullscreen layouts
+- **Personalization** — Choose light, dark, Aqua, or system themes and sidebar or fullscreen layouts
 
 ## Supported AI Providers
 

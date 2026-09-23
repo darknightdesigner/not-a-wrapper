@@ -1,0 +1,404 @@
+/* Aqua overlays: menus, popovers, help tags, windows, command, toasts (ADR 0042). */
+
+:root.aqua {
+  --aqua-popover-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.25), 0 5px 14px rgb(0 0 0 / 0.3);
+  --aqua-window-drop-shadow:
+    0 12px 28px rgb(0 0 0 / 0.34), 0 2px 6px rgb(0 0 0 / 0.2);
+
+  /* Search modal reads only these tokens; one highlighted row, painted below */
+  --modal-search-foreground: #000;
+  --modal-search-border: rgb(0 0 0 / 0.25);
+  --modal-search-edge-shadow: 0 5px 14px rgb(0 0 0 / 0.3);
+  --modal-search-radius: 6px;
+  --modal-search-row-active: transparent;
+}
+
+/* Menu surfaces */
+.aqua
+  :is(
+    [data-slot="dropdown-menu-content"],
+    [data-slot="dropdown-menu-sub-content"],
+    [data-slot="context-menu-content"],
+    [data-slot="context-menu-sub-content"],
+    [data-slot="menubar-content"],
+    [data-slot="menubar-sub-content"],
+    [data-slot="select-content"],
+    [data-slot="combobox-content"],
+    [data-slot="popover-content"][data-chat-composer-menu]
+  ) {
+  color: #000;
+  border-radius: 5px;
+  background-color: #fafafa;
+  background-image: var(--aqua-pin-menu);
+  box-shadow: var(--floating-surface-edge-shadow);
+  backdrop-filter: none;
+}
+
+/* Open instantly; the ending-style fade stays so Base UI still sees the exit */
+.aqua [data-slot="dropdown-menu-content"][data-starting-style] {
+  opacity: 1;
+}
+
+/* Menu rows */
+.aqua
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="context-menu-sub-trigger"],
+    [data-slot="context-menu-checkbox-item"],
+    [data-slot="context-menu-radio-item"],
+    [data-slot="menubar-item"],
+    [data-slot="menubar-sub-trigger"],
+    [data-slot="menubar-checkbox-item"],
+    [data-slot="menubar-radio-item"],
+    [data-slot="select-item"],
+    [data-slot="combobox-item"],
+    [data-composer-menu-row],
+    [data-model-selector-row]
+  ) {
+  border-radius: 0;
+}
+
+.aqua
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="menubar-item"]
+  )[data-variant="destructive"] {
+  --destructive: #a40000;
+  color: #a40000;
+}
+
+/* After destructive so disabled wins the tie */
+.aqua
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="context-menu-sub-trigger"],
+    [data-slot="context-menu-checkbox-item"],
+    [data-slot="context-menu-radio-item"],
+    [data-slot="menubar-item"],
+    [data-slot="menubar-sub-trigger"],
+    [data-slot="menubar-checkbox-item"],
+    [data-slot="menubar-radio-item"],
+    [data-slot="select-item"],
+    [data-slot="combobox-item"],
+    [data-composer-menu-row]
+  ):is([data-disabled], [aria-disabled="true"]) {
+  --foreground: #8d8d8d;
+  --text-primary: #8d8d8d;
+  --text-secondary: #8d8d8d;
+  --text-tertiary: #8d8d8d;
+  --muted-foreground: #8d8d8d;
+  --destructive: #8d8d8d;
+  color: #8d8d8d;
+  opacity: 1;
+  background-color: transparent;
+  background-image: none;
+}
+
+/* Aqua shows one blue row: chosen values keep only their check */
+.aqua
+  :is(
+    [data-slot="select-item"],
+    [data-slot="combobox-item"]
+  )[data-selected]:not([data-highlighted]),
+.aqua [data-model-selector-row]:not([data-highlighted]),
+.aqua [data-slot="command-item"][data-selected="false"] {
+  background-color: transparent;
+}
+
+.aqua [data-slot="selected-model-check"] {
+  color: #000;
+}
+
+/* Highlight. Text tokens flip so utility-colored descendants turn white. */
+.aqua
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="context-menu-sub-trigger"],
+    [data-slot="context-menu-checkbox-item"],
+    [data-slot="context-menu-radio-item"],
+    [data-slot="menubar-item"],
+    [data-slot="menubar-sub-trigger"],
+    [data-slot="menubar-checkbox-item"],
+    [data-slot="menubar-radio-item"],
+    [data-slot="select-item"],
+    [data-slot="combobox-item"],
+    [data-composer-menu-row]
+  ):is([data-highlighted], [data-popup-open]):not(
+    [data-disabled],
+    [aria-disabled="true"]
+  ),
+.aqua
+  [data-slot="menubar-trigger"]:is([data-popup-open], [aria-expanded="true"]),
+.aqua
+  [data-slot="command-item"][data-selected="true"]:not([data-disabled="true"]),
+.aqua
+  #desktop-search-modal-listbox
+  [data-row-index][aria-selected="true"]
+  > div {
+  --foreground: #fff;
+  --text-primary: #fff;
+  --text-secondary: #fff;
+  --text-tertiary: #fff;
+  --muted-foreground: #fff;
+  --popover-foreground: #fff;
+  --floating-surface-foreground: #fff;
+  --destructive: #fff;
+  color: #fff;
+  border-radius: 0;
+  background-color: #336abd;
+  background-image: var(--aqua-pin-highlight);
+  /* Paint under .menu-item-hoverable's transparent block borders */
+  background-clip: border-box;
+}
+
+.aqua
+  :is(
+    [data-slot="dropdown-menu-item"],
+    [data-slot="dropdown-menu-sub-trigger"],
+    [data-slot="dropdown-menu-checkbox-item"],
+    [data-slot="dropdown-menu-radio-item"],
+    [data-slot="context-menu-item"],
+    [data-slot="context-menu-sub-trigger"],
+    [data-slot="context-menu-checkbox-item"],
+    [data-slot="context-menu-radio-item"],
+    [data-slot="menubar-item"],
+    [data-slot="menubar-sub-trigger"],
+    [data-slot="menubar-checkbox-item"],
+    [data-slot="menubar-radio-item"],
+    [data-slot="select-item"],
+    [data-slot="combobox-item"],
+    [data-composer-menu-row]
+  ):is([data-highlighted], [data-popup-open]):not(
+    [data-disabled],
+    [aria-disabled="true"]
+  )
+  :is(svg, [data-slot$="-shortcut"]),
+.aqua
+  [data-slot="command-item"][data-selected="true"]
+  :is(svg, [data-slot="command-shortcut"]),
+.aqua
+  #desktop-search-modal-listbox
+  [data-row-index][aria-selected="true"]
+  > div
+  svg {
+  color: #fff;
+}
+
+.aqua
+  :is(
+    [data-slot="dropdown-menu-separator"],
+    [data-slot="context-menu-separator"],
+    [data-slot="menubar-separator"],
+    [data-slot="select-separator"],
+    [data-slot="combobox-separator"],
+    [data-slot="command-separator"]
+  ) {
+  background-color: var(--floating-menu-divider);
+}
+
+.aqua
+  :is(
+    [data-slot="dropdown-menu-label"],
+    [data-slot="context-menu-label"],
+    [data-slot="menubar-label"],
+    [data-slot="select-label"],
+    [data-slot="combobox-label"],
+    [data-composer-menu-hint],
+    [data-slot="command-group"] [cmdk-group-heading]
+  ) {
+  color: #8d8d8d;
+  font-weight: 400;
+}
+
+/* Popovers and hover cards */
+.aqua
+  :is(
+    [data-slot="popover-content"]:not([data-chat-composer-menu]),
+    [data-slot="hover-card-content"]
+  ) {
+  color: #000;
+  border-radius: 6px;
+  background-color: #fff;
+  background-image: none;
+  box-shadow: var(--aqua-popover-shadow);
+  backdrop-filter: none;
+}
+
+/* Help tag. The default variant is a forced .dark island, so tokens are
+   restated on the element; its real 1px border carries the edge. */
+:root.aqua [data-slot="tooltip-content"][data-variant="default"] {
+  --bg-tooltip: #ffffc7;
+  --border-tooltip: #9a9a6e;
+  --foreground: #000;
+  --text-primary: #000;
+  --text-secondary: #555;
+  --text-tertiary: #666;
+  --muted-foreground: #555;
+  color: #000;
+  border-color: #9a9a6e;
+  border-radius: 0;
+  background-color: #ffffc7;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.28);
+}
+
+/* EXCEPTION: help tags are small */
+:root.aqua
+  [data-slot="tooltip-content"][data-variant="default"]
+  [data-slot="tooltip-content-text"] {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+:root.aqua
+  [data-slot="tooltip-content"][data-variant="default"]
+  :is([data-slot="tooltip-shortcut-keys"], [data-slot="kbd"]) {
+  color: #555;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+:root.aqua
+  [data-slot="tooltip-content"][data-variant="default"]
+  [data-slot="kbd"] {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+:root.aqua
+  [data-slot="tooltip-content"][data-variant="default"]
+  [data-slot="tooltip-shortcut-detail"] {
+  font-weight: 400;
+}
+
+/* EXCEPTION: help tags have no arrow */
+:root.aqua
+  [data-slot="tooltip-content"][data-variant="default"]
+  [data-slot="tooltip-arrow"] {
+  display: none;
+}
+
+/* Windows. The mobile sidebar sheet is skinned by shell.css. */
+.aqua
+  :is(
+    [data-slot="dialog-content"],
+    [data-slot="alert-dialog-content"],
+    [data-slot="sheet-content"]:not([data-mobile="true"])
+  ) {
+  color: #000;
+  background-color: #dedede;
+  background-image: var(--aqua-pin-window);
+  box-shadow:
+    inset 0 0 0 1px var(--aqua-edge),
+    var(--aqua-window-drop-shadow);
+  backdrop-filter: none;
+}
+
+.aqua :is([data-slot="dialog-content"], [data-slot="alert-dialog-content"]) {
+  border-radius: 8px 8px 6px 6px;
+}
+
+/* Settings window: the nav is a pinstriped source list over the window
+   stripe; the page pane stays white. The active tab paints its fill inline
+   from --sidebar-row-active-background, so selection goes through the token. */
+.aqua [data-settings-dialog] nav {
+  background-color: transparent;
+}
+
+.aqua [data-settings-dialog] nav .sidebar-menu-row[data-active] {
+  --sidebar-row-active-background: var(--aqua-select);
+  --foreground: #fff;
+  --text-primary: #fff;
+  --text-secondary: #fff;
+  --muted-foreground: #fff;
+  color: #fff;
+}
+
+/* Drawers draw a real border, so the edge goes there; radii stay vaul's */
+.aqua [data-slot="drawer-content"] {
+  color: #000;
+  border-color: var(--aqua-edge);
+  background-color: #dedede;
+  background-image: var(--aqua-pin-window);
+  box-shadow: var(--aqua-window-drop-shadow);
+  backdrop-filter: none;
+}
+
+.aqua
+  :is(
+    [data-slot="dialog-overlay"],
+    [data-slot="alert-dialog-overlay"],
+    [data-slot="sheet-overlay"],
+    [data-slot="drawer-overlay"]
+  ) {
+  background-color: rgb(0 0 0 / 0.12);
+  backdrop-filter: none;
+}
+
+.aqua
+  :is(
+    [data-slot="dialog-title"],
+    [data-slot="alert-dialog-title"],
+    [data-slot="sheet-title"],
+    [data-slot="drawer-title"],
+    [data-slot="popover-title"]
+  ) {
+  font-weight: 700;
+}
+
+/* Command palette: white popover; the dialog host adopts the same look */
+.aqua [data-slot="command"],
+.aqua [data-slot="dialog-content"]:has(> [data-slot="command"]) {
+  color: #000;
+  background-color: #fff;
+  background-image: none;
+  box-shadow: var(--aqua-popover-shadow);
+}
+
+.aqua [data-slot="dialog-content"]:has(> [data-slot="command"]) {
+  border-radius: 6px;
+}
+
+.aqua [data-slot="dialog-content"] [data-slot="command"] {
+  box-shadow: none;
+}
+
+/* Toasts. Sonner vars are restated on the toast so rich colors keep theirs. */
+.aqua [data-sonner-toast][data-styled="true"] {
+  --normal-bg: #fff;
+  --normal-text: #000;
+  --normal-border: rgb(0 0 0 / 0.25);
+  --border-radius: 6px;
+  box-shadow: 0 5px 14px rgb(0 0 0 / 0.3);
+}
+
+.aqua [data-sonner-toast][data-styled="true"]:focus-visible {
+  box-shadow:
+    0 5px 14px rgb(0 0 0 / 0.3),
+    0 0 0 2px var(--aqua-focus);
+}
+
+.aqua [data-slot="toast"] {
+  color: #000;
+  border-radius: 6px;
+  background-color: #fff;
+  background-image: none;
+  box-shadow: var(--aqua-popover-shadow);
+  backdrop-filter: none;
+}

@@ -40,6 +40,7 @@ export function SettingsDialog({
         initialFocus={dialogContentRef}
         showCloseButton={false}
         surface="centered"
+        data-settings-dialog=""
         className="flex flex-col gap-0 overflow-hidden p-0"
         style={{
           height: "calc(100dvh - 2rem)",
