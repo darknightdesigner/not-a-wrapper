@@ -559,9 +559,12 @@ workaround.
   the user id as `user` on OpenAI requests.
 
 **Fix.**
-1. Add a hashed actor id (an HMAC of the WorkOS subject or guest id, never the
-   email) to `RequestShapingContext`, passed in from
-   `app/api/chat/chat-turn-runtime.ts`.
+1. Add a hashed actor id (an HMAC of the WorkOS subject, never the email) to
+   `RequestShapingContext`, passed in from `app/api/chat/chat-turn-runtime.ts`.
+   Do not hash the guest id: the browser sends it (`app/api/chat/route.ts`) and
+   can change it every request, which defeats per-actor isolation. Leave guests
+   without an id until the server-signed guest identity from the TODO.md item
+   "Guest abuse and spending limits" exists, then hash that.
 2. In `lib/openproviders/request-shaping.ts`, add an OpenAI block outside the
    reasoning-only gate so every OpenAI request sends
    `openai: { safetyIdentifier, store: false }`. Also send
@@ -3918,9 +3921,10 @@ and `eslint-config-next/typescript` in place of the bare `eslint-config-next`,
 and keep our override blocks after them. Set
 `@typescript-eslint/no-unused-vars` to error, with the args, vars,
 caught-errors and destructured-array ignore patterns all set to `^_`, plus
-`ignoreRestSiblings: true`. Turn off `no-explicit-any` and
-`no-unsafe-function-type` for `**/*.test.{ts,tsx}` and `**/__tests__/**`.
-Then remove the leftovers, type the 5 production `any` (for `debounce`,
+`ignoreRestSiblings: true`. Keep `no-explicit-any` and
+`no-unsafe-function-type` on for tests too; type the test `any` and `Function`
+hits (narrow mock types, `vi.fn<...>()`) instead of adding a test override,
+since our rules forbid weakening checks to make them pass. Then remove the leftovers, type the 5 production `any` (for `debounce`,
 `(...args: never[]) => unknown`, and a real type for the store map in
 `persist.ts`), fix the `prefer-const` hits, and change the lint script in
 `package.json:24` to `eslint . --max-warnings=0`.
