@@ -24,7 +24,6 @@ function CodeBlock({ children, className, ...props }: CodeBlockProps) {
   // 3xl token is 22px, so the literal radius is intentional.
   return (
     <div
-      data-slot="code-block"
       className={cn(
         "not-prose relative mt-4 mb-1 flex w-full flex-col overflow-clip border",
         "border-border bg-card text-card-foreground rounded-[24px]",
@@ -159,7 +158,6 @@ function CodeBlockGroup({
 }: CodeBlockGroupProps) {
   return (
     <div
-      data-slot="code-block-header"
       className={cn("flex items-center justify-between", className)}
       {...props}
     >

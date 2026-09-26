@@ -22,10 +22,7 @@ type ToastProps = {
 
 function Toast({ title, description, button, id, status }: ToastProps) {
   return (
-    <div
-      data-slot="toast"
-      className="bg-popover shadow-border-md flex items-center overflow-hidden rounded-xl p-4 backdrop-blur-xl"
-    >
+    <div className="bg-popover shadow-border-md flex items-center overflow-hidden rounded-xl p-4 backdrop-blur-xl">
       <div className="flex flex-1 items-center">
         {status === "error" ? (
           <Icon

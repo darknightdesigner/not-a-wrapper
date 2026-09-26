@@ -1,7 +1,6 @@
 "use client"
 
 import { Icon } from "@/components/ui/icon"
-import { resolveColorScheme } from "@/lib/theme"
 import {
   RiCheckboxCircleLine,
   RiCloseCircleLine,
@@ -17,8 +16,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
   return (
     <Sonner
-      // Sonner only knows light/dark/system; custom themes use their base scheme.
-      theme={theme === "system" ? "system" : resolveColorScheme(theme)}
+      theme={theme as ToasterProps["theme"]}
       className="toaster group"
       icons={{
         success: <Icon icon={RiCheckboxCircleLine} slotSize={16} />,

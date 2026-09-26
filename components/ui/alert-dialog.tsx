@@ -127,10 +127,6 @@ function AlertDialogAction({
 }: AlertDialogPrimitive.Close.Props) {
   return (
     <AlertDialogPrimitive.Close
-      data-slot="button"
-      data-button=""
-      data-variant="default"
-      data-size="default"
       className={cn(buttonVariants(), className)}
       {...props}
     />
@@ -143,10 +139,6 @@ function AlertDialogCancel({
 }: AlertDialogPrimitive.Close.Props) {
   return (
     <AlertDialogPrimitive.Close
-      data-slot="button"
-      data-button=""
-      data-variant="outline"
-      data-size="default"
       className={cn(buttonVariants({ variant: "outline" }), className)}
       {...props}
     />

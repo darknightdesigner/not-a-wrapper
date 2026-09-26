@@ -1,14 +1,6 @@
 import type { Metadata, Viewport } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
-// Aqua theme (ADR 0042): unlayered and after globals so `.aqua` skins beat
-// utilities. Not @import-ed from globals.css: Turbopack drops a trailing @import.
-import "./aqua/tokens.css"
-import "./aqua/controls.css"
-import "./aqua/overlays.css"
-import "./aqua/shell.css"
-import "./aqua/thread.css"
-import "./aqua/composer.css"
 import {
   ChatAnnouncerOutlet,
   ChatAnnouncerProvider,
@@ -23,7 +15,6 @@ import { readComposerShellHint } from "@/lib/composer-shell-hint.server"
 import { APP_DOMAIN } from "@/lib/config"
 import { ModelProvider } from "@/lib/model-store/provider"
 import { TanstackQueryProvider } from "@/lib/tanstack-query/tanstack-query-provider"
-import { APP_THEMES } from "@/lib/theme"
 import { UserPreferencesProvider } from "@/lib/user-preference-store/provider"
 import { UserProvider } from "@/lib/user-store/provider"
 import { getUserAuth } from "@/lib/user/api"
@@ -108,7 +99,6 @@ export default async function RootLayout({
                             defaultTheme="system"
                             enableSystem
                             disableTransitionOnChange
-                            themes={[...APP_THEMES]}
                           >
                             <SidebarProvider defaultOpen>
                               <Toaster position="top-center" />

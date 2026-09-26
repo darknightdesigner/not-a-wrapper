@@ -81,10 +81,6 @@ function Button({
   return (
     <ButtonPrimitive
       data-slot="button"
-      // Survives render-prop composition; triggers replace data-slot.
-      data-button=""
-      data-variant={variant}
-      data-size={size}
       data-loading={loading ? "" : undefined}
       data-visually-disabled={visuallyDisabled ? "" : undefined}
       aria-busy={loading ? true : ariaBusy}

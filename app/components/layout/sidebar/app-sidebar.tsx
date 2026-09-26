@@ -251,7 +251,6 @@ function DesktopAppSidebar() {
         Scroll state tracked via data attributes (zero re-renders) for CSS-only indicators.
       */}
       <div
-        data-sidebar-layer="expanded"
         className={cn(
           "h-full",
           "w-(--sidebar-width) overflow-x-clip text-clip whitespace-nowrap",
@@ -387,10 +386,7 @@ function SidebarExpandedNav({
         aria-label="Chat history"
       >
         {/* The action-group mask below owns the header seam. */}
-        <div
-          data-sidebar-layer="header"
-          className="bg-sidebar sticky top-0 z-30"
-        >
+        <div className="bg-sidebar sticky top-0 z-30">
           <div className="px-2">
             <div className="flex h-(--sidebar-header-height) items-center justify-between">
               <Link
@@ -431,7 +427,6 @@ function SidebarExpandedNav({
         </div>
 
         <aside
-          data-sidebar-layer="actions"
           className={cn(
             "bg-sidebar z-20 px-0 pt-(--sidebar-section-first-margin-top)",
             "tall:sticky tall:top-(--sidebar-header-height)",
@@ -459,7 +454,6 @@ function SidebarExpandedNav({
           </div>
           {/* On tall viewports the mask gains a hairline after scrolling. */}
           <div
-            data-sidebar-layer="actions-mask"
             className={cn(
               "pointer-events-none absolute inset-x-0 -bottom-(--sticky-spacer) h-(--sticky-spacer)",
               "bg-sidebar",
@@ -559,10 +553,7 @@ function SidebarExpandedNav({
         <div className="grow" />
 
         {!data.isLoggedIn && (
-          <div
-            data-sidebar-layer="signed-out-menu"
-            className="bg-sidebar z-20 flex w-full flex-col items-start gap-0 px-0 pb-3"
-          >
+          <div className="bg-sidebar z-20 flex w-full flex-col items-start gap-0 px-0 pb-3">
             <SidebarMenuItem
               aria-disabled="true"
               disabled
@@ -585,7 +576,6 @@ function SidebarExpandedNav({
             as the header/actions, flipped to the footer's top edge. */}
         {data.isLoggedIn ? (
           <div
-            data-sidebar-layer="footer"
             className={cn(
               "bg-sidebar sticky bottom-0 z-30 px-2 py-(--sidebar-footer-inset) empty:hidden",
               "scroll-state-shadow-bottom"
@@ -594,10 +584,7 @@ function SidebarExpandedNav({
             <UserMenu variant="sidebar" />
           </div>
         ) : (
-          <div
-            data-sidebar-layer="footer"
-            className="bg-sidebar border-sidebar-border sticky bottom-0 z-30 border-t p-5"
-          >
+          <div className="bg-sidebar border-sidebar-border sticky bottom-0 z-30 border-t p-5">
             <div className="mb-6 text-sm whitespace-normal">
               <p className="text-sidebar-foreground mb-4 font-semibold">
                 Get responses tailored to you

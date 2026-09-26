@@ -31,7 +31,6 @@ export function MessageActionButton({
   return (
     <MessageAction tooltip={disabledReason ?? tooltip ?? label} side={side}>
       <button
-        data-message-action=""
         className={cn(
           "text-muted-foreground flex items-center justify-center bg-transparent disabled:pointer-events-none disabled:opacity-50 aria-disabled:opacity-50",
           // Reference metrics: standard actions 32×32 / 8px radius; branch-pager
