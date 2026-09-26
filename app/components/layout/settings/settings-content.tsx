@@ -83,7 +83,7 @@ export function SettingsContent() {
         <div className="bg-popover border-border flex shrink-0 border-b pt-3 pr-12 pb-2 pl-3">
           <TabsList
             variant="line"
-            className="group-data-horizontal/tabs:h-8 w-full [scrollbar-width:none] justify-start overflow-x-auto rounded-none p-0 [&::-webkit-scrollbar]:hidden"
+            className="w-full [scrollbar-width:none] justify-start overflow-x-auto rounded-none p-0 group-data-horizontal/tabs:h-8 [&::-webkit-scrollbar]:hidden"
           >
             {SETTINGS_TABS.map((tab) => (
               <TabsTrigger
@@ -181,14 +181,14 @@ export function SettingsContent() {
         </nav>
       )}
 
-      <div className="bg-popover flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="bg-popover flex min-h-0 min-w-0 flex-1 flex-col [--settings-page-padding-x:calc(var(--spacing)*6)]">
         <div
           ref={contentScrollStateRef}
           className="scroll-state-scrollport group/settings-scrollport relative min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
         >
           {!isMobile ? <SettingsPageHeader title={activeTabLabel} /> : null}
 
-          <div className="p-4">
+          <div className="px-(--settings-page-padding-x) py-4">
             <TabsContent value="general" className="mt-0 space-y-6">
               <UserProfile />
               {isMobile ? (
