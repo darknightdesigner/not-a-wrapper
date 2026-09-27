@@ -27,6 +27,7 @@ import {
   deriveConversationTimestampHeaders,
 } from "./conversation-timestamp"
 import { Message } from "./message"
+import { MessageRowBoundary, Rethrow } from "./message-row-boundary"
 import {
   THREAD_GUTTER_VARS,
   THREAD_MAXWIDTH_VARS,
@@ -450,6 +451,16 @@ export function Conversation({
             )
           }
           if (row.kind === "pending") {
+            const pendingModel: TurnRowModel = {
+              kind: "assistant",
+              id: PENDING_ACTIVITY_TURN_ID,
+              text: "",
+              isLast: true,
+              view: PENDING_TURN_VIEW,
+              retryModelId,
+              status: "submitted",
+              isDurableChat,
+            }
             return (
               <Fragment key={row.key}>
                 <TurnRow
@@ -467,22 +478,17 @@ export function Conversation({
                   onCenterIntersectionChange={onCenterIntersectionChange}
                   verticalPadding="last"
                 >
-                  <Message
-                    model={{
-                      kind: "assistant",
-                      id: PENDING_ACTIVITY_TURN_ID,
-                      text: "",
-                      isLast: true,
-                      view: PENDING_TURN_VIEW,
-                      retryModelId,
-                      status: "submitted",
-                      isDurableChat,
-                    }}
-                    onEdit={onEdit}
-                    onReload={undefined}
-                    onSelectBranch={onSelectBranch}
-                    onQuote={onQuote}
-                  />
+                  {/* Same tree shape as the message row below, so the first
+                      content chunk reconciles in place instead of remounting. */}
+                  <MessageRowBoundary model={pendingModel}>
+                    <Message
+                      model={pendingModel}
+                      onEdit={onEdit}
+                      onReload={undefined}
+                      onSelectBranch={onSelectBranch}
+                      onQuote={onQuote}
+                    />
+                  </MessageRowBoundary>
                 </TurnRow>
               </Fragment>
             )
@@ -499,15 +505,6 @@ export function Conversation({
           const isAssistant = message.role === "assistant"
           const isUser = message.role === "user"
 
-          // Branch nav always anchors on the user message (the turn): show the
-          // user's own edit branch, or — when the prompt itself wasn't edited —
-          // the response's regenerate branch. Assistant messages never render the
-          // control; selecting a response sibling still works because the branch
-          // descriptor carries the assistant sibling ids.
-          const turnBranch = resolveTurnBranch(
-            message,
-            renderedMessages[index + 1]
-          )
           const durableStatus = (message as { status?: string }).status
           // Durable status wins only when it asserts a settled/paused OUTCOME
           // (aborted/failed/awaiting_approval). Durable LIVE statuses
@@ -527,43 +524,63 @@ export function Conversation({
                 ? status
                 : "ready"
 
+          // Deriving a row walks persisted parts and tool output, so a throw
+          // here belongs to this row too: the row boundary below rethrows it.
           let rowModel: TurnRowModel
-          if (message.role === "assistant") {
-            // The single per-render derivation of everything the assistant row
-            // renders (see CONTEXT.md "Assistant turn view"). Derived fresh each
-            // render — the AI SDK mutates part objects in place during streaming,
-            // so this must never be memoized by message reference. The live
-            // row reuses the view the active-turn resolver derived this render.
-            const view =
-              activeTurn.kind === "live" && activeTurn.message === message
-                ? activeTurn.view
-                : deriveAssistantTurnView(message, isLast ? status : "ready")
+          let derivationFailure: { error: unknown } | undefined
+          try {
+            if (message.role === "assistant") {
+              // The single per-render derivation of everything the assistant
+              // row renders (see CONTEXT.md "Assistant turn view"). Derived
+              // fresh each render — the AI SDK mutates part objects in place
+              // during streaming, so this must never be memoized by message
+              // reference. The live row reuses the view the active-turn
+              // resolver derived this render.
+              const view =
+                activeTurn.kind === "live" && activeTurn.message === message
+                  ? activeTurn.view
+                  : deriveAssistantTurnView(message, isLast ? status : "ready")
 
-            rowModel = {
-              kind: "assistant",
-              id: message.id,
-              text: view.text,
-              view,
-              isLast,
-              retryModelId,
-              retryDisabled: generationActive,
-              status: messageStatus,
-              isDurableChat,
-              finishReason:
-                getFinishReason(message.metadata) ??
-                (isLast ? lastFinishReason : undefined),
+              rowModel = {
+                kind: "assistant",
+                id: message.id,
+                text: view.text,
+                view,
+                isLast,
+                retryModelId,
+                retryDisabled: generationActive,
+                status: messageStatus,
+                isDurableChat,
+                finishReason:
+                  getFinishReason(message.metadata) ??
+                  (isLast ? lastFinishReason : undefined),
+              }
+            } else if (message.role === "user") {
+              rowModel = {
+                kind: "user",
+                id: message.id,
+                text: getMessageText(message),
+                isEditing: editingMessageId === message.id,
+                attachments: getMessageAttachments(message),
+                // Branch nav always anchors on the user message (the turn):
+                // show the user's own edit branch, or — when the prompt itself
+                // wasn't edited — the response's regenerate branch. Assistant
+                // messages never render the control; selecting a response
+                // sibling still works because the branch descriptor carries
+                // the assistant sibling ids.
+                branch: resolveTurnBranch(message, renderedMessages[index + 1]),
+                isDurableChat,
+              }
+            } else {
+              rowModel = {
+                kind: "unsupported",
+                id: message.id,
+                text: getMessageText(message),
+                isDurableChat,
+              }
             }
-          } else if (message.role === "user") {
-            rowModel = {
-              kind: "user",
-              id: message.id,
-              text: getMessageText(message),
-              isEditing: editingMessageId === message.id,
-              attachments: getMessageAttachments(message),
-              branch: turnBranch,
-              isDurableChat,
-            }
-          } else {
+          } catch (error) {
+            derivationFailure = { error }
             rowModel = {
               kind: "unsupported",
               id: message.id,
@@ -572,16 +589,23 @@ export function Conversation({
             }
           }
 
+          // Outside Message so the memo contract is unchanged.
           const messageContent = (
-            <Message
-              model={rowModel}
-              isReplaying={message.id === replayingMessageId}
-              onEdit={onEdit}
-              onEditingChange={handleEditingChange}
-              onReload={onReload}
-              onSelectBranch={onSelectBranch}
-              onQuote={onQuote}
-            />
+            <MessageRowBoundary model={rowModel}>
+              {derivationFailure ? (
+                <Rethrow error={derivationFailure.error} />
+              ) : (
+                <Message
+                  model={rowModel}
+                  isReplaying={message.id === replayingMessageId}
+                  onEdit={onEdit}
+                  onEditingChange={handleEditingChange}
+                  onReload={onReload}
+                  onSelectBranch={onSelectBranch}
+                  onQuote={onQuote}
+                />
+              )}
+            </MessageRowBoundary>
           )
 
           const timestampHeader = timestampHeaders[index]

