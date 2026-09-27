@@ -31,8 +31,8 @@ export type RequestShapingContext = {
   wireReasoningEffort?: ModelReasoningEffort
   /**
    * Opaque per-actor id for provider abuse attribution (ADR-0021), from
-   * `deriveProviderSafetyIdentifier`. Absent sends none: guests stay absent
-   * until a server-signed guest identity exists to derive it from.
+   * `deriveProviderSafetyIdentifier` (signed-in users and signed-cookie
+   * guests). Absent sends none.
    */
   safetyIdentifier?: string
 }

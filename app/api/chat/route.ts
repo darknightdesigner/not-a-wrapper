@@ -337,6 +337,8 @@ export async function POST(req: Request) {
         perf,
         requestReceivedAtMs,
         requestReceivedPerfMs,
+        // Vercel's edge sets it from the caller's IP; the runtime validates it.
+        requestTimeZone: req.headers.get("x-vercel-ip-timezone") ?? undefined,
       },
     })
 

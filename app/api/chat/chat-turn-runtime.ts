@@ -62,7 +62,10 @@ import {
   resolveRequestPolicyOptions,
   shapeRequest,
 } from "@/lib/openproviders/request-shaping"
-import { deriveProviderSafetyIdentifier } from "@/lib/openproviders/safety-identifier"
+import {
+  deriveProviderSafetyIdentifier,
+  type ProviderSafetyActor,
+} from "@/lib/openproviders/safety-identifier"
 import {
   captureGeneration,
   flushPostHog,
@@ -189,6 +192,8 @@ export type ChatTurnInput = {
   regeneration?: ChatTurnRegenerationRequest
   requestId: string
   userId: string
+  /** Guests only: the server-signed guest cookie id (ADR-0045), never the
+   * body's client-minted id. Keys tool limits and provider attribution. */
   anonymousId: string | undefined
   isAuthenticated: boolean
   convexToken: string | undefined
@@ -641,13 +646,16 @@ export function createChatTurnRuntime(args: {
     }
     const providerToolKeyMode: ToolKeyMode = credentialSource
 
-    // Provider abuse attribution (ADR-0021): the hashed WorkOS subject for
-    // signed-in actors. Guests send none; the browser-chosen guest id is not
-    // an identity. This is the one place a server-signed guest identity
-    // would be derived from.
-    const safetyIdentifier = isAuthenticated
-      ? deriveProviderSafetyIdentifier(userId)
-      : undefined
+    // Provider abuse attribution (ADR-0021), derived only here: the hashed
+    // WorkOS subject, or for guests the route's server-signed cookie id
+    // (`anonymousId`, ADR-0045). A guest without one sends none.
+    const safetyActor: ProviderSafetyActor | undefined = isAuthenticated
+      ? { kind: "user", id: userId }
+      : anonymousId
+        ? { kind: "guest", id: anonymousId }
+        : undefined
+    const safetyIdentifier =
+      safetyActor && deriveProviderSafetyIdentifier(safetyActor)
 
     const phClient = deps.getPostHogClient()
     const normalizedChatVersion = normalizeChatVersion(chatVersion, messages)

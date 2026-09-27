@@ -364,13 +364,13 @@ balance negative. Estimation is admission control, not the final charge.
 
 ## Platform-paid operation inventory
 
-| Operation                                    | Treatment                                                                                                                                     |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Main `streamText` generation (all steps)     | metered (primary snapshot)                                                                                                                    |
-| Automatic title generation                   | metered (executed title or fallback route's pinned snapshot; `generateChatTitle` returns usage + route identity)                              |
-| Exa search / extract on the platform key     | **subsidized**, bounded by the existing per-tool `toolLimitBuckets` budgets (platform key mode)                                               |
-| Anonymous turns on `NON_AUTH_ALLOWED_MODELS` | **subsidized**, bounded by the 5/day guest limit + anonymous step cap; anonymous ids are client-controlled, so no cash-like wallet is created |
-| Image/audio generation                       | not applicable today (no platform-listed route bills non-token modalities); a future one must add rates or be explicitly subsidized           |
+| Operation                                    | Treatment                                                                                                                                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Main `streamText` generation (all steps)     | metered (primary snapshot)                                                                                                                                                                                                |
+| Automatic title generation                   | metered (executed title or fallback route's pinned snapshot; `generateChatTitle` returns usage + route identity)                                                                                                          |
+| Exa search / extract on the platform key     | **subsidized**, bounded by the existing per-tool `toolLimitBuckets` budgets (platform key mode)                                                                                                                           |
+| Anonymous turns on `NON_AUTH_ALLOWED_MODELS` | **subsidized**, bounded by ADR-0045 guest admission (5/day per signed guest cookie and per client network, running-answer caps, one daily ceiling across all guests) + anonymous step cap; no cash-like wallet is created |
+| Image/audio generation                       | not applicable today (no platform-listed route bills non-token modalities); a future one must add rates or be explicitly subsidized                                                                                       |
 
 ## Provider retention and attribution (amended 2026-09-27)
 
@@ -400,29 +400,31 @@ balance negative. Estimation is admission control, not the final charge.
   step and its continuation, and that rare continuation can fail with a
   provider error. Revisit when the SDK replays hosted calls inline. xAI is
   not excepted: its SDK drops hosted calls whatever `store` says.
-- **Attribution.** Signed-in requests carry one opaque actor id: the first 32
-  hex characters of HMAC-SHA-256 over
-  `["provider-safety-identifier-v1", workosSubject]`, keyed by
-  `CHAT_ADMISSION_SECRET` (no new secret). It goes out as OpenAI
+- **Attribution.** Signed-in and guest requests carry one opaque actor id:
+  the first 32 hex characters of HMAC-SHA-256 over
+  `["provider-safety-identifier-v1", kind, id]`, keyed by
+  `CHAT_ADMISSION_SECRET` (no new secret). `kind` is `user` with the WorkOS
+  subject, or `guest` with the server-signed guest cookie id (ADR-0045), so a
+  guest can never share a user's id. The Chat turn runtime derives it in one
+  place; the browser-sent guest id is never an input. It goes out as OpenAI
   `safetyIdentifier`, Anthropic `metadata.userId`, and OpenRouter `user`
   (all per-request provider options); the xAI SDK has no field. Title calls
   carry the same options. It is never the email, cannot be reversed without the
-  secret, and changes for everyone if the secret rotates. Guests send none:
-  the browser-chosen guest id is not an identity. A server-signed guest
-  identity is the one input to add, at the Chat turn runtime's single
-  derivation point.
+  secret, and changes for everyone if the secret rotates; without a usable
+  secret, none is sent.
 
 ## Existing counters
 
-`users.dailyMessageCount` (and the anonymous counter) remain **abuse rate
-limits** only. The retired pro-model fields remain optional in the schema only
-until production preflight proves older user rows can be contracted safely.
-The chat route calls one `usage.admit` mutation that checks and increments the
-counter in the same transaction, before the credential source is known. This
-prevents concurrent requests from both passing a read-only check at the final
-slot. Once admitted, the attempt counts even if later credential or preparation
-work fails; this is abuse control, not economic settlement. The economic
-admission remains the reservation itself.
+`users.dailyMessageCount` (and the ADR-0045 guest windows) remain **abuse
+rate limits** only. The retired pro-model fields remain optional in the schema
+only until production preflight proves older user rows can be contracted
+safely. For signed-in users the chat route calls one `usage.admit` mutation
+that checks and increments the counter in the same transaction, before the
+credential source is known (guests are admitted by `usage.admitGuestTurn`
+instead). This prevents concurrent requests from both passing a read-only
+check at the final slot. Once admitted, the attempt counts even if later
+credential or preparation work fails; this is abuse control, not economic
+settlement. The economic admission remains the reservation itself.
 
 ## Alternatives considered
 

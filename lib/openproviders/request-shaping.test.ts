@@ -353,7 +353,7 @@ describe("request policy (ADR-0021)", () => {
     expect(
       optionsFor({ providerId: "openrouter", baseProviderId: "google" })
     ).toEqual({ openrouter: { user: "actor-hash" } })
-    // Guests: no identifier, storage still off.
+    // No identifier (no usable secret): storage still off.
     expect(optionsFor({ providerId: "openai" }, NO_TOOLS)).toEqual({
       openai: { store: false },
     })
