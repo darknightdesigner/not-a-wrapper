@@ -43,6 +43,7 @@ import {
   TEXT_FILE_PICKER_TYPES,
   type Attachment,
 } from "@/lib/file-handling"
+import { fileNeedsVision } from "@/lib/file/policy"
 import { StopBulkRoundedIcon } from "@/lib/icons"
 import { getLogicalModelInfo } from "@/lib/models"
 import type { ChatUiWindow } from "@/lib/observability/chat-ui-observer"
@@ -374,6 +375,18 @@ export const Composer = memo(
     )
 
     const handleSend = useCallback(async () => {
+      // A model switch keeps attachments, so recheck them against the model.
+      if (
+        !acceptsVisionFiles &&
+        attachments.some(({ file }) => fileNeedsVision(file.type))
+      ) {
+        toast({
+          title: "This model reads text files only",
+          description: "Remove images and PDFs, or switch models.",
+          status: "error",
+        })
+        return
+      }
       const text = valueRef.current
       const key = draftIdentity.persistenceId
       const pendingSend = { edited: false }
@@ -409,6 +422,8 @@ export const Composer = memo(
         }
       }
     }, [
+      acceptsVisionFiles,
+      attachments,
       applyValue,
       submitAttachments,
       onTurn,
