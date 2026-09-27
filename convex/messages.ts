@@ -1,11 +1,6 @@
 import { v } from "convex/values"
 import type { Doc, Id } from "./_generated/dataModel"
-import {
-  mutation,
-  query,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server"
+import { mutation, type MutationCtx, type QueryCtx } from "./_generated/server"
 import {
   bucketPow2,
   logChatPerfConvex,
@@ -20,11 +15,7 @@ import {
 } from "./domain/message_branches"
 import { isVisibleChatMessage } from "./domain/message_visibility"
 import { recordChatActivity } from "./domain/project_activity"
-import {
-  findChatByPublicId,
-  isChatActive,
-  requireOwnedChat,
-} from "./lib/auth"
+import { requireOwnedChat } from "./lib/auth"
 import { ownedChatMutation, readableChatQuery } from "./lib/authedFunctions"
 
 function withBranchMetadata(
@@ -64,44 +55,14 @@ function getVisibleSelectedMessages(messages: Doc<"messages">[]) {
   )
 }
 
-/**
- * Run/worker correlation ids are owner-internal plumbing: a public or
- * non-owner viewer gets the conversation, never the
- * generation-run linkage that keys durable control state. Both fields are
- * optional on the doc, so omitting them preserves the handler return type.
- */
-function stripRunLinkageForViewer<
-  T extends { generationRunId?: unknown; requestId?: unknown },
->(messages: T[]): T[] {
-  return messages.map((message) => {
-    const { generationRunId: _run, requestId: _request, ...rest } = message
-    return rest as unknown as T
-  })
-}
-
-async function listMessagesByChatOrder(
-  ctx: QueryCtx | MutationCtx,
+export async function listMessagesByChatOrder(
+  ctx: Pick<QueryCtx | MutationCtx, "db">,
   chatId: Id<"chats">
 ) {
   return await ctx.db
     .query("messages")
     .withIndex("by_chat_order", (q) => q.eq("chatId", chatId))
     .collect()
-}
-
-export async function getPublicForChatHandler(
-  ctx: QueryCtx,
-  { chatId }: { chatId: string }
-) {
-  const chat = await findChatByPublicId(ctx, chatId)
-  if (!chat || !chat.public || !(await isChatActive(ctx, chat))) return []
-
-  const messages = await listMessagesByChatOrder(ctx, chat._id)
-  return stripRunLinkageForViewer(
-    getVisibleSelectedMessages(messages).filter(
-      (message) => message.status !== "awaiting_approval"
-    )
-  )
 }
 
 // Selected-conversation projections.
@@ -164,7 +125,9 @@ export async function getSelectedPathForViewer(
     selectedMessages: [],
     pathVersion: { count: 0, tailMessageId: null, maxUpdatedAt: 0 },
   }
-  if (!chat) return empty
+  // The builder hands only the owner a chat; strangers read shares through
+  // the share view (ADR-0043). Fail closed if that ever changes.
+  if (!chat || viewer === null || chat.userId !== viewer._id) return empty
   const messages = await listMessagesByChatOrder(ctx, chat._id)
   const selectedMessages = getVisibleSelectedMessages(messages)
 
@@ -184,20 +147,12 @@ export async function getSelectedPathForViewer(
     })
   }
 
-  const isOwner = viewer !== null && chat.userId === viewer._id
-  const visibleMessages = isOwner
-    ? selectedMessages
-    : stripRunLinkageForViewer(
-        selectedMessages.filter(
-          (message) => message.status !== "awaiting_approval"
-        )
-      )
   return {
-    selectedMessages: visibleMessages,
+    selectedMessages,
     pathVersion: {
-      count: visibleMessages.length,
-      tailMessageId: visibleMessages.at(-1)?._id ?? null,
-      maxUpdatedAt: visibleMessages.reduce(
+      count: selectedMessages.length,
+      tailMessageId: selectedMessages.at(-1)?._id ?? null,
+      maxUpdatedAt: selectedMessages.reduce(
         (max, message) => Math.max(max, message.updatedAt ?? 0),
         0
       ),
@@ -206,7 +161,7 @@ export async function getSelectedPathForViewer(
 }
 
 /**
- * The tiny per-beat run state. Public and non-owner viewers get null. Run↔chat
+ * The tiny per-beat run state. Non-owner viewers get null. Run↔chat
  * ownership and the points-back check stay server-side; the on-selected-path
  * half lives in the client, which is sound because both queries'
  * values always come from one Convex transition (same client, same
@@ -281,15 +236,6 @@ export const getSelectedRunState = readableChatQuery({
   args: {},
   handler: async (ctx) =>
     getSelectedRunStateForViewer(ctx, { chat: ctx.chat, viewer: ctx.user }),
-})
-
-/**
- * Get messages for a public chat (no authentication required)
- * For public share pages
- */
-export const getPublicForChat = query({
-  args: { chatId: v.string() },
-  handler: getPublicForChatHandler,
 })
 
 /**

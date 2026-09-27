@@ -128,11 +128,12 @@ export const optionalAuthMutation = customMutation(
 // so nothing behind the boundary ever holds an unresolved public id.
 
 /**
- * A read of a chat the caller may view: the owner, or anyone when the chat is
- * public (share links). Injects `ctx.chat: Doc<"chats"> | null` (null when not
- * authorized) and `ctx.user: Doc<"users"> | null`. A rejected account throws
- * instead of reading public chats as a guest. Consumes a `chatId` arg
- * (publicId) and passes it through.
+ * A non-throwing read of a chat the caller owns. Injects
+ * `ctx.chat: Doc<"chats"> | null` (null for a guest, another user, or a
+ * missing chat) and `ctx.user: Doc<"users"> | null`. A shared chat stays
+ * private here; strangers read it through its share link (ADR-0043). A
+ * rejected account throws. Consumes a `chatId` arg (publicId) and passes it
+ * through.
  */
 export const readableChatQuery = customQuery(
   query,
@@ -146,11 +147,10 @@ export const readableChatQuery = customQuery(
 )
 
 /**
- * A read restricted to the chat's owner (no public exception) — throws
- * "Not authenticated" / "Chat not found" / "Not authorized". Injects
- * owner-verified `ctx.chat` and `ctx.user`. Consumes a `chatId` arg (publicId)
- * and passes it through. Use `readableChatQuery` instead when public chats
- * should be viewable.
+ * A read restricted to the chat's owner that throws "Not authenticated" /
+ * "Chat not found" / "Not authorized". Injects owner-verified `ctx.chat` and
+ * `ctx.user`. Consumes a `chatId` arg (publicId) and passes it through. Use
+ * `readableChatQuery` instead when a non-owner should get null, not an error.
  */
 export const ownedChatQuery = customQuery(
   query,
