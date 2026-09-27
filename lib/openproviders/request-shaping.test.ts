@@ -26,6 +26,10 @@ const NO_TOOLS: RequestShapingContext = {
   hasTools: false,
 }
 
+// Request policy every Anthropic/OpenAI/xAI request carries (ADR-0021).
+const ANTHROPIC_CACHE = { cacheControl: { type: "ephemeral" } } as const
+const NO_STORE = { store: false } as const
+
 describe("shapeRequest provider options", () => {
   const cases: Array<{
     name: string
@@ -42,7 +46,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: { searchToolsActive: false, hasTools: true },
       expected: {
-        anthropic: { thinking: { type: "adaptive", display: "summarized" } },
+        anthropic: {
+          thinking: { type: "adaptive", display: "summarized" },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -58,7 +65,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: { searchToolsActive: true, hasTools: true },
       expected: {
-        anthropic: { thinking: { type: "enabled", budgetTokens: 10000 } },
+        anthropic: {
+          thinking: { type: "enabled", budgetTokens: 10000 },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -73,7 +83,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: { searchToolsActive: true, hasTools: true },
       expected: {
-        anthropic: { thinking: { type: "adaptive", display: "summarized" } },
+        anthropic: {
+          thinking: { type: "adaptive", display: "summarized" },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -87,7 +100,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: { searchToolsActive: false, hasTools: true },
       expected: {
-        anthropic: { thinking: { type: "adaptive", display: "summarized" } },
+        anthropic: {
+          thinking: { type: "adaptive", display: "summarized" },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -99,7 +115,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: NO_TOOLS,
       expected: {
-        anthropic: { thinking: { type: "enabled", budgetTokens: 12000 } },
+        anthropic: {
+          thinking: { type: "enabled", budgetTokens: 12000 },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -107,7 +126,10 @@ describe("shapeRequest provider options", () => {
       model: { providerId: "anthropic", reasoningText: true },
       ctx: NO_TOOLS,
       expected: {
-        anthropic: { thinking: { type: "enabled", budgetTokens: 10000 } },
+        anthropic: {
+          thinking: { type: "enabled", budgetTokens: 10000 },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -121,7 +143,10 @@ describe("shapeRequest provider options", () => {
       },
       ctx: { searchToolsActive: true, hasTools: true },
       expected: {
-        anthropic: { thinking: { type: "enabled", budgetTokens: 12000 } },
+        anthropic: {
+          thinking: { type: "enabled", budgetTokens: 12000 },
+          ...ANTHROPIC_CACHE,
+        },
       },
     },
     {
@@ -134,21 +159,21 @@ describe("shapeRequest provider options", () => {
       name: "openai reasoning model gets no effort override and an auto summary",
       model: { providerId: "openai", reasoningText: true },
       ctx: NO_TOOLS,
-      expected: { openai: { reasoningSummary: "auto" } },
+      expected: { openai: { reasoningSummary: "auto", ...NO_STORE } },
     },
     {
       // xAI accepts reasoning_effort only on grok-3-mini ("low" | "high");
       // the cataloged Grok 4-family models reject it, so xai sends none.
-      name: "xai reasoning model gets no provider options",
+      name: "xai reasoning model gets only the storage opt-out",
       model: { providerId: "xai", reasoningText: true },
       ctx: NO_TOOLS,
-      expected: {},
+      expected: { xai: NO_STORE },
     },
     {
-      name: "model without reasoningText gets no options",
+      name: "model without reasoningText gets no thinking options",
       model: { providerId: "anthropic", thinkingBudget: 12000 },
       ctx: NO_TOOLS,
-      expected: {},
+      expected: { anthropic: ANTHROPIC_CACHE },
     },
     {
       // Mistral reasoning is off unless reasoning_effort is "high" (the
@@ -248,6 +273,7 @@ describe("per-turn reasoning effort (ADR-0026)", () => {
       anthropic: {
         thinking: { type: "adaptive", display: "summarized" },
         effort: "xhigh",
+        ...ANTHROPIC_CACHE,
       },
     })
     expect(
@@ -256,7 +282,7 @@ describe("per-turn reasoning effort (ADR-0026)", () => {
         wireReasoningEffort: "low",
       }).providerOptions
     ).toEqual({
-      openai: { reasoningEffort: "low", reasoningSummary: "auto" },
+      openai: { reasoningEffort: "low", reasoningSummary: "auto", ...NO_STORE },
     })
     expect(
       shapeRequest(makeModel({ providerId: "google", reasoningText: true }), {
@@ -273,14 +299,57 @@ describe("per-turn reasoning effort (ADR-0026)", () => {
         ...NO_TOOLS,
         wireReasoningEffort: "low",
       }).providerOptions
-    ).toEqual({ xai: { reasoningEffort: "low" } })
-    // Without a wire override, xai sends nothing (Grok 4 rejects the param).
+    ).toEqual({ xai: { reasoningEffort: "low", ...NO_STORE } })
+    // Without a wire override, xai sends no effort (Grok 4 rejects the param).
     expect(
       shapeRequest(
         makeModel({ providerId: "xai", reasoningText: true }),
         NO_TOOLS
       ).providerOptions
+    ).toEqual({ xai: NO_STORE })
+  })
+})
+
+describe("request policy (ADR-0021)", () => {
+  // Storage, attribution, and caching apply to every request, so they must
+  // survive the reasoning-only gate and merge into the reasoning namespace.
+  it("sends store: false, the actor id, and Claude caching outside the reasoning gate", () => {
+    const ctx: RequestShapingContext = {
+      ...NO_TOOLS,
+      safetyIdentifier: "actor-hash",
+    }
+    expect(
+      shapeRequest(makeModel({ providerId: "openai" }), ctx).providerOptions
+    ).toEqual({ openai: { store: false, safetyIdentifier: "actor-hash" } })
+    expect(
+      shapeRequest(
+        makeModel({
+          providerId: "anthropic",
+          reasoningText: true,
+          thinkingMode: "adaptive",
+        }),
+        ctx
+      ).providerOptions
+    ).toEqual({
+      anthropic: {
+        thinking: { type: "adaptive", display: "summarized" },
+        cacheControl: { type: "ephemeral" },
+        metadata: { userId: "actor-hash" },
+      },
+    })
+    // The xAI SDK has no id field; OpenRouter takes it at construction.
+    expect(
+      shapeRequest(makeModel({ providerId: "xai" }), ctx).providerOptions
+    ).toEqual({ xai: { store: false } })
+    expect(
+      shapeRequest(makeModel({ providerId: "openrouter" }), ctx)
+        .providerOptions
     ).toEqual({})
+    // Guests: no identifier, storage still off.
+    expect(
+      shapeRequest(makeModel({ providerId: "openai" }), NO_TOOLS)
+        .providerOptions
+    ).toEqual({ openai: { store: false } })
   })
 })
 
@@ -350,7 +419,10 @@ describe("catalog contract for Request shaping", () => {
         shapeRequest(model!, { searchToolsActive: true, hasTools: true })
           .providerOptions
       ).toEqual({
-        anthropic: { thinking: { type: "adaptive", display: "summarized" } },
+        anthropic: {
+          thinking: { type: "adaptive", display: "summarized" },
+          ...ANTHROPIC_CACHE,
+        },
       })
     }
   )

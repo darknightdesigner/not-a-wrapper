@@ -59,8 +59,10 @@ import { createLanguageModel } from "@/lib/openproviders/create-language-model"
 import { resolveGenerationBudget } from "@/lib/openproviders/output-budget"
 import {
   resolveReasoningEffort,
+  resolveRequestPolicyOptions,
   shapeRequest,
 } from "@/lib/openproviders/request-shaping"
+import { deriveProviderSafetyIdentifier } from "@/lib/openproviders/safety-identifier"
 import {
   captureGeneration,
   flushPostHog,
@@ -103,6 +105,7 @@ import { after } from "next/server"
 import { adaptHistoryForProvider } from "./adapters"
 import type { AdaptationContext, AdaptationWarning } from "./adapters/types"
 import { splitAndValidateApprovalContinuation } from "./approval-continuation"
+import { formatCurrentDateLine } from "./current-date-line"
 import {
   createDeterministicChatModel,
   createDeterministicTitleModel,
@@ -217,6 +220,11 @@ export type ChatTurnInput = {
    * Falls back to the runtime's construction instant.
    */
   requestReceivedPerfMs?: number
+  /**
+   * Raw `x-vercel-ip-timezone` request header for the instructions' date
+   * line. Untrusted: validated there, UTC when absent or unrecognized.
+   */
+  requestTimeZone?: string
 }
 
 /**
@@ -318,6 +326,8 @@ type PreparedTurn = {
   titleModel: ReturnType<typeof createLanguageModel>
   /** Title-route id, reported with the title call's usage (ADR-0021). */
   titleRouteId: string
+  /** Storage and attribution options the title call shares with the answer. */
+  titleProviderOptions: ReturnType<typeof resolveRequestPolicyOptions>
   modelConfig: ModelConfig
   provider: Provider
   /** Concrete effective effort recorded for badges and reopen (ADR-0026). */
@@ -502,6 +512,7 @@ export function createChatTurnRuntime(args: {
     route,
     reservationId,
     generationInput,
+    requestTimeZone,
   } = input
   // No-op unless the route sampled this request (rate 0 short-circuits).
   const perf = input.perf ?? createChatPerfServerSession(null, { rate: 0 })
@@ -630,6 +641,14 @@ export function createChatTurnRuntime(args: {
     }
     const providerToolKeyMode: ToolKeyMode = credentialSource
 
+    // Provider abuse attribution (ADR-0021): the hashed WorkOS subject for
+    // signed-in actors. Guests send none; the browser-chosen guest id is not
+    // an identity. This is the one place a server-signed guest identity
+    // would be derived from.
+    const safetyIdentifier = isAuthenticated
+      ? deriveProviderSafetyIdentifier(userId)
+      : undefined
+
     const phClient = deps.getPostHogClient()
     const normalizedChatVersion = normalizeChatVersion(chatVersion, messages)
 
@@ -737,12 +756,13 @@ export function createChatTurnRuntime(args: {
             modelConfig.providerId === "openrouter"
             ? { ...modelConfig, reasoning: { effort: wireReasoningEffort } }
             : modelConfig,
-          apiKey
+          apiKey,
+          safetyIdentifier
         )
     const titleModelConfig = selectChatTitleModelConfig(allModels, modelConfig)
     const titleModel = perfDirective
       ? createDeterministicTitleModel()
-      : createLanguageModel(titleModelConfig, apiKey)
+      : createLanguageModel(titleModelConfig, apiKey, safetyIdentifier)
 
     const durableRuntimeEnabled = isDurableConvexChat({
       isAuthenticated,
@@ -1060,6 +1080,7 @@ export function createChatTurnRuntime(args: {
         searchToolsActive: shouldInjectSearch,
         hasTools: hasAnyTools,
         ...(wireReasoningEffort !== undefined ? { wireReasoningEffort } : {}),
+        ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
       }
     )
 
@@ -1067,13 +1088,15 @@ export function createChatTurnRuntime(args: {
     // metadata resolver (the four per-layer maps never escape the runtime).
     const toolMetadataByName = tool.metadata.toInvocationMetadataByName()
 
-    // Custom system prompts own their communication style.
-    const enrichedSystemPrompt =
+    // Custom system prompts own their communication style (ADR-0040). The
+    // date line is a fact, not style, so it follows every prompt.
+    const toolProgressGuidance =
       resolvedProvider === "openai" &&
       hasAnyTools &&
       effectiveSystemPrompt === SYSTEM_PROMPT_DEFAULT
-        ? `${effectiveSystemPrompt}\n\nBefore using tools, briefly explain what you will check. Give another concise progress update when findings change your next step. Keep these updates to one or two sentences, then provide the answer after the tool work.`
-        : effectiveSystemPrompt
+        ? "\n\nBefore using tools, briefly explain what you will check. Give another concise progress update when findings change your next step. Keep these updates to one or two sentences, then provide the answer after the tool work."
+        : ""
+    const enrichedSystemPrompt = `${effectiveSystemPrompt}${toolProgressGuidance}\n\n${formatCurrentDateLine(new Date(), requestTimeZone)}`
 
     const mcpServerCount = tool.mcpServerCount
     const braintrustMetadata: BraintrustChatMetadata = {
@@ -1144,6 +1167,10 @@ export function createChatTurnRuntime(args: {
       aiModel,
       titleModel,
       titleRouteId: titleModelConfig.id,
+      titleProviderOptions: resolveRequestPolicyOptions(
+        resolvedProvider,
+        safetyIdentifier
+      ),
       modelConfig,
       provider: resolvedProvider,
       appliedReasoningEffort,
@@ -1192,6 +1219,7 @@ export function createChatTurnRuntime(args: {
       aiModel,
       titleModel,
       titleRouteId,
+      titleProviderOptions,
       modelConfig,
       provider: resolvedProvider,
       providerMaxOutputTokens,
@@ -1293,16 +1321,23 @@ export function createChatTurnRuntime(args: {
     // started-without-usage, never a zero-usage "actual".
     const aggregateAbortStepUsage = (
       steps: ReadonlyArray<{
-        usage?: { inputTokens?: number; outputTokens?: number }
+        usage?: {
+          inputTokens?: number
+          outputTokens?: number
+          inputTokenDetails?: { cacheReadTokens?: number }
+        }
       }>
     ): TerminalUsageFacts["primary"] | null => {
       let inputTokens = 0
       let outputTokens = 0
+      let cacheReadTokens = 0
       let observed = false
       for (const step of steps) {
         if (typeof step.usage?.inputTokens === "number") {
           inputTokens += step.usage.inputTokens
           observed = true
+          // An unreported cache read counts as zero: full input rate.
+          cacheReadTokens += step.usage.inputTokenDetails?.cacheReadTokens ?? 0
         }
         if (typeof step.usage?.outputTokens === "number") {
           outputTokens += step.usage.outputTokens
@@ -1310,7 +1345,12 @@ export function createChatTurnRuntime(args: {
         }
       }
       return observed
-        ? { kind: "completed-steps", inputTokens, outputTokens }
+        ? {
+            kind: "completed-steps",
+            inputTokens,
+            outputTokens,
+            ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
+          }
         : null
     }
 
@@ -1836,6 +1876,9 @@ export function createChatTurnRuntime(args: {
           // aggregates across ALL steps (v6 `onFinish.usage` was the final step
           // only, undercounting multi-step tool turns); generation-run
           // accounting wants the aggregate. Guest: inert.
+          // `inputTokens` already includes cache reads; the split lets
+          // settlement price them at the pinned cache rate (ADR-0021).
+          const cacheReadTokens = usage?.inputTokenDetails?.cacheReadTokens
           lifecycle.stream.captureFinish({
             usage: {
               inputTokens: usage?.inputTokens,
@@ -1844,6 +1887,9 @@ export function createChatTurnRuntime(args: {
                 typeof usage?.totalTokens === "number"
                   ? usage.totalTokens
                   : undefined,
+              ...(typeof cacheReadTokens === "number"
+                ? { cacheReadTokens }
+                : {}),
             },
             finishReason,
             toolCounts: { totalToolCalls, failedToolCalls },
@@ -2031,6 +2077,7 @@ export function createChatTurnRuntime(args: {
           fallback: { model: aiModel, routeId: route.routeId },
           userText: titleRequest.userText,
           abortSignal: titleSignal,
+          providerOptions: titleProviderOptions,
           // Cancellation evidence (ADR-0021): pin each concrete attempt so a
           // stopped title call settles at its input floor for the exact
           // attempted route, and a never-started one settles to zero.

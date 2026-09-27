@@ -11,21 +11,27 @@ import { createOpenAI, openai } from "@ai-sdk/openai"
 import { createPerplexity, perplexity } from "@ai-sdk/perplexity"
 import type { LanguageModelV4 } from "@ai-sdk/provider"
 import { createXai, xai } from "@ai-sdk/xai"
-import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import {
+  createOpenRouter,
+  type OpenRouterChatSettings,
+} from "@openrouter/ai-sdk-provider"
 import type { ToolSet } from "ai"
 
 /**
  * Per-model settings a strategy MAY consume when constructing the language
  * model. Provider-neutral vocabulary: each strategy consumes only the
  * settings its SDK takes at construction time and ignores the rest — today
- * only OpenRouter does (its reasoning knob is `.chat(id, { reasoning })`,
- * not a per-call providerOptions namespace; see the ProviderLanguageModel
- * note). Per-CALL configuration stays in Request shaping
+ * only OpenRouter does (its reasoning, `user`, and `cache_control` knobs are
+ * `.chat(id, settings)`, not a per-call providerOptions namespace; see the
+ * ProviderLanguageModel note). Per-CALL configuration stays in Request shaping
  * (request-shaping.ts); this seam exists only for knobs that cannot ride
  * `providerOptions`.
  */
 export type ModelConstructionSettings = {
   reasoning?: ModelReasoningSettings
+  /** Hashed actor id (Request shaping's `safetyIdentifier`), for providers
+   * that only take it at construction. */
+  safetyIdentifier?: string
 }
 
 /**
@@ -42,18 +48,34 @@ function toOpenRouterChatModelId(modelId: string): string {
 /**
  * Map neutral construction settings onto OpenRouter's chat settings.
  * Body-internal like the id-prefix strip — the shared interface never sees
- * OpenRouter's snake_case shapes. Returns undefined when nothing is declared
- * so the no-settings construction stays identical to the pre-seam call.
+ * OpenRouter's snake_case shapes. Returns undefined when nothing applies so
+ * the no-settings construction stays identical to the pre-seam call.
+ * Per-request knobs live here too because the installed provider takes them
+ * only at construction: the actor id as `user`, and Anthropic automatic
+ * prompt caching (`anthropic/*` upstreams only, mirroring Request shaping).
  */
-function toOpenRouterChatSettings(settings?: ModelConstructionSettings) {
+function toOpenRouterChatSettings(
+  chatModelId: string,
+  settings?: ModelConstructionSettings
+): OpenRouterChatSettings | undefined {
   const reasoning = settings?.reasoning
-  if (!reasoning) return undefined
-  if (reasoning.maxTokens !== undefined) {
-    return { reasoning: { max_tokens: reasoning.maxTokens } }
+  const chatSettings: OpenRouterChatSettings = {
+    ...(reasoning
+      ? {
+          reasoning:
+            reasoning.maxTokens !== undefined
+              ? { max_tokens: reasoning.maxTokens }
+              : { effort: toOpenRouterEffort(reasoning.effort) },
+        }
+      : {}),
+    ...(settings?.safetyIdentifier !== undefined
+      ? { user: settings.safetyIdentifier }
+      : {}),
+    ...(chatModelId.startsWith("anthropic/")
+      ? { cache_control: { type: "ephemeral" } }
+      : {}),
   }
-  return {
-    reasoning: { effort: toOpenRouterEffort(reasoning.effort) },
-  }
+  return Object.keys(chatSettings).length > 0 ? chatSettings : undefined
 }
 
 /**
@@ -273,11 +295,13 @@ const STRATEGIES: Record<Provider, ProviderStrategy> = {
         compatibility: "strict",
       })
       return {
-        languageModel: (id, settings) =>
-          provider.chat(
-            toOpenRouterChatModelId(id),
-            toOpenRouterChatSettings(settings)
-          ),
+        languageModel: (id, settings) => {
+          const chatModelId = toOpenRouterChatModelId(id)
+          return provider.chat(
+            chatModelId,
+            toOpenRouterChatSettings(chatModelId, settings)
+          )
+        },
         searchTool: () =>
           asSearchTool(provider.tools.webSearch({ engine: "auto" })),
       }

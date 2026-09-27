@@ -154,14 +154,15 @@ function validateOpenAIBlock(block: MessagePart[]): BlockValidationResult {
   return { keep: true, parts: sanitized }
 }
 
-// OpenAI replay must be SELF-CONTAINED. With the Responses API default
-// `store: true`, any history part carrying `providerMetadata.openai.itemId`
-// (msg_/rs_ ids on text and reasoning parts) is serialized as a server-side
-// `item_reference` lookup instead of its actual content — and the API 400s
-// (`invalid_value` on `input`) whenever the referenced items are not
-// retrievable under the current key. Strip BOTH metadata carriers from every
-// history part so replay always sends real content and never provider-linked
-// ids. The live continuation tail never passes through this adapter, so
+// OpenAI replay must be SELF-CONTAINED. History parts carry
+// `providerMetadata.openai.itemId` (msg_/rs_ ids on text and reasoning
+// parts). Under the Responses API default `store: true` the SDK serializes
+// them as `item_reference` lookups that 400 (`invalid_value` on `input`)
+// whenever the items are not retrievable under the current key; requests now
+// send `store: false` (Request shaping, ADR-0021), under which they were
+// never stored at all. Strip BOTH metadata carriers from every history part
+// so replay always sends real content and never provider-linked ids. The
+// live continuation tail never passes through this adapter, so
 // approval-protocol metadata is unaffected.
 //
 // The one exception (ADR-0041, C7): a text part keeps its `phase`

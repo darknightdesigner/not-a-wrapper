@@ -21,7 +21,7 @@ function requireAuthorizationSecret(secret: string | undefined): string {
 
 function serializePricingRate(
   rate: UsageReservationArgs["pricingSnapshot"]["primary"]
-): readonly [string, string, string, string, number, number] {
+): readonly (string | number)[] {
   const {
     modelId,
     routeId,
@@ -29,6 +29,7 @@ function serializePricingRate(
     upstreamModelId,
     inputCreditsPerMTok,
     outputCreditsPerMTok,
+    cacheReadCreditsPerMTok,
     ...unserialized
   } = rate
   unserialized satisfies Record<string, never>
@@ -39,6 +40,9 @@ function serializePricingRate(
     upstreamModelId,
     inputCreditsPerMTok,
     outputCreditsPerMTok,
+    // Appended only when pinned: a rate without a cache price serializes
+    // exactly as before, so proofs from a not-yet-redeployed server verify.
+    ...(cacheReadCreditsPerMTok !== undefined ? [cacheReadCreditsPerMTok] : []),
   ]
 }
 

@@ -1,6 +1,7 @@
 import { ANTHROPIC_BETA_HEADERS } from "@/lib/config"
 import type { ModelConfig, ModelReasoningEffort } from "@/lib/models/types"
 import { clampToNearestEffortLevel } from "@/lib/models/types"
+import type { Provider } from "@/lib/provider-identity"
 import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fixedThinkingBudgetTokens } from "./output-budget"
 
@@ -8,8 +9,9 @@ import { fixedThinkingBudgetTokens } from "./output-budget"
  * Request shaping (CONTEXT.md): everything provider-specific about issuing
  * one model request, resolved from the model config plus request context —
  * provider options (thinking/reasoning configuration, per-model thinking
- * budgets) and provider beta headers. Callers spread the result into
- * streamText and never branch on provider.
+ * budgets, response storage, actor attribution, prompt caching) and provider
+ * beta headers. Callers spread the result into streamText and never branch
+ * on provider.
  */
 
 export type RequestShapingContext = {
@@ -22,6 +24,12 @@ export type RequestShapingContext = {
    * this route's provider accepts. Absent means send no effort override.
    */
   wireReasoningEffort?: ModelReasoningEffort
+  /**
+   * Opaque per-actor id for provider abuse attribution (ADR-0021), from
+   * `deriveProviderSafetyIdentifier`. Absent sends none: guests stay absent
+   * until a server-signed guest identity exists to derive it from.
+   */
+  safetyIdentifier?: string
 }
 
 function usesFixedBudgetSearchThinking(
@@ -88,9 +96,62 @@ export function shapeRequest(
   ctx: RequestShapingContext
 ): ShapedRequest {
   return {
-    providerOptions: resolveProviderOptions(modelConfig, ctx),
+    providerOptions: mergeProviderOptions(
+      resolveReasoningOptions(modelConfig, ctx),
+      resolveRequestPolicyOptions(modelConfig.providerId, ctx.safetyIdentifier),
+      // Anthropic automatic prompt caching: the SDK sends this as the
+      // request-level cache point, so every step of a tool loop and every
+      // later turn re-reads the shared prefix at the cache rate. Prompts
+      // below the model's minimum cacheable size are simply not cached.
+      modelConfig.providerId === "anthropic"
+        ? { anthropic: { cacheControl: { type: "ephemeral" } } }
+        : {}
+    ),
     headers: resolveHeaders(modelConfig, ctx),
   }
+}
+
+/**
+ * Options every request to a provider carries, reasoning or not, the title
+ * call included (ADR-0021, provider data retention and attribution):
+ * OpenAI and xAI get `store: false` (Convex already holds the conversation;
+ * the SDKs then request encrypted reasoning themselves for in-turn replay),
+ * and the hashed actor id goes out as OpenAI `safetyIdentifier` and
+ * Anthropic `metadata.userId`. OpenRouter takes the same id at model
+ * construction (provider-strategy.ts); the xAI SDK has no id field.
+ */
+export function resolveRequestPolicyOptions(
+  providerId: Provider,
+  safetyIdentifier: string | undefined
+): ProviderOptions {
+  switch (providerId) {
+    case "openai":
+      return {
+        openai: {
+          store: false,
+          ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
+        },
+      }
+    case "anthropic":
+      return safetyIdentifier !== undefined
+        ? { anthropic: { metadata: { userId: safetyIdentifier } } }
+        : {}
+    case "xai":
+      return { xai: { store: false } }
+    default:
+      return {}
+  }
+}
+
+/** Merge per-provider option objects one namespace level deep. */
+function mergeProviderOptions(...sources: ProviderOptions[]): ProviderOptions {
+  const merged: ProviderOptions = {}
+  for (const source of sources) {
+    for (const [namespace, options] of Object.entries(source)) {
+      merged[namespace] = { ...merged[namespace], ...options }
+    }
+  }
+  return merged
 }
 
 /**
@@ -102,7 +163,7 @@ export function shapeRequest(
  * response. Never apply that workaround to later models that reject fixed
  * budgets; fix renewed `pause_turn` failures at the SDK continuation layer.
  */
-function resolveProviderOptions(
+function resolveReasoningOptions(
   modelConfig: ModelConfig,
   ctx: RequestShapingContext
 ): ProviderOptions {

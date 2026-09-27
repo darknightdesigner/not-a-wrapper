@@ -132,6 +132,14 @@ const vUsage = v.object({
   totalTokens: v.optional(v.number()),
 })
 
+// The completion aggregate also carries the cache-read share of input so
+// settlement can price it at the pinned cache rate (ADR-0021). Settlement
+// evidence only: the message keeps the three-field `usage` shape.
+const vCompletionUsage = v.object({
+  ...vUsage.fields,
+  cacheReadTokens: v.optional(v.number()),
+})
+
 const vRoutedTitleUsage = v.object({
   routeId: v.string(),
   pricingRole: v.union(v.literal("title"), v.literal("primary")),
@@ -207,7 +215,7 @@ export const generationRunWriteArgs = {
     parts: v.any(),
     metadata: v.optional(vToolInvocationStreamMetadata),
     finishReason: v.optional(v.string()),
-    usage: v.optional(vUsage),
+    usage: v.optional(vCompletionUsage),
     // Title-call evidence for allowance settlement (ADR-0021): new workers
     // bind observed usage to the executed route and one of the reservation's
     // two immutable pricing roles. The token-only object remains accepted
@@ -2703,6 +2711,7 @@ export async function markGenerationRunCompletedForChat(
       inputTokens?: number
       outputTokens?: number
       totalTokens?: number
+      cacheReadTokens?: number
     }
     titleUsage?: TitleUsageEvidence
     totalToolCalls?: number
@@ -2712,6 +2721,9 @@ export async function markGenerationRunCompletedForChat(
 ) {
   const { run } = owner
   const timingReceipt = sanitizeRunTimingReceipt(args.timingReceipt)
+  // `messages.usage` stores the three-field shape; the cache split is
+  // settlement evidence only.
+  const { cacheReadTokens, ...messageUsage } = args.usage ?? {}
   // The first-terminal-wins guard and the completed-vs-awaiting_approval shape
   // live in the Generation run lifecycle's `complete` rule. `hasPendingApprovals`
   // is fact-gathering for it; the message payload (content/parts/metadata/usage)
@@ -2741,7 +2753,7 @@ export async function markGenerationRunCompletedForChat(
     metadata: args.metadata,
     status,
     finishReason: args.finishReason,
-    usage: args.usage,
+    usage: args.usage ? messageUsage : undefined,
     error: undefined,
     errorRecovery: undefined,
     updatedAt: now,
@@ -2792,6 +2804,7 @@ export async function markGenerationRunCompletedForChat(
             usage: {
               inputTokens: args.usage.inputTokens,
               outputTokens: args.usage.outputTokens,
+              cacheReadTokens,
             },
           }
         : {}),

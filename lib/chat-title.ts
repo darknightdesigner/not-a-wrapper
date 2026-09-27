@@ -8,6 +8,7 @@ import {
   clipChatTitleInput,
 } from "@/lib/chat-title-prompt"
 import type { ModelConfig } from "@/lib/models/types"
+import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { APICallError, type LanguageModel } from "ai"
 
 export const CHAT_TITLE_PLACEHOLDER = "New chat"
@@ -145,6 +146,12 @@ export async function generateChatTitle(args: {
   userText: string
   abortSignal?: AbortSignal
   /**
+   * Request policy options (Request shaping's `resolveRequestPolicyOptions`):
+   * response storage off and the hashed actor id, same as the answer call.
+   * The fallback runs on the same provider, so one value serves both.
+   */
+  providerOptions?: ProviderOptions
+  /**
    * Fired immediately before each concrete provider attempt (initial title
    * route, then the primary fallback on a 404). Cancellation settlement uses
    * it to charge a started-but-unfinished title at its input floor for the
@@ -180,6 +187,9 @@ export async function generateChatTitle(args: {
       maxRetries: 1,
       timeout: CHAT_TITLE_TIMEOUT_MS,
       abortSignal: args.abortSignal,
+      ...(args.providerOptions
+        ? { providerOptions: args.providerOptions }
+        : {}),
     })
     const generated = {
       title: sanitizeGeneratedChatTitle(result.text, userText),

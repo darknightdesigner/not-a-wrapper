@@ -32,10 +32,14 @@ Required local `.env.local` values:
 
 `WORKOS_COOKIE_PASSWORD` must be at least 32 characters.
 `CHAT_ADMISSION_SECRET` signs both durable chat admission and platform-usage
-reservation authorization. It must be at least 32 bytes and must use the same
-value in `.env.local` and the target Convex deployment. Use a different secret
-for Production and Preview; use a per-preview secret when sibling-preview
-isolation is required. Generate it with:
+reservation authorization. On the Next.js server it also keys the opaque
+per-user id sent to OpenAI, Anthropic, and OpenRouter for abuse attribution
+(an HMAC of the WorkOS user id, never the email; ADR-0021). Rotating it
+changes every user's id; without it, no id is sent. It must be at least 32
+bytes and must use the same value in `.env.local` and the target Convex
+deployment. Use a different secret for Production and Preview; use a
+per-preview secret when sibling-preview isolation is required. Generate it
+with:
 
 ```bash
 openssl rand -base64 32
