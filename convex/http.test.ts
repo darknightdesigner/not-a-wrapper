@@ -7,7 +7,10 @@ import {
   it,
   vi,
 } from "vitest"
-import { ATTACHMENT_NAME_HEADER } from "../lib/file/policy"
+import {
+  ATTACHMENT_NAME_HEADER,
+  DAILY_FILE_LIMIT_CODE,
+} from "../lib/file/policy"
 import type { Id } from "./_generated/dataModel"
 import {
   handleAttachmentUploadRequest,
@@ -245,8 +248,14 @@ describe("attachment HTTP upload", () => {
   )
   afterEach(() => vi.unstubAllEnvs())
 
-  function createAttachmentHarness(staged: string | null = "attachment-1") {
-    const runMutation = vi.fn().mockResolvedValue(staged)
+  function createAttachmentHarness(
+    staged: string | null = "attachment-1",
+    admission: { status: string } = { status: "allowed" }
+  ) {
+    const runMutation = vi
+      .fn()
+      .mockResolvedValueOnce(admission)
+      .mockResolvedValueOnce(staged)
     const store = vi.fn().mockResolvedValue(attachmentStorageId)
     const deleteStoredFile = vi.fn()
     return {
@@ -298,7 +307,8 @@ describe("attachment HTTP upload", () => {
     await expect(response.json()).resolves.toEqual({
       attachmentId: "attachment-1",
     })
-    expect(harness.runMutation.mock.calls[0]?.[1]).toEqual({
+    expect(harness.runMutation.mock.calls[0]?.[1]).toEqual({ userId: owner })
+    expect(harness.runMutation.mock.calls[1]?.[1]).toEqual({
       userId: owner,
       storageId: attachmentStorageId,
       fileName: "notes é.txt",
@@ -306,15 +316,25 @@ describe("attachment HTTP upload", () => {
     })
   })
 
-  it("deletes the blob it stored when staging refuses it", async () => {
-    const harness = createAttachmentHarness(null)
-
-    const response = await handleAttachmentUploadRequest(
-      harness.ctx,
+  it("stores nothing when admission refuses, and deletes the blob it stored when staging refuses", async () => {
+    const overLimit = createAttachmentHarness(null, { status: "daily_limit" })
+    const refused = await handleAttachmentUploadRequest(
+      overLimit.ctx,
       uploadRequest(signUploadTicket(owner))
     )
+    expect(refused.status).toBe(429)
+    await expect(refused.json()).resolves.toMatchObject({
+      code: DAILY_FILE_LIMIT_CODE,
+    })
+    expect(overLimit.store).not.toHaveBeenCalled()
 
+    // Concurrent uploads can all pass admission; staging stays authoritative.
+    const raced = createAttachmentHarness(null)
+    const response = await handleAttachmentUploadRequest(
+      raced.ctx,
+      uploadRequest(signUploadTicket(owner))
+    )
     expect(response.status).toBe(429)
-    expect(harness.deleteStoredFile).toHaveBeenCalledWith(attachmentStorageId)
+    expect(raced.deleteStoredFile).toHaveBeenCalledWith(attachmentStorageId)
   })
 })

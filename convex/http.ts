@@ -1,6 +1,7 @@
 import { httpRouter } from "convex/server"
 import {
   ATTACHMENT_NAME_HEADER,
+  DAILY_FILE_LIMIT_CODE,
   isAllowedFileMimeType,
   isAllowedProfileImageMimeType,
   MAX_FILE_SIZE,
@@ -255,8 +256,16 @@ export async function handleAttachmentUploadRequest(
   ctx: AttachmentUploadCtx,
   request: Request
 ): Promise<Response> {
-  const respond = (status: number, body: Record<string, unknown>) =>
-    jsonResponse(status, body, ATTACHMENT_UPLOAD_CORS)
+  const respond = (
+    status: number,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>
+  ) => jsonResponse(status, body, { ...ATTACHMENT_UPLOAD_CORS, ...headers })
+  const dailyLimitReached = () =>
+    respond(429, {
+      error: "Daily file upload limit reached",
+      code: DAILY_FILE_LIMIT_CODE,
+    })
 
   const authorization = request.headers.get("Authorization")
   const userId = verifyUploadTicket(
@@ -274,6 +283,31 @@ export async function handleAttachmentUploadRequest(
   const contentLength = Number(request.headers.get("Content-Length"))
   if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
     return respond(413, { error: "File is too large" })
+  }
+
+  // Admit before reading the body, as /profile-image rate-limits first: a
+  // replayed ticket past the daily limit or burst window stores nothing.
+  const admission = await ctx
+    .runMutation(internal.files.admitAttachmentUpload, { userId })
+    .catch(() => null)
+  if (!admission) {
+    console.warn(JSON.stringify({ _tag: "attachment_upload_admission_failed" }))
+    return respond(500, { error: "Attachment upload failed" })
+  }
+  if (admission.status === "refused") {
+    return respond(403, { error: "Forbidden" })
+  }
+  if (admission.status === "daily_limit") return dailyLimitReached()
+  if (admission.status === "rate_limited") {
+    return respond(
+      429,
+      { error: "Too many uploads" },
+      {
+        "Retry-After": String(
+          Math.max(1, Math.ceil(admission.retryAfterMs / 1000))
+        ),
+      }
+    )
   }
 
   let blob: Blob
@@ -305,7 +339,7 @@ export async function handleAttachmentUploadRequest(
         storageId,
         "attachment_upload_cleanup_failed"
       )
-      return respond(429, { error: "Daily file upload limit reached" })
+      return dailyLimitReached()
     }
     return respond(200, { attachmentId })
   } catch {

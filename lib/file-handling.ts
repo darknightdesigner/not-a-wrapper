@@ -1,4 +1,7 @@
-import { ATTACHMENT_NAME_HEADER } from "@/lib/file/policy"
+import {
+  ATTACHMENT_NAME_HEADER,
+  DAILY_FILE_LIMIT_CODE,
+} from "@/lib/file/policy"
 import type { ConvexReactClient } from "convex/react"
 
 export { ACCEPTED_FILE_PICKER_TYPES, validateFile } from "@/lib/file/validation"
@@ -28,7 +31,9 @@ export type AttachmentUploadTarget = { url: string; ticket: string }
 /**
  * Upload one file to the attachment upload action, which stores and stages it
  * in one request (ADR-0046). Resolves its attachment id, or null when the
- * server refuses it over the daily limit.
+ * server refuses it over the daily limit. A cancel after the body is sent
+ * no longer aborts: the server stages the file anyway, so the id still
+ * resolves and the caller releases it.
  */
 export function uploadBinaryWithProgress(
   target: AttachmentUploadTarget,
@@ -37,7 +42,10 @@ export function uploadBinaryWithProgress(
 ): Promise<string | null> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    const abort = () => xhr.abort()
+    let bodySent = false
+    const abort = () => {
+      if (!bodySent) xhr.abort()
+    }
 
     xhr.open("POST", target.url)
     xhr.setRequestHeader("Authorization", `Bearer ${target.ticket}`)
@@ -52,17 +60,27 @@ export function uploadBinaryWithProgress(
         percent: Math.min(100, Math.round((event.loaded / event.total) * 100)),
       })
     })
+    xhr.upload.addEventListener("load", () => {
+      bodySent = true
+    })
     xhr.addEventListener("load", () => {
       options.signal?.removeEventListener("abort", abort)
-      if (xhr.status === 429) {
+      const response = xhr.response as {
+        attachmentId?: unknown
+        code?: unknown
+      } | null
+      if (xhr.status === 429 && response?.code === DAILY_FILE_LIMIT_CODE) {
         resolve(null)
+        return
+      }
+      if (xhr.status === 429) {
+        reject(new Error("Too many uploads. Try again in a minute."))
         return
       }
       if (xhr.status < 200 || xhr.status >= 300) {
         reject(new Error(`Failed to upload file (${xhr.status})`))
         return
       }
-      const response = xhr.response as { attachmentId?: unknown } | null
       if (!response || typeof response.attachmentId !== "string") {
         reject(new Error("Upload response did not include an attachment id"))
         return
@@ -147,7 +165,7 @@ export class FileUploadLimitError extends Error {
   code: string
   constructor(message: string) {
     super(message)
-    this.code = "DAILY_FILE_LIMIT_REACHED"
+    this.code = DAILY_FILE_LIMIT_CODE
   }
 }
 

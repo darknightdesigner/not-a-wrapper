@@ -59,18 +59,31 @@ keeping its own partial check.
 
 - `files.generateUploadUrl` returns `{ url, ticket }`, or null when the daily
   limit is spent. The ticket lives 15 minutes (a slow 10 MB transfer); reuse
-  inside that window is bounded by the limit re-check at staging.
+  inside that window is bounded by admission.
 - `POST /attachments` on the deployment's `.convex.site` origin: a missing,
   forged, or expired Bearer ticket is 401 before anything is stored; a type
   outside `ALLOWED_FILE_TYPES` is 415; a body over 10 MB is 413 (Convex HTTP
   actions accept up to 20 MB). The file name travels URI-encoded in
   `X-Attachment-Name`.
+- Admission, before the body is read (where `/profile-image` consumes its rate
+  limit): `internal.files.admitAttachmentUpload` answers 403 for a missing or
+  rejected account (ADR-0044), 429 with `code: DAILY_FILE_LIMIT_REACHED` for a
+  spent daily limit, and 429 with `Retry-After` past 20 uploads a minute per
+  user. The burst window is an `attachment_upload` bucket on the shared
+  `apiRateLimits` table, read and committed through `readFixedWindow` /
+  `commitFixedWindow` as guest turn windows are. A replayed ticket therefore
+  stores nothing once its owner may not upload.
 - The action stores the body, then runs `internal.files.stageUploadedAttachment`
-  with the ticket's user. That mutation refuses a rejected account (ADR-0044)
-  and re-checks the daily limit. On any refusal the action deletes the blob it
+  with the ticket's user. That mutation refuses a rejected account and
+  re-checks the daily limit, which stays authoritative because concurrent
+  uploads can all pass admission. On any refusal the action deletes the blob it
   just stored: it knows the blob is its own, so the old orphan (a refused
   caller-supplied id nobody could safely delete) is gone. Success is
   `{ attachmentId }`; the client never sees a storage id.
+- The client stops honoring a cancel once the request body is sent: the server
+  stages the file anyway, so the attachment id still resolves and the Composer
+  deletes that row, releasing its daily slot. A cancel before then aborts the
+  transfer and nothing is stored.
 - CORS: `Access-Control-Allow-Origin: *` plus an OPTIONS preflight. The
   ticket is a bearer credential only an authenticated mutation mints, and no
   cookie is involved, so no origin gains anything by sending one.
@@ -102,11 +115,10 @@ batch retries (ADR-0014).
 - Browser tabs loaded before the deploy call the removed
   `saveStagedAttachment` and fail the upload until reloaded.
 - A ticket is replayable for 15 minutes by whoever holds it; the worst case is
-  more staged files for that same user, bounded by the daily limit (premium
-  stays unlimited, as with Convex upload URLs before).
-- The upload action has no per-request rate limit: `apiRateLimits` buckets key
-  on a Convex identity, which a ticketed request does not carry. Follow-up if
-  premium upload abuse appears.
+  more staged files for that same user, at most 20 a minute and none once the
+  daily limit is spent (premium has no daily limit, as before).
+- A blob orphaned by an action crash between store and staging has no row, so
+  no reference rule reaches it; a sweep for unreferenced storage stays open.
 - Image normalization (open PR #191) schedules from
   `saveStagedAttachmentHandler`, whose flow is unchanged; its local
   `deleteStorageIfUnreferenced` is replaced by this module's, which has the same

@@ -77,3 +77,6 @@ export function sniffProfileImageMimeType(bytes: Uint8Array): string | null {
 
 /** Carries the URI-encoded file name to the attachment upload action. */
 export const ATTACHMENT_NAME_HEADER = "X-Attachment-Name"
+
+/** Marks a daily-limit 429 from the upload action, apart from a burst 429. */
+export const DAILY_FILE_LIMIT_CODE = "DAILY_FILE_LIMIT_REACHED"

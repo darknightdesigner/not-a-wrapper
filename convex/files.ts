@@ -24,9 +24,16 @@ import {
   ownedChatQuery,
 } from "./lib/authedFunctions"
 import { ATTACHMENT_UPLOAD_PATH, signUploadTicket } from "./lib/uploadTicket"
+import { commitFixedWindow, readFixedWindow } from "./rateLimits"
 
 const DAILY_FILE_UPLOAD_LIMIT = 5
 const PREMIUM_FILE_UPLOAD_LIMIT = null
+/** Per-user burst ceiling on the upload action, where tickets are replayable. */
+export const ATTACHMENT_UPLOAD_WINDOW = {
+  bucket: "attachment_upload",
+  limit: 20,
+  windowMs: 60_000,
+}
 
 type FileUploadLimitUser = {
   premium?: boolean
@@ -168,6 +175,18 @@ async function getTodayUploadCount(
   return attachments.length
 }
 
+/** Premium users are unlimited, so their daily attachments are not scanned. */
+async function isDailyUploadLimitReached(
+  ctx: MutationCtx | QueryCtx,
+  user: Doc<"users">
+): Promise<boolean> {
+  if (getFileUploadLimit(user) === null) return false
+  return isFileUploadLimitExceeded(
+    user,
+    await getTodayUploadCount(ctx, user._id)
+  )
+}
+
 /**
  * Mint an upload target for the `/attachments` HTTP action: its URL and a
  * ticket bound to the caller (ADR-0046). Null when the daily limit is spent.
@@ -176,15 +195,7 @@ export const generateUploadUrl = authenticatedMutation({
   args: {},
   handler: async (ctx) => {
     const user = ctx.user
-    // Enforce daily upload limit server-side. Premium users are unlimited, so
-    // avoid scanning their daily attachments.
-    if (getFileUploadLimit(user) !== null) {
-      const todayCount = await getTodayUploadCount(ctx, user._id)
-
-      if (isFileUploadLimitExceeded(user, todayCount)) {
-        return null
-      }
-    }
+    if (await isDailyUploadLimitReached(ctx, user)) return null
 
     const siteUrl = process.env.CONVEX_SITE_URL
     if (!siteUrl) throw new Error("CONVEX_SITE_URL is not set")
@@ -263,14 +274,8 @@ export async function saveStagedAttachmentHandler(
     throw new Error("Stored file failed server validation")
   }
 
-  // Re-check the daily limit: a ticket outlives the check that minted it.
-  if (getFileUploadLimit(user) !== null) {
-    const todayCount = await getTodayUploadCount(ctx, user._id)
-
-    if (isFileUploadLimitExceeded(user, todayCount)) {
-      return null
-    }
-  }
+  // Authoritative re-check: concurrent uploads can all pass admission.
+  if (await isDailyUploadLimitReached(ctx, user)) return null
 
   const fileUrl = await ctx.storage.getUrl(args.storageId)
   if (!fileUrl) throw new Error("Failed to get file URL")
@@ -295,6 +300,36 @@ export async function saveStagedAttachmentHandler(
 }
 
 /**
+ * The `/attachments` action's gate before it reads or stores the body, like
+ * the profile-image rate limit: a ticket outlives the check that minted it,
+ * so a replayed one past the daily limit or the burst window stores nothing.
+ */
+export const admitAttachmentUpload = internalMutation({
+  args: { userId: v.id("users") },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db.get(userId)
+    // The ticket proved who uploads; the row decides whether they still may.
+    if (!user || isRejectedAccount(user)) return { status: "refused" } as const
+    if (await isDailyUploadLimitReached(ctx, user)) {
+      return { status: "daily_limit" } as const
+    }
+    const window = await readFixedWindow(ctx, {
+      actorKey: `user:${userId}`,
+      ...ATTACHMENT_UPLOAD_WINDOW,
+      now: Date.now(),
+    })
+    if (!window.allowed) {
+      return {
+        status: "rate_limited",
+        retryAfterMs: window.retryAfterMs,
+      } as const
+    }
+    await commitFixedWindow(ctx, window)
+    return { status: "allowed" } as const
+  },
+})
+
+/**
  * Stage a blob the `/attachments` HTTP action just stored for the user its
  * upload ticket names. Internal-only, so no client can nominate a storage id.
  */
@@ -308,7 +343,6 @@ export const stageUploadedAttachment = internalMutation({
   handler: async (ctx, { userId, ...args }) => {
     const user = await ctx.db.get(userId)
     if (!user) throw new Error("User not found")
-    // The ticket proved who uploaded; the row decides whether they still may.
     if (isRejectedAccount(user)) throw new Error("Account rejected")
     return await saveStagedAttachmentHandler({ ...ctx, user }, args)
   },
