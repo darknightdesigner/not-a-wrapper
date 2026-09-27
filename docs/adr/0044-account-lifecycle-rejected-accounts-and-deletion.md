@@ -64,17 +64,24 @@ starts one `deletionJobs` row with `targetKind: "account"` (ADR-0014
 machinery: one bounded page per scheduled mutation, idempotent, restart-safe,
 blocked on invariant or storage failure, never auto-resumed). Phases:
 
-1. `chats`: every owned Chat, one at a time, through the Chat phases. Live
-   runs are closed through the supersede path first and share links revoked in
-   the same commit, as in direct Chat deletion.
-2. `projects`: every owned Project root. An unfinished Project job for it is
+1. `liveRuns`: every live run of the account (queued, running, streaming;
+   `generationRuns.by_user_status`) is closed through the supersede path, which
+   revokes its worker grant, and every pending approval is denied through the
+   next turn's deny-pending path, which closes the paused run and settles its
+   usage. One Chat per batch. This goes first because the lease and approval
+   reapers skip a deleted account's Chats and scan a fixed window from the
+   head of their ranges: live rows left behind a later blocked phase would
+   never drain and could starve the reapers for everyone.
+2. `chats`: every owned Chat, one at a time, through the Chat phases, with
+   share links revoked in the same commit, as in direct Chat deletion.
+3. `projects`: every owned Project root. An unfinished Project job for it is
    marked complete (superseded) so it never blocks on the missing root.
-3. `accountAttachments`: staged attachments, with the `by_storage`
+4. `accountAttachments`: staged attachments, with the `by_storage`
    exclusivity check before deleting a blob.
-4. `userKeys`, `mcpToolApprovals`, `mcpServers`, `userPreferences`,
+5. `userKeys`, `mcpToolApprovals`, `mcpServers`, `userPreferences`,
    `feedback`, `toolCallLog` (new `by_user` index), `toolLimitBuckets`
    (`user:<WorkOS subject>`), `apiRateLimits` (`user:<users id>`).
-5. `accountRoot`: delete the profile image blob unless an attachment still
+6. `accountRoot`: delete the profile image blob unless an attachment still
    references it, then scrub the tombstone's personal fields (email, names,
    avatar, system prompt, favorite models). The row keeps `workosUserId`, the
    lifecycle timestamps, and counters.
@@ -86,16 +93,21 @@ live account.
 `usageLedgerEntries` stay: ADR-0021 makes the ledger append-only, the rows are
 content-free accounting, and the tombstone keeps their foreign keys valid.
 Pending reservations keep settling through their receipt or deadline
-reconciler. `deletionJobs` rows stay as the content-free trail. In-flight
-worker grants are not revoked at the tombstone: a run already streaming for a
-deleted account may finish and settle normally (bounded by the execution
-budget), and the drain closes any run still live when it reaches that Chat.
+reconciler. `deletionJobs` rows stay as the content-free trail. The tombstone
+write itself does not revoke in-flight worker grants; the drain's first
+batches do, seconds later, and a superseded run's reservation settles through
+the ADR-0021 cancellation window.
 
 **Clients.** The UserProvider wraps the app in a boundary that catches
 `account_rejected` from any per-user read or the bootstrap and ends the
-session (clear local stores, WorkOS sign-out) instead of crashing or acting as
-a guest. The chat route maps the rejection to a 403 `ACCOUNT_REJECTED`; other
-Next routes fail closed through the same Convex calls.
+session through the shared sign-out (clear local stores, WorkOS sign-out, with
+a Sign out button to retry) instead of crashing or acting as a guest. Next
+routes map the rejection to a 403 `ACCOUNT_REJECTED`: the chat route, the
+usage read, and the `authenticatedRoute` routes that call Convex directly
+(through the seam or `routeFailureResponse`). The BYOK and usage loaders
+rethrow it instead of falling back to the platform key or default usage. The
+profile-image upload proxy and the stream-resume route still fail closed with
+a 5xx and no data.
 
 ## Alternatives considered
 
@@ -107,6 +119,12 @@ Next routes fail closed through the same Convex calls.
   would recreate it. The tombstone is what makes deletion stick.
 - **Tombstone every Chat at deletion.** Unbounded fan-out in one mutation.
   The owner-ancestor read gives the same immediacy for one extra point read.
+- **Let the reapers settle a deleted owner's rows, or page them with a
+  checkpoint cursor.** Either removes the starvation risk for every job kind,
+  but it changes the reapers' contract. Closing live work at the start of the
+  drain keeps the reapers unchanged and matches direct Chat deletion, which
+  also closes live runs before anything can block. Project jobs keep the
+  older, narrower form of this risk.
 - **Amend ADR-0014 only.** The rejected-account rule changes the ADR-0003
   builder contract and the bootstrap contract, which is more than a deletion
   policy, so it gets its own record.
@@ -117,13 +135,18 @@ Next routes fail closed through the same Convex calls.
   subscriptions, not when its token expires.
 - Every chat-bound access reads the owner row. Owner paths already read it,
   so the new cost is one point read on public share reads and reapers.
-  Reapers skip a deleted account's chats; the drain owns them.
+  Reapers skip a deleted account's chats; the drain owns them, and its
+  `liveRuns` phase leaves nothing in the reapers' ranges before any phase
+  that can block.
 - A row created by the bootstrap has no email, name, or avatar until the
   verified webhook arrives. The client shows the WorkOS session's own name
   and picture meanwhile.
-- The AuthKit component returns early on `user.deleted` when its own mirror
-  row is missing, before our handler runs. For such accounts, run the
-  operator mutation below.
+- The AuthKit component (0.2.9, the latest release) returns early on
+  `user.deleted` when its own mirror row is missing, before our handler runs.
+  The mirror is complete once `workosAuth:backfillUsers` has run after a
+  deployment reset (docs/environment.md); for an account missed anyway, run
+  the operator mutation below. The WorkOS session of a deleted user cannot
+  refresh, so its access still ends when the access token expires.
 
 ## Runbook
 

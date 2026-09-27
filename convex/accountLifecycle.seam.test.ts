@@ -1,7 +1,7 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { api } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import type { TableNames } from "./_generated/dataModel"
 import schema from "./schema"
 import { modules } from "./test.setup"
@@ -136,6 +136,94 @@ describe("account bootstrap and profile sync", () => {
 })
 
 describe("account deletion drain", () => {
+  it("closes live runs and pending approvals before any phase that can block", async () => {
+    vi.useFakeTimers()
+    const t = makeT()
+    const seeded = await t.run(async (ctx) => {
+      const now = Date.now()
+      const userId = await ctx.db.insert("users", {
+        workosUserId: "workos_live",
+      })
+      const runIds = []
+      // A lease-expired stream and an expired approval pause: exactly the rows
+      // the reapers would skip (and rescan) forever behind a blocked job.
+      for (const status of ["streaming", "awaiting_approval"] as const) {
+        const chatId = await ctx.db.insert("chats", {
+          publicId: `live-${status}`,
+          userId,
+          public: false,
+          pinned: false,
+          updatedAt: 1,
+        })
+        const messageId = await ctx.db.insert("messages", {
+          chatId,
+          orderId: 1,
+          role: "assistant",
+          content: "",
+          parts: [],
+          status,
+          createdAt: 1,
+          updatedAt: 1,
+        })
+        const runId = await ctx.db.insert("generationRuns", {
+          chatId,
+          userId,
+          requestId: `request_${status}`,
+          model: "gpt-5-mini",
+          provider: "openai",
+          assistantMessageId: messageId,
+          status,
+          leaseExpiresAt: status === "streaming" ? now - 1 : undefined,
+          updatedAt: 1,
+        })
+        runIds.push(runId)
+        if (status === "awaiting_approval") {
+          await ctx.db.insert("toolApprovalRequests", {
+            chatId,
+            runId,
+            assistantMessageId: messageId,
+            userId,
+            toolCallId: "call_1",
+            toolName: "send_email",
+            source: "mcp",
+            riskClass: "destructive",
+            approvalId: "approval_live",
+            status: "pending",
+            createdAt: 1,
+            expiresAt: now - 1,
+          })
+        }
+      }
+      return { runIds }
+    })
+    await t.run((ctx) =>
+      softDeleteAppUserFromWorkOS(ctx, { workosUserId: "workos_live" })
+    )
+
+    const readState = () =>
+      t.run(async (ctx) => ({
+        job: (await ctx.db.query("deletionJobs").collect())[0],
+        runs: await Promise.all(seeded.runIds.map((id) => ctx.db.get(id))),
+        approvals: await ctx.db.query("toolApprovalRequests").collect(),
+        chats: await ctx.db.query("chats").collect(),
+      }))
+    let state = await readState()
+    for (let batch = 0; batch < 5 && state.job?.phase === "liveRuns"; batch++) {
+      await t.mutation(internal.deletionCleanup.runDeletionBatch, {
+        jobId: state.job._id,
+      })
+      state = await readState()
+    }
+
+    expect(state.job).toMatchObject({ phase: "chats", state: "running" })
+    expect(state.runs.map((run) => run?.status)).toEqual(["aborted", "aborted"])
+    expect(state.approvals.map((approval) => approval.status)).toEqual([
+      "denied",
+    ])
+    // Nothing is deleted yet; only live work was settled.
+    expect(state.chats).toHaveLength(2)
+  })
+
   it("drains every owned row, keeps usage evidence and the scrubbed tombstone, and spares other accounts", async () => {
     vi.useFakeTimers()
     const t = makeT()

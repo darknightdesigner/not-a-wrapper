@@ -23,6 +23,24 @@ export const ACCOUNT_TABLE_PHASES = [
 
 export type AccountTablePhase = (typeof ACCOUNT_TABLE_PHASES)[number]
 
+/**
+ * Account job phases. `liveRuns` goes first and cannot block: the reapers
+ * skip a deleted account's Chats, so a run or approval left live behind a
+ * blocked later phase would sit at the head of their bounded scans forever.
+ * Then every owned Chat drains through the Chat phases, and the users row
+ * survives as the scrubbed tombstone.
+ */
+export const ACCOUNT_PHASES = [
+  "liveRuns",
+  "chats",
+  "projects",
+  "accountAttachments",
+  ...ACCOUNT_TABLE_PHASES,
+  "accountRoot",
+] as const
+
+export type AccountPhase = (typeof ACCOUNT_PHASES)[number]
+
 type AccountTablePageOptions = {
   cursor: null
   numItems: number
@@ -122,7 +140,7 @@ export async function ensureAccountDeletionJob(
     targetKind: "account",
     userId,
     state: "pending",
-    phase: "chats",
+    phase: ACCOUNT_PHASES[0],
     version: 1,
     batchesProcessed: 0,
     documentsDeleted: 0,

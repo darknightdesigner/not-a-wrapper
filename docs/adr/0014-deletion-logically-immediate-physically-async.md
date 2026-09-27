@@ -63,10 +63,12 @@ ADR-0044 adds a third job kind, `targetKind: "account"`, on the same state
 machine. The deleted account is the logical root: its users row stays as a
 tombstone, and `isChatActive` reads the chat owner's row, so every chat-bound
 surface (share links included) treats the account's Chats as missing at the
-moment of deletion. The job drains every owned Chat through the Chat phases
-(closing live runs first, like Project jobs), then Project roots, staged
-attachments, and the account-owned tables, and finally scrubs the tombstone's
-personal fields. It refuses to run for an account that is not deleted.
+moment of deletion. The job first closes every live run and denies every
+pending approval of the account, before any phase that can block (the
+reapers skip a deleted account's Chats). It then drains every owned Chat
+through the Chat phases, then Project roots, staged attachments, and the
+account-owned tables, and finally scrubs the tombstone's personal fields. It
+refuses to run for an account that is not deleted.
 
 ## Blocked-job runbook
 

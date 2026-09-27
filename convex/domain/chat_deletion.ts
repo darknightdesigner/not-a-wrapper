@@ -2,14 +2,21 @@ import { getConvexSize, type Value } from "convex/values"
 import { internal } from "../_generated/api"
 import type { Doc, Id, TableNames } from "../_generated/dataModel"
 import type { MutationCtx } from "../_generated/server"
-import { closeSupersededGenerationsForChat } from "../chatRuntime"
 import {
+  closeSupersededGenerationsForChat,
+  denyPendingApprovalsForChat,
+} from "../chatRuntime"
+import {
+  ACCOUNT_PHASES,
   ACCOUNT_TABLE_PHASES,
   ACCOUNT_TOMBSTONE_SCRUB,
   paginateAccountTable,
+  type AccountPhase,
   type AccountTablePhase,
 } from "./account_deletion"
 import { takeLinkedChats } from "./chat_project_link"
+import { isSupersedableGenerationRunStatus } from "./generation_run_lifecycle"
+import { GENERATION_RUN_STATUSES } from "./message_contract"
 
 export const DELETION_PHASES = [
   "toolInvocations",
@@ -22,15 +29,8 @@ export const DELETION_PHASES = [
 ] as const
 // Project jobs: phase "chats" (drain linked chats through the phases above,
 // one chat at a time via job.chatId), then "projectRoot".
-// Account jobs (ADR-0044): the same "chats" loop over every owned Chat, then
-// the phases below, ending at the tombstone scrub. The users row survives.
-const ACCOUNT_PHASES = [
-  "chats",
-  "projects",
-  "accountAttachments",
-  ...ACCOUNT_TABLE_PHASES,
-  "accountRoot",
-] as const
+// Account jobs (ADR-0044): ACCOUNT_PHASES, whose "chats" phase is the same
+// loop over every owned Chat.
 
 export const DELETION_BATCH = {
   numItems: 200,
@@ -70,8 +70,6 @@ type BatchProgress = {
   documentsDeleted: number
   bytesObserved: number
 }
-
-type AccountPhase = (typeof ACCOUNT_PHASES)[number]
 
 type ChatBatchResult = {
   phase: string
@@ -375,6 +373,26 @@ async function beginChatDrain(
   return { phase: "chats", chatId: chat._id, complete: false }
 }
 
+const SUPERSEDABLE_RUN_STATUSES = GENERATION_RUN_STATUSES.filter(
+  isSupersedableGenerationRunStatus
+)
+
+async function findLiveRun(
+  ctx: ChatDeletionCtx,
+  userId: Id<"users">
+): Promise<Doc<"generationRuns"> | null> {
+  for (const status of SUPERSEDABLE_RUN_STATUSES) {
+    const run = await ctx.db
+      .query("generationRuns")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", userId).eq("status", status)
+      )
+      .first()
+    if (run) return run
+  }
+  return null
+}
+
 async function runAccountBatch(
   ctx: ChatDeletionCtx,
   job: Doc<"deletionJobs">,
@@ -388,6 +406,40 @@ async function runAccountBatch(
   const account = await ctx.db.get(job.userId)
   invariant(account && account.deletedAt !== undefined)
   const phase = job.phase
+
+  if (phase === "liveRuns") {
+    // One Chat per batch, through the same lifecycle paths as Chat deletion
+    // (supersede, which revokes the worker grant) and the next turn's
+    // deny-pending (which closes the paused run and settles its usage).
+    const liveRun = await findLiveRun(ctx, account._id)
+    if (liveRun) {
+      await closeSupersededGenerationsForChat(
+        ctx,
+        liveRun.chatId,
+        account._id,
+        Date.now()
+      )
+      const closed = await ctx.db.get(liveRun._id)
+      invariant(!closed || !isSupersedableGenerationRunStatus(closed.status))
+      return { phase, complete: false }
+    }
+    const pendingApproval = await ctx.db
+      .query("toolApprovalRequests")
+      .withIndex("by_user_status", (q) =>
+        q.eq("userId", account._id).eq("status", "pending")
+      )
+      .first()
+    if (pendingApproval) {
+      await denyPendingApprovalsForChat(
+        ctx,
+        pendingApproval.chatId,
+        account._id,
+        "account deleted"
+      )
+      return { phase, complete: false }
+    }
+    return { phase: nextAccountPhase(phase), complete: false }
+  }
 
   if (phase === "chats") {
     const chat = await ctx.db
