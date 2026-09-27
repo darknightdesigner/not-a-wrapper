@@ -24,11 +24,11 @@ only within that capture's configured scenario/warmup order. Local attached
 Chrome keeps the person's existing identity and history (`attached-session-v1`).
 Comparisons require the same identity protocol.
 
-Generated test users and fixture data are retained in the benchmark environment.
-They do not enter later captures; automatic deletion is deliberately absent
-because the existing WorkOS deletion hook only disables the app user, without
-removing its chats or accounting records. Environment maintenance is separate
-from benchmark measurement.
+Each CI capture user is recorded in `PERF_CAPTURE_USERS_FILE` and deleted by
+the workflow's final always-run step, however the job ends. The WorkOS
+deletion webhook then drains the user's chats and other owned data from the
+dev deployment (ADR-0044); accounting records stay, as ADR-0021 keeps them.
+Local runs keep their account.
 
 ## Suites
 

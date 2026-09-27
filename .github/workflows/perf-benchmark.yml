@@ -103,6 +103,8 @@ jobs:
            'new-chat-cold,interact-long-answer')) || '' }}
       PERF_COMPARE_REF: ${{ inputs.comparison_ref || 'HEAD^' }}
       COLLECT_BASELINE: ${{ github.event_name == 'workflow_dispatch' && inputs.collect_baseline || false }}
+      # Each CI harness process records the WorkOS user it creates here.
+      PERF_CAPTURE_USERS_FILE: ${{ github.workspace }}/perf-capture-users.txt
     steps:
       - name: Validate diagnostic suite
         if: ${{ inputs.diagnose || inputs.observer_overhead || inputs.rendering_probe || inputs.late_menu_trace }}
@@ -262,3 +264,9 @@ jobs:
             benchmarks/chat-performance/browser/results/traces/
             .next-perf/static/chunks/**/*.js
           retention-days: 90
+
+      # Delete the recorded WorkOS capture users however the job ends,
+      # cancellation and timeouts included.
+      - name: Delete benchmark capture users
+        if: ${{ always() && hashFiles('perf-capture-users.txt') != '' }}
+        run: bun run benchmarks/chat-performance/browser/ensure-auth-user.ts --delete-recorded
