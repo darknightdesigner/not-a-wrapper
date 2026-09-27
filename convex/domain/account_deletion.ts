@@ -26,7 +26,7 @@ export type AccountTablePhase = (typeof ACCOUNT_TABLE_PHASES)[number]
 /**
  * Account job phases. `liveRuns` goes first and cannot block: the reapers
  * skip a deleted account's Chats, so a run or approval left live behind a
- * blocked later phase would sit at the head of their bounded scans forever.
+ * blocked later phase would never drain.
  * Then every owned Chat drains through the Chat phases, and the users row
  * survives as the scrubbed tombstone.
  */

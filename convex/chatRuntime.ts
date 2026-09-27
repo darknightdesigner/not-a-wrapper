@@ -1,3 +1,4 @@
+import type { PaginationOptions, PaginationResult } from "convex/server"
 import { ConvexError, v } from "convex/values"
 import { CHAT_TURN_EXECUTION_BUDGET } from "../lib/chat-turn/execution-budget"
 import { estimatePartialOutputTokens } from "../lib/usage/terminal-usage-estimate"
@@ -136,7 +137,7 @@ const vUsage = v.object({
   totalTokens: v.optional(v.number()),
 })
 
-// The completion aggregate also carries the cache-read share of input so
+// Step and completion usage also carry the cache-read share of input so
 // settlement can price it at the pinned cache rate (ADR-0021). Settlement
 // evidence only: the message keeps the three-field `usage` shape.
 const vCompletionUsage = v.object({
@@ -189,7 +190,7 @@ export const generationRunWriteArgs = {
     stepNumber: v.optional(v.number()),
     // Per-step token usage — durable evidence so abort/failure settlement
     // does not depend on the happy-path onEnd aggregate (ADR-0021).
-    usage: v.optional(vUsage),
+    usage: v.optional(vCompletionUsage),
     invocations: v.array(
       v.object({
         toolCallId: v.string(),
@@ -3327,7 +3328,11 @@ export async function recordToolInvocationsForChat(
   args: {
     messageId: Id<"messages">
     stepNumber?: number
-    usage?: { inputTokens?: number; outputTokens?: number }
+    usage?: {
+      inputTokens?: number
+      outputTokens?: number
+      cacheReadTokens?: number
+    }
     invocations: Array<{
       toolCallId: string
       toolName: string
@@ -3422,11 +3427,14 @@ export async function recordToolInvocationsForChat(
   // otherwise it preserves the accumulated value.
   const stepInputTokens = args.usage?.inputTokens ?? 0
   const stepOutputTokens = args.usage?.outputTokens ?? 0
+  const stepCacheReadTokens = args.usage?.cacheReadTokens ?? 0
   if (
     !Number.isSafeInteger(stepInputTokens) ||
     stepInputTokens < 0 ||
     !Number.isSafeInteger(stepOutputTokens) ||
     stepOutputTokens < 0 ||
+    !Number.isSafeInteger(stepCacheReadTokens) ||
+    stepCacheReadTokens < 0 ||
     (args.stepNumber !== undefined &&
       (!Number.isSafeInteger(args.stepNumber) ||
         args.stepNumber <= 0 ||
@@ -3438,7 +3446,11 @@ export async function recordToolInvocationsForChat(
   let usagePatch:
     | Pick<
         Doc<"generationRuns">,
-        "inputTokens" | "outputTokens" | "usageSteps" | "lastUsageStepNumber"
+        | "inputTokens"
+        | "outputTokens"
+        | "cacheReadTokens"
+        | "usageSteps"
+        | "lastUsageStepNumber"
       >
     | undefined
 
@@ -3473,9 +3485,14 @@ export async function recordToolInvocationsForChat(
           ...(args.usage?.outputTokens !== undefined
             ? { outputTokens: args.usage.outputTokens }
             : {}),
+          ...(stepCacheReadTokens > 0
+            ? { cacheReadTokens: stepCacheReadTokens }
+            : {}),
         },
       ].sort((left, right) => left.stepNumber - right.stepNumber)
-      const sum = (field: "inputTokens" | "outputTokens") => {
+      const sum = (
+        field: "inputTokens" | "outputTokens" | "cacheReadTokens"
+      ) => {
         const total = usageSteps.reduce(
           (current, step) => current + BigInt(step[field] ?? 0),
           BigInt(0)
@@ -3485,10 +3502,12 @@ export async function recordToolInvocationsForChat(
         }
         return Number(total)
       }
+      const cacheReadTokens = sum("cacheReadTokens")
       usagePatch = {
         usageSteps,
         inputTokens: sum("inputTokens"),
         outputTokens: sum("outputTokens"),
+        ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
         lastUsageStepNumber: Math.max(
           run.lastUsageStepNumber ?? 0,
           args.stepNumber
@@ -3530,6 +3549,7 @@ export async function recordToolInvocationsForChat(
         computeUsageCredits(reservation.pricingSnapshot.primary, {
           inputTokens: usagePatch.inputTokens,
           outputTokens: usagePatch.outputTokens,
+          cacheReadTokens: usagePatch.cacheReadTokens,
         })
       }
     }
@@ -3542,6 +3562,9 @@ export async function recordToolInvocationsForChat(
       await ctx.db.patch(reservation._id, {
         observedInputTokens: usagePatch.inputTokens,
         observedOutputTokens: usagePatch.outputTokens,
+        ...(usagePatch.cacheReadTokens !== undefined
+          ? { observedCacheReadTokens: usagePatch.cacheReadTokens }
+          : {}),
         updatedAt: now,
       })
     }
@@ -3571,6 +3594,73 @@ export async function recordToolInvocationsForChat(
 // starvation. 25 keeps a pathological backlog draining incrementally
 // (25/status/tick at a 15 s cadence clears thousands per hour).
 const REAPER_BATCH_LIMIT = 25
+
+/**
+ * Scan window for the expiry reapers, wider than the settle budget. A pass
+ * skips rows its deletion job or owner lifecycle owns (an inactive Chat's run
+ * or approval), and those rows stay in the expiry range. A head-only window
+ * would let them hide every expired row behind them forever, so a checkpoint
+ * cursor moves past them instead.
+ */
+const EXPIRY_SCAN_LIMIT = 8 * REAPER_BATCH_LIMIT
+
+/**
+ * One bounded page of an expiry range per tick, from a checkpoint. A sweep
+ * pins its upper bound when it starts, so every page reads only rows that had
+ * expired by then (never live leases, whose heartbeats would conflict) and
+ * the cursor keeps meeting the query it came from. Rows expiring later join
+ * the next sweep. When the settle budget runs out mid-page the cursor holds:
+ * settled rows leave the range, so the next tick resumes the unexamined tail.
+ */
+async function sweepExpiredRange<Row>(
+  ctx: MutationCtx,
+  checkpointName: string,
+  paginate: (
+    rangeEnd: number,
+    options: PaginationOptions
+  ) => Promise<PaginationResult<Row>>,
+  settle: (row: Row) => Promise<boolean>
+): Promise<number> {
+  const now = nowMs()
+  const checkpoint = await ctx.db
+    .query("reaperCheckpoints")
+    .withIndex("by_name", (q) => q.eq("name", checkpointName))
+    .unique()
+  const resuming =
+    checkpoint?.cursor !== undefined && checkpoint.rangeEnd !== undefined
+  const rangeEnd = resuming ? checkpoint.rangeEnd! : now
+  const page = await paginate(rangeEnd, {
+    cursor: resuming ? checkpoint.cursor! : null,
+    numItems: EXPIRY_SCAN_LIMIT,
+    maximumRowsRead: EXPIRY_SCAN_LIMIT,
+  })
+  let settled = 0
+  let budgetExhausted = false
+  for (const row of page.page) {
+    if (settled >= REAPER_BATCH_LIMIT) {
+      budgetExhausted = true
+      break
+    }
+    if (await settle(row)) settled++
+  }
+  const cursor = budgetExhausted
+    ? resuming
+      ? checkpoint.cursor
+      : undefined
+    : page.isDone
+      ? undefined
+      : page.continueCursor
+  if (cursor !== checkpoint?.cursor) {
+    const next = {
+      cursor,
+      rangeEnd: cursor === undefined ? undefined : rangeEnd,
+      updatedAt: now,
+    }
+    if (checkpoint) await ctx.db.patch(checkpoint._id, next)
+    else await ctx.db.insert("reaperCheckpoints", { name: checkpointName, ...next })
+  }
+  return settled
+}
 
 /**
  * Settle the auxiliary records a terminal run leaves behind: pending
@@ -3612,6 +3702,14 @@ async function settleAuxiliaryRecordsForTerminalRun(
   }
 }
 
+// Versioned with the scan's index and range (see reaperCheckpoints).
+const EXPIRED_LEASE_CHECKPOINTS = {
+  running: "expired_leases_running_v1",
+  streaming: "expired_leases_streaming_v1",
+} as const
+
+type LeasedRunStatus = keyof typeof EXPIRED_LEASE_CHECKPOINTS
+
 /**
  * Fail runs whose worker lease lapsed. Every candidate is validated inside
  * this transaction: the indexed read IS the transactional state (Convex
@@ -3622,69 +3720,70 @@ async function settleAuxiliaryRecordsForTerminalRun(
  * partial content preserved.
  */
 export async function reapExpiredGenerationRunsPass(
-  ctx: MutationCtx
+  ctx: MutationCtx,
+  status: LeasedRunStatus
 ): Promise<{ reaped: number }> {
-  {
-    const now = nowMs()
-    let reaped = 0
-    for (const status of ["running", "streaming"] as const) {
-      const candidates = await ctx.db
+  const now = nowMs()
+  const reaped = await sweepExpiredRange(
+    ctx,
+    EXPIRED_LEASE_CHECKPOINTS[status],
+    (rangeEnd, options) =>
+      ctx.db
         .query("generationRuns")
         .withIndex("by_status_lease_expires", (q) =>
           q
             .eq("status", status)
             .gt("leaseExpiresAt", undefined)
-            .lt("leaseExpiresAt", now)
+            .lt("leaseExpiresAt", rangeEnd)
         )
-        .take(REAPER_BATCH_LIMIT)
-      for (const run of candidates) {
-        // Belt-and-suspenders re-validation of the fields the range implies.
-        if (run.leaseExpiresAt === undefined || run.leaseExpiresAt >= now) {
-          continue
-        }
-        const chat = await ctx.db.get(run.chatId)
-        if (!chat || !(await isChatActive(ctx, chat))) continue
-        const currentRun = await ctx.db.get(run._id)
-        if (!currentRun) continue
-        const resolved = await gatherAssistantMessageFacts(
-          ctx,
-          currentRun,
-          undefined
-        )
-        const verdict = resolveGenerationRunTransition(
-          { runStatus: currentRun.status, message: resolved?.facts ?? null },
-          { kind: "lease-expired" }
-        )
-        if (verdict.kind !== "transition") continue
-        await applyLifecycleVerdict(ctx, currentRun, verdict, resolved, now)
-        await settleAuxiliaryRecordsForTerminalRun(
-          ctx,
-          currentRun,
-          "generation worker lease expired",
-          now
-        )
-        reaped++
-        console.log(
-          JSON.stringify({
-            _tag: "run_stale_reaped",
-            runId: run._id,
-            chatId: run.chatId,
-            status,
-            heartbeatAt: run.heartbeatAt,
-            leaseExpiresAt: run.leaseExpiresAt,
-            ageMs: run.startedAt === undefined ? null : now - run.startedAt,
-          })
-        )
-      }
+        .paginate(options),
+    async (run) => {
+      const chat = await ctx.db.get(run.chatId)
+      if (!chat || !(await isChatActive(ctx, chat))) return false
+      const currentRun = await ctx.db.get(run._id)
+      if (!currentRun) return false
+      const resolved = await gatherAssistantMessageFacts(
+        ctx,
+        currentRun,
+        undefined
+      )
+      const verdict = resolveGenerationRunTransition(
+        { runStatus: currentRun.status, message: resolved?.facts ?? null },
+        { kind: "lease-expired" }
+      )
+      if (verdict.kind !== "transition") return false
+      await applyLifecycleVerdict(ctx, currentRun, verdict, resolved, now)
+      await settleAuxiliaryRecordsForTerminalRun(
+        ctx,
+        currentRun,
+        "generation worker lease expired",
+        now
+      )
+      console.log(
+        JSON.stringify({
+          _tag: "run_stale_reaped",
+          runId: run._id,
+          chatId: run.chatId,
+          status,
+          heartbeatAt: run.heartbeatAt,
+          leaseExpiresAt: run.leaseExpiresAt,
+          ageMs: run.startedAt === undefined ? null : now - run.startedAt,
+        })
+      )
+      return true
     }
-    return { reaped }
-  }
+  )
+  return { reaped }
 }
 
+// One status per invocation: Convex allows one paginated query per function.
 export const reapExpiredGenerationRuns = internalMutation({
-  args: {},
-  handler: async (ctx) => reapExpiredGenerationRunsPass(ctx),
+  args: { status: v.union(v.literal("running"), v.literal("streaming")) },
+  handler: async (ctx, { status }) =>
+    reapExpiredGenerationRunsPass(ctx, status),
 })
+
+const EXPIRED_APPROVAL_CHECKPOINT = "expired_tool_approvals_v1"
 
 /**
  * Expire approval pauses nobody resolved. The pending approval row settles as
@@ -3694,31 +3793,30 @@ export const reapExpiredGenerationRuns = internalMutation({
 export async function reapExpiredToolApprovalsPass(
   ctx: MutationCtx
 ): Promise<{ expired: number }> {
-  {
-    const now = nowMs()
-    let expired = 0
-    const candidates = await ctx.db
-      .query("toolApprovalRequests")
-      .withIndex("by_status_expires", (q) =>
-        q.eq("status", "pending").lte("expiresAt", now)
-      )
-      .take(REAPER_BATCH_LIMIT)
-    for (const approval of candidates) {
-      if (approval.expiresAt > now) continue
+  const now = nowMs()
+  const expired = await sweepExpiredRange(
+    ctx,
+    EXPIRED_APPROVAL_CHECKPOINT,
+    (rangeEnd, options) =>
+      ctx.db
+        .query("toolApprovalRequests")
+        .withIndex("by_status_expires", (q) =>
+          q.eq("status", "pending").lte("expiresAt", rangeEnd)
+        )
+        .paginate(options),
+    async (approval) => {
       const run = await ctx.db.get(approval.runId)
-      if (!run) continue
+      if (!run) return false
       const chat = await ctx.db.get(run.chatId)
-      if (!chat || !(await isChatActive(ctx, chat))) continue
+      if (!chat || !(await isChatActive(ctx, chat))) return false
       const currentApproval = await ctx.db.get(approval._id)
-      if (
-        currentApproval &&
+      return (
+        currentApproval !== null &&
         (await expireToolApprovalForChat(ctx, currentApproval, now, "reaper"))
-      ) {
-        expired++
-      }
+      )
     }
-    return { expired }
-  }
+  )
+  return { expired }
 }
 
 export const reapExpiredToolApprovals = internalMutation({

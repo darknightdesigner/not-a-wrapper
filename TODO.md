@@ -1,12 +1,5 @@
 # To Do
 
-- **Reapers can starve behind a blocked Project deletion job:**
-`reapExpiredGenerationRunsPass` and `reapExpiredToolApprovalsPass`
-(`convex/chatRuntime.ts`) read a fixed 25-row window with no cursor and skip
-inactive chats, so the live runs and approvals of a Project whose deletion job
-blocked stay at the head of the range forever. Page them with a
-`reaperCheckpoints` cursor like `reapResolvedApprovalPausesPass`, or close live
-work at the start of Project jobs as ADR-0044 does for account jobs.
 - **Direct request stall recovery:** A durable turn's initiating POST
 (`app/api/chat/chat-turn-runtime.ts`) sends no heartbeat frames, so a half-open
 connection with no page wake waits for the 330 s client budget, and an
@@ -218,12 +211,6 @@ Details, evidence, and how the references handle each one:
 - **Final answer at the tool-step cap:** A tool call on the last allowed step
 ends the turn with no reply. Make the last step tools-off.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-step-cap-can-end-a-turn-with-no-answer))
-- **Durable cache-read evidence:** Failure, lease-expiry and deadline
-settlements still charge cached input at the full rate, because run step usage
-and reservations do not store the cache-read count. Add optional
-`cacheReadTokens` to `generationRuns.usageSteps`, the run totals and
-`usageReservations`, and feed it to the fallback settlement evidence
-(ADR-0021).
 - **Send only the new message:** The client uploads the whole conversation on
 every send, although signed-in turns read history from Convex.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#every-send-uploads-the-whole-conversation))

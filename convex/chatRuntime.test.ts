@@ -247,6 +247,21 @@ function createMutationCtx(
               return true
             }
           )
+          // Expiry indexes order by their expiry field, as Convex does.
+          const expiryField =
+            indexName === "by_status_lease_expires"
+              ? "leaseExpiresAt"
+              : indexName === "by_status_expires"
+                ? "expiresAt"
+                : undefined
+          if (expiryField) {
+            results = [...results].sort((left, right) =>
+              convexOrderCompare(
+                (left as unknown as Record<string, unknown>)[expiryField],
+                (right as unknown as Record<string, unknown>)[expiryField]
+              )
+            )
+          }
           if (tableName === "generationRuns" && indexName === "by_status") {
             results = [...results].sort((left, right) => {
               const creationDelta = left._creationTime - right._creationTime
@@ -3330,7 +3345,7 @@ describe("reapers", () => {
     const fixture = makeExpiredStreamingFixture()
     const { ctx } = createMutationCtx(fixture.tables)
 
-    const result = await reapExpiredGenerationRunsPass(ctx)
+    const result = await reapExpiredGenerationRunsPass(ctx, "streaming")
 
     expect(result).toEqual({ reaped: 1 })
     expect(fixture.run).toMatchObject({
@@ -3367,7 +3382,9 @@ describe("reapers", () => {
     fixture.tables.projects.push(project)
     const { ctx } = createMutationCtx(fixture.tables)
 
-    await expect(reapExpiredGenerationRunsPass(ctx)).resolves.toEqual({
+    await expect(
+      reapExpiredGenerationRunsPass(ctx, "streaming")
+    ).resolves.toEqual({
       reaped: 0,
     })
     expect(fixture.run.status).toBe("streaming")
@@ -3396,7 +3413,7 @@ describe("reapers", () => {
     fresh.tables.generationRuns.push(legacy, paused)
     const { ctx } = createMutationCtx(fresh.tables)
 
-    const result = await reapExpiredGenerationRunsPass(ctx)
+    const result = await reapExpiredGenerationRunsPass(ctx, "streaming")
 
     expect(result).toEqual({ reaped: 0 })
     expect(fresh.run.status).toBe("streaming")
@@ -3411,7 +3428,7 @@ describe("reapers", () => {
     fixture.chat.statusRunId = fixture.otherRunId
     const { ctx } = createMutationCtx(fixture.tables)
 
-    await reapExpiredGenerationRunsPass(ctx)
+    await reapExpiredGenerationRunsPass(ctx, "streaming")
 
     expect(fixture.run.status).toBe("failed")
     expect(fixture.chat.liveRunStatus).toBe("streaming")
@@ -3452,7 +3469,7 @@ describe("reapers", () => {
     })
     const { ctx } = createMutationCtx(fixture.tables)
 
-    await reapExpiredGenerationRunsPass(ctx)
+    await reapExpiredGenerationRunsPass(ctx, "streaming")
 
     expect(fixture.tables.toolApprovalRequests[0]).toMatchObject({
       status: "expired",
@@ -5970,7 +5987,7 @@ describe("allowance settlement rides terminal transitions (ADR-0021)", () => {
     }
     const { ctx, tables } = createMutationCtx(fixture.tables)
 
-    const { reaped } = await reapExpiredGenerationRunsPass(ctx)
+    const { reaped } = await reapExpiredGenerationRunsPass(ctx, "streaming")
     expect(reaped).toBe(1)
     // 2_000 input × 0.75 = 1_500. Far below the 100k reserve.
     expect(tables.usageReservations[0]).toMatchObject({
@@ -5978,6 +5995,45 @@ describe("allowance settlement rides terminal transitions (ADR-0021)", () => {
       settlementBasis: "estimated_input_floor",
       titleSettlementBasis: "not_run",
       actualCredits: 1_500,
+    })
+  })
+
+  it("a reaped lease prices recorded cache reads at the cache rate", async () => {
+    const fixture = createAllowanceFixture({ workStartedAt: 1_000 })
+    fixture.tables.usageReservations[0] = {
+      ...fixture.tables.usageReservations[0]!,
+      pricingSnapshot: {
+        ...pricingSnapshot,
+        primary: {
+          ...pricingSnapshot.primary,
+          cacheReadCreditsPerMTok: 75_000,
+        },
+      },
+    }
+    const { ctx, tables } = createMutationCtx(fixture.tables)
+    await recordToolInvocationsForChat(
+      ctx,
+      await runOwner(ctx, fixture.runId),
+      {
+        messageId: fixture.messageId,
+        stepNumber: 1,
+        usage: { inputTokens: 1_000, outputTokens: 100, cacheReadTokens: 800 },
+        invocations: [],
+      }
+    )
+    tables.generationRuns[0] = {
+      ...tables.generationRuns[0]!,
+      heartbeatAt: 1_000,
+      leaseExpiresAt: Date.now() - 60_000,
+    }
+
+    await reapExpiredGenerationRunsPass(ctx, "streaming")
+    // 200 uncached × 0.75 + 800 cached × 0.075 + 100 output × 4.5. At the
+    // full input rate this was 1,200.
+    expect(tables.usageReservations[0]).toMatchObject({
+      status: "settled",
+      settlementBasis: "observed_partial",
+      actualCredits: 150 + 60 + 450,
     })
   })
 
