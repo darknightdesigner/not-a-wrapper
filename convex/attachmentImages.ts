@@ -29,11 +29,12 @@ export type NormalizedAttachmentImage = {
  * Shrink and re-encode an image once so the stored copy is safe for every
  * vision model (LibreChat resizes at upload the same way). The output is
  * always JPEG or PNG, the two formats every provider takes (xAI takes only
- * these). Returns null when the original already fits; throws when the image
- * cannot be read within the limits.
+ * these). Returns null when the original already fits and is stored under its
+ * real type; throws when the image cannot be fully decoded within the limits.
  */
 export async function normalizeAttachmentImage(
-  bytes: Uint8Array
+  bytes: Uint8Array,
+  storedMediaType?: string
 ): Promise<NormalizedAttachmentImage | null> {
   const input = {
     limitInputPixels: ATTACHMENT_IMAGE_MAX_INPUT_PIXELS,
@@ -46,9 +47,15 @@ export async function normalizeAttachmentImage(
   if (!width || !height) throw new Error("Image dimensions are unreadable")
   if (
     (format === "jpeg" || format === "png") &&
+    storedMediaType === `image/${format}` &&
     Math.max(width, height) <= ATTACHMENT_IMAGE_MAX_LONG_SIDE &&
     bytes.byteLength <= ATTACHMENT_IMAGE_MAX_BYTES
   ) {
+    // metadata() reads only the header: decode every pixel so a truncated or
+    // corrupt file is rejected instead of kept as ready.
+    await sharp(bytes, input)
+      .timeout({ seconds: ATTACHMENT_IMAGE_TIMEOUT_SECONDS })
+      .stats()
     return null
   }
 
@@ -87,15 +94,18 @@ export const normalizeStagedImage = internalAction({
   args: {
     attachmentId: v.id("chatAttachments"),
     storageId: v.id("_storage"),
+    /** The stored type; without it the image is always re-encoded. */
+    mediaType: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx, { attachmentId, storageId }) => {
+  handler: async (ctx, { attachmentId, storageId, mediaType }) => {
     let image: NormalizedAttachmentImage | null
     try {
       const blob = await ctx.storage.get(storageId)
       if (!blob) throw new Error("Staged image is missing")
       image = await normalizeAttachmentImage(
-        new Uint8Array(await blob.arrayBuffer())
+        new Uint8Array(await blob.arrayBuffer()),
+        mediaType
       )
     } catch (error) {
       console.warn(

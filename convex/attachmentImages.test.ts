@@ -24,9 +24,14 @@ async function png(width: number, height: number) {
 
 describe("attachment image normalization", () => {
   it("keeps images that fit and stores the rest as small PNG or JPEG", async () => {
-    await expect(normalizeAttachmentImage(await png(800, 600))).resolves.toBe(
+    const fits = await png(800, 600)
+    await expect(normalizeAttachmentImage(fits, "image/png")).resolves.toBe(
       null
     )
+    // A readable header over truncated pixel data is rejected, not kept.
+    await expect(
+      normalizeAttachmentImage(fits.subarray(0, fits.length - 64), "image/png")
+    ).rejects.toThrow()
 
     const screenshot = await normalizeAttachmentImage(await png(1200, 9000))
     expect(screenshot?.mediaType).toBe("image/png")

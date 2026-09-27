@@ -308,7 +308,7 @@ export async function saveStagedAttachmentHandler(
     await ctx.scheduler.runAfter(
       0,
       internal.attachmentImages.normalizeStagedImage,
-      { attachmentId, storageId: args.storageId }
+      { attachmentId, storageId: args.storageId, mediaType: storedType }
     )
   }
 
