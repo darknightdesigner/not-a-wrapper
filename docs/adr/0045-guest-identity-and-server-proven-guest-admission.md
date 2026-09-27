@@ -45,8 +45,11 @@ limit is keyed on the cookie **and** on the client network.
 **How Convex knows the server made the call**
 
 1. Public mutations trusting their arguments (status quo). Forgeable.
-2. A Convex HTTP action with a shared Bearer secret dispatching to internal
-   mutations. Sends the raw secret on every call and adds a second wire.
+2. Internal mutations (the TODO's wording) behind a server-verified entry:
+   a Convex HTTP action with a shared Bearer secret, or a public action that
+   checks a proof and then runs the internal mutation. The first sends the raw
+   secret on every call and adds a second wire; the second adds an action hop
+   and splits the check from the write for no stronger gate.
 3. **A public mutation that verifies an HMAC server-call proof before its
    trusted core runs.** Chosen: the exact shape of the ADR-0020 admission
    proof and the ADR-0021 reservation authorization (same secret, domain
@@ -103,9 +106,14 @@ refusal:
 | ----------------------------- | -------------- | ------------------------------------------------------------------------------ |
 | Daily turns per guest         | cookie id      | 5                                                                              |
 | Daily turns per network       | network key    | 5 (equal, so a new cookie never resets it)                                     |
-| Running answers per guest     | cookie id      | 1                                                                              |
+| Running answers per guest     | cookie id      | 2                                                                              |
 | Running answers per network   | network key    | 2                                                                              |
 | Daily turns across all guests | one shared row | 1,000; Convex env `GUEST_DAILY_TURN_CEILING` overrides, 0 turns guest chat off |
+
+Two running answers per guest, not one: ADR-0013 keeps an answer streaming
+when the guest clicks New chat or Back, and a Stopped answer frees its slot
+only once its response closes, so a cap of one would refuse the guest's next
+send in both cases. The network cap still bounds parallel spend.
 
 Limits live in `GUEST_TURN_LIMITS` (`lib/config.ts`). An admitted turn writes
 a `guestTurnLeases` row (expiry = route budget + settlement reserve). The route
@@ -130,7 +138,13 @@ remaining turns through `usage.checkGuestUsage` (proof-gated).
 `checkAndConsume` requires a `tool_limit` proof and resolves its window policy
 by tool name (`resolveToolLimitPolicy`, `lib/tools/limit-policy.ts`), like
 `API_RATE_LIMIT_POLICIES`. The actor is the Convex identity for signed-in
-callers or the signed guest id for guests, never both.
+callers. For guests it is the client network of the admitted turn: the call
+names the guest id and request id (both proof-bound), and Convex reads the
+network from that turn's live `guestTurnLeases` row. A guest can drop its
+cookie but not its network, so tool budgets and per-domain limits hold for
+cookie-less scripts; guests on one network share them, as they share daily
+turns. A guest call without a live lease throws, which the runtime handles
+like any store error (the bounded soft cap below).
 
 ### Fail closed
 
@@ -155,6 +169,14 @@ own continuation.
   ceiling bounds even that.
 - Guests behind one shared address (office NAT, carrier NAT) share five turns
   a day. Sign-in lifts it. Tune `dailyTurnsPerNetwork` if that bites.
+- The ceiling is a shared resource anyone holding many networks can spend: a
+  home IPv6 /56 is 256 /64 buckets, a free tunnel /48 is 65,536, and rented
+  IPv4 proxies work the same way. Once it is spent every guest is refused until
+  UTC midnight. That is the designed fail-closed state (spend stays bounded,
+  signed-in users are unaffected). A coarser IPv6 bucket was not added: a /48
+  merges unrelated customers of ISPs that assign /60s or /64s from one block,
+  and it does nothing against IPv4 proxies. Bot attestation (Vercel BotID) in
+  front of `usage.admitGuestTurn` is the mitigation.
 - Off Vercel, every guest shares one network bucket. A self-hosted deploy
   behind a trusted proxy needs a trusted-header setting before guests are
   usable at scale.

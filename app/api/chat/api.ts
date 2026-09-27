@@ -94,7 +94,7 @@ function toGuestRefusalError(reason: GuestTurnRefusal): PublicChatHttpError {
     case "network_active_limit":
       return new PublicChatHttpError({
         message:
-          "Wait for your current answer to finish before sending another message.",
+          "Too many answers are running. Wait for one to finish, then try again.",
         statusCode: 429,
         code: "TOO_MANY_ACTIVE_ANSWERS",
       })

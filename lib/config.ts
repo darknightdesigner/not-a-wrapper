@@ -11,7 +11,12 @@ export const REMAINING_QUERY_ALERT_THRESHOLD = 2
 export const GUEST_TURN_LIMITS = {
   dailyTurnsPerGuest: NON_AUTH_DAILY_MESSAGE_LIMIT,
   dailyTurnsPerNetwork: NON_AUTH_DAILY_MESSAGE_LIMIT,
-  activeTurnsPerGuest: 1,
+  /**
+   * Two, not one: an answer left streaming by New chat or Back (ADR-0013
+   * detach) and a Stopped answer whose slot is still being released must not
+   * block the guest's next send. The network cap bounds parallel spend.
+   */
+  activeTurnsPerGuest: 2,
   activeTurnsPerNetwork: 2,
   /**
    * Aggregate guest spend ceiling: admitted guest turns per UTC day across

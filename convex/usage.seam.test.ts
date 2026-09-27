@@ -2,8 +2,13 @@
 import { convexTest } from "convex-test"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { GUEST_TURN_LIMITS } from "../lib/config"
+import { resolveToolLimitPolicy } from "../lib/tools/limit-policy"
 import { api } from "./_generated/api"
-import { signServerCallProof, type GuestActor } from "./lib/serverCallProof"
+import {
+  signServerCallProof,
+  type GuestActor,
+  type GuestTurnRef,
+} from "./lib/serverCallProof"
 import schema from "./schema"
 import { modules } from "./test.setup"
 
@@ -67,25 +72,24 @@ describe("guest turn admission (server-proven)", () => {
     const t = makeT()
     const first = { guestId: "guest_a", networkKey: "network_1" }
     const second = { guestId: "guest_b", networkKey: "network_1" }
-    const third = { guestId: "guest_c", networkKey: "network_1" }
 
-    await expect(admit(t, first, "request_1")).resolves.toEqual({
-      kind: "admitted",
-    })
-    await expect(admit(t, first, "request_2")).resolves.toMatchObject({
+    // A detached answer (ADR-0013) plus a new send both run.
+    for (const requestId of ["request_1", "request_2"]) {
+      await expect(admit(t, first, requestId)).resolves.toEqual({
+        kind: "admitted",
+      })
+    }
+    await expect(admit(t, first, "request_3")).resolves.toMatchObject({
       kind: "refused",
       reason: "guest_active_limit",
     })
-    await expect(admit(t, second, "request_3")).resolves.toEqual({
-      kind: "admitted",
-    })
-    await expect(admit(t, third, "request_4")).resolves.toMatchObject({
+    await expect(admit(t, second, "request_4")).resolves.toMatchObject({
       kind: "refused",
       reason: "network_active_limit",
     })
 
     await release(t, first, "request_1")
-    await expect(admit(t, third, "request_4")).resolves.toEqual({
+    await expect(admit(t, second, "request_4")).resolves.toEqual({
       kind: "admitted",
     })
   })
@@ -101,6 +105,44 @@ describe("guest turn admission (server-proven)", () => {
     await expect(
       admit(t, { guestId: "guest_3", networkKey: "network_3" }, "r3")
     ).resolves.toMatchObject({ kind: "refused", reason: "guest_ceiling" })
+  })
+
+  it("keys guest tool budgets on the admitted turn's network", async () => {
+    const t = makeT()
+    const webSearch = resolveToolLimitPolicy("budget", "web_search", "platform")
+    const consumeWebSearch = (guestTurn: GuestTurnRef, count: number) => {
+      const call = {
+        limitType: "budget" as const,
+        toolName: "web_search",
+        keyMode: "platform" as const,
+        scopeCounts: [{ scopeKey: "*", count }],
+        consume: true,
+        guestTurn,
+        issuedAt: Date.now(),
+      }
+      return t.mutation(api.toolLimits.checkAndConsume, {
+        ...call,
+        proof: signServerCallProof({ purpose: "tool_limit", ...call }, SECRET),
+      })
+    }
+
+    await admit(t, { guestId: "guest_a", networkKey: "network_1" }, "r1")
+    await expect(
+      consumeWebSearch(
+        { guestId: "guest_a", requestId: "r1" },
+        webSearch.maxCount
+      )
+    ).resolves.toMatchObject({ allowed: true })
+
+    // A fresh cookie on the same network inherits the spent budget.
+    await admit(t, { guestId: "guest_b", networkKey: "network_1" }, "r2")
+    await expect(
+      consumeWebSearch({ guestId: "guest_b", requestId: "r2" }, 1)
+    ).resolves.toMatchObject({ allowed: false, code: "TOOL_BUDGET_EXCEEDED" })
+    // A signed call for a turn that holds no lease is refused.
+    await expect(
+      consumeWebSearch({ guestId: "guest_b", requestId: "r_unadmitted" }, 1)
+    ).rejects.toThrow("admitted, running guest turn")
   })
 
   it("rejects forged proofs and direct browser calls without writing", async () => {
@@ -126,7 +168,7 @@ describe("guest turn admission (server-proven)", () => {
         keyMode: "platform",
         scopeCounts: [{ scopeKey: "*", count: 1 }],
         consume: true,
-        guestId: "guest_forged",
+        guestTurn: { guestId: "guest_forged", requestId: "request_1" },
         issuedAt: Date.now(),
         proof: "0".repeat(64),
       })

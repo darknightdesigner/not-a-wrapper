@@ -346,7 +346,7 @@ The per-request decision of which tool capabilities (search, extract, mcp, code)
 _Avoid_: permissions, feature flags
 
 **Tool budget**:
-The per-tool call allowance enforced during a request — probed before provider-executed calls, consumed after execution, degrading to a request-local soft cap when the policy store is unreachable. The window policy is resolved server-side by tool name (`lib/tools/limit-policy.ts`) and every consume carries a **Server-call proof**; guests are keyed by their **Guest identity**.
+The per-tool call allowance enforced during a request — probed before provider-executed calls, consumed after execution, degrading to a request-local soft cap when the policy store is unreachable. The window policy is resolved server-side by tool name (`lib/tools/limit-policy.ts`) and every consume carries a **Server-call proof**; guests are keyed by the client network of their admitted turn (**Guest identity**), so a dropped cookie never resets it.
 _Avoid_: rate limit, quota
 
 **Tool outcome**:

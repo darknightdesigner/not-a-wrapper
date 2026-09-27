@@ -33,8 +33,8 @@ function formatDomainLimitCode(
  * Callable only by the Next server (ADR-0045): every call carries a
  * server-call proof over its arguments, the window policy is resolved here by
  * tool name, and the actor is the caller's Convex identity or, for guests, the
- * cookie-verified guest id the server signed. A browser cannot reach it with
- * a chosen id or policy.
+ * client network of their admitted turn. A guest can drop its cookie, not its
+ * network, so a fresh cookie never resets a tool budget or domain limit.
  */
 export const checkAndConsume = optionalAuthMutation({
   args: {
@@ -48,8 +48,10 @@ export const checkAndConsume = optionalAuthMutation({
       })
     ),
     consume: v.boolean(),
-    /** Guests only: the cookie-verified id, bound by the proof. */
-    guestId: v.optional(v.string()),
+    /** Guests only: the admitted turn (signed guest id + request id). */
+    guestTurn: v.optional(
+      v.object({ guestId: v.string(), requestId: v.string() })
+    ),
     issuedAt: v.number(),
     proof: v.string(),
   },
@@ -60,7 +62,7 @@ export const checkAndConsume = optionalAuthMutation({
       keyMode,
       scopeCounts,
       consume,
-      guestId,
+      guestTurn,
       issuedAt,
       proof,
     } = args
@@ -73,7 +75,7 @@ export const checkAndConsume = optionalAuthMutation({
     requireServerCallProof(
       {
         purpose: "tool_limit",
-        guestId: guestId ?? null,
+        guestTurn: guestTurn ?? null,
         limitType,
         toolName,
         keyMode,
@@ -84,14 +86,30 @@ export const checkAndConsume = optionalAuthMutation({
       proof
     )
 
+    const now = Date.now()
     // Signed-in callers are their Convex identity; the server never signs a
-    // guest id alongside a user token.
+    // guest turn alongside a user token.
     const identity = ctx.identity
     let actorKey: string
-    if (identity && !guestId) {
+    if (identity && !guestTurn) {
       actorKey = `user:${identity.subject}`
-    } else if (!identity && guestId) {
-      actorKey = `guest:${guestId}`
+    } else if (!identity && guestTurn) {
+      // The live lease written by `usage.admitGuestTurn` carries the
+      // server-derived network. No live lease, no guest tool call.
+      const lease = await ctx.db
+        .query("guestTurnLeases")
+        .withIndex("by_request", (q) => q.eq("requestId", guestTurn.requestId))
+        .unique()
+      if (
+        !lease ||
+        lease.guestId !== guestTurn.guestId ||
+        lease.expiresAt <= now
+      ) {
+        throw new Error(
+          "Guest tool limits need an admitted, running guest turn"
+        )
+      }
+      actorKey = `network:${lease.networkKey}`
     } else {
       throw new Error("Tool limits need exactly one signed-in or guest actor")
     }
@@ -106,7 +124,6 @@ export const checkAndConsume = optionalAuthMutation({
       return { allowed: true, remaining: maxCount }
     }
 
-    const now = Date.now()
     const currentBucketStartMs = Math.floor(now / bucketSizeMs) * bucketSizeMs
     const windowStartMs = now - windowMs + 1
     const firstBucketStartMs =

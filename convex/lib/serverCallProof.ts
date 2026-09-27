@@ -20,6 +20,9 @@ export type GuestActor = { guestId: string; networkKey: string }
 
 export type ToolLimitProofScope = { scopeKey: string; count: number }
 
+/** One admitted guest turn: its lease row is keyed by the request id. */
+export type GuestTurnRef = { guestId: string; requestId: string }
+
 export type ServerCallProofPayload =
   | {
       purpose: "guest_turn_admit" | "guest_turn_release"
@@ -30,8 +33,11 @@ export type ServerCallProofPayload =
   | { purpose: "guest_usage_read"; guest: GuestActor; issuedAt: number }
   | {
       purpose: "tool_limit"
-      /** Null for signed-in callers, whose actor is their Convex identity. */
-      guestId: string | null
+      /**
+       * The admitted guest turn the call belongs to; null for signed-in
+       * callers, whose actor is their Convex identity.
+       */
+      guestTurn: GuestTurnRef | null
       limitType: "domain" | "budget"
       toolName: string
       keyMode: "platform" | "byok"
@@ -86,7 +92,9 @@ function serializePayload(payload: ServerCallProofPayload): DigestPart[] {
     case "tool_limit":
       return [
         payload.purpose,
-        payload.guestId,
+        payload.guestTurn
+          ? [payload.guestTurn.guestId, payload.guestTurn.requestId]
+          : null,
         payload.limitType,
         payload.toolName,
         payload.keyMode,

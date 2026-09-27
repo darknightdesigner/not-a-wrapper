@@ -232,6 +232,8 @@ type ConvexToolLimitStoreOptions = {
   convexToken?: string
   /** The cookie-verified guest id the route threads through (ADR-0045). */
   anonymousId?: string
+  /** The turn's request id; a guest's admitted turn lease is keyed by it. */
+  requestId: string
 }
 
 /**
@@ -245,13 +247,15 @@ type ConvexToolLimitStoreOptions = {
  * to the worker wire without revisiting the decision.
  *
  * Each call carries a fresh server-call proof, so only this server can reach
- * the mutation; a signed-in caller is its token, a guest its verified id.
+ * the mutation; a signed-in caller is its token, a guest its admitted turn
+ * (limited by that turn's client network).
  */
 export function createConvexToolLimitStore(
   options: ConvexToolLimitStoreOptions
 ): ToolLimitStore {
-  const { convexToken } = options
-  const guestId = convexToken ? null : (options.anonymousId ?? null)
+  const { convexToken, anonymousId, requestId } = options
+  const guestTurn =
+    !convexToken && anonymousId ? { guestId: anonymousId, requestId } : null
 
   return {
     async checkAndConsume(input) {
@@ -261,7 +265,7 @@ export function createConvexToolLimitStore(
         const issuedAt = Date.now()
         const proof = signServerCallProof({
           purpose: "tool_limit",
-          guestId,
+          guestTurn,
           limitType,
           toolName,
           keyMode,
@@ -277,7 +281,7 @@ export function createConvexToolLimitStore(
             keyMode,
             scopeCounts,
             consume,
-            ...(guestId ? { guestId } : {}),
+            ...(guestTurn ? { guestTurn } : {}),
             issuedAt,
             proof,
           },
