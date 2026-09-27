@@ -56,6 +56,7 @@ vi.mock("@/lib/openproviders/create-language-model", () => ({
 vi.mock("@/lib/openproviders/request-shaping", () => ({
   shapeRequest: vi.fn(() => ({ providerOptions: {}, headers: {} })),
   resolveReasoningEffort: vi.fn(() => ({})),
+  resolveRequestPolicyOptions: vi.fn(() => ({})),
 }))
 
 vi.mock("@/lib/tools/runtime", () => ({
@@ -381,7 +382,7 @@ describe("createChatTurnRuntime — prepare()", () => {
       enriched: false,
     },
   ] as const)(
-    "requests real progress only for default OpenAI tool turns ($provider, tools=$hasTools, enriched=$enriched)",
+    "requests real progress only for default OpenAI tool turns and dates every prompt ($provider, tools=$hasTools, enriched=$enriched)",
     async ({ provider, hasTools, systemPrompt, enriched }) => {
       vi.mocked(getAllModels).mockResolvedValue([
         { id: "test-model", provider, tools: hasTools },
@@ -391,7 +392,10 @@ describe("createChatTurnRuntime — prepare()", () => {
           ReturnType<typeof prepareToolRuntime>
         >
       )
-      const input = makeInput({ systemPrompt })
+      const input = makeInput({
+        systemPrompt,
+        requestTimeZone: "America/Chicago",
+      })
       input.credential.provider = provider
       input.route.providerId = provider
       const harness = makeStreamHarness()
@@ -402,15 +406,19 @@ describe("createChatTurnRuntime — prepare()", () => {
       await runtime.prepare()
       await runtime.toResponse(notAbortedSignal())
 
-      const instructions = harness.captured.streamOpts.instructions
-      if (enriched) {
-        expect(instructions).toContain(SYSTEM_PROMPT_DEFAULT)
-        expect(instructions).toContain(
+      const instructions: string = harness.captured.streamOpts.instructions
+      expect(
+        instructions.startsWith(systemPrompt ?? SYSTEM_PROMPT_DEFAULT)
+      ).toBe(true)
+      expect(
+        instructions.includes(
           "Before using tools, briefly explain what you will check."
         )
-      } else {
-        expect(instructions).toBe(systemPrompt ?? SYSTEM_PROMPT_DEFAULT)
-      }
+      ).toBe(enriched)
+      // A fact, not style: custom prompts get it too, in the request's zone.
+      expect(instructions).toMatch(
+        /\n\nCurrent date: \w+, \w+ \d{1,2}, \d{4} \(America\/Chicago\)$/
+      )
     }
   )
 
@@ -492,7 +500,10 @@ describe("createChatTurnRuntime — prepare()", () => {
       { platformFunded: false, searchToolsActive: true }
     )
     expect(harness.captured.streamOpts.providerOptions).toEqual({
-      anthropic: { thinking: { type: "enabled", budgetTokens: 10000 } },
+      anthropic: {
+        thinking: { type: "enabled", budgetTokens: 10000 },
+        cacheControl: { type: "ephemeral" },
+      },
     })
     expect(harness.captured.streamOpts).not.toHaveProperty("maxOutputTokens")
     const prepareArgs = findCall(

@@ -277,11 +277,12 @@ describe("Convex auth helpers", () => {
 
   it.each([
     {
-      name: "allows public chat reads without authentication",
+      // ADR-0043: a shared chat is public only through its share link.
+      name: "returns null for a shared chat read through its private id",
       identitySubject: undefined,
       isPublic: true,
       users: (owner: Doc<"users">) => [owner],
-      expected: "chat",
+      expected: null,
     },
     {
       name: "returns null for missing chat reads",
@@ -340,13 +341,17 @@ describe("Convex auth helpers", () => {
     }
   )
 
-  it("returns null for a tombstoned public chat just like a missing chat", async () => {
+  it("returns null for the owner's tombstoned chat just like a missing chat", async () => {
     const owner = createUser("user_1", "workos_owner")
     const chat = {
-      ...createChat("chat_1", owner._id, true),
+      ...createChat("chat_1", owner._id),
       deletingAt: 2,
     }
-    const ctx = createCtx({ users: [owner], chats: [chat] })
+    const ctx = createCtx({
+      identitySubject: owner.workosUserId,
+      users: [owner],
+      chats: [chat],
+    })
 
     await expect(getAuthorizedChatForRead(ctx, chat._id)).resolves.toBeNull()
   })

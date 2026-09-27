@@ -6,6 +6,10 @@ import {
 } from "../lib/file/policy"
 import type { Doc, Id } from "./_generated/dataModel"
 import { internalMutation, type MutationCtx } from "./_generated/server"
+import {
+  deleteStorageIfUnreferenced,
+  isStorageReferenced,
+} from "./domain/storage_refs"
 import { isRejectedAccount } from "./lib/auth"
 import {
   authenticatedMutation,
@@ -40,6 +44,11 @@ export async function commitProfileImageHandler(
   ctx: CommitProfileImageCtx,
   { storageId, fileType }: { storageId: Id<"_storage">; fileType: string }
 ) {
+  // A blob is bound once (ADR-0046), even though the upload action always
+  // passes one it just stored.
+  if (await isStorageReferenced(ctx, storageId)) {
+    throw new Error("Stored file is already in use")
+  }
   const metadata = await ctx.db.system.get("_storage", storageId)
   if (!isProfileImageMetadataValid(metadata, fileType)) {
     throw new Error("Profile image failed server validation")
@@ -55,7 +64,7 @@ export async function commitProfileImageHandler(
   })
 
   if (previousStorageId && previousStorageId !== storageId) {
-    await ctx.storage.delete(previousStorageId)
+    await deleteStorageIfUnreferenced(ctx, previousStorageId)
   }
 
   return profileImageUrl

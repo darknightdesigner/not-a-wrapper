@@ -6,7 +6,7 @@ import {
 } from "../lib/chat-store/identity"
 import { internal } from "./_generated/api"
 import type { Doc, Id } from "./_generated/dataModel"
-import { query, type MutationCtx, type QueryCtx } from "./_generated/server"
+import type { MutationCtx, QueryCtx } from "./_generated/server"
 import { closeSupersededGenerationsForChat } from "./chatRuntime"
 import { ensureChatDeletionJob } from "./domain/chat_deletion"
 import {
@@ -35,6 +35,7 @@ import {
   ownedChatMutation,
   readableChatQuery,
 } from "./lib/authedFunctions"
+import { deleteChatShare } from "./shares"
 
 // Upper bound on title-search results. The history search UI renders a flat
 // list, so a bounded read is plenty and keeps the search subscription cheap.
@@ -272,51 +273,13 @@ export const searchByTitle = maybeAuthQuery({
     await searchByTitleForCurrentUserHandler(ctx, term),
 })
 
-// The sidebar status-projection fields (CONTEXT.md "Sidebar status projection")
-// are owner-only, but they ride the chat doc that public/shared reads return. Strip
-// them from any read that can hand a chat to a non-owner, so a shared-chat viewer
-// never receives the owner's read cursor or live/last-run state (nor reactive
-// updates to it). Owner-scoped list queries only ever return the caller's own
-// chats, so only the getById/getPublicById paths below need this.
-const OWNER_ONLY_STATUS_FIELDS = [
-  "liveRunStatus",
-  "liveRunFreshUntil",
-  "statusRunId",
-  "lastRunEndedAt",
-  "lastRunStatus",
-  "lastReadAt",
-] as const
-
-function stripOwnerStatus(chat: Doc<"chats">): Doc<"chats"> {
-  const stripped = { ...chat }
-  for (const field of OWNER_ONLY_STATUS_FIELDS) {
-    delete (stripped as Record<string, unknown>)[field]
-  }
-  return stripped
-}
-
 /**
- * Project a readable chat for return: the owner sees the full doc; a non-owner
- * (public/shared viewer) gets the owner-only status fields stripped. Pure — the
- * testable core of getById's owner-only strip.
- */
-export function projectChatForReader(
-  chat: Doc<"chats"> | null,
-  user: Doc<"users"> | null
-): Doc<"chats"> | null {
-  if (!chat) return null
-  const isOwner = user != null && chat.userId === user._id
-  return isOwner ? chat : stripOwnerStatus(chat)
-}
-
-/**
- * Get a single chat by ID. Returns the chat if it is public (no auth required)
- * or the authenticated caller owns it; otherwise null. Owner-only status
- * projection fields are stripped for non-owners (shared-chat viewers).
+ * Get one of the caller's chats by its publicId; null for anyone else. A
+ * shared chat is public only through its share link (ADR-0043).
  */
 export const getById = readableChatQuery({
   args: {},
-  handler: async (ctx) => projectChatForReader(ctx.chat, ctx.user),
+  handler: async (ctx) => ctx.chat,
 })
 
 type NewChatArgs = {
@@ -563,39 +526,9 @@ export const togglePin = ownedChatMutation({
   },
 })
 
-export const makePublic = ownedChatMutation({
-  args: {},
-  handler: async (ctx) => {
-    await patchChatActivity(ctx, ctx.chat, { public: true }, Date.now())
-  },
-})
-
-/**
- * Get a public chat by ID (no authentication required). Pure-public read with
- * no user concept — deliberately outside the authenticated-handler seam.
- */
-export async function getPublicByIdHandler(
-  ctx: Pick<QueryCtx, "db">,
-  { chatId }: { chatId: string }
-) {
-  const chat = await findChatByPublicId(ctx, chatId)
-  if (!chat) return null
-
-  if (!chat.public) return null
-  if (!(await isChatActive(ctx, chat))) return null
-
-  // Pure-public read (no owner concept) — always strip owner-only fields.
-  return stripOwnerStatus(chat)
-}
-
-export const getPublicById = query({
-  args: { chatId: v.string() },
-  handler: getPublicByIdHandler,
-})
-
 /**
  * Stamp `user`'s read cursor on a chat they own; no-op for a missing or
- * not-owned chat. Opening a public chat you do not own must not throw.
+ * not-owned chat. Opening a chat URL you do not own must not throw.
  */
 export async function markChatReadForOwner(
   ctx: Pick<MutationCtx, "db">,
@@ -619,10 +552,10 @@ export async function markChatReadForOwner(
  * Stamp the caller's read cursor on a chat they own, clearing its derived
  * unread/error indicator (lastReadAt >= lastRunEndedAt → idle).
  *
- * Deliberately NOT ownedChatMutation: opening a *public* chat you don't own is
- * a valid read, and ownedChatMutation would THROW. Unread/error only exist for
- * chats you own, so a non-owned (or missing) chat is a silent no-op. Guests
- * never reach here — the client gates on auth and this is an
+ * Deliberately NOT ownedChatMutation: opening a chat URL you don't own (it
+ * renders not found) must not throw, and ownedChatMutation would. Unread/error
+ * only exist for chats you own, so a non-owned (or missing) chat is a silent
+ * no-op. Guests never reach here — the client gates on auth and this is an
  * authenticatedMutation.
  */
 export const markChatRead = authenticatedMutation({
@@ -643,9 +576,11 @@ export async function removeChatForOwner(
   // batch purges the run and strands a still-reserved reservation for the
   // stale reconciler's legacy full-estimate charge.
   await closeSupersededGenerationsForChat(ctx, ctx.chat._id, ctx.user._id, now)
+  // Revoke the share link in the same commit as the tombstone.
+  await deleteChatShare(ctx, ctx.chat._id)
   await ctx.db.patch(ctx.chat._id, {
     deletingAt: now,
-    public: false, // revoke share links in the same commit
+    public: false,
     liveRunStatus: undefined,
     statusRunId: undefined,
     liveRunFreshUntil: undefined,

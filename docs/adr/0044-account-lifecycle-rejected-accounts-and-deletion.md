@@ -74,16 +74,17 @@ blocked on invariant or storage failure, never auto-resumed). Phases:
    head of their ranges: live rows left behind a later blocked phase would
    never drain and could starve the reapers for everyone.
 2. `chats`: every owned Chat, one at a time, through the Chat phases, with
-   share links revoked in the same commit, as in direct Chat deletion.
+   its share link row (ADR-0043) deleted in the same commit, as in direct
+   Chat deletion.
 3. `projects`: every owned Project root. An unfinished Project job for it is
    marked complete (superseded) so it never blocks on the missing root.
-4. `accountAttachments`: staged attachments, with the `by_storage`
-   exclusivity check before deleting a blob.
+4. `accountAttachments`: staged attachments, deleting a blob only when no
+   other reference holds it (ADR-0046).
 5. `userKeys`, `mcpToolApprovals`, `mcpServers`, `userPreferences`,
    `feedback`, `toolCallLog` (new `by_user` index), `toolLimitBuckets`
    (`user:<WorkOS subject>`), `apiRateLimits` (`user:<users id>`).
-6. `accountRoot`: delete the profile image blob unless an attachment still
-   references it, then scrub the tombstone's personal fields (email, names,
+6. `accountRoot`: delete the profile image blob unless another reference
+   holds it, then scrub the tombstone's personal fields (email, names,
    avatar, system prompt, favorite models). The row keeps `workosUserId`, the
    lifecycle timestamps, and counters.
 

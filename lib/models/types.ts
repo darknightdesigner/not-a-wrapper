@@ -208,6 +208,11 @@ type ModelConfig = {
   maxOutput?: number
   inputCost?: number
   outputCost?: number
+  /**
+   * USD per 1M input tokens read from the provider's prompt cache. Absent
+   * means the allowance charges cached input at `inputCost` (ADR-0021).
+   */
+  cachedInputCost?: number
   priceUnit?: string
 
   vision?: boolean

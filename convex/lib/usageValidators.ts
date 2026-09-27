@@ -13,6 +13,9 @@ export const vRoutePricingRate = v.object({
   upstreamModelId: v.string(),
   inputCreditsPerMTok: v.number(),
   outputCreditsPerMTok: v.number(),
+  // Provider prompt-cache read rate. Absent (older snapshots, routes without
+  // a published cache price) charges cached input at the input rate.
+  cacheReadCreditsPerMTok: v.optional(v.number()),
 })
 
 export const vPricingSnapshot = v.object({
@@ -89,11 +92,14 @@ export const vPrimaryTerminalUsageEvidence = v.union(
     kind: v.literal("actual"),
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),
+    // The cache-read share of `inputTokens` (AI SDK 7 counts it inside).
+    cacheReadTokens: v.optional(v.number()),
   }),
   v.object({
     kind: v.literal("completed-steps"),
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),
+    cacheReadTokens: v.optional(v.number()),
     partialOutputTokens: v.optional(v.number()),
   }),
   v.object({

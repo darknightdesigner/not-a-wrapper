@@ -1,7 +1,8 @@
 /**
  * Resolve the origin serving this deployment's Convex HTTP actions. Shared by
  * every server-side caller of a Convex HTTP route (durable worker wire,
- * profile-image proxy) so the resolution order lives in exactly one place.
+ * profile-image proxy) and the CSP that lets browsers upload attachments
+ * there, so the resolution order lives in exactly one place.
  *
  * Kept free of `import "server-only"` so modules under test (which import this
  * directly) load in vitest's node environment.

@@ -385,6 +385,7 @@ const openaiModels: ModelConfig[] = [
     contextWindow: 400000,
     inputCost: 0.25,
     outputCost: 2.0,
+    cachedInputCost: 0.025,
     priceUnit: "per 1M tokens",
     vision: true,
     tools: true,

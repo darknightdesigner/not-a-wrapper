@@ -89,6 +89,15 @@ describe("usage reservation authorization", () => {
       },
     ],
     [
+      "cache-read rate",
+      {
+        pricingSnapshot: {
+          ...pricingSnapshot,
+          primary: { ...pricingSnapshot.primary, cacheReadCreditsPerMTok: 0 },
+        },
+      },
+    ],
+    [
       "title pricing rate",
       {
         pricingSnapshot: {
