@@ -76,13 +76,14 @@ it("retries preparation, settles an expired replay, and serves an authorized str
   })
   vi.mocked(readRetainedChatStream).mockResolvedValue(stream)
   const req = new Request(
-    "http://localhost/api/chat/chat/stream?runId=run&after=5-0"
+    "http://localhost/api/chat/chat/stream?heartbeat=1&runId=run&after=5-0"
   )
   const response = await GET(req, params)
   expect(response.status).toBe(200)
   expect(response.headers.get("Cache-Control")).toContain("no-store")
   expect(readRetainedChatStream).toHaveBeenLastCalledWith("run", {
     after: "5-0",
+    heartbeat: true,
     signal: req.signal,
   })
   expect(fetchQuery).toHaveBeenLastCalledWith(

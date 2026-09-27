@@ -47,8 +47,8 @@ changing. This decision is about where browser lifecycle knowledge lives.
    document becomes visible, the network returns, or the back/forward cache
    restores the page. Its listeners exist only while something subscribes. The
    stream receiver (`lib/chat-stream/resumable-chat.ts`) subscribes while it
-   holds a live connection and releases it when the connection ends
-   (ADR-0039).
+   holds a live connection and releases it when the connection ends. A wake
+   only replaces a connection that has already gone quiet (ADR-0039).
 No Module introduces a React `useEffect`; browser ownership is event-driven or
 callback-ref-owned.
 

@@ -46,6 +46,7 @@ export async function GET(
 
   const stream = await readRetainedChatStream(run.runId, {
     after: after ?? undefined,
+    heartbeat: search.get("heartbeat") === "1",
     signal: request.signal,
   })
   if (!stream) {

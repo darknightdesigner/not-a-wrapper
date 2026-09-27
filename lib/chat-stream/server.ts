@@ -260,10 +260,17 @@ export async function initializeRetainedChatStream({
   }
 }
 
-/** The route must authorize run ownership before opening this private replay. */
+/**
+ * The route must authorize run ownership before opening this private replay.
+ * Heartbeats are opt-in: tabs loaded before they existed reject unknown frames.
+ */
 export async function readRetainedChatStream(
   runId: string,
-  { after = "0-0", signal }: { after?: string; signal?: AbortSignal } = {}
+  {
+    after = "0-0",
+    heartbeat = false,
+    signal,
+  }: { after?: string; heartbeat?: boolean; signal?: AbortSignal } = {}
 ): Promise<ReadableStream<Uint8Array> | null> {
   if (
     !retainedChatStreamCursorSchema.safeParse(after).success ||
@@ -364,6 +371,7 @@ export async function readRetainedChatStream(
             queued.push({ type: "end" })
             ended = true
           } else if (
+            heartbeat &&
             queued.length === 0 &&
             Date.now() - lastFrameAt >= RETAINED_STREAM_HEARTBEAT_MS
           ) {

@@ -12,6 +12,7 @@ import {
 } from "ai"
 import {
   compareRetainedCursors,
+  RETAINED_STREAM_HEARTBEAT_MS,
   RETAINED_STREAM_STALL_MS,
   retainedChatStreamFrameSchema,
   type RetainedChatStreamFrame,
@@ -22,8 +23,8 @@ type Selection = Extract<RetainedChatStreamFrame, { type: "selection" }>
 // A replay the displayed checkpoint keeps rejecting gets this long to catch
 // up. After that, Convex checkpoints drive the turn instead of a frozen answer.
 const CHECKPOINT_HANDOFF_MS = 2_000
-// A wake signal never replaces a connection younger than this.
-const MIN_RECONNECT_INTERVAL_MS = 1_000
+// A wake replaces only a connection that has missed two heartbeats.
+const WAKE_REPLACE_QUIET_MS = 2 * RETAINED_STREAM_HEARTBEAT_MS
 
 function containsValue(
   next: unknown,
@@ -246,6 +247,7 @@ function watchConnection(connection: AbortController) {
     touch: () => {
       lastActivity = Date.now()
     },
+    quietFor: () => Date.now() - lastActivity,
     stop: () => clearTimeout(timer),
   }
 }
@@ -258,23 +260,26 @@ export class ResumableChat extends Chat<UIMessage> {
   private nativeRunId: string | null = null
   private discoveredChatId: string | null = null
   private historicalAssistantId: string | null = null
-  private lastRequestChunkAt = 0
   private stopWakeListener: (() => void) | null = null
-  private readonly abortRequest: () => Promise<void>
+  // The latest direct request: chunk arrival is its only liveness signal, and
+  // `end` closes its stream as if the response ended there.
+  private readonly direct: { lastChunkAt: number; end: () => void }
 
   constructor({ transport, ...options }: ChatInit<UIMessage>) {
-    let noteRequestChunk = () => {}
+    const direct = { lastChunkAt: 0, end: () => {} }
     super({
       ...options,
-      // Chunk arrival is the only liveness signal a direct request has.
       transport: transport && {
         async sendMessages(request) {
           const stream = await transport.sendMessages(request)
-          noteRequestChunk()
+          direct.lastChunkAt = Date.now()
           return stream.pipeThrough(
             new TransformStream<UIMessageChunk, UIMessageChunk>({
+              start(controller) {
+                direct.end = () => controller.terminate()
+              },
               transform(chunk, controller) {
-                noteRequestChunk()
+                direct.lastChunkAt = Date.now()
                 controller.enqueue(chunk)
               },
             })
@@ -283,9 +288,7 @@ export class ResumableChat extends Chat<UIMessage> {
         reconnectToStream: (request) => transport.reconnectToStream(request),
       },
     })
-    noteRequestChunk = () => {
-      this.lastRequestChunkAt = Date.now()
-    }
+    this.direct = direct
     const sendMessage = this.sendMessage
     this.sendMessage = (...args) => {
       this.detachObserver()
@@ -297,7 +300,6 @@ export class ResumableChat extends Chat<UIMessage> {
       return regenerate(...args)
     }
     const stopRequest = this.stop
-    this.abortRequest = stopRequest
     this.stop = async () => {
       this.seenRunId = this.nativeRunId ?? this.seenRunId
       this.disconnectObserver()
@@ -353,14 +355,16 @@ export class ResumableChat extends Chat<UIMessage> {
       return
     }
     // A durable run outlives its initiating request, so after a silent gap
-    // that request is dropped and the next sync resumes the retained stream.
-    // That request has no heartbeats: a shorter gap may be the model thinking.
+    // that request ends and the next sync resumes the retained stream. It
+    // ends as a transport handoff, not an abort: abort cleanup would remove
+    // the in-flight assistant. It has no heartbeats, so a shorter gap may be
+    // the model thinking.
     if (
       this.status === "streaming" &&
       this.nativeRunId !== null &&
-      Date.now() - this.lastRequestChunkAt >= RETAINED_STREAM_STALL_MS
+      Date.now() - this.direct.lastChunkAt >= RETAINED_STREAM_STALL_MS
     )
-      void this.abortRequest()
+      this.direct.end()
   }
 
   syncRun(
@@ -476,18 +480,18 @@ export class ResumableChat extends Chat<UIMessage> {
         const release = () => connection.abort()
         signal.addEventListener("abort", release, { once: true })
         const watchdog = watchConnection(connection)
-        const openedAt = Date.now()
+        let woken = false
         onWake(() => {
-          if (Date.now() - openedAt >= MIN_RECONNECT_INTERVAL_MS)
-            connection.abort()
+          if (watchdog.quietFor() < WAKE_REPLACE_QUIET_MS) return
+          woken = true
+          connection.abort()
         })
         try {
-          const query = new URLSearchParams()
+          const query = new URLSearchParams({ heartbeat: "1" })
           if (run.runId) query.set("runId", run.runId)
           if (replay.cursor) query.set("after", replay.cursor)
-          const search = query.toString()
           const response = await fetch(
-            `/api/chat/${encodeURIComponent(run.chatId)}/stream${search ? `?${search}` : ""}`,
+            `/api/chat/${encodeURIComponent(run.chatId)}/stream?${query}`,
             { signal: connection.signal, cache: "no-store" }
           )
           watchdog.touch()
@@ -528,11 +532,12 @@ export class ResumableChat extends Chat<UIMessage> {
           return
         } catch {
           if (signal.aborted) return
-          // A stalled or woken connection resumes after its cursor at once.
-          if (connection.signal.aborted) continue
+          // A woken page replaces its possibly dead connection at once.
+          if (woken) continue
           // Checkpoints stay visible while the replay service is unavailable.
           this.setStatus({ status: "ready" })
-          // A permanently missing log falls back instead of polling all turn.
+          // A missing log or a route that never delivers, stalls included,
+          // falls back instead of polling all turn.
           if (++failures >= 5) return
         } finally {
           watchdog.stop()

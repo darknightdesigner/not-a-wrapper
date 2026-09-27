@@ -212,7 +212,7 @@ it("reconnects by GET without erasing visible text or dispatching another genera
   expect(fetchMock).toHaveBeenCalledTimes(1)
 })
 
-it("replaces a silent retained connection and resumes after its cursor", async () => {
+it("replaces a silent retained connection after its cursor and falls back when stalls repeat", async () => {
   vi.useFakeTimers()
   const sources: ReadableStreamDefaultController<Uint8Array>[] = []
   const fetchMock = vi.fn(
@@ -276,7 +276,7 @@ it("replaces a silent retained connection and resumes after its cursor", async (
     await vi.advanceTimersByTimeAsync(2_000)
     await vi.waitFor(() => expect(sources).toHaveLength(2))
     expect(fetchMock.mock.calls[1][0]).toBe(
-      "/api/chat/chat/stream?runId=run&after=4-0"
+      "/api/chat/chat/stream?heartbeat=1&runId=run&after=4-0"
     )
     published.length = 0
     sources[1].enqueue(frame({ type: "base", highWater: "4-0" }))
@@ -287,6 +287,14 @@ it("replaces a silent retained connection and resumes after its cursor", async (
       true
     )
     expect(chat.status).toBe("streaming")
+    // Connections that never deliver count as failures: checkpoints drive
+    // the turn instead of a frozen answer polled every 10 s.
+    await vi.advanceTimersByTimeAsync(RETAINED_STREAM_STALL_MS)
+    expect(chat.status).toBe("ready")
+    await vi.advanceTimersByTimeAsync(6 * RETAINED_STREAM_STALL_MS)
+    expect(chat.replayRunId).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(6)
+    expect(text()).toBe("Hello world again")
     expect(sendMessages).not.toHaveBeenCalled()
     expect(onFinish).not.toHaveBeenCalled()
   } finally {
@@ -425,7 +433,7 @@ it("restores the checkpoint before subscription hydration and silently catches u
   chat.syncRun(null, [], conversation)
   await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
   expect(fetchMock).toHaveBeenCalledWith(
-    "/api/chat/chat/stream",
+    "/api/chat/chat/stream?heartbeat=1",
     expect.objectContaining({ cache: "no-store" })
   )
   chat.syncRun(null, [], conversation)

@@ -30,9 +30,9 @@ The Markdown offscreen-layout optimization excludes semantic list roots and bloc
 
 If replay cannot extend the displayed checkpoint and no update is adopted within 2 seconds, the observer disconnects but keeps the run marked as seen. Convex checkpoints then drive the rest of that turn instead of a frozen answer; they only ever replace a checkpoint, so the prefix rule holds.
 
-Each observer keeps one ordered SDK reducer across connections. A reconnect sends its last applied entry id as `after`, together with its `runId`; the route rejects a cursor without one. The server resends the immutable base, sends only newer entries, and sends a new caught-up fence. The client ignores the repeated base and any entry at or before its cursor. Idle readers send a `heartbeat` frame after 2.5 seconds without a frame (about every 3 seconds) and write nothing to Redis. A connection that delivers nothing for 10 seconds, response headers included, is replaced at once from its cursor. A visible tab, `online`, or a back/forward-cache `pageshow` replaces a connection at least 1 second old, or ends a retry backoff early (the shared Connection wake Module, ADR-0024).
+Each observer keeps one ordered SDK reducer across connections. A reconnect sends its last applied entry id as `after`, together with its `runId`; the route rejects a cursor without one. The server resends the immutable base, sends only newer entries, and sends a new caught-up fence. The client ignores the repeated base and any entry at or before its cursor. Idle readers send a `heartbeat` frame after 2.5 seconds without a frame (about every 3 seconds) and write nothing to Redis. Heartbeats are opt-in (`heartbeat=1`), because tabs loaded before they existed reject unknown frames. A connection that delivers nothing for 10 seconds, response headers included, is replaced from its cursor. That stall counts toward the same five-failure budget as other transport failures, with checkpoints shown while it retries, so a route that never delivers falls back to checkpoints instead of polling all turn. A visible tab, `online`, or a back/forward-cache `pageshow` replaces at once a connection that has delivered nothing for 5 seconds (two missed heartbeats), and ends a retry backoff early (the shared Connection wake Module, ADR-0024). A connection still receiving heartbeats is healthy and is kept.
 
-A durable run outlives its initiating request. On the same wake signals, a direct request that has not changed the message for 10 seconds is dropped, and the next sync resumes from the retained stream. The direct request has no heartbeats, so it gets no silence watchdog; the 330-second client stream budget remains its outer backstop.
+A durable run outlives its initiating request. On the same wake signals, a direct request that has not changed the message for 10 seconds is ended, and the next sync resumes from the retained stream. It ends as a transport handoff: its response stream closes as if the server had ended it, so abort cleanup never removes the in-flight assistant. The direct request has no heartbeats, so it gets no silence watchdog; the 330-second client stream budget remains its outer backstop.
 
 Successful server completion does not cut an exact retained reader while its historical output is still reaching the screen. The shared presentation resolver keeps that reader active until it drains. Stop, branch changes and new Send/regenerate commands disconnect it immediately. Terminal content and generation ownership remain authoritative in Convex.
 
@@ -133,10 +133,19 @@ visibility, `online` and `pageshow`. A provider that stops producing on a health
 connection is a server concern; AI SDK 7 `timeout: { firstChunkMs, chunkMs }` in
 the Chat turn runtime is the follow-up.
 
-Focused tests cover the stall reconnect with its cursor, heartbeat keepalive, and
-the handoff. Live acceptance: a refresh during a long answer keeps growing; a
-response body that stops delivering reconnects with `after` within about 10
-seconds and resumes; `online`, `visibilitychange` and `pageshow` reconnect.
+Review corrections: a stall counts as a failure, so a route that never delivers
+cannot keep the answer frozen behind endless 10-second reconnects; a wake keeps a
+connection that is still receiving heartbeats; a direct-request handoff closes the
+response stream instead of aborting it; and heartbeats are sent only to readers
+that ask, so a tab loaded before this change never receives a frame it rejects.
+HuggingChat's SSE readers ignore unknown events, so it needs no such opt-in.
+
+Focused tests cover the stall reconnect with its cursor, heartbeat keepalive, the
+stall failure budget, and the handoff. Live acceptance: a refresh during a long
+answer keeps growing; a response body that stops delivering reconnects with
+`after` within about 10 seconds and resumes; after 5 seconds of silence, `online`,
+`visibilitychange` and `pageshow` reconnect at once, while a connection still
+receiving heartbeats is kept.
 
 ## References
 
