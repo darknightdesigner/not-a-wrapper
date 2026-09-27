@@ -42,6 +42,13 @@ changing. This decision is about where browser lifecycle knowledge lives.
    transfer, publishing state on the focused element. The selector still requires
    native `:focus-visible`; moving the state off `html` avoids invalidating every
    descendant when the user switches input methods.
+6. `lib/browser/connection-wake.ts` is the **Connection wake** Module. It
+   reports moments after which an open connection may be silently dead: the
+   document becomes visible, the network returns, or the back/forward cache
+   restores the page. Its listeners exist only while something subscribes. The
+   stream receiver (`lib/chat-stream/resumable-chat.ts`) subscribes while it
+   holds a live connection and releases it when the connection ends. A wake
+   only replaces a connection that has already gone quiet (ADR-0039).
 No Module introduces a React `useEffect`; browser ownership is event-driven or
 callback-ref-owned.
 

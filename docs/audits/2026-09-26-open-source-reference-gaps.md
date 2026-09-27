@@ -1504,9 +1504,8 @@ head start in production; it shows up more in local dev without analytics, on
 slow connections, or in long chats. `seenRunId` blocks repeats, so it happens at
 most once per run. To verify, check that no `GET /api/chat/<id>/stream?runId=`
 fires right after a normal answer. A saved resume cursor like HuggingChat's
-would also make any mistaken replay cheap; the route accepts none today, and
-"Stalled connection recovery" in TODO.md already plans an `after` cursor for
-reconnects.
+would also make any mistaken replay cheap. Since 2026-09-27 the route accepts an
+`after` cursor, but only reconnects within the same page use it (ADR-0039).
 
 ### Stream probe reads the whole chat
 

@@ -40,22 +40,18 @@ tool-heavy chats, and user messages over 1 MiB fail at prepare. When real chats
 approach this, move tool payloads to their own rows (LobeHub `message_plugins`,
 Convex agent component per-step rows). `bun scripts/convex-read-limits-smoke.ts
 --target-mib N` measures the ceiling against dev.
-- **Refresh mid-stream can freeze the answer:** `lib/chat-stream/resumable-chat.ts`
-drops replay updates that fail `hasVisiblePrefix` while status is already
-streaming, so Convex checkpoints are not shown either and the UI freezes until
-the run ends (recorded in ADR-0039 on 09-06 and 09-08). If no update is accepted
-about 2 seconds after caught-up, drop the observer and let checkpoints take
-over. Consider one ordered log with a sequence cursor like HuggingChat, so there
-is no second copy to compare.
-- **Stalled connection recovery:** The only client stall guard is 330 s
-(`use-generation-presentation-controller.ts`), with no reaction to
-`visibilitychange`, `online`, or `pageshow` and no heartbeat frames, so a phone
-sleep or Wi-Fi switch can freeze text for up to 5.5 minutes. Add heartbeats and
-reconnect after about 10 s of silence and on tab or network return (HuggingChat
-`reattachStream.ts`); dropping the client fetch is free for durable runs. Pass
-the `after` cursor from `app/api/chat/[chatId]/stream/route.ts` so a reconnect
-does not replay the whole log. Consider AI SDK 7 `timeout: { firstChunkMs,
-chunkMs }` for provider-side stalls.
+- **Direct request stall recovery:** A durable turn's initiating POST
+(`app/api/chat/chat-turn-runtime.ts`) sends no heartbeat frames, so a half-open
+connection with no page wake waits for the 330 s client budget, and an
+accepted request still in the SDK's `submitted` phase (hidden reasoning before
+first content) has no client guard at all. Send heartbeats on that stream,
+apply the retained stream's 10 s watchdog to the whole accepted request
+(ADR-0039), and consider AI SDK 7 `timeout: { firstChunkMs, chunkMs }` for
+provider-side stalls, with its own terminal reason.
+- **Checkpoint replay cursor:** Store the retained-stream cursor on Convex
+checkpoints (HuggingChat `materializedSeq`) so a refreshed tab resumes after
+the checkpoint it shows instead of comparing two copies. Today a mismatch hands
+the turn to checkpoints after 2 s (ADR-0039).
 - **Retained stream can stay "active" after completion:** Stream end depends on
 one unretried Redis write whose errors are swallowed
 (`lib/chat-stream/server.ts`), and the reader loop never checks the run's

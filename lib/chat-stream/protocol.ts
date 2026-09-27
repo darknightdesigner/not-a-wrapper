@@ -17,6 +17,26 @@ export const retainedChatStreamCursorSchema = z
   .max(64)
   .regex(/^\d+-\d+$/)
 
+/** Idle readers send a heartbeat once this long passes without a frame. */
+export const RETAINED_STREAM_HEARTBEAT_MS = 2_500
+/** Silence this long, several missed heartbeats, means a dead connection. */
+export const RETAINED_STREAM_STALL_MS = 10_000
+
+/** Orders Redis Stream entry ids (`<ms>-<sequence>`). */
+export function compareRetainedCursors(left: string, right: string) {
+  const [leftTime, leftSequence] = left.split("-").map(BigInt)
+  const [rightTime, rightSequence] = right.split("-").map(BigInt)
+  return leftTime === rightTime
+    ? leftSequence < rightSequence
+      ? -1
+      : leftSequence > rightSequence
+        ? 1
+        : 0
+    : leftTime < rightTime
+      ? -1
+      : 1
+}
+
 // SDK schemas are asynchronous. Consume frames with parseAsync, in wire order.
 export const retainedChatStreamFrameSchema = z.discriminatedUnion("type", [
   z.object({
@@ -53,6 +73,7 @@ export const retainedChatStreamFrameSchema = z.discriminatedUnion("type", [
       ),
   }),
   z.object({ type: z.literal("caught-up") }),
+  z.object({ type: z.literal("heartbeat") }),
   z.object({ type: z.literal("end") }),
   z.object({ type: z.literal("unavailable") }),
 ])
