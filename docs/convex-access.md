@@ -82,7 +82,7 @@ itself with a real-looking url. It does not error; it returns confidently wrong
   means the read tool is pointed at the wrong deployment, not that the app is
   empty. A read that contradicts what you can see in the running app is wrong;
   cross-check the dashboard immediately rather than theorising.
-- **One empty table ≠ empty deployment.** `anonymousUsage` is often empty while
+- **One empty table ≠ empty deployment.** `guestTurnLeases` is often empty while
   `chats` has rows. Check the _specific_ table you care about
   (`chats` / `messages` / `generationRuns`), not whatever the dashboard opened by
   default.
@@ -92,6 +92,6 @@ itself with a real-looking url. It does not error; it returns confidently wrong
 ## Tables you'll usually want
 
 `chats`, `messages`, `generationRuns`, `toolInvocations`, `toolCallLog`,
-`toolApprovalRequests`, `toolLimitBuckets`,
+`toolApprovalRequests`, `toolLimitBuckets`, `apiRateLimits`, `guestTurnLeases`,
 `users`, `userKeys`, `userPreferences`, `projects`, `mcpServers`,
-`mcpToolApprovals`, `chatAttachments`, `anonymousUsage`, `feedback`.
+`mcpToolApprovals`, `chatAttachments`, `feedback`.

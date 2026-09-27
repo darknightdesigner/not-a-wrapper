@@ -35,11 +35,13 @@ export function mergeUserProfileWithConvexFields(
   return {
     ...user,
     display_name: convexUser.displayName ?? user.display_name,
+    // The session's own WorkOS picture covers a row the verified webhook has
+    // not synced yet; the bootstrap no longer copies browser profile fields.
     profile_image:
       pendingProfileImage ??
       convexUser.profileImageOverride ??
       convexUser.profileImage ??
-      null,
+      user.profile_image,
     anonymous: convexUser.anonymous ?? user.anonymous,
     premium: convexUser.premium ?? user.premium,
     message_count: convexUser.messageCount ?? user.message_count,

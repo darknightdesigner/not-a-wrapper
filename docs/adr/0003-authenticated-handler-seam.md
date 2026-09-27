@@ -131,3 +131,13 @@ first addendum made unrepresentable for run writes is now unrepresentable for
 prepare writes too. Core-level tests resolve the owner the way the builders do
 (`prepareAsOwner` / `decideAsOwner` helpers); the registrations themselves are
 covered by seam tests (ADR-0034).
+
+## Addendum (2026-09-27): rejected accounts
+
+Every builder now resolves the caller through one helper,
+`getOptionalAuth`, which throws `ConvexError({ code: "account_rejected" })`
+for a users row with `deletedAt` or `disabledAt`, even while the JWT is valid.
+Maybe and optional builders keep returning `null` for a guest or an unsynced
+user, but never for a rejected account. The identity builders now inject
+`ctx.user` (nullable) beside `ctx.identity` and reject the same way; the
+bootstrap they serve is the insert-only `users.ensureCurrent`. See ADR-0044.

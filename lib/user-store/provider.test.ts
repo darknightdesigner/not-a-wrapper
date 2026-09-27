@@ -2,6 +2,7 @@
 
 import type { UserProfile } from "@/lib/user/types"
 import type { toast } from "@/components/ui/toast"
+import { ConvexError } from "convex/values"
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import {
@@ -22,8 +23,10 @@ const providerMocks = vi.hoisted(() => ({
   convexAuthenticated: true,
   convexAuthLoading: false,
   convexUser: null as Record<string, unknown> | null | undefined,
+  queryError: null as Error | null,
   workosUser: null as Record<string, unknown> | null,
   mutation: vi.fn(),
+  signOut: vi.fn(async () => {}),
   showToast: vi.fn<(...args: Parameters<typeof toast>) => number>(() => 1),
   dismissToast: vi.fn(),
 }))
@@ -41,7 +44,11 @@ vi.mock("@workos-inc/authkit-nextjs/components", () => ({
   useAuth: () => ({
     loading: providerMocks.authLoading,
     user: providerMocks.workosUser,
+    signOut: providerMocks.signOut,
   }),
+}))
+vi.mock("@/lib/chat-store/persist", () => ({
+  clearAllIndexedDBStores: vi.fn(async () => {}),
 }))
 
 vi.mock("convex/react", () => ({
@@ -52,7 +59,10 @@ vi.mock("convex/react", () => ({
   useMutation: () => providerMocks.mutation,
 }))
 vi.mock("convex-helpers/react/cache", () => ({
-  useQuery: () => providerMocks.convexUser,
+  useQuery: () => {
+    if (providerMocks.queryError) throw providerMocks.queryError
+    return providerMocks.convexUser
+  },
 }))
 
 const baseUser: UserProfile = {
@@ -186,6 +196,7 @@ describe("UserProvider", () => {
       systemPrompt: "Be concise",
     }
     providerMocks.workosUser = null
+    providerMocks.queryError = null
     providerMocks.mutation.mockReset()
     capturedUpdateUser = null
   })
@@ -323,7 +334,7 @@ describe("UserProvider", () => {
     expect(providerMocks.mutation).toHaveBeenCalledOnce()
     providerMocks.convexUser = null
     renderProvider()
-    expect(providerMocks.mutation).toHaveBeenLastCalledWith(expect.objectContaining({ workosUserId: "user-2" }))
+    expect(providerMocks.mutation).toHaveBeenCalledTimes(2)
     await act(async () => { first.reject(new Error("Old account failure")) })
     expect(providerMocks.showToast).not.toHaveBeenCalled()
     await act(async () => { second.reject(new Error("Current account failure")) })
@@ -355,6 +366,19 @@ describe("UserProvider", () => {
       expect(providerMocks.showToast).not.toHaveBeenCalled()
     }
     expect(providerMocks.mutation).toHaveBeenCalledOnce()
+  })
+
+  it("ends the session instead of crashing or continuing as a guest when Convex rejects the account", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    setAuthenticatedProfileUser()
+    providerMocks.queryError = new ConvexError({ code: "account_rejected" })
+    renderProvider()
+    await act(async () => { await Promise.resolve() })
+    expect(providerMocks.signOut).toHaveBeenCalledWith({ returnTo: "/" })
+    expect(container?.querySelector("[data-chat-admission-ready]")).toBeNull()
+    expect(container?.textContent).toContain(
+      "This account is no longer active."
+    )
   })
 
   it("applies Convex-managed fields after WorkOS hydrates later", () => {

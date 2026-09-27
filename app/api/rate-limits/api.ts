@@ -1,4 +1,9 @@
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
+import {
+  signServerCallProof,
+  type GuestActor,
+} from "@/convex/lib/serverCallProof"
 import {
   AUTH_DAILY_MESSAGE_LIMIT,
   NON_AUTH_DAILY_MESSAGE_LIMIT,
@@ -11,37 +16,55 @@ export type UsageResult = {
   remaining: number
 }
 
-/**
- * Get message usage for a user from Convex
- * @param token - Convex auth token (for authenticated users)
- * @param anonymousId - Anonymous ID (for unauthenticated users)
- * @param isAuthenticated - Whether the user is authenticated
- */
-export async function getMessageUsage(
-  token: string | undefined,
-  anonymousId: string | undefined,
-  isAuthenticated: boolean
-): Promise<UsageResult> {
-  // Default limit based on auth state - used for error fallback
-  const defaultLimit = isAuthenticated
-    ? AUTH_DAILY_MESSAGE_LIMIT
-    : NON_AUTH_DAILY_MESSAGE_LIMIT
+export type UsageActor =
+  | { kind: "user"; token: string | undefined }
+  /** Cookie-verified guest (ADR-0045); never a client-sent id. */
+  | { kind: "guest"; guest: GuestActor }
 
-  try {
-    const regularUsage = await fetchQuery(
-      api.usage.checkUsage,
-      { anonymousId },
-      token ? { token } : undefined
-    )
-
+async function readUsage(actor: UsageActor): Promise<UsageResult> {
+  if (actor.kind === "guest") {
+    const issuedAt = Date.now()
+    const usage = await fetchQuery(api.usage.checkGuestUsage, {
+      guest: actor.guest,
+      issuedAt,
+      proof: signServerCallProof({
+        purpose: "guest_usage_read",
+        guest: actor.guest,
+        issuedAt,
+      }),
+    })
     return {
-      dailyCount: regularUsage.count ?? 0,
-      dailyLimit: regularUsage.limit,
-      remaining: regularUsage.remaining,
+      dailyCount: usage.count,
+      dailyLimit: usage.limit,
+      remaining: usage.remaining,
     }
+  }
+  const usage = await fetchQuery(
+    api.usage.checkUsage,
+    {},
+    { token: actor.token }
+  )
+  return {
+    dailyCount: usage.count ?? 0,
+    dailyLimit: usage.limit,
+    remaining: usage.remaining,
+  }
+}
+
+/** Daily message usage for the composer's pre-send hint. */
+export async function getMessageUsage(actor: UsageActor): Promise<UsageResult> {
+  try {
+    return await readUsage(actor)
   } catch (error) {
+    // A rejected account is refused, never shown default usage (ADR-0044).
+    if (isAccountRejectedError(error)) throw error
     console.error("Error fetching usage from Convex:", error)
-    // Usage lookup failures must not block messaging.
+    // A hint only: /api/chat admission is the enforcing, fail-closed gate, so
+    // a failed lookup must not block the send that admission will judge.
+    const defaultLimit =
+      actor.kind === "user"
+        ? AUTH_DAILY_MESSAGE_LIMIT
+        : NON_AUTH_DAILY_MESSAGE_LIMIT
     return {
       dailyCount: 0,
       dailyLimit: defaultLimit,

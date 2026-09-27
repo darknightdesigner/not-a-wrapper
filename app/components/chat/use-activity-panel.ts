@@ -118,6 +118,23 @@ export function isGenerationActive(
 }
 
 /**
+ * Deriving a view walks persisted tool output, which can hold shapes no parser
+ * expects. Above the rows a failure means "no view": the turn's own row derives
+ * it again and shows the failure (MessageRowBoundary), so one broken turn
+ * cannot take the whole Chat down with it.
+ */
+function tryDeriveAssistantTurnView(
+  message: UIMessage,
+  status: ChatStatus
+): AssistantTurnView | undefined {
+  try {
+    return deriveAssistantTurnView(message, status)
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * The last message's standing while this client's generation is active — one
  * derivation shared by `Conversation` (the pending row and the live row) and
  * the Activity panel (its default target), so the pending gate can't drift
@@ -129,7 +146,8 @@ export function isGenerationActive(
  * adoption would briefly replace the 32px Thinking slot with an empty turn.
  */
 export type ActiveAssistantTurn =
-  /** No generation is active on this client. */
+  /** No generation is active on this client, or its live turn cannot be
+   * derived (its row then derives on its own and shows the failure). */
   | { kind: "none" }
   /** Generation is active and nothing renderable exists yet: the pending
    * placeholder row owns the slot. */
@@ -153,7 +171,8 @@ export function resolveActiveAssistantTurn({
   if (lastMessage?.role === "user") return { kind: "pending" }
   if (lastMessage?.role !== "assistant") return { kind: "none" }
 
-  const view = deriveAssistantTurnView(lastMessage, status)
+  const view = tryDeriveAssistantTurnView(lastMessage, status)
+  if (!view) return { kind: "none" }
   const durableStatus = messageRenderStatus(lastMessage)
   const durableLive =
     durableStatus === "ready" ||
@@ -244,7 +263,7 @@ export function selectActivityPanelTarget({
     ? undefined
     : activeTurn.kind === "live" && activeTurn.message === defaultMessage
       ? activeTurn.view
-      : deriveAssistantTurnView(defaultMessage, status)
+      : tryDeriveAssistantTurnView(defaultMessage, status)
   const lastMessage = messages[messages.length - 1]
   const workClockMessage =
     defaultMessage ??
@@ -325,7 +344,7 @@ export function useActivityPanel({
   const panelView = isPanelDefaultTurn
     ? defaultView
     : panelMessage
-      ? deriveAssistantTurnView(panelMessage, "ready")
+      ? tryDeriveAssistantTurnView(panelMessage, "ready")
       : undefined
 
   const defaultWorkDuration = useAssistantWorkDuration({

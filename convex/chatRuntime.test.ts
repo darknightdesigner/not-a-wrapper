@@ -6209,13 +6209,11 @@ describe("generation-run write trust boundary (ADR-0011 / ADR-0021)", () => {
 describe("closeSupersededGenerationsForChat", () => {
   const NOW = 1700000000000
 
-  it("mints the receipt-attach capability when an orphan message's live run is superseded", async () => {
+  it("closes a live run behind any number of newer runs, even with no live message", async () => {
     const { user, chat, userId, chatId } = createOwnerFixture()
-    const liveRunId = asId<"generationRuns">("run_orphan")
-    const messageId = asId<"messages">("message_orphan")
-    // 50 newer terminal runs (ACTIVE_RUN_SCAN_LIMIT) push the live run out of
-    // the scan window, so its message reaches the orphan branch.
-    const fillers = Array.from({ length: 50 }, (_, index) =>
+    // Newer terminal runs must not hide an older live run: the account drain
+    // (ADR-0044) blocks if the sweep leaves the run it found live.
+    const fillers = Array.from({ length: 60 }, (_, index) =>
       createGenerationRun({
         id: `run_done_${index}`,
         chatId,
@@ -6226,37 +6224,31 @@ describe("closeSupersededGenerationsForChat", () => {
     )
     const liveRun: Doc<"generationRuns"> = {
       ...createGenerationRun({
-        id: liveRunId,
+        id: "run_live",
         chatId,
         userId,
-        assistantMessageId: messageId,
+        status: "queued",
         updatedAt: 1000,
       }),
       grantDigest: "d".repeat(64),
       grantExpiresAt: NOW + 60_000,
+      leaseExpiresAt: NOW + 30_000,
     }
-    const message = createAssistantRuntimeMessage({
-      id: messageId,
-      chatId,
-      runId: liveRunId,
-      orderId: 1,
-      content: "partial",
-      parts: [{ type: "text", text: "partial" }],
-    })
     const { ctx } = createMutationCtx({
       users: [user],
       chats: [chat],
-      messages: [message],
       generationRuns: [...fillers, liveRun],
     })
 
-    await closeSupersededGenerationsForChat(ctx, chatId, userId, NOW)
+    await expect(
+      closeSupersededGenerationsForChat(ctx, chatId, userId, NOW)
+    ).resolves.toBe(true)
 
-    expect(message.status).toBe("aborted")
     expect(liveRun).toMatchObject({
       status: "aborted",
       terminalReason: "superseded",
       grantDigest: undefined,
+      leaseExpiresAt: undefined,
       timingReceiptGrantDigest: "d".repeat(64),
       timingReceiptGrantExpiresAt: NOW + TIMING_RECEIPT_ATTACH_WINDOW_MS,
     })

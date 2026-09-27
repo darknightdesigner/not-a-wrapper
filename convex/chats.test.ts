@@ -684,14 +684,17 @@ describe("projectChatForReader (owner-only status strip)", () => {
 describe("markChatReadForOwner", () => {
   function createReadWriteCtx(
     chats: Doc<"chats">[],
-    projects: Doc<"projects">[] = []
+    projects: Doc<"projects">[] = [],
+    users: Doc<"users">[] = []
   ) {
     const patches: Array<{ id: string; value: Record<string, unknown> }> = []
     const ctx = {
       db: {
+        // Chat activity reads the owner account (ADR-0044).
         get: async (id: string) =>
           chats.find((chat) => chat._id === id) ??
           projects.find((project) => project._id === id) ??
+          users.find((user) => user._id === id) ??
           null,
         // The boundary lookup: chats by client-minted publicId (ADR-0033).
         query: (tableName: string) => ({
@@ -732,7 +735,7 @@ describe("markChatReadForOwner", () => {
       userId: owner._id,
       lastRunEndedAt: 200,
     })
-    const { ctx, patches } = createReadWriteCtx([chat])
+    const { ctx, patches } = createReadWriteCtx([chat], [], [owner])
 
     await markChatReadForOwner(ctx, owner, chat.publicId, 200)
 
@@ -747,7 +750,7 @@ describe("markChatReadForOwner", () => {
       userId: owner._id,
       lastRunEndedAt: 200,
     })
-    const { ctx, patches } = createReadWriteCtx([chat])
+    const { ctx, patches } = createReadWriteCtx([chat], [], [owner])
 
     await markChatReadForOwner(ctx, owner, chat.publicId, 300)
 

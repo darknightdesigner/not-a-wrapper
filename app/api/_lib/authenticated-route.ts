@@ -1,5 +1,6 @@
 import "server-only"
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import type { RateLimitBucket } from "@/convex/rateLimits"
 import { getAuthenticatedWorkosSession } from "@/lib/auth/workos"
 import {
@@ -10,6 +11,7 @@ import {
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import {
+  accountRejectedError,
   createAuthenticatedConvexClient,
   jsonError,
   unauthorizedError,
@@ -93,12 +95,20 @@ export function authenticatedRoute<Rest extends unknown[]>(
 
     const convex = createAuthenticatedConvexClient(session.accessToken)
 
-    if (opts.rateLimit) {
-      const rateLimitError = await enforceRateLimit(convex, opts.rateLimit)
-      if (rateLimitError) return rateLimitError
-    }
+    try {
+      if (opts.rateLimit) {
+        const rateLimitError = await enforceRateLimit(convex, opts.rateLimit)
+        if (rateLimitError) return rateLimitError
+      }
 
-    return handler(req, { session, convex }, ...rest)
+      return await handler(req, { session, convex }, ...rest)
+    } catch (error) {
+      // The Convex boundary rejects a deleted or disabled account even with a
+      // valid session (ADR-0044). Handlers that catch their own Convex errors
+      // map them through routeFailureResponse.
+      if (isAccountRejectedError(error)) return accountRejectedError()
+      throw error
+    }
   }
 }
 

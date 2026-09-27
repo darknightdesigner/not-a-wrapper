@@ -30,7 +30,9 @@ const toolApprovalStatus = v.union(
 export default defineSchema({
   users: defineTable({
     workosUserId: v.string(),
-    email: v.string(),
+    // Written only by the verified WorkOS webhook or a verified token claim;
+    // absent until one arrives, and scrubbed from an account tombstone.
+    email: v.optional(v.string()),
     displayName: v.optional(v.string()),
     profileImage: v.optional(v.string()),
     profileImageOverride: v.optional(v.string()),
@@ -46,6 +48,10 @@ export default defineSchema({
     lastActiveAt: v.optional(v.number()),
     lastSyncedFromWorkOSAt: v.optional(v.number()),
     workosUpdatedAt: v.optional(v.string()),
+    // Account lifecycle (ADR-0044). Either value makes the account rejected at
+    // the auth boundary. deletedAt is permanent (the row stays as a tombstone
+    // so the bootstrap cannot resurrect it); neither is ever cleared by the
+    // public bootstrap or a webhook profile sync.
     deletedAt: v.optional(v.number()),
     disabledAt: v.optional(v.number()),
 
@@ -315,9 +321,13 @@ export default defineSchema({
     timingReceiptGrantExpiresAt: v.optional(v.number()),
   })
     .index("by_chat", ["chatId"])
-    .index("by_user", ["userId"])
+    // An account deletion job closes the account's live runs first (ADR-0044).
+    // Complete per account: prepareGenerationForChat, the only writer, always
+    // sets userId to the Chat owner (optional by declaration, never absent).
+    .index("by_user_status", ["userId", "status"])
     .index("by_status", ["status"])
-    .index("by_chat_updated", ["chatId", "updatedAt"])
+    // The supersede sweep reads a Chat's live runs by status.
+    .index("by_chat_status", ["chatId", "status"])
     .index("by_status_lease_expires", ["status", "leaseExpiresAt"])
     // Windowed receipt summaries (runTiming.timingSummary) range over
     // completed runs by completion time.
@@ -403,7 +413,12 @@ export default defineSchema({
   }).index("by_user", ["userId"]),
 
   deletionJobs: defineTable({
-    targetKind: v.union(v.literal("chat"), v.literal("project")),
+    targetKind: v.union(
+      v.literal("chat"),
+      v.literal("project"),
+      // A deleted account's owned data (ADR-0044); userId is the target.
+      v.literal("account")
+    ),
     chatId: v.optional(v.id("chats")),
     projectId: v.optional(v.id("projects")),
     userId: v.id("users"),
@@ -426,7 +441,8 @@ export default defineSchema({
   })
     .index("by_chat", ["chatId"])
     .index("by_project", ["projectId"])
-    .index("by_state_updated", ["state", "updatedAt"]),
+    .index("by_state_updated", ["state", "updatedAt"])
+    .index("by_kind_user", ["targetKind", "userId"]),
 
   userPreferences: defineTable({
     userId: v.id("users"),
@@ -599,6 +615,9 @@ export default defineSchema({
     .index("by_bucket", ["bucketId"])
     .index("by_user_created", ["userId", "createdAt"]),
 
+  // Retired client-keyed guest counters (ADR-0045 moved guest admission to
+  // server-derived `apiRateLimits` windows). Nothing reads or writes it; the
+  // limiter sweep cron drains production rows before the table is removed.
   anonymousUsage: defineTable({
     anonymousId: v.string(),
     dailyMessageCount: v.number(),
@@ -606,6 +625,7 @@ export default defineSchema({
   }).index("by_anonymous_id", ["anonymousId"]),
 
   // Persistent sliding-window buckets for domain and tool-budget limits.
+  // `by_updated_at` serves the bounded limiter sweep (convex/rateLimits.ts).
   toolLimitBuckets: defineTable({
     actorKey: v.string(),
     limitType: v.union(v.literal("domain"), v.literal("budget")),
@@ -615,24 +635,43 @@ export default defineSchema({
     bucketStartMs: v.number(),
     count: v.number(),
     updatedAt: v.number(),
-  }).index("by_actor_limit_scope_bucket", [
-    "actorKey",
-    "limitType",
-    "toolName",
-    "scopeKey",
-    "keyMode",
-    "bucketStartMs",
-  ]),
+  })
+    .index("by_actor_limit_scope_bucket", [
+      "actorKey",
+      "limitType",
+      "toolName",
+      "scopeKey",
+      "keyMode",
+      "bucketStartMs",
+    ])
+    .index("by_updated_at", ["updatedAt"]),
 
-  // Fixed-window per-identity throttle for expensive API routes (e.g. the MCP
-  // "test connection" endpoint, which opens an outbound connection per call).
-  // Keyed by the authenticated user; see convex/rateLimits.ts.
+  // Fixed-window throttles keyed by a server-derived actor: expensive API
+  // routes per user (e.g. the MCP "test connection" endpoint) and guest turn
+  // admission per guest, per network, and across all guests (ADR-0045). See
+  // convex/rateLimits.ts.
   apiRateLimits: defineTable({
     actorKey: v.string(),
     bucket: v.string(),
     windowStartMs: v.number(),
     count: v.number(),
-  }).index("by_actor_bucket_window", ["actorKey", "bucket", "windowStartMs"]),
+  })
+    .index("by_actor_bucket_window", ["actorKey", "bucket", "windowStartMs"])
+    .index("by_window_start", ["windowStartMs"]),
+
+  // One row per running guest answer (ADR-0045): admission counts unexpired
+  // leases for the concurrency cap; the route deletes its lease when the
+  // response ends, and `expiresAt` frees a crashed function's slot.
+  guestTurnLeases: defineTable({
+    requestId: v.string(),
+    guestId: v.string(),
+    networkKey: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_guest_expires", ["guestId", "expiresAt"])
+    .index("by_network_expires", ["networkKey", "expiresAt"])
+    .index("by_expires", ["expiresAt"]),
 
   mcpServers: defineTable({
     userId: v.id("users"),
@@ -715,5 +754,8 @@ export default defineSchema({
     chatVersion: v.optional(v.number()),
     toolKey: v.optional(v.string()),
     stateMutationKey: v.optional(v.string()),
-  }).index("by_chat", ["chatId"]),
+  })
+    .index("by_chat", ["chatId"])
+    // Account deletion reaches rows logged without a chat.
+    .index("by_user", ["userId"]),
 })

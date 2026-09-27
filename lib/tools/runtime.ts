@@ -368,6 +368,7 @@ async function buildToolRuntime(
   const toolLimitStore = createConvexToolLimitStore({
     convexToken,
     anonymousId,
+    requestId,
   })
   const makePolicyGuard = (keyMode: ToolKeyMode) =>
     createToolPolicyGuard({ store: toolLimitStore, keyMode })

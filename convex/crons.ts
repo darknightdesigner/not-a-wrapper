@@ -70,4 +70,15 @@ crons.interval(
   {}
 )
 
+// Expired limiter rows (ADR-0045): tool buckets past the longest tool window,
+// fixed windows past a day, expired guest turn leases, and the retired
+// anonymous counters. Sweep-on-write alone misses actors that never return.
+// Bounded per run; a full batch schedules its own continuation.
+crons.interval(
+  "sweep expired limiter rows",
+  { minutes: 10 },
+  internal.rateLimits.sweepExpiredLimiterRows,
+  {}
+)
+
 export default crons

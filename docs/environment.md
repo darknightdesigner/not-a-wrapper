@@ -31,13 +31,16 @@ Required local `.env.local` values:
 - at least one AI provider key
 
 `WORKOS_COOKIE_PASSWORD` must be at least 32 characters.
-`CHAT_ADMISSION_SECRET` signs both durable chat admission and platform-usage
-reservation authorization. On the Next.js server it also keys the opaque
-per-user id sent to OpenAI, Anthropic, and OpenRouter for abuse attribution
-(an HMAC of the WorkOS user id, never the email; ADR-0021). Rotating it
-changes every user's id; without it, no id is sent. It must be at least 32
-bytes and must use the same value in `.env.local` and the target Convex
-deployment. Use a different secret for Production and Preview; use a
+`CHAT_ADMISSION_SECRET` signs durable chat admission, platform-usage
+reservation authorization, the guest cookie, and the server-call proofs that
+gate guest admission and tool limits
+([ADR-0045](adr/0045-guest-identity-and-server-proven-guest-admission.md)).
+Without it, guest turns fail closed. On the Next.js server it also keys the
+opaque per-user id sent to OpenAI, Anthropic, and OpenRouter for abuse
+attribution (an HMAC of the WorkOS user id, never the email; ADR-0021).
+Rotating it changes every user's id; without it, no id is sent. It must be at
+least 32 bytes and must use the same value in `.env.local` and the target
+Convex deployment. Use a different secret for Production and Preview; use a
 per-preview secret when sibling-preview isolation is required. Generate it
 with:
 
@@ -95,6 +98,24 @@ transmission, so oversized output cannot exceed hosted Redis request limits.
 Missing or unavailable replay leaves Convex checkpoint recovery active. A reconnect
 retries transient failures with bounded backoff, then falls back after five failures
 without new output. Redis does not make the existing model worker survive a crash.
+
+## Guest limits
+
+Guest turns are limited per signed guest cookie, per client network, by running
+answers, and by one daily ceiling across all guests
+([ADR-0045](adr/0045-guest-identity-and-server-proven-guest-admission.md)).
+Defaults live in `GUEST_TURN_LIMITS` (`lib/config.ts`).
+
+- The client network comes from `x-real-ip` only on Vercel (`VERCEL=1`), where
+  the platform sets it. Locally and on other hosts, every guest shares one
+  network bucket, so a few guest turns from any browser use it up.
+- The optional Convex env `GUEST_DAILY_TURN_CEILING` overrides the daily
+  ceiling without a deploy. `0` turns guest chat off; a malformed value keeps
+  the default.
+
+```bash
+bunx convex env set GUEST_DAILY_TURN_CEILING 200
+```
 
 ## Convex Env
 
@@ -175,6 +196,13 @@ once from WorkOS (this also upserts the app's `users` rows):
 ```bash
 bunx convex run workosAuth:backfillUsers        # dev
 bunx convex run --prod workosAuth:backfillUsers # production
+```
+
+A skipped `user.deleted` also skips the app's account deletion (ADR-0044).
+Apply it by hand for a user WorkOS already deleted:
+
+```bash
+bunx convex run users:deleteAccount '{"workosUserId":"user_..."}'
 ```
 
 ```bash
