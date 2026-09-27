@@ -1,10 +1,5 @@
 # To Do
 
-- **File ownership and safe deletion:** Bind storage ownership during authenticated
-upload; prevent `saveStagedAttachment` from claiming another attachment's or
-profile image's blob through a caller-supplied storage ID. Share reference-aware
-deletion rules across explicit deletion and staged-attachment cleanup so duplicate
-references cannot delete a blob still in use.
 - **Account deletion webhook gap:** `@convex-dev/workos-authkit` 0.2.9 (the
 latest release) returns early on `user.deleted` for a user missing from its
 mirror, so our account deletion never runs for that user. Keep the mirror
@@ -30,16 +25,10 @@ Google's favicon service about that host. A prompt-injected link to
 `https://<encoded-chat>.evil.example` can leak data through DNS with no click.
 Show favicons only for tool-sourced citations, or a static globe for
 model-written links.
-- **Sharing: revoke and a safe public view:** `makePublic` is the only writer of
-`public: true`, and only chat deletion clears it. Add un-share, and consider a
-separate share id or snapshot instead of exposing the private chat id live.
-`getPublicById` returns `systemPrompt` and `userId`, and `getPublicForChat`
-returns raw `parts` (tool inputs and outputs, reasoning, file URLs), so a shared
-chat that used a private MCP tool exposes those results. Build the public view
-from a field allowlist and serve files through a share-scoped path (LibreChat
-`share.ts` is the reference). Changes a contract, so record it in an ADR.
-Also mark share pages `noindex`
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#shared-chat-pages-can-be-indexed)).
+- **Shared chats omit attachments:** The share view (ADR-0043) leaves files
+out. If shared attachments become a product need, serve them through a
+share-scoped route that checks the file belongs to a message on the shared path
+(LibreChat `/api/share/:shareId/files/:fileId`).
 - **Convex read ceiling for very large chats:** `prepareGeneration` now reads a
 chat once per turn and each message is capped at 896 KiB (CONTEXT.md "Message
 payload cap"), so sends work up to about 16 MiB of messages (verified to 12 MiB
@@ -107,13 +96,15 @@ public signed-in mutation with no rate limit, retention, or ownership check
 beyond `by_chat`, so any signed-in browser can forge or flood audit rows. Delete
 the unused copies or make them server-written, bounded, and indexed for a real
 reader.
-- **Upload admission and orphan cleanup:** `generateUploadUrl`
-(`convex/files.ts`) counts only saved rows, and the cleanup job promised by the
-comment there does not exist in `convex/crons.ts`, so failed or abandoned
-uploads live forever and the daily cap never trips. Rate-limit it with the
-existing `apiRateLimits`, verify whether the upload URL caps size, check content
-type server-side instead of trusting the declared one, and add a cron that
-deletes unreferenced storage. Complements the file-ownership item above.
+- **Upload content type and orphan sweep:** ADR-0046 moved attachment uploads
+to the ticketed `/attachments` HTTP action, which admits before storing (daily
+limit, a 20-a-minute `attachment_upload` window, rejected accounts), enforces
+the 10 MB cap while reading, and releases any blob that staging refuses or
+fails through the reference rule. Still open: the stored
+Content-Type is the browser's declared header, so sniff content server-side;
+and add a cron that deletes unreferenced storage (blobs orphaned between store
+and staging, and blobs left by the pre-ADR-0046 flow) through
+`deleteStorageIfUnreferenced` (`convex/domain/storage_refs.ts`).
 - **Hosted search fees in the platform allowance:** Settlement counts tokens
 only (`convex/domain/usage_accounting.ts`, `lib/usage/billable-pricing.ts`);
 per-call search fees exist as display metadata in `provider-strategy.ts` and the
@@ -280,15 +271,25 @@ PDF cost from file size instead of URL length.
 - **Final answer at the tool-step cap:** A tool call on the last allowed step
 ends the turn with no reply. Make the last step tools-off.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-step-cap-can-end-a-turn-with-no-answer))
-- **Provider request settings:** Turn on Anthropic prompt caching, send OpenAI
-`store: false` with a hashed per-user `safetyIdentifier`, and put today's date
-in the system prompt.
-([caching](docs/audits/2026-09-26-open-source-reference-gaps.md#anthropic-prompt-caching-is-never-turned-on),
-[OpenAI](docs/audits/2026-09-26-open-source-reference-gaps.md#openai-keeps-response-storage-on-and-gets-no-user-id),
-[date](docs/audits/2026-09-26-open-source-reference-gaps.md#the-model-is-never-told-the-date))
-- **Bill cached input at the cache rate:** The allowance charges cached tokens
-at the full input price, so users run out early on longer chats.
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#cached-input-tokens-are-billed-at-full-price))
+- **Confirm Claude prompt caching live:** #196 sends Anthropic `cacheControl`
+on every Claude request (direct and through OpenRouter `anthropic/*`), covered
+by request-shaping tests but not yet seen on a real BYOK Claude turn. Send two
+turns in a long chat with a Claude key and check generation stats show cached
+input tokens.
+- **Durable cache-read evidence:** Failure, lease-expiry and deadline
+settlements still charge cached input at the full rate, because run step usage
+and reservations do not store the cache-read count. Add optional
+`cacheReadTokens` to `generationRuns.usageSteps`, the run totals and
+`usageReservations`, and feed it to the fallback settlement evidence
+(ADR-0021).
+- **OpenAI storage with hosted search:** OpenAI turns that pair hosted web
+search with Exa, content or MCP tools still keep response storage, because
+`@ai-sdk/openai` drops hosted search calls from later steps when `store` is
+false. Switch them to `store: false` once the SDK replays hosted calls inline
+(ADR-0021, "Storage exception").
+- **Encrypted reasoning size:** With `store: false`, OpenAI and xAI reasoning
+parts persist the encrypted reasoning once per summary part. Measure message
+size on long tool turns; if it matters, keep one copy per reasoning item.
 - **Send only the new message:** The client uploads the whole conversation on
 every send, although signed-in turns read history from Convex.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#every-send-uploads-the-whole-conversation))

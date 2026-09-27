@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   togglePinned: vi.fn(),
   updateTitle: vi.fn(),
   menuRender: vi.fn(),
+  mutation: vi.fn(async (_args: { chatId: string }) => ({ shareId: "share" })),
 }))
 
 beforeEach(() => {
@@ -36,16 +37,27 @@ vi.mock("@/lib/chat-store/chats/provider", () => ({
 vi.mock("@/lib/chat-store/session/provider", () => ({
   useChatSession: () => ({ chatId: mocks.chatId }),
 }))
-vi.mock("convex/react", () => ({ useMutation: () => vi.fn() }))
+vi.mock("convex/react", () => ({ useMutation: () => mocks.mutation }))
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock("./share-publish-drawer", () => ({ SharePublishDrawer: () => null }))
+vi.mock("./share-publish-content-loader", () => ({
+  preloadSharePublishContent: vi.fn(),
+}))
+vi.mock("./share-publish-drawer", () => ({
+  SharePublishDrawer: ({ open }: { open: boolean }) =>
+    open ? <div data-share-drawer /> : null,
+}))
 vi.mock("./row-actions-menu", () => ({
   RowActionsMenu: ({ items }: { items: RowActionItem[] }) => {
     mocks.menuRender()
+    const select = (key: string) =>
+      items.find((item) => item.key === key)?.onSelect
     return (
-      <button onClick={items.find((item) => item.key === "delete")?.onSelect}>
-        Request delete
-      </button>
+      <>
+        <button onClick={select("delete")}>Request delete</button>
+        <button data-share onClick={select("share")}>
+          Share
+        </button>
+      </>
     )
   },
 }))
@@ -149,6 +161,42 @@ it("skips unrelated chat switches and preserves current-chat deletion scope", as
       expect.any(Function)
     )
     expect(mocks.reset).toHaveBeenCalledOnce()
+  } finally {
+    act(() => root.unmount())
+    vi.unstubAllGlobals()
+  }
+})
+
+it("closes the share drawer when the menu's chat changes", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
+  const container = document.createElement("div")
+  const root = createRoot(container)
+  const chatFor = (id: string): Chat => ({
+    id,
+    user_id: "owner",
+    title: "Test",
+    model: null,
+    project_id: null,
+    public: false,
+    pinned: false,
+    pinned_at: null,
+    created_at: null,
+    updated_at: null,
+  })
+  // The header's menu follows the route: same instance, new chat prop.
+  const render = (id: string) =>
+    act(() => root.render(<ChatActionsMenu chat={chatFor(id)} showShare />))
+  try {
+    render("chat-a")
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>("[data-share]")!.click()
+    )
+    expect(mocks.mutation).toHaveBeenCalledWith({ chatId: "chat-a" })
+    expect(container.querySelector("[data-share-drawer]")).not.toBeNull()
+
+    // A's link must not stay open over B, where Stop sharing would revoke B.
+    render("chat-b")
+    expect(container.querySelector("[data-share-drawer]")).toBeNull()
   } finally {
     act(() => root.unmount())
     vi.unstubAllGlobals()

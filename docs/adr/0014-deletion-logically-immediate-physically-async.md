@@ -23,8 +23,9 @@ Deletion is a two-stage operation:
    and its Project and fails closed when either is missing or tombstoned.
 2. A `deletionJobs` state machine drains one bounded child-table page per
    scheduled mutation. Destructive pages always restart at `cursor: null`;
-   attachments use bounded `take` reads and an in-transaction
-   `by_storage.take(2)` exclusivity check. Chat roots are deleted only after
+   attachments use bounded `take` reads, and a blob is deleted only when no
+   other attachment row or profile image references it (the shared rule,
+   ADR-0046). Chat roots are deleted only after
    every child range is empty, and Project roots are deleted only after every
    linked Chat is gone.
 
@@ -69,6 +70,13 @@ reapers skip a deleted account's Chats). It then drains every owned Chat
 through the Chat phases, then Project roots, staged attachments, and the
 account-owned tables, and finally scrubs the tombstone's personal fields. It
 refuses to run for an account that is not deleted.
+
+## Amendment (2026-09-27): share links
+
+ADR-0043 moves public access to a `chatShares` row. The Chat tombstone commit
+(and the drain-start commit of Project and account jobs) deletes that row, so
+a revoked link cannot outlive its Chat, and the public read also fails closed
+through the ancestor rule above.
 
 ## Blocked-job runbook
 

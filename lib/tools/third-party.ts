@@ -134,7 +134,7 @@ export async function getThirdPartyTools(
           "- URLs in code snippets, import statements, or reference links\n\n" +
           "Query tips:\n" +
           "- Be specific and concise — include key terms, names, and dates when relevant\n" +
-          "- Do NOT append the current year unless the user specifically asks for recent results\n" +
+          "- For recent or current topics, use today's year from the current date, not your training data's year\n" +
           "- Prefer natural language queries over keyword-stuffed searches",
         inputSchema: z.object({
           query: z

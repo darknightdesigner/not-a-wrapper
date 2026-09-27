@@ -104,38 +104,67 @@ describe("stored file validation", () => {
       )
     ).toBe(false)
   })
+})
 
-  it("does not delete caller-supplied storage on validation failure", async () => {
-    const deleteStoredFile = vi.fn()
+describe("staging an uploaded blob", () => {
+  function stagingCtx(heldBy?: "chatAttachments" | "users") {
+    const insert = vi.fn().mockResolvedValue(attachmentId)
     const ctx = {
-      user: { _id: userId },
+      // Premium skips the daily count, which this fake does not model.
+      user: { _id: userId, premium: true },
       db: {
+        query: (table: "chatAttachments" | "users") => ({
+          withIndex: () => ({
+            take: async () =>
+              table === heldBy ? [{ _id: `${table}-holder` }] : [],
+          }),
+        }),
         system: {
           get: vi.fn().mockResolvedValue({
             size: 42,
             contentType: "application/pdf",
           }),
         },
+        insert,
       },
-      storage: { delete: deleteStoredFile },
+      storage: { getUrl: vi.fn().mockResolvedValue("https://files.test/1") },
+      scheduler: { runAfter: vi.fn() },
     } as unknown as Parameters<typeof saveStagedAttachmentHandler>[0]
+    return { ctx, insert }
+  }
 
+  it("never stages a blob another attachment or a profile image already holds", async () => {
+    for (const heldBy of ["chatAttachments", "users"] as const) {
+      const { ctx, insert } = stagingCtx(heldBy)
+      await expect(
+        saveStagedAttachmentHandler(ctx, {
+          storageId,
+          fileType: "application/pdf",
+        })
+      ).rejects.toThrow("Stored file is already in use")
+      expect(insert).not.toHaveBeenCalled()
+    }
+
+    const { ctx, insert } = stagingCtx()
     await expect(
       saveStagedAttachmentHandler(ctx, {
         storageId,
-        fileType: "image/png",
+        fileType: "application/pdf",
       })
-    ).rejects.toThrow("Stored file failed server validation")
-    expect(deleteStoredFile).not.toHaveBeenCalled()
+    ).resolves.toBe(attachmentId)
+    expect(insert).toHaveBeenCalledWith(
+      "chatAttachments",
+      expect.objectContaining({ userId, storageId })
+    )
   })
 })
 
 describe("attachment deletion", () => {
   it("allows staged cleanup but rejects deletion after chat binding", () => {
     expect(() => assertAttachmentCanBeDeletedIndependently({})).not.toThrow()
-    expect(() =>
-      assertAttachmentCanBeDeletedIndependently({ chatId })
-    ).toThrow("Attached files cannot be deleted independently")
+    expect(() => assertAttachmentCanBeDeletedIndependently({ chatId })).toThrow(
+      "Attached files cannot be deleted independently"
+    )
   })
 })
 

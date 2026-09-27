@@ -6,7 +6,6 @@ import {
   getSelectedPathMessages,
 } from "./domain/message_branches"
 import {
-  getPublicForChatHandler,
   getSelectedPathForViewer,
   getSelectedRunStateForViewer,
   selectBranchForChat,
@@ -151,7 +150,7 @@ function createMutationCtx(tablesInput: Partial<TableDocuments>) {
   return { ctx, tables }
 }
 
-function createOwnerFixture({ publicChat = false } = {}) {
+function createOwnerFixture() {
   const userId = asId<"users">("user_1")
   const chatId = asId<"chats">("chat_1")
   const user: Doc<"users"> = {
@@ -165,73 +164,13 @@ function createOwnerFixture({ publicChat = false } = {}) {
     _creationTime: 1,
     publicId: "chat-1-public",
     userId,
-    public: publicChat,
+    public: false,
     pinned: false,
     updatedAt: 1,
   }
 
   return { user, chat, userId, chatId }
 }
-
-describe("getPublicForChatHandler", () => {
-  it("returns no messages for a tombstoned public chat", async () => {
-    const { user, chat, chatId } = createOwnerFixture({ publicChat: true })
-    chat.deletingAt = 2
-    const { ctx } = createMutationCtx({
-      users: [user],
-      chats: [chat],
-      messages: [
-        {
-          ...createMessage({
-            id: "message_1",
-            orderId: 1,
-            role: "user",
-            content: "hidden",
-          }),
-          chatId,
-        },
-      ],
-    })
-
-    await expect(
-      getPublicForChatHandler(ctx, { chatId: chat.publicId })
-    ).resolves.toEqual([])
-  })
-
-  it("returns no messages when the public Chat's Project is tombstoned", async () => {
-    const { user, chat, chatId } = createOwnerFixture({ publicChat: true })
-    const project: Doc<"projects"> = {
-      _id: asId<"projects">("project_1"),
-      _creationTime: 1,
-      userId: user._id,
-      name: "Deleting",
-      updatedAt: 1,
-      pinned: false,
-      deletingAt: 2,
-    }
-    chat.projectId = project._id
-    const { ctx } = createMutationCtx({
-      users: [user],
-      chats: [chat],
-      projects: [project],
-      messages: [
-        {
-          ...createMessage({
-            id: "message_1",
-            orderId: 1,
-            role: "user",
-            content: "hidden",
-          }),
-          chatId,
-        },
-      ],
-    })
-
-    await expect(
-      getPublicForChatHandler(ctx, { chatId: chat.publicId })
-    ).resolves.toEqual([])
-  })
-})
 
 describe("message branch selection", () => {
   it("walks the selected path and reports sibling branch metadata", () => {
@@ -292,9 +231,7 @@ describe("message branch selection", () => {
   })
 
   it("returns selected-path messages from chat queries after a branch switch", async () => {
-    const { user, chat, userId, chatId } = createOwnerFixture({
-      publicChat: true,
-    })
+    const { user, chat, userId, chatId } = createOwnerFixture()
     const messages = [
       {
         ...createMessage({
@@ -347,9 +284,8 @@ describe("message branch selection", () => {
       messageId: asMessageId("message_assistant_old"),
     })
 
-    await expect(
-      getPublicForChatHandler(ctx, { chatId: chat.publicId })
-    ).resolves.toMatchObject([
+    const path = await getSelectedPathForViewer(ctx, { chat, viewer: user })
+    expect(path.selectedMessages).toMatchObject([
       { _id: "message_user_1" },
       { _id: "message_assistant_old" },
     ])
@@ -360,9 +296,8 @@ describe("selected conversation projections", () => {
   function createRunWorld({
     runStatus = "streaming" as Doc<"generationRuns">["status"],
     assistantSelected = true,
-    publicChat = false,
   } = {}) {
-    const { user, chat, userId, chatId } = createOwnerFixture({ publicChat })
+    const { user, chat, userId, chatId } = createOwnerFixture()
     const runId = asId<"generationRuns">("run_1")
     const assistantId = asMessageId("message_assistant_1")
     const messages: Doc<"messages">[] = [
@@ -454,8 +389,8 @@ describe("selected conversation projections", () => {
     })
   })
 
-  it("does not expose run metadata to a public non-owner viewer", async () => {
-    const world = createRunWorld({ publicChat: true })
+  it("gives a non-owner viewer neither the path nor run metadata", async () => {
+    const world = createRunWorld()
     // The viewer is authenticated but does NOT own the chat.
     world.chat.userId = asId<"users">("user_other")
     const { ctx } = createMutationCtx({
@@ -477,13 +412,8 @@ describe("selected conversation projections", () => {
     const path = await getSelectedPathForViewer(ctx, viewer)
     const runState = await getSelectedRunStateForViewer(ctx, viewer)
 
-    expect(path.selectedMessages.length).toBeGreaterThan(0)
+    expect(path.selectedMessages).toEqual([])
     expect(runState).toBeNull()
-    for (const message of path.selectedMessages) {
-      expect(message).not.toHaveProperty("generationRunId")
-      expect(message).not.toHaveProperty("requestId")
-      expect(message.status).not.toBe("awaiting_approval")
-    }
   })
 
   it("keeps projecting a terminal current run with its terminal reason (convergence metadata)", async () => {

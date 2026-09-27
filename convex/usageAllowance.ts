@@ -601,6 +601,8 @@ async function settleReservation(
     basis: SettlementBasis
     inputTokens?: number
     outputTokens?: number
+    /** Logged, not stored: the cache-read share priced at the cache rate. */
+    cacheReadTokens?: number
     titleCredits?: number
     reason: string
   },
@@ -653,6 +655,9 @@ async function settleReservation(
     reservedCredits: reservation.reservedCredits,
     actualCredits: settlement.actualCredits,
     basis: settlement.basis,
+    ...(settlement.cacheReadTokens !== undefined
+      ? { cacheReadTokens: settlement.cacheReadTokens }
+      : {}),
     reason: settlement.reason,
     negativeBalance: next.availableCredits < 0,
   })
@@ -762,6 +767,7 @@ async function applyTerminalSettlementDecision(
         basis: decision.basis,
         inputTokens: decision.inputTokens,
         outputTokens: decision.outputTokens,
+        cacheReadTokens: decision.cacheReadTokens,
         titleCredits: decision.titleCredits,
         reason,
       },
@@ -1310,6 +1316,7 @@ export async function settleUsageForTerminalRun(
         basis,
         inputTokens: evidence.usage.inputTokens,
         outputTokens: evidence.usage.outputTokens,
+        cacheReadTokens: evidence.usage.cacheReadTokens,
         titleCredits,
         reason: auditReason,
       },

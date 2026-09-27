@@ -31,9 +31,9 @@ describe("sharePublishedChat", () => {
 
     await expect(
       sharePublishedChat({
-        chatId: "chat-a",
         publish: async () => {
           order.push("publish")
+          return "share-a"
         },
         openFallback,
       })
@@ -49,12 +49,11 @@ describe("sharePublishedChat", () => {
 
     await expect(
       sharePublishedChat({
-        chatId: "chat-a",
-        publish: async () => undefined,
+        publish: async () => "share-a",
         openFallback,
       })
     ).resolves.toBe("unsupported")
 
-    expect(openFallback).toHaveBeenCalledOnce()
+    expect(openFallback).toHaveBeenCalledExactlyOnceWith("share-a")
   })
 })

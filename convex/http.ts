@@ -1,11 +1,15 @@
 import { httpRouter } from "convex/server"
 import {
+  ATTACHMENT_NAME_HEADER,
+  DAILY_FILE_LIMIT_CODE,
+  isAllowedFileMimeType,
   isAllowedProfileImageMimeType,
   MAX_FILE_SIZE,
   normalizeFileMimeType,
   PROFILE_IMAGE_SNIFF_BYTES,
   sniffProfileImageMimeType,
 } from "../lib/file/policy"
+import { readBodyCapped } from "../lib/file/read-body-capped"
 import { api, internal } from "./_generated/api"
 import { httpAction, type ActionCtx } from "./_generated/server"
 import {
@@ -16,6 +20,7 @@ import {
 } from "./chatRuntimeWorker"
 import { requireIdentity } from "./lib/auth"
 import { sha256Hex } from "./lib/sha256"
+import { ATTACHMENT_UPLOAD_PATH, verifyUploadTicket } from "./lib/uploadTicket"
 import { authKit } from "./workosAuth"
 
 const http = httpRouter()
@@ -95,16 +100,20 @@ type ProfileImageUploadCtx = Pick<
   "auth" | "runAction" | "runMutation" | "storage"
 >
 
-async function cleanupStoredProfileImage(
-  ctx: ProfileImageUploadCtx,
-  storageId: Awaited<ReturnType<ProfileImageUploadCtx["storage"]["store"]>>
+type StoredUploadId = Awaited<ReturnType<ActionCtx["storage"]["store"]>>
+
+// For a blob this request stored but could not commit. A commit whose result
+// was lost may still have referenced it, so cleanup goes through the one
+// deletion rule instead of `ctx.storage.delete` (ADR-0046).
+async function cleanupStoredUpload(
+  ctx: Pick<ActionCtx, "runMutation">,
+  storageId: StoredUploadId,
+  failureTag: string
 ) {
   try {
-    await ctx.storage.delete(storageId)
+    await ctx.runMutation(internal.files.releaseUploadedStorage, { storageId })
   } catch {
-    console.warn(
-      JSON.stringify({ _tag: "profile_image_upload_cleanup_failed" })
-    )
+    console.warn(JSON.stringify({ _tag: failureTag }))
   }
 }
 
@@ -124,6 +133,8 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(415, { error: "Unsupported profile image type" })
   }
 
+  // Fast pre-reject on the declared length; the capped read below enforces
+  // the cap for chunked bodies that omit it.
   const contentLength = Number(request.headers.get("Content-Length"))
   if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
     return jsonResponse(413, { error: "Profile image is too large" })
@@ -153,15 +164,14 @@ export async function handleProfileImageUploadRequest(
     )
   }
 
-  let blob: Blob
-  try {
-    blob = await request.blob()
-  } catch {
-    return jsonResponse(400, { error: "Invalid profile image body" })
-  }
-  if (blob.size > MAX_FILE_SIZE) {
+  const bodyRead = await readBodyCapped(request, MAX_FILE_SIZE, fileType)
+  if (bodyRead.kind === "too_large") {
     return jsonResponse(413, { error: "Profile image is too large" })
   }
+  if (bodyRead.kind === "invalid") {
+    return jsonResponse(400, { error: "Invalid profile image body" })
+  }
+  const { blob } = bodyRead
   // Cheaply reject obvious mismatches before staging the body. This signature
   // check is only a prefilter; the staged image is fully decoded below before
   // any user record or storage URL can reference it.
@@ -172,8 +182,7 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(415, { error: "Unsupported profile image type" })
   }
 
-  let storageId:
-    Awaited<ReturnType<ProfileImageUploadCtx["storage"]["store"]>> | undefined
+  let storageId: StoredUploadId | undefined
   try {
     storageId = await ctx.storage.store(blob)
     const validation = await ctx.runAction(
@@ -181,7 +190,11 @@ export async function handleProfileImageUploadRequest(
       { storageId, fileType }
     )
     if (!validation.valid) {
-      await cleanupStoredProfileImage(ctx, storageId)
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "profile_image_upload_cleanup_failed"
+      )
       return jsonResponse(415, { error: "Unsupported profile image type" })
     }
 
@@ -196,10 +209,151 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(200, { profileImageUrl })
   } catch {
     if (storageId !== undefined) {
-      await cleanupStoredProfileImage(ctx, storageId)
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "profile_image_upload_cleanup_failed"
+      )
     }
     console.warn(JSON.stringify({ _tag: "profile_image_upload_failed" }))
     return jsonResponse(500, { error: "Profile image upload failed" })
+  }
+}
+
+type AttachmentUploadCtx = Pick<ActionCtx, "runMutation" | "storage">
+
+// Browsers upload attachments straight to this origin, because Vercel caps a
+// function body below MAX_FILE_SIZE. The ticket is a bearer credential only
+// an authenticated mutation mints, and no cookie is involved, so any origin
+// may present one.
+const ATTACHMENT_UPLOAD_CORS = { "Access-Control-Allow-Origin": "*" }
+
+export function handleAttachmentUploadPreflight(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...ATTACHMENT_UPLOAD_CORS,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": `Authorization, Content-Type, ${ATTACHMENT_NAME_HEADER}`,
+      "Access-Control-Max-Age": "600",
+    },
+  })
+}
+
+function readAttachmentName(request: Request): string | undefined {
+  const encoded = request.headers.get(ATTACHMENT_NAME_HEADER)
+  if (!encoded) return undefined
+  try {
+    return decodeURIComponent(encoded) || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Store an attachment and stage it for the user its upload ticket names, in
+ * one request (ADR-0046). The client never sees or sends a storage id, and a
+ * blob this request stored is released whenever staging refuses or fails.
+ */
+export async function handleAttachmentUploadRequest(
+  ctx: AttachmentUploadCtx,
+  request: Request
+): Promise<Response> {
+  const respond = (
+    status: number,
+    body: Record<string, unknown>,
+    headers?: Record<string, string>
+  ) => jsonResponse(status, body, { ...ATTACHMENT_UPLOAD_CORS, ...headers })
+  const dailyLimitReached = () =>
+    respond(429, {
+      error: "Daily file upload limit reached",
+      code: DAILY_FILE_LIMIT_CODE,
+    })
+
+  const authorization = request.headers.get("Authorization")
+  const userId = verifyUploadTicket(
+    authorization?.startsWith("Bearer ")
+      ? authorization.slice("Bearer ".length)
+      : undefined
+  )
+  if (!userId) return respond(401, { error: "Unauthorized" })
+
+  const fileType = normalizeFileMimeType(request.headers.get("Content-Type"))
+  if (!isAllowedFileMimeType(fileType)) {
+    return respond(415, { error: "Unsupported file type" })
+  }
+
+  // Fast pre-reject on the declared length; the capped read below enforces
+  // the cap for chunked bodies that omit it.
+  const contentLength = Number(request.headers.get("Content-Length"))
+  if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
+    return respond(413, { error: "File is too large" })
+  }
+
+  // Admit before reading the body, as /profile-image rate-limits first: a
+  // replayed ticket past the daily limit or burst window stores nothing.
+  const admission = await ctx
+    .runMutation(internal.files.admitAttachmentUpload, { userId })
+    .catch(() => null)
+  if (!admission) {
+    console.warn(JSON.stringify({ _tag: "attachment_upload_admission_failed" }))
+    return respond(500, { error: "Attachment upload failed" })
+  }
+  if (admission.status === "refused") {
+    return respond(403, { error: "Forbidden" })
+  }
+  if (admission.status === "daily_limit") return dailyLimitReached()
+  if (admission.status === "rate_limited") {
+    return respond(
+      429,
+      { error: "Too many uploads" },
+      {
+        "Retry-After": String(
+          Math.max(1, Math.ceil(admission.retryAfterMs / 1000))
+        ),
+      }
+    )
+  }
+
+  const bodyRead = await readBodyCapped(request, MAX_FILE_SIZE, fileType)
+  if (bodyRead.kind === "too_large") {
+    return respond(413, { error: "File is too large" })
+  }
+  if (bodyRead.kind === "invalid") {
+    return respond(400, { error: "Invalid file body" })
+  }
+
+  let storageId: StoredUploadId | undefined
+  try {
+    storageId = await ctx.storage.store(bodyRead.blob)
+    const attachmentId = await ctx.runMutation(
+      internal.files.stageUploadedAttachment,
+      {
+        userId,
+        storageId,
+        fileName: readAttachmentName(request),
+        fileType,
+      }
+    )
+    if (!attachmentId) {
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "attachment_upload_cleanup_failed"
+      )
+      return dailyLimitReached()
+    }
+    return respond(200, { attachmentId })
+  } catch {
+    if (storageId !== undefined) {
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "attachment_upload_cleanup_failed"
+      )
+    }
+    console.warn(JSON.stringify({ _tag: "attachment_upload_failed" }))
+    return respond(500, { error: "Attachment upload failed" })
   }
 }
 
@@ -276,6 +430,18 @@ http.route({
   path: "/profile-image",
   method: "POST",
   handler: httpAction(handleProfileImageUploadRequest),
+})
+
+http.route({
+  path: ATTACHMENT_UPLOAD_PATH,
+  method: "POST",
+  handler: httpAction(handleAttachmentUploadRequest),
+})
+
+http.route({
+  path: ATTACHMENT_UPLOAD_PATH,
+  method: "OPTIONS",
+  handler: httpAction(async () => handleAttachmentUploadPreflight()),
 })
 
 export default http

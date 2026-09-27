@@ -2,24 +2,25 @@ import { SourcesList } from "@/app/components/chat/sources-list"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Message, MessageContent } from "@/components/ui/message"
-import type { Doc } from "@/convex/_generated/dataModel"
-import { getSources } from "@/lib/chat-messages/sources"
+import type {
+  SharedMessageView,
+  SharedSource,
+} from "@/convex/domain/share_view"
+import type { AssistantSourceResult } from "@/lib/chat-messages/sources"
 import { cn } from "@/lib/utils"
-import type { UIMessage as MessageAISDK } from "@ai-sdk/react"
 import { RiArrowRightUpLine } from "@remixicon/react"
 import Link from "next/link"
 import { Header } from "./header"
-
-type ConvexMessage = Pick<
-  Doc<"messages">,
-  "_id" | "_creationTime" | "chatId" | "role" | "content" | "parts"
->
 
 type ArticleProps = {
   date: string
   title: string
   subtitle: string
-  messages: ConvexMessage[]
+  messages: SharedMessageView[]
+}
+
+function toSourceResult({ url, title }: SharedSource): AssistantSourceResult {
+  return { type: "source-url", sourceId: url, url, title }
 }
 
 export default function Article({
@@ -69,14 +70,13 @@ export default function Article({
           </Link>
         </div>
         <div className="mt-20 w-full">
-          {messages.map((message) => {
-            const parts = message?.parts as MessageAISDK["parts"]
-            const sources = getSources(parts)
+          {messages.map((message, index) => {
+            const sources = message.sources.map(toSourceResult)
 
             return (
-              <div key={message._id}>
+              // The shared path is a fixed snapshot, so its order is stable.
+              <div key={index}>
                 <Message
-                  key={message._id}
                   className={cn(
                     "mb-4 flex flex-col gap-0",
                     message.role === "assistant" && "w-full items-start",
@@ -92,12 +92,10 @@ export default function Article({
                         "w-full min-w-full bg-transparent"
                     )}
                   >
-                    {message.content}
+                    {message.text}
                   </MessageContent>
                 </Message>
-                {sources && sources.length > 0 && (
-                  <SourcesList sources={sources} />
-                )}
+                {sources.length > 0 && <SourcesList sources={sources} />}
               </div>
             )
           })}

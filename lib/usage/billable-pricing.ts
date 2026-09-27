@@ -8,8 +8,9 @@ import type { ModelConfig } from "@/lib/models/types"
 
 /**
  * Billable route pricing (ADR-0021): compile the catalog's numeric USD-per-1M
- * `inputCost`/`outputCost` into typed integer rates (credits = micro-USD per
- * 1M tokens) ONCE, at snapshot-build time. The human-readable `priceUnit`
+ * `inputCost`/`outputCost` (plus optional `cachedInputCost`) into typed
+ * integer rates (credits = micro-USD per 1M tokens) ONCE, at snapshot-build
+ * time. The human-readable `priceUnit`
  * string is display-only and never parsed. Platform funding fails closed: a
  * route without valid numeric pricing gets no snapshot and therefore no
  * reservation. An explicitly free route ($0.00) is a valid zero-rate snapshot.
@@ -17,7 +18,7 @@ import type { ModelConfig } from "@/lib/models/types"
 
 /** Names the pricing generation a snapshot was compiled from. Bump when the
  * rate derivation or the catalog pricing data changes materially. */
-export const PLATFORM_PRICING_REVISION = "catalog-2026-08-19"
+export const PLATFORM_PRICING_REVISION = "catalog-2026-09-27"
 
 const USD_TO_CREDITS = 1_000_000
 
@@ -42,6 +43,9 @@ export function buildRoutePricingRate(
   if (inputCreditsPerMTok === null || outputCreditsPerMTok === null) {
     return null
   }
+  // Optional: without a valid cache price, cached input bills at the input
+  // rate (never cheaper than real cost).
+  const cacheReadCreditsPerMTok = toCreditsPerMTok(config.cachedInputCost)
   return {
     modelId,
     routeId: config.id,
@@ -49,6 +53,7 @@ export function buildRoutePricingRate(
     upstreamModelId: toUpstreamModelId(config.id),
     inputCreditsPerMTok,
     outputCreditsPerMTok,
+    ...(cacheReadCreditsPerMTok !== null ? { cacheReadCreditsPerMTok } : {}),
   }
 }
 

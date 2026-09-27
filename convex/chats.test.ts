@@ -7,12 +7,10 @@ import {
   getPinnedForCurrentUserHandler,
   getProjectChatDirectoryForProject,
   getProjectChatsForCurrentUserHandler,
-  getPublicByIdHandler,
   getRecentWindowForCurrentUserHandler,
   listForCurrentUserPaginatedHandler,
   markChatReadForOwner,
   PROJECT_CHAT_PREVIEW_SCAN_LIMIT,
-  projectChatForReader,
   removeChatForOwner,
   searchByTitleForCurrentUserHandler,
   selectProjectChatPreview,
@@ -412,43 +410,6 @@ describe("getPinnedForCurrentUserHandler", () => {
   })
 })
 
-describe("getPublicByIdHandler", () => {
-  it("returns null for a tombstoned public chat", async () => {
-    const user = createUser("user-1")
-    const chat = createChat({
-      _id: asId<"chats">("deleting-public"),
-      userId: user._id,
-      public: true,
-      deletingAt: 2,
-    })
-    const ctx = createCtx({ user: null, chats: [chat] })
-
-    await expect(
-      getPublicByIdHandler(ctx, { chatId: chat.publicId })
-    ).resolves.toBeNull()
-  })
-
-  it("returns null when the public Chat's Project is tombstoned", async () => {
-    const user = createUser("user-1")
-    const project = createProject("project-1", user._id, { deletingAt: 2 })
-    const chat = createChat({
-      _id: asId<"chats">("project-public"),
-      userId: user._id,
-      projectId: project._id,
-      public: true,
-    })
-    const ctx = createCtx({
-      user: null,
-      chats: [chat],
-      projects: [project],
-    })
-
-    await expect(
-      getPublicByIdHandler(ctx, { chatId: chat.publicId })
-    ).resolves.toBeNull()
-  })
-})
-
 describe("getRecentWindowForCurrentUserHandler", () => {
   it("paginates project and non-project chats in one recency window", async () => {
     const user = createUser("user-1")
@@ -623,64 +584,6 @@ describe("listForCurrentUserPaginatedHandler", () => {
   })
 })
 
-describe("projectChatForReader (owner-only status strip)", () => {
-  const OWNER_ONLY_FIELDS = [
-    "liveRunStatus",
-    "liveRunFreshUntil",
-    "statusRunId",
-    "lastRunEndedAt",
-    "lastRunStatus",
-    "lastReadAt",
-  ] as const
-
-  function sharedChatWithStatus(): Doc<"chats"> {
-    return createChat({
-      _id: asId<"chats">("shared"),
-      userId: asId<"users">("owner"),
-      title: "shared",
-      public: true,
-      liveRunStatus: "streaming",
-      liveRunFreshUntil: 330_000,
-      statusRunId: "run_1" as Id<"generationRuns">,
-      lastRunEndedAt: 200,
-      lastRunStatus: "completed",
-      lastReadAt: 100,
-    })
-  }
-
-  it("returns the full doc (owner-only fields intact) for the owner", () => {
-    const chat = sharedChatWithStatus()
-    const result = projectChatForReader(chat, createUser("owner"))
-    expect(result).toBe(chat)
-    for (const field of OWNER_ONLY_FIELDS) {
-      expect(result).toHaveProperty(field)
-    }
-  })
-
-  it("strips owner-only status fields for a non-owner (shared-chat viewer)", () => {
-    const result = projectChatForReader(
-      sharedChatWithStatus(),
-      createUser("viewer")
-    )
-    for (const field of OWNER_ONLY_FIELDS) {
-      expect(result).not.toHaveProperty(field)
-    }
-    // Non-status fields survive.
-    expect(result).toMatchObject({ public: true, title: "shared" })
-  })
-
-  it("strips for an unauthenticated public reader (no user)", () => {
-    const result = projectChatForReader(sharedChatWithStatus(), null)
-    for (const field of OWNER_ONLY_FIELDS) {
-      expect(result).not.toHaveProperty(field)
-    }
-  })
-
-  it("returns null when there is no chat", () => {
-    expect(projectChatForReader(null, createUser("viewer"))).toBeNull()
-  })
-})
-
 describe("markChatReadForOwner", () => {
   function createReadWriteCtx(
     chats: Doc<"chats">[],
@@ -785,7 +688,7 @@ describe("markChatReadForOwner", () => {
     expect(chat.lastReadAt).toBeUndefined()
   })
 
-  it("no-ops for a chat the caller does not own (opening a public chat)", async () => {
+  it("no-ops for a chat the caller does not own, even a shared one", async () => {
     const owner = createUser("owner")
     const viewer = createUser("viewer")
     const chat = createChat({
@@ -1193,14 +1096,20 @@ describe("removeChatForOwner", () => {
         query: (tableName: string) => {
           queriedTables.push(tableName)
           // The pre-tombstone supersede sweep (ADR-0021 cancellation
-          // amendment) scans runs and assistant messages; this chat has none.
-          if (tableName === "generationRuns" || tableName === "messages") {
+          // amendment) scans runs and assistant messages, and the share
+          // revoke reads the chat's link; this chat has none.
+          if (
+            tableName === "generationRuns" ||
+            tableName === "messages" ||
+            tableName === "chatShares"
+          ) {
             const emptyApi = {
               withIndex: () => emptyApi,
               order: () => emptyApi,
               take: async () => [],
               collect: async () => [],
               first: async () => null,
+              unique: async () => null,
             }
             return emptyApi
           }

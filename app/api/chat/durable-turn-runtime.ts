@@ -232,7 +232,13 @@ export type DurableStreamTextExtras = {
  * (`captureFinish`). ai@7 `usage` aggregates across ALL steps.
  */
 export type StreamFinishFacts = {
-  usage: { inputTokens?: number; outputTokens?: number; totalTokens?: number }
+  usage: {
+    inputTokens?: number
+    outputTokens?: number
+    totalTokens?: number
+    /** Cache-read share of `inputTokens`, priced at the pinned cache rate. */
+    cacheReadTokens?: number
+  }
   finishReason: string | undefined
   toolCounts: { totalToolCalls: number; failedToolCalls: number }
 }
@@ -2169,6 +2175,9 @@ export function createConvexDurableTurn(args: {
                           kind: "actual",
                           inputTokens: usage.inputTokens,
                           outputTokens: usage.outputTokens,
+                          ...(usage.cacheReadTokens !== undefined
+                            ? { cacheReadTokens: usage.cacheReadTokens }
+                            : {}),
                         },
                         title: terminalFacts?.title ?? { kind: "not-run" },
                       }

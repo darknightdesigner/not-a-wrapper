@@ -2,7 +2,9 @@
 import { convexTest } from "convex-test"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api, internal } from "./_generated/api"
-import type { TableNames } from "./_generated/dataModel"
+import type { Id, TableNames } from "./_generated/dataModel"
+import type { MutationCtx } from "./_generated/server"
+import { mintShareId } from "./domain/share_view"
 import { signServerCallProof } from "./lib/serverCallProof"
 import schema from "./schema"
 import { modules } from "./test.setup"
@@ -35,15 +37,39 @@ async function seedUser(
       ...lifecycle,
     })
     const publicId = `${workosUserId}-shared`
-    await ctx.db.insert("chats", {
+    const chatId = await ctx.db.insert("chats", {
       publicId,
       userId,
       public: true,
       pinned: false,
       updatedAt: 1,
     })
-    return { userId, publicId }
+    const shareId = await seedShare(ctx, chatId)
+    return { userId, publicId, shareId }
   })
+}
+
+// A shared chat's first message plus its share link (ADR-0043).
+async function seedShare(ctx: Pick<MutationCtx, "db">, chatId: Id<"chats">) {
+  const messageId = await ctx.db.insert("messages", {
+    chatId,
+    orderId: 1,
+    role: "user",
+    content: "hi",
+    parts: [],
+    status: "completed",
+    createdAt: 1,
+    updatedAt: 1,
+  })
+  const shareId = mintShareId()
+  await ctx.db.insert("chatShares", {
+    shareId,
+    chatId,
+    throughMessageId: messageId,
+    createdAt: 1,
+    updatedAt: 1,
+  })
+  return shareId
 }
 
 afterEach(() => {
@@ -101,10 +127,10 @@ describe("rejected account at the auth boundary", () => {
       })
     ).resolves.toEqual({ kind: "admitted" })
     await expect(
-      t.query(api.chats.getPublicById, { chatId: deleted.publicId })
+      t.query(api.shares.getPublic, { shareId: deleted.shareId })
     ).resolves.toBeNull()
     await expect(
-      t.query(api.chats.getPublicById, { chatId: disabled.publicId })
+      t.query(api.shares.getPublic, { shareId: disabled.shareId })
     ).resolves.toBeNull()
   })
 })
@@ -266,6 +292,7 @@ describe("account deletion drain", () => {
         updatedAt: 1,
         pinned: false,
       })
+      const shareIds = []
       for (const [publicId, linked] of [
         ["owner-shared", undefined],
         ["owner-in-project", projectId],
@@ -278,16 +305,7 @@ describe("account deletion drain", () => {
           pinned: false,
           updatedAt: 1,
         })
-        await ctx.db.insert("messages", {
-          chatId,
-          orderId: 1,
-          role: "user",
-          content: "hi",
-          parts: [],
-          status: "completed",
-          createdAt: 1,
-          updatedAt: 1,
-        })
+        shareIds.push(await seedShare(ctx, chatId))
       }
       await ctx.db.insert("chatAttachments", {
         userId,
@@ -340,7 +358,7 @@ describe("account deletion drain", () => {
         createdAt: 1,
         updatedAt: 1,
       })
-      return { userId, avatar, staged, bucketId }
+      return { userId, avatar, staged, bucketId, shareIds }
     })
     // Limiter rows through their real writers, so the actor keys cannot drift.
     const signedIn = t.withIdentity({ subject: owner })
@@ -368,14 +386,17 @@ describe("account deletion drain", () => {
       })
     )
     // Logically immediate: share links die before any row is drained.
-    await expect(
-      t.query(api.chats.getPublicById, { chatId: "owner-shared" })
-    ).resolves.toBeNull()
+    for (const shareId of seeded.shareIds) {
+      await expect(
+        t.query(api.shares.getPublic, { shareId })
+      ).resolves.toBeNull()
+    }
 
     await t.finishAllScheduledFunctions(vi.runAllTimers)
 
     const ownedTables: TableNames[] = [
       "chats",
+      "chatShares",
       "messages",
       "projects",
       "chatAttachments",
@@ -399,9 +420,11 @@ describe("account deletion drain", () => {
     expect(remaining).toEqual({
       ...Object.fromEntries(ownedTables.map((table) => [table, 0])),
       chats: 1,
+      chatShares: 1,
+      messages: 1,
     })
     await expect(
-      t.query(api.chats.getPublicById, { chatId: other.publicId })
+      t.query(api.shares.getPublic, { shareId: other.shareId })
     ).resolves.not.toBeNull()
 
     const after = await t.run(async (ctx) => ({

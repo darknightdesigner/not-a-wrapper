@@ -7,7 +7,9 @@ ADR-0011 (durable settlement gains an accounting half: every terminal
 transition also settles or releases the run's usage reservation).
 **Amended:** 2026-08-28 — cancellation-aware settlement (see
 "Cancellation-aware settlement" below): a user Stop or supersession no longer
-converts the worst-case admission reservation into final spend.
+converts the worst-case admission reservation into final spend. 2026-09-27 —
+cached input settles at the cache-read rate, and provider-side retention and
+actor attribution are recorded (see "Provider retention and attribution").
 
 **Context.** ADR-0020 made Priority/Fallback API-key preferences real routing
 tiers, but the platform tier admits by list membership (`FREE_MODELS_IDS`)
@@ -39,6 +41,18 @@ single Convex mutations (transactional, OCC-serialized).
   platform cost to zero.
 - A route without valid numeric pricing is **not platform-fundable** (fails
   closed). An explicitly free route ($0.00 rates) is fundable at zero credits.
+- **Cached input** (amended 2026-09-27): a route whose catalog declares
+  `cachedInputCost` also pins `cacheReadCreditsPerMTok` in its snapshot.
+  Settlement charges the provider-reported cache-read share of input at that
+  rate and the rest at the input rate (a third component, `ceil` once); a
+  missing rate or count falls back to the full input rate, and reservations
+  stay at the full rate. Only gpt-5-mini declares one today, on both of its
+  routes: the direct record states it, and the generated OpenRouter route
+  takes it from the snapshot's `pricing.input_cache_read` (ADR-0007), so the
+  rate follows whichever route the platform tier picks. Cache writes are
+  not priced separately because no metered route bills them yet; Claude
+  requests turn prompt caching on, so a platform-funded Claude route must
+  first price writes (1.25x input).
 - The UI presents percentages of the included allowance, never raw credits or
   dollars.
 
@@ -356,25 +370,70 @@ balance negative. Estimation is admission control, not the final charge.
 
 ## Platform-paid operation inventory
 
-| Operation                                    | Treatment                                                                                                                                     |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Main `streamText` generation (all steps)     | metered (primary snapshot)                                                                                                                    |
-| Automatic title generation                   | metered (executed title or fallback route's pinned snapshot; `generateChatTitle` returns usage + route identity)                              |
-| Exa search / extract on the platform key     | **subsidized**, bounded by the existing per-tool `toolLimitBuckets` budgets (platform key mode)                                               |
-| Anonymous turns on `NON_AUTH_ALLOWED_MODELS` | **subsidized**, bounded by the 5/day guest limit + anonymous step cap; anonymous ids are client-controlled, so no cash-like wallet is created |
-| Image/audio generation                       | not applicable today (no platform-listed route bills non-token modalities); a future one must add rates or be explicitly subsidized           |
+| Operation                                    | Treatment                                                                                                                                                                                                                 |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Main `streamText` generation (all steps)     | metered (primary snapshot)                                                                                                                                                                                                |
+| Automatic title generation                   | metered (executed title or fallback route's pinned snapshot; `generateChatTitle` returns usage + route identity)                                                                                                          |
+| Exa search / extract on the platform key     | **subsidized**, bounded by the existing per-tool `toolLimitBuckets` budgets (platform key mode)                                                                                                                           |
+| Anonymous turns on `NON_AUTH_ALLOWED_MODELS` | **subsidized**, bounded by ADR-0045 guest admission (5/day per signed guest cookie and per client network, running-answer caps, one daily ceiling across all guests) + anonymous step cap; no cash-like wallet is created |
+| Image/audio generation                       | not applicable today (no platform-listed route bills non-token modalities); a future one must add rates or be explicitly subsidized                                                                                       |
+
+## Provider retention and attribution (amended 2026-09-27)
+
+- **Retention.** OpenAI and xAI requests send `store: false` (Request
+  shaping). Convex already holds each conversation, so a provider-stored
+  response adds nothing. The SDKs then replay statelessly within a request:
+  they request `reasoning.encrypted_content` themselves and send reasoning
+  items inline between steps. The encrypted content rides each reasoning
+  part's provider metadata and is persisted with the message, but no later
+  request replays it. History replay strips reasoning metadata (ADR-0041),
+  and an approval continuation's paused step is history too (only its
+  approval parts skip adaptation), so the SDK drops that reasoning and sends
+  the id-less call and its output, as it did with storage on. Replaying it
+  would tie the continuation to the key that produced it, and the route can
+  change credentials between the pause and the continuation. Hosted-tool
+  results are never replayed without storage, which is why historical hosted
+  activity stays lowered to text (ADR-0029). OpenAI still keeps
+  abuse-monitoring logs for up to 30 days; BYOK responses land in the key
+  owner's organization.
+- **Storage exception.** An OpenAI turn that offers hosted web search
+  together with app-executed tools (Exa, content, MCP) keeps the default
+  storage. With `store: false`, `@ai-sdk/openai` 4.0.45 drops the hosted
+  `web_search_call` from later steps of the same request but still sends
+  the reasoning item that preceded it; OpenAI requires every item since the
+  last user message to be replayed untouched and rejects a reasoning item
+  without its following item (vercel/ai#8379).
+  Stored turns replay by `item_reference`, as before this amendment. The
+  decision follows the request's search toggle and tool set, so toggling
+  search while an approval is pending can flip the mode between the paused
+  step and its continuation, and that rare continuation can fail with a
+  provider error. Revisit when the SDK replays hosted calls inline. xAI is
+  not excepted: its SDK drops hosted calls whatever `store` says.
+- **Attribution.** Signed-in and guest requests carry one opaque actor id:
+  the first 32 hex characters of HMAC-SHA-256 over
+  `["provider-safety-identifier-v1", kind, id]`, keyed by
+  `CHAT_ADMISSION_SECRET` (no new secret). `kind` is `user` with the WorkOS
+  subject, or `guest` with the server-signed guest cookie id (ADR-0045), so a
+  guest can never share a user's id. The Chat turn runtime derives it in one
+  place; the browser-sent guest id is never an input. It goes out as OpenAI
+  `safetyIdentifier`, Anthropic `metadata.userId`, and OpenRouter `user`
+  (all per-request provider options); the xAI SDK has no field. Title calls
+  carry the same options. It is never the email, cannot be reversed without the
+  secret, and changes for everyone if the secret rotates; without a usable
+  secret, none is sent.
 
 ## Existing counters
 
-`users.dailyMessageCount` (and the anonymous counter) remain **abuse rate
-limits** only. The retired pro-model fields remain optional in the schema only
-until production preflight proves older user rows can be contracted safely.
-The chat route calls one `usage.admit` mutation that checks and increments the
-counter in the same transaction, before the credential source is known. This
-prevents concurrent requests from both passing a read-only check at the final
-slot. Once admitted, the attempt counts even if later credential or preparation
-work fails; this is abuse control, not economic settlement. The economic
-admission remains the reservation itself.
+`users.dailyMessageCount` (and the ADR-0045 guest windows) remain **abuse
+rate limits** only. The retired pro-model fields remain optional in the schema
+only until production preflight proves older user rows can be contracted
+safely. For signed-in users the chat route calls one `usage.admit` mutation
+that checks and increments the counter in the same transaction, before the
+credential source is known (guests are admitted by `usage.admitGuestTurn`
+instead). This prevents concurrent requests from both passing a read-only
+check at the final slot. Once admitted, the attempt counts even if later
+credential or preparation work fails; this is abuse control, not economic
+settlement. The economic admission remains the reservation itself.
 
 ## Alternatives considered
 

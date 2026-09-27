@@ -891,6 +891,82 @@ describe("approval continuation final provider requests", () => {
     }
   )
 
+  it("keeps an OpenAI approval continuation self-contained under store: false (ADR-0021)", async () => {
+    // Only the approval parts skip history adaptation. The paused step's
+    // reasoning is history like any earlier turn's: stripped, so the SDK
+    // drops it and sends the id-less call and its output. Nothing points at
+    // an unstored item or at another key's encrypted reasoning.
+    const target = makeTarget("openai")
+    const tools = clientApprovalTools("static")
+    const reasoning = (itemId: string, encrypted: string) => ({
+      type: "reasoning",
+      text: `Thinking ${itemId}`,
+      state: "done",
+      providerMetadata: {
+        openai: { itemId, reasoningEncryptedContent: encrypted },
+      },
+    })
+    const tail = approvalTail({ kind: "static", approved: true })
+    tail.parts.unshift(
+      reasoning("rs_paused_step", "PAUSED_STEP_ENCRYPTED") as never
+    )
+    const messages = [
+      { id: "user-1", role: "user", parts: [{ type: "text", text: "Hi" }] },
+      {
+        id: "assistant-1",
+        role: "assistant",
+        metadata: { provider: "openai" },
+        parts: [
+          reasoning("rs_prior_turn", "PRIOR_TURN_ENCRYPTED"),
+          { type: "text", text: "Hello." },
+        ],
+      },
+      { id: "user-2", role: "user", parts: [{ type: "text", text: "Check" }] },
+      tail,
+    ] as unknown as UIMessage[]
+    const split = splitAndValidateApprovalContinuation({
+      messages,
+      targetProvider: "openai",
+      tools,
+    })
+    const adapted = await adaptHistoryForProvider(split.history, "openai", {
+      targetModelId: modelIds.openai,
+      hasTools: true,
+    })
+    const modelMessages = await convertToModelMessages(
+      [...adapted.messages, ...split.tail],
+      { tools }
+    )
+    try {
+      await generateText({
+        model: target.model,
+        messages: modelMessages,
+        tools,
+        providerOptions: { openai: { store: false } },
+      })
+    } catch {}
+
+    const input = (
+      target.getBody() as { input: Array<Record<string, unknown>> }
+    ).input
+    expect(input.map((item) => item.type ?? item.role)).toEqual([
+      "user",
+      "assistant",
+      "user",
+      "function_call",
+      "function_call_output",
+    ])
+    const bodyJson = JSON.stringify(input)
+    for (const leaked of [
+      "item_reference",
+      "rs_prior_turn",
+      "rs_paused_step",
+      "_ENCRYPTED",
+    ]) {
+      expect(bodyJson).not.toContain(leaked)
+    }
+  })
+
   it("rejects provider switch and absent-tool tails before target conversion", () => {
     const googleTarget = makeTarget("google")
     const tail = approvalTail({ kind: "hosted", approved: true })

@@ -35,9 +35,13 @@ Required local `.env.local` values:
 reservation authorization, the guest cookie, and the server-call proofs that
 gate guest admission and tool limits
 ([ADR-0045](adr/0045-guest-identity-and-server-proven-guest-admission.md)).
-Without it, guest turns fail closed. It must be at least 32 bytes and must use
-the same value in `.env.local` and the target Convex deployment. Use a different secret
-for Production and Preview; use a per-preview secret when sibling-preview
+Without it, guest turns fail closed. On the Next.js server it also keys the
+opaque per-actor id sent to OpenAI, Anthropic, and OpenRouter for abuse
+attribution (an HMAC of the WorkOS user id or the signed guest cookie id,
+never the email; ADR-0021). Rotating it changes every actor's id; without it,
+no id is sent. It must be at least 32 bytes and must use the same value in
+`.env.local` and the target Convex deployment. Use a different secret for
+Production and Preview; use a per-preview secret when sibling-preview
 isolation is required. Generate it with:
 
 ```bash
