@@ -24,21 +24,26 @@ import {
 } from "./share-publish-content-loader"
 import { SharePublishDrawer } from "./share-publish-drawer"
 
+/**
+ * The header outlives chat routes (ADR-0013), so the share surface is keyed by
+ * chat: a route change resets it, and Stop sharing only ever revokes the chat
+ * whose link it shows.
+ */
 export function DialogPublish() {
+  const { chatId } = useChatSession()
+  return chatId ? <ChatShareDialog key={chatId} chatId={chatId} /> : null
+}
+
+function ChatShareDialog({ chatId }: { chatId: string }) {
   const [openDialog, setOpenDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [shareId, setShareId] = useState<string | null>(null)
-  const { chatId } = useChatSession()
   const isMobile = useBreakpoint(768)
   const prefetchShareRef = useIntentPrefetch<HTMLButtonElement>(
     preloadSharePublishContent
   )
   const publishMutation = useMutation(api.shares.publish)
   const revokeMutation = useMutation(api.shares.revoke)
-
-  if (!chatId) {
-    return null
-  }
 
   const handlePublish = async () => {
     setIsLoading(true)

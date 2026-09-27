@@ -37,13 +37,15 @@ type ChatActionsMenuProps = {
 
 // Chat adapter over the Row-actions menu: builds the Share/Stop sharing/Pin/
 // Rename/Delete item set and owns the chat-specific handlers, delete dialog,
-// and share drawer.
+// and share drawer. Keyed by chat: the header's menu follows the route
+// (ADR-0013), and its drawer and dialog belong to the chat that opened them.
 export function ChatActionsMenu(props: ChatActionsMenuProps) {
   const { chatId } = useChatSession()
   const resetMessages = useResetMessages()
   const isCurrentChat = props.chat.id === chatId
   return (
     <ChatActionsMenuContent
+      key={props.chat.id}
       {...props}
       isCurrentChat={isCurrentChat}
       resetMessages={isCurrentChat ? resetMessages : undefined}

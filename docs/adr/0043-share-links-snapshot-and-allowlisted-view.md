@@ -53,7 +53,10 @@ new id would break links already sent.
 
 **Revoke deletes the link.** `shares.revoke` deletes the row, so the URL is
 not found from that commit on. The next `shares.publish` mints a new id, so a
-revoked URL never comes back.
+revoked URL never comes back. The owner's share surfaces (the header dialog
+and the chat actions drawer) are keyed by chat: the header outlives chat
+routes (ADR-0013), so a route change resets them and Stop sharing only revokes
+the chat whose link it shows.
 
 **The private id is owner-only.** `resolveChatForRead` no longer honors
 `chat.public`: `readableChatQuery` hands a chat only to its owner and null to
@@ -126,4 +129,6 @@ and `shares.getPublic` replace them.
 - Links shared before this change are not found.
 - Tests: `convex/shares.seam.test.ts` pins the allowlist, the snapshot (path
   and title), revoke and re-share, deletion, and the owner-only private id;
-  `accountLifecycle.seam.test.ts` pins the account drain of share rows.
+  `accountLifecycle.seam.test.ts` pins the account drain of share rows;
+  `chat-actions-menu.test.tsx` pins that a chat switch closes the share
+  drawer.
