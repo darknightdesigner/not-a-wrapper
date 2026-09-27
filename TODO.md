@@ -1,10 +1,5 @@
 # To Do
 
-- **File ownership and safe deletion:** Bind storage ownership during authenticated
-upload; prevent `saveStagedAttachment` from claiming another attachment's or
-profile image's blob through a caller-supplied storage ID. Share reference-aware
-deletion rules across explicit deletion and staged-attachment cleanup so duplicate
-references cannot delete a blob still in use.
 - **Account deletion webhook gap:** `@convex-dev/workos-authkit` 0.2.9 (the
 latest release) returns early on `user.deleted` for a user missing from its
 mirror, so our account deletion never runs for that user. Keep the mirror
@@ -107,13 +102,14 @@ public signed-in mutation with no rate limit, retention, or ownership check
 beyond `by_chat`, so any signed-in browser can forge or flood audit rows. Delete
 the unused copies or make them server-written, bounded, and indexed for a real
 reader.
-- **Upload admission and orphan cleanup:** `generateUploadUrl`
-(`convex/files.ts`) counts only saved rows, and the cleanup job promised by the
-comment there does not exist in `convex/crons.ts`, so failed or abandoned
-uploads live forever and the daily cap never trips. Rate-limit it with the
-existing `apiRateLimits`, verify whether the upload URL caps size, check content
-type server-side instead of trusting the declared one, and add a cron that
-deletes unreferenced storage. Complements the file-ownership item above.
+- **Upload content type and orphan sweep:** ADR-0046 moved attachment uploads
+to the ticketed `/attachments` HTTP action, which admits before storing (daily
+limit, a 20-a-minute `attachment_upload` window, rejected accounts), enforces
+the 10 MB cap and deletes any blob that staging refuses. Still open: the stored
+Content-Type is the browser's declared header, so sniff content server-side;
+and add a cron that deletes unreferenced storage (blobs orphaned between store
+and staging, and blobs left by the pre-ADR-0046 flow) through
+`deleteStorageIfUnreferenced` (`convex/domain/storage_refs.ts`).
 - **Hosted search fees in the platform allowance:** Settlement counts tokens
 only (`convex/domain/usage_accounting.ts`, `lib/usage/billable-pricing.ts`);
 per-call search fees exist as display metadata in `provider-strategy.ts` and the
