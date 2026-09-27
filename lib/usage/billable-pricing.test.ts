@@ -174,11 +174,12 @@ describe("platform usage estimation", () => {
   })
 
   it("sizes PDFs by stored bytes only on routes that take them", () => {
-    const pdf = (attachmentId: string) => ({
+    // Shaped like a validated part: `url` survives, `attachmentId` does not.
+    const pdfUrl = (name: string) => `https://files.example/${name}.pdf`
+    const pdf = (name: string) => ({
       type: "file",
       mediaType: "application/pdf",
-      url: `https://files.example/${attachmentId}.pdf`,
-      attachmentId,
+      url: pdfUrl(name),
     })
     const estimatePdfs = (
       extra: Pick<
@@ -198,7 +199,7 @@ describe("platform usage estimation", () => {
       }).estimatedInputTokens
     // 20 pages at ~55 KB each, ~1,500 tokens per page.
     const twentyPages = 20 * 55 * 1024
-    const sizes = { a: twentyPages, b: twentyPages }
+    const sizes = { [pdfUrl("a")]: twentyPages, [pdfUrl("b")]: twentyPages }
     // A text-only route gets a short note, not the document.
     const noted = estimatePdfs({ attachmentSizes: sizes })
 

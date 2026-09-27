@@ -127,7 +127,7 @@ export async function preflightDurableGenerationInput(
   const attachmentSizes: Record<string, number> = {}
   for (const attachment of trustedAttachments) {
     if (isPdfMediaType(attachment.mediaType) && attachment.size !== undefined) {
-      attachmentSizes[attachment.attachmentId] = attachment.size
+      attachmentSizes[attachment.url] = attachment.size
     }
   }
 

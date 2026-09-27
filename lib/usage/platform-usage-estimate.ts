@@ -68,7 +68,10 @@ export type PlatformUsageEstimate = {
   estimatedCredits: number
 }
 
-/** Stored byte size by attachment id, for file parts sized by bytes (PDFs). */
+/**
+ * Stored byte size by file URL, for file parts sized by bytes (PDFs). Keyed by
+ * URL because validated UI message parts keep `url` but drop `attachmentId`.
+ */
 export type AttachmentSizes = Readonly<Record<string, number>>
 
 type FileEstimateContext = {
@@ -85,11 +88,7 @@ function estimatePdfTokens(
   part: Extract<UIMessage["parts"][number], { type: "file" }>,
   context: FileEstimateContext
 ): number {
-  const attachmentId = (part as { attachmentId?: unknown }).attachmentId
-  const size =
-    typeof attachmentId === "string"
-      ? context.attachmentSizes?.[attachmentId]
-      : undefined
+  const size = context.attachmentSizes?.[part.url]
   if (size === undefined) return PDF_UNKNOWN_SIZE_TOKENS
   return Math.max(1, Math.ceil(size / PDF_BYTES_PER_PAGE)) * PDF_TOKENS_PER_PAGE
 }

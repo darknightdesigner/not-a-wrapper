@@ -115,7 +115,7 @@ describe("preflightDurableGenerationInput", () => {
     expect(result).toMatchObject({
       inputHash: "a".repeat(64),
       pinnedProvider: "openai",
-      attachmentSizes: { "attachment-pdf": 110_000 },
+      attachmentSizes: { "https://stored.example/report.pdf": 110_000 },
       textFileStats: {
         convertedCount: 1,
         failedCount: 0,
