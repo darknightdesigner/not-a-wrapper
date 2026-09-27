@@ -1033,8 +1033,9 @@ with one real-shape case: a single large text item keeps its trimmed start.
 
 **Notes.** Do not simply raise the inline image budget. The trimmed result is
 saved in message parts and replayed on later turns, so it must fit Convex's
-1 MiB document limit. Moving large images to file storage belongs with the
-TODO.md item "Convex document and read limits". The TODO.md note about
+1 MiB document limit. Since 2026-09-27 messages are capped at 896 KiB, oldest
+tool payloads first; moving large images to file storage belongs with the
+TODO.md item "Convex read ceiling for very large chats". The TODO.md note about
 capping MCP response size covers bytes read from the network, not this
 trimmer.
 
@@ -1535,8 +1536,8 @@ the on-path check and the first paint. Idle answers (204 or 404) return at once
 (`lib/chat-stream/resumable-chat.ts:314`); retries happen only on 5xx or
 network errors (`:377-382`). Convex's server query cache may already serve the
 page's later `getSelectedPath` subscription from the probe's result, so measure
-before assuming the cost doubles. Related TODO item: "Convex document and read
-limits".
+before assuming the cost doubles. Related TODO item: "Convex read ceiling for very
+large chats".
 
 ## Accounts, sessions and privacy
 
