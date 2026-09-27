@@ -1,6 +1,5 @@
 import { FileUpload, FileUploadContent } from "@/components/ui/file-upload"
 import { Icon } from "@/components/ui/icon"
-import { ACCEPTED_FILE_PICKER_TYPES } from "@/lib/file-handling"
 import {
   RiFileTextLine,
   RiFolderFill,
@@ -9,6 +8,8 @@ import {
 
 type InputDropZoneProps = {
   onFileUpload: (files: File[]) => void
+  /** Picker filter; drops are checked by the same validation after. */
+  accept: string
   disabled?: boolean
   children: React.ReactNode
 }
@@ -19,6 +20,7 @@ type InputDropZoneProps = {
  */
 export function InputDropZone({
   onFileUpload,
+  accept,
   disabled,
   children,
 }: InputDropZoneProps) {
@@ -26,7 +28,7 @@ export function InputDropZone({
     <FileUpload
       onFilesAdded={onFileUpload}
       multiple
-      accept={ACCEPTED_FILE_PICKER_TYPES}
+      accept={accept}
       disabled={disabled}
     >
       {children}

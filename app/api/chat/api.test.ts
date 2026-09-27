@@ -326,41 +326,44 @@ describe("validateAndResolveChatCredential", () => {
     expect(admitted.reservationId).toBe("res-1")
   })
 
-  it("requires vision routes when the turn carries image attachments", async () => {
-    vi.mocked(resolveModelRoute).mockResolvedValue({
-      ok: true,
-      route: resolvedRoute,
-      apiKey: "sk-or-byok",
-    })
+  it.each(["image/png", "application/pdf"])(
+    "requires vision routes when the turn carries a %s attachment",
+    async (mediaType) => {
+      vi.mocked(resolveModelRoute).mockResolvedValue({
+        ok: true,
+        route: resolvedRoute,
+        apiKey: "sk-or-byok",
+      })
 
-    await validateAndResolveChatCredential({
-      ...admissionBase,
-      model: "claude-sonnet-5",
-      isAuthenticated: true,
-      token: "convex-token",
-      messages: [
-        {
-          id: "u1",
-          role: "user",
-          parts: [
-            { type: "text", text: "what is this?" },
-            {
-              type: "file",
-              mediaType: "image/png",
-              url: "convex://file-1",
-            },
-          ],
-        },
-      ] as UIMessage[],
-    })
+      await validateAndResolveChatCredential({
+        ...admissionBase,
+        model: "claude-sonnet-5",
+        isAuthenticated: true,
+        token: "convex-token",
+        messages: [
+          {
+            id: "u1",
+            role: "user",
+            parts: [
+              { type: "text", text: "what is this?" },
+              {
+                type: "file",
+                mediaType,
+                url: "convex://file-1",
+              },
+            ],
+          },
+        ] as UIMessage[],
+      })
 
-    expect(resolveModelRoute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        requiredCapabilities: { vision: true, webSearch: false },
-      }),
-      expect.any(Object)
-    )
-  })
+      expect(resolveModelRoute).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requiredCapabilities: { vision: true, webSearch: false },
+        }),
+        expect.any(Object)
+      )
+    }
+  )
 
   it("requires web-search routes when search is enabled", async () => {
     vi.mocked(resolveModelRoute).mockResolvedValue({

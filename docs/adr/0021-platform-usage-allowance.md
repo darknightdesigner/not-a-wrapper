@@ -385,8 +385,9 @@ balance negative. Estimation is admission control, not the final charge.
   response adds nothing. The SDKs then replay statelessly within a request:
   they request `reasoning.encrypted_content` themselves and send reasoning
   items inline between steps. The encrypted content rides each reasoning
-  part's provider metadata and is persisted with the message, but no later
-  request replays it. History replay strips reasoning metadata (ADR-0041),
+  part's provider metadata and is persisted with the message (one copy per
+  summary part, bounded by the message payload cap), but no later request
+  replays it. History replay strips reasoning metadata (ADR-0041),
   and an approval continuation's paused step is history too (only its
   approval parts skip adaptation), so the SDK drops that reasoning and sends
   the id-less call and its output, as it did with storage on. Replaying it

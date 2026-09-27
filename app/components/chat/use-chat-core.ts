@@ -311,13 +311,12 @@ export function useChatCore({
     const snapshot = getTurnSnapshot()
     return buildChatTurnRequestBody({
       chatId,
-      userId: user?.id ?? "",
       selectedModel: snapshot.selectedModel,
       systemPrompt: snapshot.systemPrompt,
       enableSearch: snapshot.enableSearch,
       reasoningEffort: snapshot.reasoningEffort,
     })
-  }, [chatId, isAuthenticated, getTurnSnapshot, user?.id])
+  }, [chatId, isAuthenticated, getTurnSnapshot])
 
   const detachableStream = useDetachableChatStream({
     chatId,

@@ -1,6 +1,7 @@
 import * as fileType from "file-type"
 import {
   ALLOWED_FILE_TYPES,
+  fileNeedsVision,
   isAllowedFileMimeType,
   isTextLikeMediaType,
   MAX_FILE_SIZE,
@@ -28,11 +29,17 @@ export const MIME_TO_EXTENSIONS: Record<
   "text/csv": [".csv"],
 }
 
+function pickerTypes(types: readonly (typeof ALLOWED_FILE_TYPES)[number][]) {
+  return types.flatMap((mime) => [mime, ...MIME_TO_EXTENSIONS[mime]]).join(",")
+}
+
 /** Derived from validation policy so picker filtering cannot drift. */
-export const ACCEPTED_FILE_PICKER_TYPES = ALLOWED_FILE_TYPES.flatMap((mime) => [
-  mime,
-  ...MIME_TO_EXTENSIONS[mime],
-]).join(",")
+export const ACCEPTED_FILE_PICKER_TYPES = pickerTypes(ALLOWED_FILE_TYPES)
+
+/** The picker filter for text-only models, which read text files only. */
+export const TEXT_FILE_PICKER_TYPES = pickerTypes(
+  ALLOWED_FILE_TYPES.filter((mime) => !fileNeedsVision(mime))
+)
 
 export type FileValidationResult =
   | {
@@ -83,7 +90,13 @@ function withMediaType(file: File, mediaType: string): File {
       })
 }
 
-export async function validateFile(file: File): Promise<FileValidationResult> {
+const TEXT_ONLY_MODEL_ERROR = "This model reads text files only"
+
+/** `vision: false` limits the file to text, for a text-only model. */
+export async function validateFile(
+  file: File,
+  { vision = true }: { vision?: boolean } = {}
+): Promise<FileValidationResult> {
   if (file.size > MAX_FILE_SIZE) {
     return {
       isValid: false,
@@ -94,9 +107,12 @@ export async function validateFile(file: File): Promise<FileValidationResult> {
   const header = new Uint8Array(await file.slice(0, 4100).arrayBuffer())
   const type = await fileType.fileTypeFromBuffer(header)
   if (type) {
-    return isAllowedFileMimeType(type.mime)
-      ? { isValid: true, file: withMediaType(file, type.mime) }
-      : { isValid: false, error: UNSUPPORTED_TYPE_ERROR }
+    if (!isAllowedFileMimeType(type.mime)) {
+      return { isValid: false, error: UNSUPPORTED_TYPE_ERROR }
+    }
+    return !vision && fileNeedsVision(type.mime)
+      ? { isValid: false, error: TEXT_ONLY_MODEL_ERROR }
+      : { isValid: true, file: withMediaType(file, type.mime) }
   }
 
   const textType = textMediaTypeFor(file)

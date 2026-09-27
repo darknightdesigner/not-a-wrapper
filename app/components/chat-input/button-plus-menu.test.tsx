@@ -56,7 +56,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
                 actionQuery={actionQuery}
                 connectors={[]}
                 enableSearch={false}
-                isFileUploadAvailable
+                acceptsImages
                 searchMode="optional"
                 isUserAuthenticated
                 onCloseActionQuery={onCloseActionQuery}
@@ -198,7 +198,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
               }}
               connectors={[]}
               enableSearch
-              isFileUploadAvailable
+              acceptsImages
               searchMode="always-on"
               isUserAuthenticated
               onToggleSearch={onToggleSearch}
@@ -230,14 +230,14 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
                 from: 1,
                 id: 1,
                 isSynthetic: true,
-                query: "files",
+                query: "web",
                 to: 1,
                 trigger: "@",
               }}
               connectors={[]}
               enableSearch={false}
-              isFileUploadAvailable={false}
-              searchMode="optional"
+              acceptsImages
+              searchMode="unsupported"
               isUserAuthenticated
               onToggleSearch={() => {}}
             />
@@ -254,8 +254,8 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
       "[data-composer-action-tooltip-anchor]"
     )
 
-    expect(row?.textContent).toContain("Upload from computer")
-    expect(anchor?.textContent).toBe("Add photos & files")
+    expect(row?.textContent).toContain("Find real-time news and info")
+    expect(anchor?.textContent).toBe("Web search")
   })
 
   it("renders connector rows with skeleton loading and slash scoping", () => {
@@ -273,7 +273,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
                 actionQuery={actionQuery}
                 connectors={connectors}
                 enableSearch={false}
-                isFileUploadAvailable
+                acceptsImages
                 searchMode="optional"
                 isUserAuthenticated
                 onActivateConnector={onActivateConnector}
@@ -368,7 +368,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
             <div id="prompt-textarea" role="textbox" tabIndex={0} />
             <ButtonPlusMenu
               enableSearch={false}
-              isFileUploadAvailable
+              acceptsImages
               searchMode="optional"
               isUserAuthenticated
               onToggleSearch={() => {}}
@@ -436,7 +436,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
             <div id="prompt-textarea" role="textbox" tabIndex={0} />
             <ButtonPlusMenu
               enableSearch={false}
-              isFileUploadAvailable
+              acceptsImages
               searchMode="optional"
               isUserAuthenticated
               connectors={[
@@ -540,7 +540,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
                 },
               ]}
               enableSearch={false}
-              isFileUploadAvailable
+              acceptsImages
               searchMode="optional"
               isUserAuthenticated
               onToggleConnector={onToggleConnector}
@@ -579,7 +579,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
                 actionQuery={actionQuery}
                 connectors={[]}
                 enableSearch={false}
-                isFileUploadAvailable
+                acceptsImages
                 searchMode="optional"
                 isUserAuthenticated
                 onActivateActionQuery={onActivateActionQuery}

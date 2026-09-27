@@ -155,4 +155,23 @@ describe("file validation", () => {
 
     expect(result.isValid && result.file.type).toBe("image/png")
   })
+
+  it("limits a text-only model to text, by content rather than name", async () => {
+    vi.mocked(fileType.fileTypeFromBuffer).mockResolvedValue({
+      ext: "pdf",
+      mime: "application/pdf",
+    })
+    await expect(
+      validateFile(new File(["%PDF"], "notes.txt"), { vision: false })
+    ).resolves.toEqual({
+      isValid: false,
+      error: "This model reads text files only",
+    })
+
+    vi.mocked(fileType.fileTypeFromBuffer).mockResolvedValue(undefined)
+    const text = await validateFile(new File(["a,b\n"], "data.csv"), {
+      vision: false,
+    })
+    expect(text.isValid && text.file.type).toBe("text/csv")
+  })
 })

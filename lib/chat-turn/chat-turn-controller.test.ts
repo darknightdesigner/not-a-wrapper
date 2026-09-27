@@ -214,7 +214,6 @@ describe("chat turn controller", () => {
       {
         body: {
           chatId: "chat-1",
-          userId: "user-1",
           model: "model-1",
           systemPrompt: "custom system",
           enableSearch: true,
@@ -966,7 +965,6 @@ describe("chat turn controller", () => {
       {
         body: expect.objectContaining({
           chatId: "chat-existing",
-          userId: "user-1",
           model: "model-1",
           systemPrompt: "custom system",
           enableSearch: true,
@@ -1082,7 +1080,6 @@ describe("chat turn controller", () => {
       {
         body: expect.objectContaining({
           chatId: "server-chat",
-          userId: "user-1",
           model: "model-1",
           systemPrompt: "custom system",
           enableSearch: true,
@@ -1182,7 +1179,6 @@ describe("chat turn controller", () => {
       messageId: "assistant-1",
       body: {
         chatId: "chat-1",
-        userId: "user-1",
         model: "model-1",
         systemPrompt: "custom system",
         // Regeneration reads the same Turn context snapshot as sends, so the
