@@ -1,12 +1,12 @@
 import type { ToolSet } from "ai"
 import { describe, expect, it } from "vitest"
 import { wrapToolsWithExecutionPolicy } from "../execution-policy"
+import { resolveToolLimitPolicy } from "../limit-policy"
 import { ToolTraceCollector, wrapMcpTools } from "../mcp-wrapper"
 import {
   createOutageTolerantToolBudgetEnforcer,
   createRequestLocalToolSoftCap,
   createToolPolicyGuard,
-  getToolBudgetPolicy,
   InMemoryToolLimitStore,
   isPolicyUnavailableError,
   probeToolBudget,
@@ -184,8 +184,12 @@ describe("tool policy guardrails", () => {
   })
 
   it("uses stricter platform budgets than BYOK budgets", () => {
-    const platform = getToolBudgetPolicy("extract_content", "platform")
-    const byok = getToolBudgetPolicy("extract_content", "byok")
+    const platform = resolveToolLimitPolicy(
+      "budget",
+      "extract_content",
+      "platform"
+    )
+    const byok = resolveToolLimitPolicy("budget", "extract_content", "byok")
     expect(byok.maxCount).toBeGreaterThan(platform.maxCount)
   })
 
@@ -218,7 +222,7 @@ describe("tool policy guardrails", () => {
       actorKey: "user:user_budget_shape",
     })
 
-    const budget = getToolBudgetPolicy("web_search", "platform")
+    const budget = resolveToolLimitPolicy("budget", "web_search", "platform")
     for (let i = 0; i < budget.maxCount; i++) {
       await guard.enforceToolBudget("web_search")
     }
@@ -232,38 +236,6 @@ describe("tool policy guardrails", () => {
     const typed = error as ToolPolicyError
     expect(typed.code).toBe("TOOL_BUDGET_EXCEEDED")
     expect(typed.message).toContain("Retry after approximately")
-  })
-
-  it("uses tool-specific domain limit codes for non-extract tools", async () => {
-    const store = new InMemoryToolLimitStore(() => 5_500_000)
-
-    const first = await store.checkAndConsume({
-      limitType: "domain",
-      toolName: "web_search",
-      keyMode: "platform",
-      scopeCounts: [{ scopeKey: "example.com", count: 1 }],
-      windowMs: 60_000,
-      maxCount: 1,
-      bucketSizeMs: 30_000,
-      consume: true,
-    })
-    expect(first.allowed).toBe(true)
-
-    const second = await store.checkAndConsume({
-      limitType: "domain",
-      toolName: "web_search",
-      keyMode: "platform",
-      scopeCounts: [{ scopeKey: "example.com", count: 1 }],
-      windowMs: 60_000,
-      maxCount: 1,
-      bucketSizeMs: 30_000,
-      consume: true,
-    })
-
-    expect(second.allowed).toBe(false)
-    expect(second.code).toBe("WEB_SEARCH_DOMAIN_LIMIT_EXCEEDED")
-    expect(second.message).toContain('"web_search"')
-    expect(second.message).toContain('domain "example.com"')
   })
 
   it("degrades with a bounded request-local soft cap when policy backend is unavailable", async () => {
@@ -312,7 +284,7 @@ describe("tool policy guardrails", () => {
       keyMode: "platform",
       actorKey: "user:user_provider_probe",
     })
-    const budget = getToolBudgetPolicy("web_search", "platform")
+    const budget = resolveToolLimitPolicy("budget", "web_search", "platform")
 
     for (let i = 0; i < 10; i++) {
       const probe = await probeToolBudget({

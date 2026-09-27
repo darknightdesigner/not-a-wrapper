@@ -1,8 +1,9 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
-import { afterEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { api, internal } from "./_generated/api"
 import type { TableNames } from "./_generated/dataModel"
+import { signServerCallProof } from "./lib/serverCallProof"
 import schema from "./schema"
 import { modules } from "./test.setup"
 import {
@@ -12,6 +13,10 @@ import {
 
 // Account lifecycle seam (ADR-0044): the rejected-account rule through the
 // real builders, the insert-only bootstrap, and the account deletion drain.
+
+const SECRET = "test-chat-admission-secret-with-32-bytes"
+beforeEach(() => vi.stubEnv("CHAT_ADMISSION_SECRET", SECRET))
+afterEach(() => vi.unstubAllEnvs())
 
 const makeT = () => convexTest(schema, modules)
 type T = ReturnType<typeof makeT>
@@ -57,10 +62,10 @@ describe("rejected account at the auth boundary", () => {
       await expect(
         caller.query(api.users.getCurrent, {})
       ).rejects.toMatchObject(REJECTED)
-      // An anonymous id must not turn the identity into a guest admission.
-      await expect(
-        caller.mutation(api.usage.admit, { anonymousId: "guest_1" })
-      ).rejects.toMatchObject(REJECTED)
+      // The identity is refused, never downgraded to guest admission.
+      await expect(caller.mutation(api.usage.admit, {})).rejects.toMatchObject(
+        REJECTED
+      )
       await expect(
         caller.query(api.userKeys.getKeySettings, {})
       ).rejects.toMatchObject(REJECTED)
@@ -77,9 +82,24 @@ describe("rejected account at the auth boundary", () => {
 
     // A real guest keeps guest behavior, but the rejected owner's share link
     // is gone without touching the chat row.
+    const guest = { guestId: "guest_1", networkKey: "network_1" }
+    const issuedAt = Date.now()
     await expect(
-      t.mutation(api.usage.admit, { anonymousId: "guest_1" })
-    ).resolves.toMatchObject({ canSend: true })
+      t.mutation(api.usage.admitGuestTurn, {
+        guest,
+        requestId: "guest_request",
+        issuedAt,
+        proof: signServerCallProof(
+          {
+            purpose: "guest_turn_admit",
+            guest,
+            requestId: "guest_request",
+            issuedAt,
+          },
+          SECRET
+        ),
+      })
+    ).resolves.toEqual({ kind: "admitted" })
     await expect(
       t.query(api.chats.getPublicById, { chatId: deleted.publicId })
     ).resolves.toBeNull()
@@ -324,14 +344,20 @@ describe("account deletion drain", () => {
     })
     // Limiter rows through their real writers, so the actor keys cannot drift.
     const signedIn = t.withIdentity({ subject: owner })
-    await signedIn.mutation(api.toolLimits.checkAndConsume, {
-      limitType: "domain",
+    const toolCall = {
+      limitType: "domain" as const,
       toolName: "extract_content",
-      keyMode: "platform",
+      keyMode: "platform" as const,
       scopeCounts: [{ scopeKey: "example.com", count: 1 }],
-      windowMs: 60_000,
-      maxCount: 10,
-      bucketSizeMs: 60_000,
+      consume: true,
+      issuedAt: Date.now(),
+    }
+    await signedIn.mutation(api.toolLimits.checkAndConsume, {
+      ...toolCall,
+      proof: signServerCallProof(
+        { purpose: "tool_limit", guestTurn: null, ...toolCall },
+        SECRET
+      ),
     })
     await signedIn.mutation(api.rateLimits.consume, { bucket: "mcp_test" })
 

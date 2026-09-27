@@ -75,7 +75,7 @@ References (sibling checkouts):
 | [User bootstrap trusts browser-sent sync fields](#user-bootstrap-trusts-browser-sent-sync-fields) | Low | Accounts, sessions and privacy |
 | [One user can exhaust the shared free-model quota](#one-user-can-exhaust-the-shared-free-model-quota) | Low | Admission limits |
 | [Platform throttle shows the wrong error](#platform-throttle-shows-the-wrong-error) | Low | Admission limits |
-| [Tool-limit rows are never deleted](#tool-limit-rows-are-never-deleted) | Low | Admission limits |
+| [Tool-limit rows are never deleted](#tool-limit-rows-are-never-deleted) (fixed, ADR-0045) | Low | Admission limits |
 | [Feedback has no length or rate limit](#feedback-has-no-length-or-rate-limit) | Low | Admission limits |
 | [A missing lazy chunk crashes the app](#a-missing-lazy-chunk-crashes-the-app) | Low | Deploys and version skew |
 | [Chat API cannot recognize an outdated tab](#chat-api-cannot-recognize-an-outdated-tab) | Low | Deploys and version skew |
@@ -1768,8 +1768,8 @@ send button stops working with no explanation until a reload.
    401 with a new `SESSION_EXPIRED` code when there is no session but the body
    looks signed-in: `userId` fails `isGuestUserId`, or the body carries
    `chatVersion`, `expectedVisibleMessageCount`, `edit` or `regeneration`. The
-   field check keeps working if guest identity later moves to a server-signed
-   cookie (TODO "Guest abuse").
+   field check keeps working now that guest identity is a server-signed cookie
+   (ADR-0045).
 2. Client: add one session-ended handler, called from
    `AcceptanceAwareChatTransport`
    (`app/components/chat/use-detachable-chat-stream.ts`) on 401
@@ -1782,7 +1782,7 @@ send button stops working with no explanation until a reload.
 **Notes.** The silent guest turn needs a cross-tab sign-out and then a send
 within about 5 minutes (Convex refetches its token 10 seconds before expiry),
 so it is uncommon. The blocked composer after any session end is the likelier
-symptom. Neither the account-deletion fix (ADR-0044) nor the "Guest abuse" item covers
+symptom. Neither the account-deletion fix (ADR-0044) nor guest admission (ADR-0045) covers
 this, and a server-signed guest cookie alone would not fix it.
 
 ### Shared chat pages can be indexed
@@ -2003,7 +2003,8 @@ load shared Convex, Vercel and Redis capacity for everyone.
    (`app/api/chat/public-http-error.ts`) has no retry field and
    `createErrorResponse` (`app/api/chat/utils.ts:57-67`) sets no headers, so
    add an optional `retryAfterSeconds` there once.
-3. Leave the per-IP bucket to the guest-abuse TODO.
+3. The per-IP guest bucket and guest running-answer caps shipped with ADR-0045
+   (`usage.admitGuestTurn`); signed-in users still need steps 1 and 2.
 
 **Notes.** Using the run row as the counter keeps the check in the same
 transaction that inserts the run, so slots cannot leak: a crashed worker frees
@@ -2138,6 +2139,11 @@ ADR-0021 only describes falling through on insufficient allowance
 
 Severity: Low.
 
+Status: fixed by ADR-0045 (fix steps 1, 2 and 4: the `by_updated_at` index, the
+10-minute `sweepExpiredLimiterRows` cron, and server-resolved policy by tool
+name); step 3 shipped with the account-deletion cascade (ADR-0044). Guest tool
+limits now key on the client network of the admitted guest turn.
+
 **What is wrong.** Each time a tool such as web search or page reading runs,
 `checkAndConsume` adds to a counter row in `toolLimitBuckets` (one row per
 scope for each minute of use), and page reading keeps a separate row per
@@ -2186,8 +2192,9 @@ keyed by their WorkOS id, even after the account is deleted.
 (`convex/toolLimits.ts:28-44`) does not let anyone raise the enforced limit:
 the server always sends its own policy (`lib/tools/policy.ts:288-317`), and
 signed-in actor keys come from the login token (`convex/toolLimits.ts:72-81`).
-Making the mutation internal and fixing the fakeable guest id are already in
-the TODO.md item "Guest abuse and spending limits". Growth costs storage only,
+ADR-0045 now requires a server-call proof on every call and keys guests on the
+network of their admitted turn, so browsers can no longer reach it with a
+chosen id or policy. Growth costs storage only,
 since reads are index range scans bounded to the 15-minute window.
 
 ### Feedback has no length or rate limit

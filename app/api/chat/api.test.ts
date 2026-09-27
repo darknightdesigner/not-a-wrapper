@@ -22,29 +22,6 @@ describe("admitServerSideUsage", () => {
     vi.clearAllMocks()
   })
 
-  it("maps missing anonymous usage IDs to INVALID_REQUEST", async () => {
-    vi.mocked(fetchMutation).mockResolvedValue({
-      canSend: false,
-      remaining: 0,
-      limit: 5,
-      isAnonymous: true,
-      error: "Anonymous ID required for usage tracking",
-      errorCode: "ANONYMOUS_ID_REQUIRED",
-    })
-
-    const error = await admitServerSideUsage(undefined).then(
-      () => null,
-      (err) => err
-    )
-
-    expect(error).toBeInstanceOf(Error)
-    expect(error).toMatchObject({
-      message: "Anonymous ID required for usage tracking",
-      statusCode: 400,
-      code: "INVALID_REQUEST",
-    })
-  })
-
   it("maps missing synced users to USER_NOT_FOUND server errors", async () => {
     vi.mocked(fetchMutation).mockResolvedValue({
       canSend: false,
@@ -121,11 +98,11 @@ describe("admitServerSideUsage", () => {
     vi.mocked(fetchMutation).mockResolvedValue({
       canSend: false,
       remaining: 0,
-      limit: 5,
-      isAnonymous: true,
+      limit: 1000,
+      isAnonymous: false,
     })
 
-    const error = await admitServerSideUsage(undefined, "guest-id").then(
+    const error = await admitServerSideUsage("convex-token").then(
       () => null,
       (caught) => caught
     )

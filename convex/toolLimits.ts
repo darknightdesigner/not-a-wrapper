@@ -1,5 +1,7 @@
 import { v } from "convex/values"
+import { resolveToolLimitPolicy } from "../lib/tools/limit-policy"
 import { optionalAuthMutation } from "./lib/authedFunctions"
+import { requireServerCallProof } from "./lib/serverCallProof"
 
 const MAX_SCOPE_ITEMS = 25
 
@@ -25,6 +27,15 @@ function formatDomainLimitCode(
   return `${normalizedToolName || "TOOL"}_DOMAIN_LIMIT_EXCEEDED`
 }
 
+/**
+ * Sliding-window tool budget and domain limits (Tool budget, CONTEXT.md).
+ *
+ * Callable only by the Next server (ADR-0045): every call carries a
+ * server-call proof over its arguments, the window policy is resolved here by
+ * tool name, and the actor is the caller's Convex identity or, for guests, the
+ * client network of their admitted turn. A guest can drop its cookie, not its
+ * network, so a fresh cookie never resets a tool budget or domain limit.
+ */
 export const checkAndConsume = optionalAuthMutation({
   args: {
     limitType: v.union(v.literal("domain"), v.literal("budget")),
@@ -36,11 +47,13 @@ export const checkAndConsume = optionalAuthMutation({
         count: v.number(),
       })
     ),
-    windowMs: v.number(),
-    maxCount: v.number(),
-    bucketSizeMs: v.number(),
-    anonymousId: v.optional(v.string()),
-    consume: v.optional(v.boolean()),
+    consume: v.boolean(),
+    /** Guests only: the admitted turn (signed guest id + request id). */
+    guestTurn: v.optional(
+      v.object({ guestId: v.string(), requestId: v.string() })
+    ),
+    issuedAt: v.number(),
+    proof: v.string(),
   },
   handler: async (ctx, args) => {
     const {
@@ -48,39 +61,69 @@ export const checkAndConsume = optionalAuthMutation({
       toolName,
       keyMode,
       scopeCounts,
-      windowMs,
-      maxCount,
-      bucketSizeMs,
-      anonymousId,
-      consume = true,
+      consume,
+      guestTurn,
+      issuedAt,
+      proof,
     } = args
-
-    if (scopeCounts.length === 0) {
-      return { allowed: true, remaining: maxCount }
-    }
-
+    // Bound the payload before hashing it.
     if (scopeCounts.length > MAX_SCOPE_ITEMS) {
       throw new Error(
         `Too many scopes (${scopeCounts.length}); max ${MAX_SCOPE_ITEMS}`
       )
     }
-
-    if (windowMs <= 0 || maxCount <= 0 || bucketSizeMs <= 0) {
-      throw new Error("Invalid limit configuration")
-    }
-
-    const identity = ctx.identity
-    let actorKey: string
-    if (identity) {
-      actorKey = `user:${identity.subject}`
-    } else {
-      if (!anonymousId) {
-        throw new Error("Anonymous ID required for unauthenticated tool limits")
-      }
-      actorKey = `guest:${anonymousId}`
-    }
+    requireServerCallProof(
+      {
+        purpose: "tool_limit",
+        guestTurn: guestTurn ?? null,
+        limitType,
+        toolName,
+        keyMode,
+        scopeCounts,
+        consume,
+        issuedAt,
+      },
+      proof
+    )
 
     const now = Date.now()
+    // Signed-in callers are their Convex identity; the server never signs a
+    // guest turn alongside a user token.
+    const identity = ctx.identity
+    let actorKey: string
+    if (identity && !guestTurn) {
+      actorKey = `user:${identity.subject}`
+    } else if (!identity && guestTurn) {
+      // The live lease written by `usage.admitGuestTurn` carries the
+      // server-derived network. No live lease, no guest tool call.
+      const lease = await ctx.db
+        .query("guestTurnLeases")
+        .withIndex("by_request", (q) => q.eq("requestId", guestTurn.requestId))
+        .unique()
+      if (
+        !lease ||
+        lease.guestId !== guestTurn.guestId ||
+        lease.expiresAt <= now
+      ) {
+        throw new Error(
+          "Guest tool limits need an admitted, running guest turn"
+        )
+      }
+      actorKey = `network:${lease.networkKey}`
+    } else {
+      throw new Error("Tool limits need exactly one signed-in or guest actor")
+    }
+
+    const { windowMs, maxCount, bucketSizeMs } = resolveToolLimitPolicy(
+      limitType,
+      toolName,
+      keyMode
+    )
+
+    if (scopeCounts.length === 0) {
+      return { allowed: true, remaining: maxCount }
+    }
+
     const currentBucketStartMs = Math.floor(now / bucketSizeMs) * bucketSizeMs
     const windowStartMs = now - windowMs + 1
     const firstBucketStartMs =

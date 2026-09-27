@@ -1,15 +1,13 @@
 import { api } from "@/convex/_generated/api"
-import {
-  EXTRACT_CONTENT_DOMAIN_MAX_REQUESTS,
-  EXTRACT_CONTENT_DOMAIN_WINDOW_MS,
-  TOOL_BUDGET_LIMITS,
-  TOOL_BUDGET_WINDOW_MS,
-  TOOL_LIMIT_BUCKET_SIZE_MS,
-} from "@/lib/config"
+import { signServerCallProof } from "@/convex/lib/serverCallProof"
 import { fetchMutation } from "convex/nextjs"
+import {
+  resolveToolLimitPolicy,
+  type ToolKeyMode,
+  type ToolLimitType,
+} from "./limit-policy"
 
-export type ToolKeyMode = "platform" | "byok"
-export type ToolLimitType = "domain" | "budget"
+export type { ToolKeyMode, ToolLimitType }
 
 export type ToolDomainLimitCode = `${string}_DOMAIN_LIMIT_EXCEEDED`
 export type ToolPolicyCode =
@@ -207,15 +205,13 @@ type ScopeCount = {
   count: number
 }
 
+/** Window policy is never an input: every store resolves it by tool name. */
 type ToolLimitStoreInput = {
   actorKey?: string
   limitType: ToolLimitType
   toolName: string
   keyMode: ToolKeyMode
   scopeCounts: ScopeCount[]
-  windowMs: number
-  maxCount: number
-  bucketSizeMs: number
   consume?: boolean
 }
 
@@ -234,7 +230,10 @@ export type ToolLimitStore = {
 
 type ConvexToolLimitStoreOptions = {
   convexToken?: string
+  /** The cookie-verified guest id the route threads through (ADR-0045). */
   anonymousId?: string
+  /** The turn's request id; a guest's admitted turn lease is keyed by it. */
+  requestId: string
 }
 
 /**
@@ -246,21 +245,45 @@ type ConvexToolLimitStoreOptions = {
  * bounded local cap (see the degraded-mode handling in lib/tools/runtime.ts).
  * The cost is degraded budget accounting for that tail; do not migrate this
  * to the worker wire without revisiting the decision.
+ *
+ * Each call carries a fresh server-call proof, so only this server can reach
+ * the mutation; a signed-in caller is its token, a guest its admitted turn
+ * (limited by that turn's client network).
  */
 export function createConvexToolLimitStore(
   options: ConvexToolLimitStoreOptions
 ): ToolLimitStore {
-  const { convexToken, anonymousId } = options
+  const { convexToken, anonymousId, requestId } = options
+  const guestTurn =
+    !convexToken && anonymousId ? { guestId: anonymousId, requestId } : null
 
   return {
     async checkAndConsume(input) {
       try {
-        const { actorKey: _actorKey, ...rest } = input
+        const { limitType, toolName, keyMode, scopeCounts } = input
+        const consume = input.consume ?? true
+        const issuedAt = Date.now()
+        const proof = signServerCallProof({
+          purpose: "tool_limit",
+          guestTurn,
+          limitType,
+          toolName,
+          keyMode,
+          scopeCounts,
+          consume,
+          issuedAt,
+        })
         const result = await fetchMutation(
           api.toolLimits.checkAndConsume,
           {
-            ...rest,
-            anonymousId,
+            limitType,
+            toolName,
+            keyMode,
+            scopeCounts,
+            consume,
+            ...(guestTurn ? { guestTurn } : {}),
+            issuedAt,
+            proof,
           },
           { token: convexToken }
         )
@@ -282,37 +305,6 @@ export function createConvexToolLimitStore(
         )
       }
     },
-  }
-}
-
-export function getToolBudgetPolicy(
-  toolName: string,
-  keyMode: ToolKeyMode
-): {
-  windowMs: number
-  maxCount: number
-  bucketSizeMs: number
-} {
-  const modeLimits = TOOL_BUDGET_LIMITS[keyMode]
-  const maxCount =
-    modeLimits[toolName as keyof typeof modeLimits] ?? modeLimits.default
-
-  return {
-    windowMs: TOOL_BUDGET_WINDOW_MS,
-    maxCount,
-    bucketSizeMs: TOOL_LIMIT_BUCKET_SIZE_MS,
-  }
-}
-
-export function getExtractContentDomainPolicy(): {
-  windowMs: number
-  maxCount: number
-  bucketSizeMs: number
-} {
-  return {
-    windowMs: EXTRACT_CONTENT_DOMAIN_WINDOW_MS,
-    maxCount: EXTRACT_CONTENT_DOMAIN_MAX_REQUESTS,
-    bucketSizeMs: TOOL_LIMIT_BUCKET_SIZE_MS,
   }
 }
 
@@ -348,14 +340,12 @@ export async function probeToolBudget(options: {
   scopeKey?: string
 }> {
   const { store, keyMode, toolName, actorKey } = options
-  const policy = getToolBudgetPolicy(toolName, keyMode)
   const result = await store.checkAndConsume({
     actorKey,
     limitType: "budget",
     toolName,
     keyMode,
     scopeCounts: [{ scopeKey: "*", count: 1 }],
-    ...policy,
     consume: false,
   })
   return {
@@ -374,14 +364,12 @@ export function createToolPolicyGuard(options: {
 
   return {
     async enforceToolBudget(toolName: string): Promise<void> {
-      const policy = getToolBudgetPolicy(toolName, keyMode)
       const result = await store.checkAndConsume({
         actorKey,
         limitType: "budget",
         toolName,
         keyMode,
         scopeCounts: [{ scopeKey: "*", count: 1 }],
-        ...policy,
         consume: true,
       })
 
@@ -405,7 +393,6 @@ export function createToolPolicyGuard(options: {
     ): Promise<void> {
       if (domainCounts.size === 0) return
 
-      const policy = getExtractContentDomainPolicy()
       const scopeCounts = Array.from(domainCounts.entries()).map(
         ([scopeKey, count]) => ({ scopeKey, count })
       )
@@ -416,7 +403,6 @@ export function createToolPolicyGuard(options: {
         toolName: "extract_content",
         keyMode,
         scopeCounts,
-        ...policy,
         consume: true,
       })
 
@@ -454,11 +440,15 @@ export class InMemoryToolLimitStore implements ToolLimitStore {
     input: ToolLimitStoreInput
   ): Promise<ToolLimitStoreResult> {
     const now = this.nowFn()
-    const currentBucketStartMs =
-      Math.floor(now / input.bucketSizeMs) * input.bucketSizeMs
-    const windowStartMs = now - input.windowMs + 1
+    const { windowMs, maxCount, bucketSizeMs } = resolveToolLimitPolicy(
+      input.limitType,
+      input.toolName,
+      input.keyMode
+    )
+    const currentBucketStartMs = Math.floor(now / bucketSizeMs) * bucketSizeMs
+    const windowStartMs = now - windowMs + 1
     const firstBucketStartMs =
-      Math.floor(windowStartMs / input.bucketSizeMs) * input.bucketSizeMs
+      Math.floor(windowStartMs / bucketSizeMs) * bucketSizeMs
 
     const scopes = input.scopeCounts.map((scope) => ({
       scopeKey: scope.scopeKey,
@@ -477,16 +467,13 @@ export class InMemoryToolLimitStore implements ToolLimitStore {
       })
 
       const projected = totals.total + scope.count
-      if (projected > input.maxCount) {
+      if (projected > maxCount) {
         const retryAfterMs = totals.oldestBucketStartMs
           ? Math.max(
               1_000,
-              totals.oldestBucketStartMs +
-                input.bucketSizeMs +
-                input.windowMs -
-                now
+              totals.oldestBucketStartMs + bucketSizeMs + windowMs - now
             )
-          : input.windowMs
+          : windowMs
 
         return {
           allowed: false,
@@ -500,7 +487,7 @@ export class InMemoryToolLimitStore implements ToolLimitStore {
               : `Budget exceeded for "${input.toolName}" in the active window.`,
           retryAfterSeconds: Math.max(1, Math.ceil(retryAfterMs / 1000)),
           scopeKey: scope.scopeKey,
-          remaining: Math.max(0, input.maxCount - totals.total),
+          remaining: Math.max(0, maxCount - totals.total),
         }
       }
     }
@@ -533,8 +520,8 @@ export class InMemoryToolLimitStore implements ToolLimitStore {
         firstBucketStartMs,
         currentBucketStartMs,
       })
-      return Math.min(min, Math.max(0, input.maxCount - totals.total))
-    }, input.maxCount)
+      return Math.min(min, Math.max(0, maxCount - totals.total))
+    }, maxCount)
 
     return { allowed: true, remaining: minRemaining }
   }

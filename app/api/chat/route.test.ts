@@ -1,8 +1,14 @@
 import { getWorkosSession } from "@/lib/auth/workos"
+import { resolveGuestIdentity } from "@/lib/guest-identity"
 import { getToolDimensionForError } from "@/lib/observability/chat-error-taxonomy"
 import * as Sentry from "@sentry/nextjs"
+import { after } from "next/server"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { admitServerSideUsage, validateAndResolveChatCredential } from "./api"
+import {
+  admitServerSideUsage,
+  createGuestTurnAdmission,
+  validateAndResolveChatCredential,
+} from "./api"
 import { createChatTurnRuntime } from "./chat-turn-runtime"
 import { preflightDurableGenerationInput } from "./durable-generation-input"
 import { PublicChatHttpError } from "./public-http-error"
@@ -35,8 +41,17 @@ vi.mock("@/lib/observability/chat-error-taxonomy", async (importActual) => {
   }
 })
 
+vi.mock("@/lib/guest-identity", () => ({
+  resolveGuestIdentity: vi.fn(),
+}))
+
+vi.mock("next/server", () => ({
+  after: vi.fn(),
+}))
+
 vi.mock("./api", () => ({
   admitServerSideUsage: vi.fn(),
+  createGuestTurnAdmission: vi.fn(),
   validateAndResolveChatCredential: vi.fn(),
 }))
 
@@ -67,6 +82,20 @@ function makeRequest(): Request {
       ],
       chatId: "3f2c6c1e-8b0d-4a3f-9a6e-1c2b3d4e5f60",
       model: "test-model",
+    }),
+  })
+}
+
+function makeGuestRequest(clientGuestId: string): Request {
+  return new Request("http://test.local/api/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      messages: [
+        { id: "u1", role: "user", parts: [{ type: "text", text: "hello" }] },
+      ],
+      chatId: "3f2c6c1e-8b0d-4a3f-9a6e-1c2b3d4e5f60",
+      model: "test-model",
+      userId: clientGuestId,
     }),
   })
 }
@@ -296,6 +325,66 @@ describe("/api/chat route", () => {
     expect(validateAndResolveChatCredential).not.toHaveBeenCalled()
     expect(admitServerSideUsage).toHaveBeenCalledOnce()
     expect(createChatTurnRuntime).not.toHaveBeenCalled()
+  })
+
+  describe("guest turns (ADR-0045)", () => {
+    const cookieGuest = { guestId: "guest_cookie", networkKey: "network-key" }
+
+    beforeEach(() => {
+      vi.mocked(getWorkosSession).mockResolvedValue({
+        user: null,
+      } as Awaited<ReturnType<typeof getWorkosSession>>)
+      vi.mocked(resolveGuestIdentity).mockResolvedValue(cookieGuest)
+    })
+
+    it("keys guest admission on the signed cookie, never the body's anonymous id", async () => {
+      const admit = vi.fn(async () => {})
+      const release = vi.fn(async () => {})
+      vi.mocked(createGuestTurnAdmission).mockReturnValue({ admit, release })
+      vi.mocked(createChatTurnRuntime).mockReturnValue({
+        prepare: vi.fn(async () => {}),
+        toResponse: vi.fn(async () => new Response("ok")),
+        fail: vi.fn(),
+      })
+
+      await POST(makeGuestRequest("guest_client_a"))
+      await POST(makeGuestRequest("guest_client_rotated"))
+
+      for (const call of vi.mocked(createGuestTurnAdmission).mock.calls) {
+        expect(call[0]).toEqual({
+          guest: cookieGuest,
+          requestId: expect.any(String),
+        })
+      }
+      expect(admit).toHaveBeenCalledTimes(2)
+      expect(admitServerSideUsage).not.toHaveBeenCalled()
+      for (const [args] of vi.mocked(createChatTurnRuntime).mock.calls) {
+        expect(args.input).toMatchObject({
+          userId: "guest_cookie",
+          anonymousId: "guest_cookie",
+        })
+      }
+      // The response-end hook frees the concurrency slot.
+      const onResponseEnd = vi.mocked(after).mock.calls[0]?.[0]
+      expect(typeof onResponseEnd).toBe("function")
+      if (typeof onResponseEnd === "function") await onResponseEnd()
+      expect(release).toHaveBeenCalledOnce()
+    })
+
+    it("fails closed when the guest limiter store is unavailable", async () => {
+      vi.mocked(createGuestTurnAdmission).mockReturnValue({
+        admit: vi.fn(async () => {
+          throw new Error("fetch failed")
+        }),
+        release: vi.fn(async () => {}),
+      })
+
+      const response = await POST(makeGuestRequest("guest_client_a"))
+
+      expect(response.status).toBe(500)
+      expect(validateAndResolveChatCredential).not.toHaveBeenCalled()
+      expect(createChatTurnRuntime).not.toHaveBeenCalled()
+    })
   })
 
   it("returns 400 for malformed JSON without capturing to Sentry", async () => {

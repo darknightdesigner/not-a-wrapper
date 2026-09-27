@@ -18,17 +18,11 @@ inactive chats, so the live runs and approvals of a Project whose deletion job
 blocked stay at the head of the range forever. Page them with a
 `reaperCheckpoints` cursor like `reapResolvedApprovalPausesPass`, or close live
 work at the start of Project jobs as ADR-0044 does for account jobs.
-- **Guest abuse and spending limits:** The five-message guest limit resets when
-the client changes its anonymous ID. Add server-enforced network and concurrency
-limits plus an aggregate guest spending ceiling, reusing existing admission
-patterns. Treat the client ID as a usage counter, not a trusted abuse boundary.
-The guest tool caps (`convex/toolLimits.ts`) key off the same ID, and neither
-`anonymousUsage` nor `toolLimitBuckets` rows are ever cleaned up
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-limit-rows-are-never-deleted)).
-Prefer a server-signed guest cookie plus an IP bucket, admitted from an
-internal mutation instead of public ones, and fail closed if the limiter store
-is down (Vercel Chatbot's Redis check fails open; do not copy that). Pairs with
-the BotID evaluation below.
+- **Guest limit follow-ups (ADR-0045):** Drop the vestigial guest `userId` from
+the chat wire contract and client builder, remove `anonymousUsage` from
+`convex/schema.ts` once production is drained, and add a trusted client-IP
+header setting for non-Vercel hosts (off Vercel every guest shares one network
+bucket).
 - **Favicon proxy sees model-chosen hostnames without a click:** Markdown link
 pills and source chips render `Favicon`, which requests
 `/api/favicon?domain=<host>` on its own, and `app/api/favicon/route.ts` asks
@@ -205,7 +199,9 @@ do not leak context across project boundaries.
 instances using existing admission patterns. Measure Redis usage and preserve
 refresh and multi-tab recovery.
 - **Evaluate Vercel's BotID:** Assess bot attestation for platform-funded
-turn admission, including compatibility with guest access and existing limits.
+turn admission; guests would gate in front of `usage.admitGuestTurn`
+(ADR-0045). It is the mitigation for anyone with many networks spending the
+shared guest ceiling.
 - **Connectors:** Integrations with Google, YouTube, Figma, and personal tools
 - **MCP OAuth (product gap):** `lib/mcp/auth-headers.ts` only sends a static
 Bearer or custom header, with no OAuth or refresh, so users paste long-lived
@@ -516,8 +512,8 @@ project can exceed the 16 MiB read limit and any message write in the project
 re-runs it. Paginate it and store the preview on the chat.
 - **Move send counters off the users row:** They live on `users`
 (`convex/usage.ts`), so every query reading that row re-runs on each send.
-`anonymousUsage` is already a separate table; give signed-in counters the same
-treatment.
+Guest counters already live in `apiRateLimits` fixed windows (ADR-0045); give
+signed-in counters the same treatment.
 - **Root layout bundle weight:** `route-bundle-stats.json` (Sep 23 build) shows
 `/_not-found` at about 500 KB gzipped and login at about 580 KB, because the
 root layout mounts every provider and Sentry replay and PostHog init eagerly.
