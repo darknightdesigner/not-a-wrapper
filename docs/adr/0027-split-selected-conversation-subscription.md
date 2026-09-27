@@ -106,3 +106,10 @@ classification stays client-side.
   after adoption and no `NEXT_PUBLIC_SPLIT_SELECTED_QUERY` production
   override. The deployed frontend already used the split pair, so the flag,
   atomic query, helper, and rollback-only tests were removed.
+- 2026-09-27: `getSelectedPath` still reads every message in the chat,
+  branches included, on each execution, so a chat's total message bytes stay
+  bounded by Convex's 16 MiB per-function read limit. `prepareGeneration` now
+  reads the chat once per turn (it read it about eight times, which failed
+  from ~2 MiB chats) and each message is capped at 896 KiB (`capMessagePayload`,
+  CONTEXT.md "Message payload cap"), so both sides hit that bound at the same
+  ~16 MiB.

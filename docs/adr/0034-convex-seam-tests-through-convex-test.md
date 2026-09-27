@@ -77,6 +77,9 @@ per test with `vi.stubEnv`; the edge runtime exposes `process.env`.
   chat, tampered proof, valid proof), `approveToolCall` / `denyToolCall`
   (guest, foreign approval, owner decision), `stopGenerationRun` (foreign run),
   and `reapExpiredGenerationRuns` (a lease-less running run is never reaped).
+  Since 2026-09-27 it also runs one turn on a long branched chat under a
+  tightened `transactionLimits.bytesRead` (prepare reads the chat once) and
+  checks the completion write stays under Convex's 1 MiB document limit.
 - `convex-test` runs under Vercel's edge runtime, which is similar to but not
   the Convex runtime; its own docs say to still test new code manually. Error
   message text is our own thrown text, so matching on it is stable.
