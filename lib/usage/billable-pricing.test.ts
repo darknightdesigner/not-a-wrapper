@@ -64,9 +64,9 @@ describe("billable route pricing (ADR-0021)", () => {
     // The title model is a cheap same-provider pick, priced independently.
     expect(snapshot!.title).toBeDefined()
     expect(snapshot!.title!.providerId).toBe(snapshot!.primary.providerId)
-    expect(
-      snapshot!.title!.inputCreditsPerMTok
-    ).toBeLessThanOrEqual(snapshot!.primary.inputCreditsPerMTok)
+    expect(snapshot!.title!.inputCreditsPerMTok).toBeLessThanOrEqual(
+      snapshot!.primary.inputCreditsPerMTok
+    )
   })
 
   it("keeps a built snapshot stable when the catalog object mutates", () => {
@@ -150,6 +150,7 @@ describe("platform usage estimation", () => {
       toolsLikely: false,
       pricingSnapshot: snapshot,
       outputTokenBudget: PLATFORM_RESPONSE_OUTPUT_TOKENS,
+      vision: true,
     })
     const withoutImage = estimatePlatformUsage({
       messages: [
@@ -168,46 +169,47 @@ describe("platform usage estimation", () => {
     ).toBeGreaterThanOrEqual(1_000)
   })
 
-  it("sizes a PDF by its stored bytes, capped at the context window", () => {
-    const estimatePdf = (
+  it("sizes PDFs by stored bytes only on routes that take them", () => {
+    const pdf = (attachmentId: string) => ({
+      type: "file",
+      mediaType: "application/pdf",
+      url: `https://files.example/${attachmentId}.pdf`,
+      attachmentId,
+    })
+    const estimatePdfs = (
       extra: Pick<
         Parameters<typeof estimatePlatformUsage>[0],
-        "attachmentSizes" | "contextWindow"
+        "attachmentSizes" | "contextWindow" | "vision"
       >
     ) =>
       estimatePlatformUsage({
         messages: [
-          {
-            id: "u1",
-            role: "user",
-            parts: [
-              {
-                type: "file",
-                mediaType: "application/pdf",
-                url: "https://files.example/report.pdf",
-                attachmentId: "pdf-1",
-              },
-            ],
-          },
+          { id: "u1", role: "user", parts: [pdf("a")] },
+          { id: "u2", role: "user", parts: [pdf("b")] },
         ] as never,
         toolsLikely: false,
         pricingSnapshot: snapshot,
         outputTokenBudget: PLATFORM_RESPONSE_OUTPUT_TOKENS,
         ...extra,
       }).estimatedInputTokens
-    const unknown = estimatePdf({})
     // 20 pages at ~55 KB each, ~1,500 tokens per page.
-    const twentyPages = estimatePdf({
-      attachmentSizes: { "pdf-1": 20 * 55 * 1024 },
-    })
+    const twentyPages = 20 * 55 * 1024
+    const sizes = { a: twentyPages, b: twentyPages }
+    // A text-only route gets a short note, not the document.
+    const noted = estimatePdfs({ attachmentSizes: sizes })
 
-    expect(twentyPages - unknown).toBe(20 * 1_500 - 2_000)
+    expect(estimatePdfs({ vision: true }) - noted).toBe(2 * 2_000 - 2 * 20)
+    expect(estimatePdfs({ attachmentSizes: sizes, vision: true }) - noted).toBe(
+      2 * 20 * 1_500 - 2 * 20
+    )
+    // The cap is per request, not per PDF.
     expect(
-      estimatePdf({
-        attachmentSizes: { "pdf-1": 20 * 55 * 1024 },
-        contextWindow: 8_000,
-      }) - unknown
-    ).toBe(8_000 - 2_000)
+      estimatePdfs({
+        attachmentSizes: sizes,
+        vision: true,
+        contextWindow: 50_000,
+      }) - noted
+    ).toBe(50_000 - 2 * 20)
   })
 
   it("estimates zero credits for zero-rate routes but keeps token counts", () => {

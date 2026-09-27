@@ -6,6 +6,8 @@ export { ACCEPTED_FILE_PICKER_TYPES, validateFile } from "@/lib/file/validation"
 /** A staged image that never commits fails its upload instead of blocking Send. */
 const STAGED_IMAGE_READY_TIMEOUT_MS = 60_000
 const UPLOAD_FAILED_MESSAGE = "Upload failed. Please try again."
+/** The server drops a staged image it cannot resize (files.rejectStagedImage). */
+const IMAGE_REJECTED_MESSAGE = "This image is too large or can't be read."
 
 export type Attachment = {
   name: string
@@ -155,7 +157,7 @@ async function waitForStagedAttachment(
       try {
         const status = watch.localQueryResult()
         if (status === "ready") settle()
-        else if (status === null) settle(new Error(UPLOAD_FAILED_MESSAGE))
+        else if (status === null) settle(new Error(IMAGE_REJECTED_MESSAGE))
       } catch {
         settle(new Error(UPLOAD_FAILED_MESSAGE))
       }

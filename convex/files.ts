@@ -14,6 +14,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
+import { isChatActive } from "./lib/auth"
 import {
   authenticatedMutation,
   authenticatedQuery,
@@ -21,7 +22,6 @@ import {
   ownedChatMutation,
   ownedChatQuery,
 } from "./lib/authedFunctions"
-import { isChatActive } from "./lib/auth"
 
 const DAILY_FILE_UPLOAD_LIMIT = 5
 const PREMIUM_FILE_UPLOAD_LIMIT = null
@@ -463,6 +463,34 @@ type CommitStagedImageArgs = {
   }
 }
 
+/** The staged row still waits on the normalization run for this blob. */
+async function getAwaitingStagedImage(
+  ctx: MutationCtx,
+  attachmentId: Id<"chatAttachments">,
+  originalStorageId: Id<"_storage">
+) {
+  const attachment = await ctx.db.get(attachmentId)
+  return attachment &&
+    !isAttachmentReady(attachment) &&
+    attachment.storageId === originalStorageId
+    ? attachment
+    : null
+}
+
+/** Chat deletion's rule: keep a blob another row still references. */
+async function deleteStorageIfUnreferenced(
+  ctx: MutationCtx,
+  storageId: Id<"_storage">
+) {
+  const reference = await ctx.db
+    .query("chatAttachments")
+    .withIndex("by_storage", (q) => q.eq("storageId", storageId))
+    .first()
+  if (!reference && (await ctx.db.system.get("_storage", storageId))) {
+    await ctx.storage.delete(storageId)
+  }
+}
+
 /**
  * Make a staged image bindable, pointing it at the normalized copy when one
  * was made. Runs only while the row is still pending, so a message can never
@@ -472,12 +500,7 @@ export async function commitStagedImageHandler(
   ctx: MutationCtx,
   { attachmentId, originalStorageId, normalized }: CommitStagedImageArgs
 ) {
-  const attachment = await ctx.db.get(attachmentId)
-  if (
-    !attachment ||
-    isAttachmentReady(attachment) ||
-    attachment.storageId !== originalStorageId
-  ) {
+  if (!(await getAwaitingStagedImage(ctx, attachmentId, originalStorageId))) {
     // Removed or already committed: nothing references the fresh copy.
     if (normalized) await ctx.storage.delete(normalized.storageId)
     return
@@ -496,14 +519,7 @@ export async function commitStagedImageHandler(
         }
       : {}),
   })
-  if (!normalized) return
-
-  // Chat deletion's rule: keep a blob another row still references.
-  const otherReference = await ctx.db
-    .query("chatAttachments")
-    .withIndex("by_storage", (q) => q.eq("storageId", originalStorageId))
-    .first()
-  if (!otherReference) await ctx.storage.delete(originalStorageId)
+  if (normalized) await deleteStorageIfUnreferenced(ctx, originalStorageId)
 }
 
 export const commitStagedImage = internalMutation({
@@ -519,6 +535,24 @@ export const commitStagedImage = internalMutation({
     ),
   },
   handler: commitStagedImageHandler,
+})
+
+/**
+ * Drop a staged image that could not be normalized (too large or unreadable)
+ * instead of storing an original some models reject. The composer sees the
+ * row disappear and fails that upload.
+ */
+export const rejectStagedImage = internalMutation({
+  args: {
+    attachmentId: v.id("chatAttachments"),
+    originalStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, { attachmentId, originalStorageId }) => {
+    if (!(await getAwaitingStagedImage(ctx, attachmentId, originalStorageId)))
+      return
+    await ctx.db.delete(attachmentId)
+    await deleteStorageIfUnreferenced(ctx, originalStorageId)
+  },
 })
 
 /**

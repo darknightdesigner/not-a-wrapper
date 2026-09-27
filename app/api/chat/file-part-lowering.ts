@@ -1,4 +1,4 @@
-import { isImageMediaType, isPdfMediaType } from "@/lib/file/policy"
+import { isImageMediaType, routeTakesFile } from "@/lib/file/policy"
 import type { UIMessage } from "ai"
 import type { AdaptationContext } from "./adapters/types"
 
@@ -18,13 +18,6 @@ export type FilePartLoweringResult = {
   loweredCount: number
 }
 
-function routeTakesFile(part: FilePart, context: AdaptationContext): boolean {
-  return (
-    context.vision === true &&
-    (isImageMediaType(part.mediaType) || isPdfMediaType(part.mediaType))
-  )
-}
-
 function omittedFileNote(part: FilePart): string {
   const name = part.filename?.trim() || "file"
   return isImageMediaType(part.mediaType)
@@ -40,7 +33,8 @@ export function lowerUnsupportedFileParts(
   const lowered = messages.map((message) => {
     if (
       !message.parts.some(
-        (part) => part.type === "file" && !routeTakesFile(part, context)
+        (part) =>
+          part.type === "file" && !routeTakesFile(part.mediaType, context)
       )
     ) {
       return message
@@ -48,7 +42,9 @@ export function lowerUnsupportedFileParts(
     return {
       ...message,
       parts: message.parts.map((part): MessagePart => {
-        if (part.type !== "file" || routeTakesFile(part, context)) return part
+        if (part.type !== "file" || routeTakesFile(part.mediaType, context)) {
+          return part
+        }
         loweredCount += 1
         return { type: "text", text: omittedFileNote(part) }
       }),

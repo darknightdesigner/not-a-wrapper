@@ -18,8 +18,13 @@ files afterward. During admission, Send and another selection could not see them
   indeterminate uploading presentation covers both admission and transfer; no new
   controls, labels, or animated loading treatment are introduced.
 - A staged image stays unbindable until the server stores a copy every model can
-  take (long side at most 2000 px, `convex/attachmentImages.ts`); its upload stays
-  in the uploading state until `files.getStagedAttachmentStatus` reads ready.
+  take (JPEG or PNG, long side at most 2000 px, `convex/attachmentImages.ts`); its
+  upload stays in the uploading state until `files.getStagedAttachmentStatus`
+  reads ready. An image the server cannot read or resize is removed and its upload
+  fails; it is never stored unresized. Tabs loaded before this rule do not wait,
+  so a Send within seconds of an image upload fails as not ready until resent.
+- Validation types an upload by its content: the detected binary type, or for
+  text the extension's type (Windows reports `.csv` as an Excel type).
 - Pending files block Send immediately. Invalid or over-capacity selections are
   removed with the existing error feedback. The server remains authoritative for
   upload allowance; the client considers earlier pending selections in its check.

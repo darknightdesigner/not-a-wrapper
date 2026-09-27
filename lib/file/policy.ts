@@ -56,6 +56,21 @@ export function isPdfMediaType(mediaType: string | null | undefined) {
   return normalizeFileMimeType(mediaType) === "application/pdf"
 }
 
+/**
+ * Whether a model route takes this file as a file part. Text-like files are
+ * inlined as text first; images and PDFs need a vision route; any other file
+ * is sent as a short note instead (app/api/chat/file-part-lowering.ts).
+ */
+export function routeTakesFile(
+  mediaType: string | null | undefined,
+  route: { vision?: boolean }
+) {
+  return (
+    route.vision === true &&
+    (isImageMediaType(mediaType) || isPdfMediaType(mediaType))
+  )
+}
+
 export function isAllowedProfileImageMimeType(
   mimeType: string | null | undefined
 ) {

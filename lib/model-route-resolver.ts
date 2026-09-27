@@ -459,6 +459,7 @@ async function resolveModelRouteOnce(
         pricingSnapshot,
         outputTokenBudget,
         attachmentSizes: funding.attachmentSizes,
+        vision: candidate.route.config.vision === true,
         contextWindow: candidate.route.config.contextWindow,
       })
       const reserved = await deps.reservePlatformUsage({
