@@ -7,8 +7,9 @@ import { APP_DOMAIN } from "@/lib/config"
 const PUBLIC_CHAT_SHARE_TITLE =
   "Check out this conversation I shared with Not A Wrapper!"
 
-export function getPublicChatShareDetails(chatId: string) {
-  const publicLink = `${APP_DOMAIN}/share/${chatId}`
+/** Link and post text for a share link id (ADR-0043), never a chat id. */
+export function getPublicChatShareDetails(shareId: string) {
+  const publicLink = `${APP_DOMAIN}/share/${shareId}`
   const postText = `${PUBLIC_CHAT_SHARE_TITLE} ${publicLink}`
   return {
     postText,
@@ -19,9 +20,9 @@ export function getPublicChatShareDetails(chatId: string) {
 }
 
 type SharePublishedChatOptions = {
-  chatId: string
-  publish: () => Promise<unknown>
-  openFallback: () => void
+  /** Creates or refreshes the share link and resolves its id. */
+  publish: () => Promise<string>
+  openFallback: (shareId: string) => void
 }
 
 /**
@@ -30,14 +31,13 @@ type SharePublishedChatOptions = {
  * decision, while a capability or operational failure opens the fallback.
  */
 export async function sharePublishedChat({
-  chatId,
   publish,
   openFallback,
 }: SharePublishedChatOptions): Promise<ShareTargetOutcome> {
-  await publish()
+  const shareId = await publish()
   const outcome = await shareTarget(
-    getPublicChatShareDetails(chatId).shareTarget
+    getPublicChatShareDetails(shareId).shareTarget
   )
-  if (outcome === "unsupported" || outcome === "failed") openFallback()
+  if (outcome === "unsupported" || outcome === "failed") openFallback(shareId)
   return outcome
 }

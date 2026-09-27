@@ -1789,11 +1789,16 @@ this, and a server-signed guest cookie alone would not fix it.
 
 Severity: Medium.
 
+Status: fixed 2026-09-27 (ADR-0043). Share pages set `robots: { index: false,
+follow: false }` and `/share/:path*` sends `X-Robots-Tag: noindex, nofollow`. The
+share copy reads "Anyone with the link can view this conversation." A share is
+now a revocable `chatShares` row with a random id, a snapshot of the path and
+title, and an allowlisted view, and the private chat id is owner-only.
+
 **What is wrong.** The public share page tells search engines they may list it.
 If a share link is posted anywhere public, the conversation can show up in
-search results under its title, and the public view still exposes the system
-prompt, raw tool output and reasoning (TODO "Sharing: revoke and a safe public
-view"). The share dialog does warn that the chat may appear in search results,
+search results under its title, and, before ADR-0043, the public view exposed the
+system prompt, raw tool output and reasoning. The share dialog does warn that the chat may appear in search results,
 but only after it is already public, and there is no un-share yet.
 
 **Our code.**
@@ -1836,7 +1841,7 @@ but only after it is already public, and there is no un-share yet.
 **Notes.** HuggingChat allows its `/r/` share pages on purpose
 (`static/robots.txt:3`), so noindex is the majority default, not a universal
 one. If public discovery is ever wanted, make it an explicit per-share opt-in
-and fold it into the TODO "Sharing: revoke and a safe public view" item.
+and record it as an amendment to ADR-0043.
 
 ### Drafts survive sign-out
 

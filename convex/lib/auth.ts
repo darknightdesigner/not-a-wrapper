@@ -195,17 +195,18 @@ export async function findChatByPublicId(
     .unique()
 }
 
-// Resolve the caller BEFORE the chat read: a rejected account is denied even
-// for public chats, never served as a guest.
+// Resolve the caller BEFORE the chat read: a rejected account is denied,
+// never served as a guest. Owner only: a shared chat is public through its
+// share link alone (ADR-0043), never through its private id.
 async function resolveChatForRead(
   ctx: ConvexCtx,
   loadChat: () => Promise<Doc<"chats"> | null>
 ): Promise<{ user: Doc<"users"> | null; chat: Doc<"chats"> | null }> {
   const user = await getCurrentUser(ctx)
   const chat = await loadChat()
-  if (!chat || !(await isChatActive(ctx, chat))) return { user, chat: null }
-  if (chat.public || chat.userId === user?._id) return { user, chat }
-  return { user, chat: null }
+  if (!chat || !user || chat.userId !== user._id) return { user, chat: null }
+  if (!(await isChatActive(ctx, chat))) return { user, chat: null }
+  return { user, chat }
 }
 
 export async function getAuthorizedChatForRead(
@@ -216,8 +217,8 @@ export async function getAuthorizedChatForRead(
 }
 
 /**
- * Boundary read: the owner, or anyone when the chat is public. Returns the
- * resolved caller beside the chat (null when not readable).
+ * Boundary read: the owner's chat, or null for anyone else. Returns the
+ * resolved caller beside the chat.
  */
 export async function resolveReadableChatByPublicId(
   ctx: ConvexCtx,

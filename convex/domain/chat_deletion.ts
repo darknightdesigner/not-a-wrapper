@@ -6,6 +6,7 @@ import {
   closeSupersededGenerationsForChat,
   denyPendingApprovalsForChat,
 } from "../chatRuntime"
+import { deleteChatShare } from "../shares"
 import {
   ACCOUNT_PHASES,
   ACCOUNT_TABLE_PHASES,
@@ -338,8 +339,8 @@ async function runProjectBatch(
 
 // Project and account jobs reach chats through this worker rather than
 // chats.remove. Close and defer live runs before any child row can be
-// deleted, using the same lifecycle path as direct Chat deletion, and revoke
-// share links in the same commit.
+// deleted, using the same lifecycle path as direct Chat deletion, and delete
+// the share link in the same commit.
 async function beginChatDrain(
   ctx: ChatDeletionCtx,
   job: Doc<"deletionJobs">,
@@ -347,6 +348,7 @@ async function beginChatDrain(
 ): Promise<ChatBatchResult> {
   const now = Date.now()
   await closeSupersededGenerationsForChat(ctx, chat._id, job.userId, now)
+  await deleteChatShare(ctx, chat._id)
   if (chat.deletingAt === undefined || chat.public) {
     await ctx.db.patch(chat._id, {
       deletingAt: chat.deletingAt ?? now,
