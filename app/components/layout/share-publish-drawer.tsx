@@ -12,13 +12,15 @@ import { LazySharePublishContent } from "./share-publish-content-loader"
 type SharePublishDrawerProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
-  chatId: string
+  shareId: string | null
+  onStopSharing: () => Promise<void>
 }
 
 export function SharePublishDrawer({
   open,
   onOpenChange,
-  chatId,
+  shareId,
+  onStopSharing,
 }: SharePublishDrawerProps) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -26,16 +28,18 @@ export function SharePublishDrawer({
         <DrawerHeader>
           <DrawerTitle>Your conversation is now public!</DrawerTitle>
           <DrawerDescription>
-            Anyone with the link can now view this conversation and may appear
-            in community feeds, featured pages, or search results in the future.
+            Anyone with the link can view this conversation.
           </DrawerDescription>
         </DrawerHeader>
-        <div className="px-4 pb-6">
-          <LazySharePublishContent
-            chatId={chatId}
-            onClose={() => onOpenChange(false)}
-          />
-        </div>
+        {shareId && (
+          <div className="px-4 pb-6">
+            <LazySharePublishContent
+              shareId={shareId}
+              onClose={() => onOpenChange(false)}
+              onStopSharing={onStopSharing}
+            />
+          </div>
+        )}
       </DrawerContent>
     </Drawer>
   )

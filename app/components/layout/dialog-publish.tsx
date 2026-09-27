@@ -9,13 +9,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer"
 import { Icon } from "@/components/ui/icon"
 import { useIntentPrefetch } from "@/components/ui/intent-prefetch"
 import { api } from "@/convex/_generated/api"
@@ -29,16 +22,19 @@ import {
   LazySharePublishContent,
   preloadSharePublishContent,
 } from "./share-publish-content-loader"
+import { SharePublishDrawer } from "./share-publish-drawer"
 
 export function DialogPublish() {
   const [openDialog, setOpenDialog] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [shareId, setShareId] = useState<string | null>(null)
   const { chatId } = useChatSession()
   const isMobile = useBreakpoint(768)
   const prefetchShareRef = useIntentPrefetch<HTMLButtonElement>(
     preloadSharePublishContent
   )
-  const makePublicMutation = useMutation(api.chats.makePublic)
+  const publishMutation = useMutation(api.shares.publish)
+  const revokeMutation = useMutation(api.shares.revoke)
 
   if (!chatId) {
     return null
@@ -50,14 +46,26 @@ export function DialogPublish() {
 
     try {
       await sharePublishedChat({
-        chatId,
-        publish: () => makePublicMutation({ chatId }),
-        openFallback: () => startTransition(() => setOpenDialog(true)),
+        publish: async () => (await publishMutation({ chatId })).shareId,
+        openFallback: (id) =>
+          startTransition(() => {
+            setShareId(id)
+            setOpenDialog(true)
+          }),
       })
     } catch (error) {
-      console.error("Failed to make chat public:", error)
+      console.error("Failed to share chat:", error)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleStopSharing = async () => {
+    try {
+      await revokeMutation({ chatId })
+      setOpenDialog(false)
+    } catch (error) {
+      console.error("Failed to stop sharing chat:", error)
     }
   }
 
@@ -78,30 +86,16 @@ export function DialogPublish() {
     </Button>
   )
 
-  const content = (
-    <LazySharePublishContent
-      chatId={chatId}
-      onClose={() => setOpenDialog(false)}
-    />
-  )
-
   if (isMobile) {
     return (
       <>
         {trigger}
-        <Drawer open={openDialog} onOpenChange={setOpenDialog}>
-          <DrawerContent className="bg-background border-border">
-            <DrawerHeader>
-              <DrawerTitle>Your conversation is now public!</DrawerTitle>
-              <DrawerDescription>
-                Anyone with the link can now view this conversation and may
-                appear in community feeds, featured pages, or search results in
-                the future.
-              </DrawerDescription>
-            </DrawerHeader>
-            <div className="px-4 pb-6">{content}</div>
-          </DrawerContent>
-        </Drawer>
+        <SharePublishDrawer
+          open={openDialog}
+          onOpenChange={setOpenDialog}
+          shareId={shareId}
+          onStopSharing={handleStopSharing}
+        />
       </>
     )
   }
@@ -114,12 +108,16 @@ export function DialogPublish() {
           <DialogHeader>
             <DialogTitle>Your conversation is now public!</DialogTitle>
             <DialogDescription>
-              Anyone with the link can now view this conversation and may appear
-              in community feeds, featured pages, or search results in the
-              future.
+              Anyone with the link can view this conversation.
             </DialogDescription>
           </DialogHeader>
-          {content}
+          {shareId && (
+            <LazySharePublishContent
+              shareId={shareId}
+              onClose={() => setOpenDialog(false)}
+              onStopSharing={handleStopSharing}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </>

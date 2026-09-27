@@ -7,7 +7,12 @@ import { useResetMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import type { Chat } from "@/lib/chat-store/types"
 import { Pin, PinOff } from "@/lib/icons"
-import { RiDeleteBinLine, RiEditLine, RiShare2Line } from "@remixicon/react"
+import {
+  RiDeleteBinLine,
+  RiEditLine,
+  RiLinkUnlinkM,
+  RiShare2Line,
+} from "@remixicon/react"
 import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
 import type React from "react"
@@ -30,8 +35,9 @@ type ChatActionsMenuProps = {
   showShare?: boolean
 }
 
-// Chat adapter over the Row-actions menu: builds the Share/Pin/Rename/Delete
-// item set and owns the chat-specific handlers, delete dialog, and share drawer.
+// Chat adapter over the Row-actions menu: builds the Share/Stop sharing/Pin/
+// Rename/Delete item set and owns the chat-specific handlers, delete dialog,
+// and share drawer.
 export function ChatActionsMenu(props: ChatActionsMenuProps) {
   const { chatId } = useChatSession()
   const resetMessages = useResetMessages()
@@ -65,9 +71,12 @@ const ChatActionsMenuContent = memo(
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState<boolean>()
     const [isShareDrawerOpen, setIsShareDrawerOpen] = useState(false)
     const [isShareLoading, setIsShareLoading] = useState(false)
+    const [isStopSharingLoading, setIsStopSharingLoading] = useState(false)
+    const [shareId, setShareId] = useState<string | null>(null)
     const { deleteChat, togglePinned, updateTitle } = useChatActions()
     const router = useRouter()
-    const makePublicMutation = useMutation(api.chats.makePublic)
+    const publishMutation = useMutation(api.shares.publish)
+    const revokeMutation = useMutation(api.shares.revoke)
 
     const handleConfirmDelete = async () => {
       const deleted = await deleteChat(
@@ -85,14 +94,30 @@ const ChatActionsMenuContent = memo(
       void preloadSharePublishContent()
       try {
         await sharePublishedChat({
-          chatId: chat.id,
-          publish: () => makePublicMutation({ chatId: chat.id }),
-          openFallback: () => startTransition(() => setIsShareDrawerOpen(true)),
+          publish: async () =>
+            (await publishMutation({ chatId: chat.id })).shareId,
+          openFallback: (id) =>
+            startTransition(() => {
+              setShareId(id)
+              setIsShareDrawerOpen(true)
+            }),
         })
       } catch (error) {
-        console.error("Failed to make chat public:", error)
+        console.error("Failed to share chat:", error)
       } finally {
         setIsShareLoading(false)
+      }
+    }
+
+    const handleStopSharing = async () => {
+      setIsStopSharingLoading(true)
+      try {
+        await revokeMutation({ chatId: chat.id })
+        setIsShareDrawerOpen(false)
+      } catch (error) {
+        console.error("Failed to stop sharing chat:", error)
+      } finally {
+        setIsStopSharingLoading(false)
       }
     }
 
@@ -124,6 +149,19 @@ const ChatActionsMenuContent = memo(
               prefetch: preloadSharePublishContent,
               loading: isShareLoading,
               disabled: isShareLoading,
+            } satisfies RowActionItem,
+          ]
+        : []),
+      // `public` mirrors an active share link (ADR-0043).
+      ...(showShare && chat.public
+        ? [
+            {
+              key: "stop-sharing",
+              icon: <Icon icon={RiLinkUnlinkM} slotSize={20} />,
+              label: "Stop sharing",
+              onSelect: handleStopSharing,
+              loading: isStopSharingLoading,
+              disabled: isStopSharingLoading,
             } satisfies RowActionItem,
           ]
         : []),
@@ -173,7 +211,8 @@ const ChatActionsMenuContent = memo(
           <SharePublishDrawer
             open={isShareDrawerOpen}
             onOpenChange={setIsShareDrawerOpen}
-            chatId={chat.id}
+            shareId={shareId}
+            onStopSharing={handleStopSharing}
           />
         )}
       </>

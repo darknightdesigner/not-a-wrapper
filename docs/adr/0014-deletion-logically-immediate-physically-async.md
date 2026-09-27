@@ -70,6 +70,13 @@ through the Chat phases, then Project roots, staged attachments, and the
 account-owned tables, and finally scrubs the tombstone's personal fields. It
 refuses to run for an account that is not deleted.
 
+## Amendment (2026-09-27): share links
+
+ADR-0043 moves public access to a `chatShares` row. The Chat tombstone commit
+(and the drain-start commit of Project and account jobs) deletes that row, so
+a revoked link cannot outlive its Chat, and the public read also fails closed
+through the ancestor rule above.
+
 ## Blocked-job runbook
 
 Inspect the job's content-free `failureCode` in the Convex dashboard and fix the
