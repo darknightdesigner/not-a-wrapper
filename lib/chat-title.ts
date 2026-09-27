@@ -147,8 +147,8 @@ export async function generateChatTitle(args: {
   abortSignal?: AbortSignal
   /**
    * Request policy options (Request shaping's `resolveRequestPolicyOptions`):
-   * response storage off and the hashed actor id, same as the answer call.
-   * The fallback runs on the same provider, so one value serves both.
+   * response storage off and the hashed actor id. The fallback runs on the
+   * same provider, so one value serves both.
    */
   providerOptions?: ProviderOptions
   /**

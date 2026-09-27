@@ -98,21 +98,6 @@ describe("provider strategy registry", () => {
       expect(budgetModel.settings?.reasoning).toEqual({ max_tokens: 2048 })
     })
 
-    it("sends the actor id as `user` and caches only anthropic/* upstreams", () => {
-      type Settings = { settings?: { user?: string; cache_control?: unknown } }
-      const instance = getProviderStrategy("openrouter").instance("byok-key")
-      const claude = instance.languageModel(
-        "openrouter:anthropic/claude-haiku-4.5",
-        { safetyIdentifier: "actor-hash" }
-      ) as Settings
-      expect(claude.settings).toMatchObject({
-        user: "actor-hash",
-        cache_control: { type: "ephemeral" },
-      })
-      const other = instance.languageModel(OPENROUTER_ID) as Settings
-      expect(other.settings?.cache_control).toBeUndefined()
-    })
-
     it("constructs OpenRouter models without reasoning when settings are absent", () => {
       const model = getProviderStrategy("openrouter")
         .instance("byok-key")

@@ -326,7 +326,7 @@ type PreparedTurn = {
   titleModel: ReturnType<typeof createLanguageModel>
   /** Title-route id, reported with the title call's usage (ADR-0021). */
   titleRouteId: string
-  /** Storage and attribution options the title call shares with the answer. */
+  /** Request policy for the title call: storage off and the actor id. */
   titleProviderOptions: ReturnType<typeof resolveRequestPolicyOptions>
   modelConfig: ModelConfig
   provider: Provider
@@ -718,6 +718,12 @@ export function createChatTurnRuntime(args: {
 
     const hasAnyTools = tool.hasTools
     const shouldInjectSearch = tool.policySummary.searchInjected
+    // Tools the app executes, beyond provider-hosted search (Request shaping).
+    const appToolsActive =
+      tool.toolCounts.thirdParty +
+        tool.toolCounts.content +
+        tool.toolCounts.mcp >
+      0
 
     // Per-turn effort (ADR-0026): resolve only after Capability policy proves
     // whether search is active. Claude 4.6's pause_turn workaround replaces
@@ -756,13 +762,12 @@ export function createChatTurnRuntime(args: {
             modelConfig.providerId === "openrouter"
             ? { ...modelConfig, reasoning: { effort: wireReasoningEffort } }
             : modelConfig,
-          apiKey,
-          safetyIdentifier
+          apiKey
         )
     const titleModelConfig = selectChatTitleModelConfig(allModels, modelConfig)
     const titleModel = perfDirective
       ? createDeterministicTitleModel()
-      : createLanguageModel(titleModelConfig, apiKey, safetyIdentifier)
+      : createLanguageModel(titleModelConfig, apiKey)
 
     const durableRuntimeEnabled = isDurableConvexChat({
       isAuthenticated,
@@ -1079,6 +1084,7 @@ export function createChatTurnRuntime(args: {
       {
         searchToolsActive: shouldInjectSearch,
         hasTools: hasAnyTools,
+        appToolsActive,
         ...(wireReasoningEffort !== undefined ? { wireReasoningEffort } : {}),
         ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
       }
@@ -1167,10 +1173,12 @@ export function createChatTurnRuntime(args: {
       aiModel,
       titleModel,
       titleRouteId: titleModelConfig.id,
-      titleProviderOptions: resolveRequestPolicyOptions(
-        resolvedProvider,
-        safetyIdentifier
-      ),
+      // The title call offers no tools.
+      titleProviderOptions: resolveRequestPolicyOptions(resolvedProvider, {
+        searchToolsActive: false,
+        appToolsActive: false,
+        ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
+      }),
       modelConfig,
       provider: resolvedProvider,
       appliedReasoningEffort,

@@ -6,14 +6,12 @@ import {
 
 export function createLanguageModel(
   route: ModelConfig,
-  apiKey?: string,
-  /** Hashed actor id for providers that take it at construction. */
-  safetyIdentifier?: string
+  apiKey?: string
 ): ProviderLanguageModel {
   return getProviderStrategy(route.providerId)
     .instance(apiKey)
-    .languageModel(route.id, {
-      ...(route.reasoning ? { reasoning: route.reasoning } : {}),
-      ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
-    })
+    .languageModel(
+      route.id,
+      route.reasoning ? { reasoning: route.reasoning } : undefined
+    )
 }

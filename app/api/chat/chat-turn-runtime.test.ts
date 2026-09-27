@@ -392,7 +392,10 @@ describe("createChatTurnRuntime — prepare()", () => {
           ReturnType<typeof prepareToolRuntime>
         >
       )
-      const input = makeInput({ systemPrompt })
+      const input = makeInput({
+        systemPrompt,
+        requestTimeZone: "America/Chicago",
+      })
       input.credential.provider = provider
       input.route.providerId = provider
       const harness = makeStreamHarness()
@@ -404,17 +407,17 @@ describe("createChatTurnRuntime — prepare()", () => {
       await runtime.toResponse(notAbortedSignal())
 
       const instructions: string = harness.captured.streamOpts.instructions
-      expect(instructions.startsWith(systemPrompt ?? SYSTEM_PROMPT_DEFAULT)).toBe(
-        true
-      )
+      expect(
+        instructions.startsWith(systemPrompt ?? SYSTEM_PROMPT_DEFAULT)
+      ).toBe(true)
       expect(
         instructions.includes(
           "Before using tools, briefly explain what you will check."
         )
       ).toBe(enriched)
-      // A fact, not style: custom prompts get it too (no zone header → UTC).
+      // A fact, not style: custom prompts get it too, in the request's zone.
       expect(instructions).toMatch(
-        /\n\nCurrent date: \w+, \w+ \d{1,2}, \d{4} \(UTC\)$/
+        /\n\nCurrent date: \w+, \w+ \d{1,2}, \d{4} \(America\/Chicago\)$/
       )
     }
   )

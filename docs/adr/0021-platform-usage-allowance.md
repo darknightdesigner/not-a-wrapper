@@ -374,7 +374,7 @@ balance negative. Estimation is admission control, not the final charge.
 
 ## Provider retention and attribution (amended 2026-09-27)
 
-- **Retention.** Every OpenAI and xAI request sends `store: false` (Request
+- **Retention.** OpenAI and xAI requests send `store: false` (Request
   shaping). Convex already holds each conversation, so a provider-stored
   response adds nothing. The SDKs then replay statelessly: they request
   `reasoning.encrypted_content` themselves and send reasoning items inline
@@ -387,13 +387,26 @@ balance negative. Estimation is admission control, not the final charge.
   activity stays lowered to text (ADR-0029). OpenAI still keeps
   abuse-monitoring logs for up to 30 days; BYOK responses land in the key
   owner's organization.
+- **Storage exception.** An OpenAI turn that offers hosted web search
+  together with app-executed tools (Exa, content, MCP) keeps the default
+  storage. With `store: false`, `@ai-sdk/openai` 4.0.45 drops the hosted
+  `web_search_call` from later steps and from an approval continuation's
+  paused step, but still sends the reasoning item that preceded it; OpenAI
+  requires every item since the last user message to be replayed untouched
+  and rejects a reasoning item without its following item (vercel/ai#8379).
+  Stored turns replay by `item_reference`, as before this amendment. The
+  decision follows the request's search toggle and tool set, so toggling
+  search while an approval is pending can flip the mode between the paused
+  step and its continuation, and that rare continuation can fail with a
+  provider error. Revisit when the SDK replays hosted calls inline. xAI is
+  not excepted: its SDK drops hosted calls whatever `store` says.
 - **Attribution.** Signed-in requests carry one opaque actor id: the first 32
   hex characters of HMAC-SHA-256 over
   `["provider-safety-identifier-v1", workosSubject]`, keyed by
   `CHAT_ADMISSION_SECRET` (no new secret). It goes out as OpenAI
   `safetyIdentifier`, Anthropic `metadata.userId`, and OpenRouter `user`
-  (set at model construction); the xAI SDK has no field. Title calls carry
-  the same options. It is never the email, cannot be reversed without the
+  (all per-request provider options); the xAI SDK has no field. Title calls
+  carry the same options. It is never the email, cannot be reversed without the
   secret, and changes for everyone if the secret rotates. Guests send none:
   the browser-chosen guest id is not an identity. A server-signed guest
   identity is the one input to add, at the Chat turn runtime's single

@@ -20,6 +20,11 @@ export type RequestShapingContext = {
   /** The request carries any tools at all (any Tool layer). */
   hasTools: boolean
   /**
+   * The request offers tools the app executes (Exa, content, MCP), beyond
+   * provider-hosted search, so the model can take a later step.
+   */
+  appToolsActive: boolean
+  /**
    * Optional per-turn wire override (ADR-0026), already clamped to a level
    * this route's provider accepts. Absent means send no effort override.
    */
@@ -98,14 +103,8 @@ export function shapeRequest(
   return {
     providerOptions: mergeProviderOptions(
       resolveReasoningOptions(modelConfig, ctx),
-      resolveRequestPolicyOptions(modelConfig.providerId, ctx.safetyIdentifier),
-      // Anthropic automatic prompt caching: the SDK sends this as the
-      // request-level cache point, so every step of a tool loop and every
-      // later turn re-reads the shared prefix at the cache rate. Prompts
-      // below the model's minimum cacheable size are simply not cached.
-      modelConfig.providerId === "anthropic"
-        ? { anthropic: { cacheControl: { type: "ephemeral" } } }
-        : {}
+      resolveRequestPolicyOptions(modelConfig.providerId, ctx),
+      resolvePromptCachingOptions(modelConfig)
     ),
     headers: resolveHeaders(modelConfig, ctx),
   }
@@ -113,22 +112,36 @@ export function shapeRequest(
 
 /**
  * Options every request to a provider carries, reasoning or not, the title
- * call included (ADR-0021, provider data retention and attribution):
- * OpenAI and xAI get `store: false` (Convex already holds the conversation;
- * the SDKs then request encrypted reasoning themselves for in-turn replay),
- * and the hashed actor id goes out as OpenAI `safetyIdentifier` and
- * Anthropic `metadata.userId`. OpenRouter takes the same id at model
- * construction (provider-strategy.ts); the xAI SDK has no id field.
+ * call included (ADR-0021, provider data retention and attribution).
+ *
+ * Storage: OpenAI and xAI send `store: false` (Convex already holds the
+ * conversation; the SDKs then request encrypted reasoning themselves and
+ * replay it inline between steps). One exception: an OpenAI turn that pairs
+ * hosted search with app tools keeps the default storage. Without it the
+ * SDK drops the hosted `web_search_call` from later steps but still sends
+ * the reasoning item that preceded it, which OpenAI rejects ("reasoning ...
+ * without its required following item"). The xAI SDK drops hosted calls
+ * whatever `store` says, so storage changes nothing there.
+ *
+ * Attribution: the hashed actor id goes out as OpenAI `safetyIdentifier`,
+ * Anthropic `metadata.userId`, and OpenRouter `user`; the xAI SDK has no
+ * id field.
  */
 export function resolveRequestPolicyOptions(
   providerId: Provider,
-  safetyIdentifier: string | undefined
+  ctx: Pick<
+    RequestShapingContext,
+    "searchToolsActive" | "appToolsActive" | "safetyIdentifier"
+  >
 ): ProviderOptions {
+  const { safetyIdentifier } = ctx
   switch (providerId) {
     case "openai":
       return {
         openai: {
-          store: false,
+          ...(ctx.searchToolsActive && ctx.appToolsActive
+            ? {}
+            : { store: false }),
           ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
         },
       }
@@ -138,9 +151,36 @@ export function resolveRequestPolicyOptions(
         : {}
     case "xai":
       return { xai: { store: false } }
+    case "openrouter":
+      return safetyIdentifier !== undefined
+        ? { openrouter: { user: safetyIdentifier } }
+        : {}
     default:
       return {}
   }
+}
+
+/**
+ * Anthropic automatic prompt caching on every Claude answer request, direct
+ * or through OpenRouter (its provider sends `cacheControl` as the top-level
+ * `cache_control`). Each step of a tool loop and each later turn re-reads
+ * the shared prefix at the cache rate; prompts below the model's minimum
+ * cacheable size are not cached. The one-shot title call skips it.
+ */
+function resolvePromptCachingOptions(
+  modelConfig: Pick<ModelConfig, "providerId" | "baseProviderId">
+): ProviderOptions {
+  const cacheControl = { type: "ephemeral" }
+  if (modelConfig.providerId === "anthropic") {
+    return { anthropic: { cacheControl } }
+  }
+  if (
+    modelConfig.providerId === "openrouter" &&
+    modelConfig.baseProviderId === "anthropic"
+  ) {
+    return { openrouter: { cacheControl } }
+  }
+  return {}
 }
 
 /** Merge per-provider option objects one namespace level deep. */
@@ -229,9 +269,9 @@ function resolveReasoningOptions(
       // enabling value the installed adapter sends); there is no per-turn
       // effort knob, so the catalog flag alone decides.
       return { mistral: { reasoningEffort: "high" } }
-    // OpenRouter reasoning remains construction-time provider state in its V4
-    // provider API; the catalog setting (and the per-turn effort override)
-    // is mapped in provider-strategy.ts at model construction.
+    // OpenRouter reasoning is mapped at model construction (ADR-0026): the
+    // catalog setting and the per-turn effort override live in
+    // provider-strategy.ts.
     default:
       return {}
   }

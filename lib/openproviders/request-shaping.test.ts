@@ -24,6 +24,7 @@ function makeModel(overrides: Partial<ModelConfig>): ModelConfig {
 const NO_TOOLS: RequestShapingContext = {
   searchToolsActive: false,
   hasTools: false,
+  appToolsActive: false,
 }
 
 // Request policy every Anthropic/OpenAI/xAI request carries (ADR-0021).
@@ -44,7 +45,7 @@ describe("shapeRequest provider options", () => {
         reasoningText: true,
         thinkingMode: "adaptive",
       },
-      ctx: { searchToolsActive: false, hasTools: true },
+      ctx: { searchToolsActive: false, hasTools: true, appToolsActive: true },
       expected: {
         anthropic: {
           thinking: { type: "adaptive", display: "summarized" },
@@ -63,7 +64,7 @@ describe("shapeRequest provider options", () => {
         thinkingMode: "adaptive",
         searchThinkingDowngrade: true,
       },
-      ctx: { searchToolsActive: true, hasTools: true },
+      ctx: { searchToolsActive: true, hasTools: true, appToolsActive: false },
       expected: {
         anthropic: {
           thinking: { type: "enabled", budgetTokens: 10000 },
@@ -81,7 +82,7 @@ describe("shapeRequest provider options", () => {
         reasoningText: true,
         thinkingMode: "adaptive",
       },
-      ctx: { searchToolsActive: true, hasTools: true },
+      ctx: { searchToolsActive: true, hasTools: true, appToolsActive: false },
       expected: {
         anthropic: {
           thinking: { type: "adaptive", display: "summarized" },
@@ -98,7 +99,7 @@ describe("shapeRequest provider options", () => {
         thinkingMode: "adaptive",
         searchThinkingDowngrade: true,
       },
-      ctx: { searchToolsActive: false, hasTools: true },
+      ctx: { searchToolsActive: false, hasTools: true, appToolsActive: true },
       expected: {
         anthropic: {
           thinking: { type: "adaptive", display: "summarized" },
@@ -141,7 +142,7 @@ describe("shapeRequest provider options", () => {
         reasoningText: true,
         thinkingBudget: 12000,
       },
-      ctx: { searchToolsActive: true, hasTools: true },
+      ctx: { searchToolsActive: true, hasTools: true, appToolsActive: false },
       expected: {
         anthropic: {
           thinking: { type: "enabled", budgetTokens: 12000 },
@@ -311,25 +312,27 @@ describe("per-turn reasoning effort (ADR-0026)", () => {
 })
 
 describe("request policy (ADR-0021)", () => {
+  const ctx: RequestShapingContext = {
+    ...NO_TOOLS,
+    safetyIdentifier: "actor-hash",
+  }
+  const optionsFor = (
+    model: Partial<ModelConfig>,
+    context: RequestShapingContext = ctx
+  ) => shapeRequest(makeModel(model), context).providerOptions
+
   // Storage, attribution, and caching apply to every request, so they must
   // survive the reasoning-only gate and merge into the reasoning namespace.
   it("sends store: false, the actor id, and Claude caching outside the reasoning gate", () => {
-    const ctx: RequestShapingContext = {
-      ...NO_TOOLS,
-      safetyIdentifier: "actor-hash",
-    }
+    expect(optionsFor({ providerId: "openai" })).toEqual({
+      openai: { store: false, safetyIdentifier: "actor-hash" },
+    })
     expect(
-      shapeRequest(makeModel({ providerId: "openai" }), ctx).providerOptions
-    ).toEqual({ openai: { store: false, safetyIdentifier: "actor-hash" } })
-    expect(
-      shapeRequest(
-        makeModel({
-          providerId: "anthropic",
-          reasoningText: true,
-          thinkingMode: "adaptive",
-        }),
-        ctx
-      ).providerOptions
+      optionsFor({
+        providerId: "anthropic",
+        reasoningText: true,
+        thinkingMode: "adaptive",
+      })
     ).toEqual({
       anthropic: {
         thinking: { type: "adaptive", display: "summarized" },
@@ -337,19 +340,43 @@ describe("request policy (ADR-0021)", () => {
         metadata: { userId: "actor-hash" },
       },
     })
-    // The xAI SDK has no id field; OpenRouter takes it at construction.
+    // The xAI SDK has no id field.
+    expect(optionsFor({ providerId: "xai" })).toEqual({
+      xai: { store: false },
+    })
+    // OpenRouter: the id as `user`; caching only for Anthropic upstreams.
     expect(
-      shapeRequest(makeModel({ providerId: "xai" }), ctx).providerOptions
-    ).toEqual({ xai: { store: false } })
+      optionsFor({ providerId: "openrouter", baseProviderId: "anthropic" })
+    ).toEqual({
+      openrouter: { user: "actor-hash", cacheControl: { type: "ephemeral" } },
+    })
     expect(
-      shapeRequest(makeModel({ providerId: "openrouter" }), ctx)
-        .providerOptions
-    ).toEqual({})
+      optionsFor({ providerId: "openrouter", baseProviderId: "google" })
+    ).toEqual({ openrouter: { user: "actor-hash" } })
     // Guests: no identifier, storage still off.
+    expect(optionsFor({ providerId: "openai" }, NO_TOOLS)).toEqual({
+      openai: { store: false },
+    })
+  })
+
+  // With store: false the OpenAI SDK drops a hosted web_search_call from
+  // later steps but keeps the reasoning item before it, which OpenAI 400s.
+  it("keeps OpenAI storage only when hosted search shares the turn with app tools", () => {
+    const withTools = { ...ctx, hasTools: true }
     expect(
-      shapeRequest(makeModel({ providerId: "openai" }), NO_TOOLS)
-        .providerOptions
-    ).toEqual({ openai: { store: false } })
+      optionsFor(
+        { providerId: "openai" },
+        { ...withTools, searchToolsActive: true, appToolsActive: true }
+      )
+    ).toEqual({ openai: { safetyIdentifier: "actor-hash" } })
+    for (const tools of [
+      { searchToolsActive: true, appToolsActive: false },
+      { searchToolsActive: false, appToolsActive: true },
+    ]) {
+      expect(
+        optionsFor({ providerId: "openai" }, { ...withTools, ...tools })
+      ).toEqual({ openai: { store: false, safetyIdentifier: "actor-hash" } })
+    }
   })
 })
 
@@ -361,7 +388,7 @@ describe("shapeRequest headers", () => {
   it("sets the token-efficient beta header for anthropic with tools", () => {
     const { headers } = shapeRequest(
       makeModel({ providerId: "anthropic", reasoningText: true }),
-      { searchToolsActive: false, hasTools: true }
+      { searchToolsActive: false, hasTools: true, appToolsActive: true }
     )
     expect(headers).toEqual({
       "anthropic-beta": ANTHROPIC_BETA_HEADERS.tokenEfficient,
@@ -381,7 +408,7 @@ describe("shapeRequest headers", () => {
     // reasoningText. A non-reasoning anthropic model with tools still gets it.
     const { headers } = shapeRequest(
       makeModel({ providerId: "anthropic", reasoningText: false }),
-      { searchToolsActive: false, hasTools: true }
+      { searchToolsActive: false, hasTools: true, appToolsActive: true }
     )
     expect(headers).toEqual({
       "anthropic-beta": ANTHROPIC_BETA_HEADERS.tokenEfficient,
@@ -391,7 +418,7 @@ describe("shapeRequest headers", () => {
   it("sends no header for non-anthropic providers with tools", () => {
     const { headers } = shapeRequest(
       makeModel({ providerId: "openai", reasoningText: true }),
-      { searchToolsActive: false, hasTools: true }
+      { searchToolsActive: false, hasTools: true, appToolsActive: true }
     )
     expect(headers).toEqual({})
   })
@@ -400,7 +427,7 @@ describe("shapeRequest headers", () => {
     vi.stubEnv("ANTHROPIC_TOKEN_EFFICIENT_TOOLS", "false")
     const { headers } = shapeRequest(
       makeModel({ providerId: "anthropic", reasoningText: true }),
-      { searchToolsActive: false, hasTools: true }
+      { searchToolsActive: false, hasTools: true, appToolsActive: true }
     )
     expect(headers).toEqual({})
   })
@@ -416,8 +443,11 @@ describe("catalog contract for Request shaping", () => {
       const model = (await getAllModels()).find((m) => m.id === id)
       expect(model).toBeDefined()
       expect(
-        shapeRequest(model!, { searchToolsActive: true, hasTools: true })
-          .providerOptions
+        shapeRequest(model!, {
+          searchToolsActive: true,
+          hasTools: true,
+          appToolsActive: false,
+        }).providerOptions
       ).toEqual({
         anthropic: {
           thinking: { type: "adaptive", display: "summarized" },
@@ -433,6 +463,7 @@ describe("catalog contract for Request shaping", () => {
     const { providerOptions } = shapeRequest(model!, {
       searchToolsActive: true,
       hasTools: true,
+      appToolsActive: false,
     })
     expect(providerOptions.anthropic?.thinking).toMatchObject({ type: "enabled" })
     expect(providerOptions.anthropic?.thinking).not.toHaveProperty("display")
