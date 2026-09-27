@@ -85,8 +85,8 @@ crashed function cannot leak a slot and nothing fails open.
   ignored and all guests share one network bucket: stricter, never chosen by
   the caller. The network is stored only as
   `HMAC(secret, ["guest-network-v1", network])`.
-- The body's `userId` is ignored for limits. The route threads the trusted
-  guest id through the runtime's existing `anonymousId` field (tool limits,
+- The body carries no user id. The route threads the trusted guest id
+  through the runtime's existing `anonymousId` field (tool limits,
   telemetry).
 
 ### Server-call proofs (`convex/lib/serverCallProof.ts`)
@@ -189,8 +189,8 @@ own continuation.
   soft cap). Signed-in admission is compatible both ways.
 - `anonymousUsage` is retired: nothing reads or writes it, the sweep drains
   it, and a later change removes it from the schema once production is empty.
-- The wire contract still requires a guest `userId`; it is now vestigial and
-  can be dropped with the client builder.
+- The vestigial guest `userId` has since left the wire contract and the
+  client builder.
 - Provider attribution for guests hashes the trusted `anonymousId` (ADR-0021,
   "Provider retention and attribution").
 - Follow-up: Vercel BotID can sit in front of guest admission.

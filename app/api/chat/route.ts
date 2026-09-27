@@ -118,15 +118,14 @@ export async function POST(req: Request) {
 
     // Validate against the Chat turn wire contract — the one statement of the
     // request shape, shared with the client builder
-    // (lib/chat-messages/chat-turn-contract.ts). Identity stays session-derived:
-    // the parser only uses `isAuthenticated` for the guest-id rule.
-    const parsed = parseChatTurnRequest(jsonBody, { isAuthenticated })
+    // (lib/chat-messages/chat-turn-contract.ts). Identity stays session-derived.
+    const parsed = parseChatTurnRequest(jsonBody)
     // Body parse + wire-contract validation together; rejected requests
     // return above/below without a span (they never stream, so their absence
     // cannot skew a turn timeline).
     perf.record("request_parse", performance.now() - parseStartedAt)
     if (!parsed.ok) {
-      // Routine bad input (missing fields, malformed JSON, absent guest id) is
+      // Routine bad input (missing fields, malformed JSON) is
       // an expected 400 and stays silent. An `unexpected` rejection is a
       // client-contract violation our own client should never produce (e.g.
       // edit+regeneration together), so capture it — this is the one

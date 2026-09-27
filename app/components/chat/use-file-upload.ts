@@ -25,6 +25,8 @@ type ActiveUpload = { attemptId: number; controller: AbortController }
 type FilePickerOptions = {
   convex: ConvexReactClient
   uploadGeneratedPastes: boolean
+  /** False for a text-only model: images and PDFs are refused at selection. */
+  vision: boolean
 }
 
 function uploadFailure(error: unknown): {
@@ -51,6 +53,7 @@ function isAbortError(error: unknown): boolean {
 export const useFilePickerState = ({
   convex,
   uploadGeneratedPastes,
+  vision,
 }: FilePickerOptions) => {
   const [attachments, setAttachments] = useState<PendingAttachment[]>([])
   const [lockedAttachmentIds, setLockedAttachmentIds] = useState<
@@ -238,7 +241,7 @@ export const useFilePickerState = ({
                 try {
                   return {
                     attachment,
-                    result: await validateFile(attachment.file),
+                    result: await validateFile(attachment.file, { vision }),
                   }
                 } catch {
                   return {
@@ -288,7 +291,7 @@ export const useFilePickerState = ({
         }
       })()
     },
-    [convex, startUpload, updateAttachments]
+    [convex, startUpload, updateAttachments, vision]
   )
 
   const handleLargePaste = useCallback(

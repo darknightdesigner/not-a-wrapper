@@ -12,10 +12,7 @@ const validBody = {
 
 describe("parseChatTurnRequest", () => {
   it("accepts a valid turn request and returns it typed", () => {
-    const result = parseChatTurnRequest(
-      { ...validBody, userId: "guest_abc", chatVersion: 3 },
-      { isAuthenticated: false }
-    )
+    const result = parseChatTurnRequest({ ...validBody, chatVersion: 3 })
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.request.chatId).toBe("3f2c6c1e-8b0d-4a3f-9a6e-1c2b3d4e5f60")
@@ -24,12 +21,7 @@ describe("parseChatTurnRequest", () => {
   })
 
   it("rejects missing required fields with per-field details", () => {
-    expect(
-      parseChatTurnRequest(
-        { messages: validBody.messages },
-        { isAuthenticated: true }
-      )
-    ).toEqual({
+    expect(parseChatTurnRequest({ messages: validBody.messages })).toEqual({
       ok: false,
       status: 400,
       code: "INVALID_REQUEST",
@@ -37,15 +29,16 @@ describe("parseChatTurnRequest", () => {
       details: { messages: "ok", chatId: "required", model: "required" },
     })
     // A non-object body degrades to the same missing-fields rejection.
-    const nonObject = parseChatTurnRequest("nope", { isAuthenticated: true })
+    const nonObject = parseChatTurnRequest("nope")
     expect(nonObject).toMatchObject({ ok: false, status: 400 })
   })
 
   it("rejects a turn carrying both edit and regeneration", () => {
-    const result = parseChatTurnRequest(
-      { ...validBody, edit: {}, regeneration: {} },
-      { isAuthenticated: true }
-    )
+    const result = parseChatTurnRequest({
+      ...validBody,
+      edit: {},
+      regeneration: {},
+    })
     expect(result).toMatchObject({
       ok: false,
       status: 400,
@@ -56,42 +49,36 @@ describe("parseChatTurnRequest", () => {
       unexpected: true,
     })
     // Routine bad input is NOT flagged unexpected.
-    const missingFields = parseChatTurnRequest(
-      { messages: validBody.messages },
-      { isAuthenticated: true }
-    )
+    const missingFields = parseChatTurnRequest({ messages: validBody.messages })
     expect(missingFields).not.toHaveProperty("unexpected")
   })
 
   it("keeps a valid reasoningEffort and drops unknown values (ADR-0026)", () => {
-    const valid = parseChatTurnRequest(
-      { ...validBody, reasoningEffort: "high" },
-      { isAuthenticated: true }
-    )
+    const valid = parseChatTurnRequest({
+      ...validBody,
+      reasoningEffort: "high",
+    })
     expect(valid).toMatchObject({ ok: true })
     expect(valid.ok && valid.request.reasoningEffort).toBe("high")
 
     // Unknown effort degrades to Default (routine bad input, never a 400).
-    const invalid = parseChatTurnRequest(
-      { ...validBody, reasoningEffort: "ultra" },
-      { isAuthenticated: true }
-    )
+    const invalid = parseChatTurnRequest({
+      ...validBody,
+      reasoningEffort: "ultra",
+    })
     expect(invalid).toMatchObject({ ok: true })
     expect(invalid.ok && invalid.request.reasoningEffort).toBeUndefined()
   })
 
   it("keeps a valid generation budget and rejects invalid spend limits", () => {
-    const valid = parseChatTurnRequest(
-      { ...validBody, generationBudget: 16_384 },
-      { isAuthenticated: true }
-    )
+    const valid = parseChatTurnRequest({
+      ...validBody,
+      generationBudget: 16_384,
+    })
     expect(valid.ok && valid.request.generationBudget).toBe(16_384)
 
     for (const generationBudget of [0, -1, 1.5, "16384", 2_000_001]) {
-      const invalid = parseChatTurnRequest(
-        { ...validBody, generationBudget },
-        { isAuthenticated: true }
-      )
+      const invalid = parseChatTurnRequest({ ...validBody, generationBudget })
       expect(invalid).toEqual({
         ok: false,
         status: 400,
@@ -100,19 +87,5 @@ describe("parseChatTurnRequest", () => {
           "Generation budget must be a positive whole number within the supported range",
       })
     }
-  })
-
-  it("requires a guest id only for unauthenticated turns", () => {
-    expect(parseChatTurnRequest(validBody, { isAuthenticated: false })).toEqual(
-      {
-        ok: false,
-        status: 400,
-        code: "MISSING_GUEST_ID",
-        error: "Guest ID required for anonymous users",
-      }
-    )
-    expect(
-      parseChatTurnRequest(validBody, { isAuthenticated: true })
-    ).toMatchObject({ ok: true })
   })
 })

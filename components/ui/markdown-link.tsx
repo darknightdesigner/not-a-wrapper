@@ -165,13 +165,9 @@ export function LinkMarkdown({
       >
         {isExternal && (
           <span aria-hidden="true" className="inline-flex shrink-0">
-            <Favicon
-              url={href}
-              alt=""
-              className="size-3.5"
-              loading="lazy"
-              decoding="async"
-            />
+            {/* The model chose this host, so no favicon lookup: fetching one
+                would reach the host's DNS without a click. */}
+            <Favicon url={null} className="size-3.5" />
           </span>
         )}
         <span className="overflow-hidden leading-4 font-normal text-ellipsis whitespace-nowrap">

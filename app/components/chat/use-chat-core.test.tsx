@@ -411,7 +411,6 @@ describe("useChatCore prompt query handling", () => {
       {
         body: expect.objectContaining({
           chatId: "chat-project",
-          userId: "user-1",
           model: "openai/gpt-4.1-mini",
           systemPrompt: "system prompt",
           enableSearch: false,

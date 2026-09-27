@@ -532,7 +532,6 @@ async function runSendTurn(
       {
         body: buildChatTurnRequestBody({
           chatId: currentChatId,
-          userId,
           selectedModel: snapshot.selectedModel,
           systemPrompt: snapshot.systemPrompt,
           enableSearch: snapshot.enableSearch,
@@ -713,7 +712,6 @@ async function runEditTurn(
       {
         body: buildChatTurnRequestBody({
           chatId: currentChatId,
-          userId,
           selectedModel: snapshot.selectedModel,
           systemPrompt: snapshot.systemPrompt,
           enableSearch: snapshot.enableSearch,
@@ -791,8 +789,7 @@ async function runRegenerationTurn(
     return
   }
 
-  const userId = await adapters.resolveUserId()
-  if (!userId) return
+  if (!(await adapters.resolveUserId())) return
 
   try {
     adapters.onLocalDispatch?.()
@@ -800,7 +797,6 @@ async function runRegenerationTurn(
       messageId: regenerationPlan.regeneration.targetAssistantMessageId,
       body: buildChatTurnRequestBody({
         chatId,
-        userId,
         selectedModel: snapshot.selectedModel,
         systemPrompt: snapshot.systemPrompt,
         enableSearch: snapshot.enableSearch,

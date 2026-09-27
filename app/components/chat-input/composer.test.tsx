@@ -68,6 +68,7 @@ const composerMocks = vi.hoisted(() => ({
   clearDraftById: [] as Array<string | null>,
   attachments: [] as PendingAttachment[],
   useRealPicker: false,
+  selectedModel: "openai/gpt-4.1-mini",
   selectFiles: undefined as ((files: File[]) => void) | undefined,
   setDraftValue: vi.fn(),
   clearDraft: vi.fn(),
@@ -105,7 +106,7 @@ beforeAll(async () => {
 
 vi.mock("@/app/components/chat/turn-context", () => ({
   useTurnContext: () => ({
-    selectedModel: "openai/gpt-4.1-mini",
+    selectedModel: composerMocks.selectedModel,
     handleModelChange: vi.fn(),
     enableSearch: composerMocks.enableSearch,
     searchMode: composerMocks.searchMode,
@@ -379,6 +380,7 @@ describe("Composer primary action", () => {
     composerMocks.setDraftValueById.length = 0
     composerMocks.clearDraftById.length = 0
     composerMocks.attachments = []
+    composerMocks.selectedModel = "openai/gpt-4.1-mini"
     composerMocks.useRealPicker = false
     composerMocks.selectFiles = undefined
     composerMocks.enableSearch = false
@@ -837,6 +839,40 @@ describe("Composer primary action", () => {
       ),
       attachments: [expect.objectContaining({ attachmentId: "attachment-1" })],
     })
+  })
+
+  it("keeps a text-only model from sending a PDF attached before a model switch", async () => {
+    const onTurn = vi.fn(async () => true)
+    composerMocks.selectedModel =
+      "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free"
+    composerMocks.attachments = [
+      {
+        id: "attachment-1",
+        kind: "selected-file",
+        status: "ready",
+        file: new File(["%PDF"], "report.pdf", { type: "application/pdf" }),
+        signature: "report",
+        uploaded: {
+          name: "report.pdf",
+          contentType: "application/pdf",
+          url: "/api/files/attachment-1/preview",
+          attachmentId: "attachment-1",
+        },
+      },
+    ]
+    const mounted = renderComposer({
+      onTurn,
+      isSubmitting: false,
+      status: "ready",
+    })
+
+    await act(async () => {
+      mounted
+        .querySelector<HTMLButtonElement>('[data-testid="send-button"]')
+        ?.click()
+    })
+
+    expect(onTurn).not.toHaveBeenCalled()
   })
 
   it("keeps Send visually disabled while an attachment is uploading or failed", () => {

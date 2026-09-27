@@ -7,6 +7,7 @@ import {
 } from "@/convex/lib/serverCallProof"
 import type { GuestTurnRefusal } from "@/convex/usage"
 import { GUEST_TURN_LIMITS } from "@/lib/config"
+import { fileNeedsVision } from "@/lib/file/policy"
 import {
   reserveAuthorizedPlatformUsage,
   resolveModelRoute,
@@ -240,10 +241,7 @@ function turnRequiresVision(messages: UIMessage[]): boolean {
   if (currentTurn?.role !== "user") return false
 
   return currentTurn.parts.some(
-    (part) =>
-      part.type === "file" &&
-      typeof part.mediaType === "string" &&
-      part.mediaType.startsWith("image/")
+    (part) => part.type === "file" && fileNeedsVision(part.mediaType)
   )
 }
 
@@ -324,7 +322,7 @@ function toAdmissionError(
   if (failure.keyProviders.length === 0) {
     return new PublicChatHttpError({
       message:
-        "This model has no route that supports this request (for example, image attachments).",
+        "This model has no route that supports this request (for example, image or PDF attachments).",
       statusCode: 400,
       code: "INVALID_REQUEST",
     })

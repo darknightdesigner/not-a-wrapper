@@ -1,38 +1,5 @@
 # To Do
 
-- **Account deletion webhook gap:** `@convex-dev/workos-authkit` 0.2.9 (the
-latest release) returns early on `user.deleted` for a user missing from its
-mirror, so our account deletion never runs for that user. Keep the mirror
-complete with `workosAuth:backfillUsers` after any reset, run
-`users:deleteAccount` for a missed user (ADR-0044, docs/environment.md), and
-upstream a fix that still calls the app handler.
-- **Guest limit follow-ups (ADR-0045):** Drop the vestigial guest `userId` from
-the chat wire contract and client builder, remove `anonymousUsage` from
-`convex/schema.ts` once production is drained, and add a trusted client-IP
-header setting for non-Vercel hosts (off Vercel every guest shares one network
-bucket).
-- **Favicon proxy sees model-chosen hostnames without a click:** Markdown link
-pills and source chips render `Favicon`, which requests
-`/api/favicon?domain=<host>` on its own, and `app/api/favicon/route.ts` asks
-Google's favicon service about that host. A prompt-injected link to
-`https://<encoded-chat>.evil.example` can leak data through DNS with no click.
-Show favicons only for tool-sourced citations, or a static globe for
-model-written links.
-- **Shared chats omit attachments:** The share view (ADR-0043) leaves files
-out. If shared attachments become a product need, serve them through a
-share-scoped route that checks the file belongs to a message on the shared path
-(LibreChat `/api/share/:shareId/files/:fileId`).
-- **Convex read ceiling for very large chats:** `prepareGeneration` now reads a
-chat once per turn and each message is capped at 896 KiB (CONTEXT.md "Message
-payload cap"), so sends work up to about 16 MiB of messages (verified to 12 MiB
-on dev). `getSelectedPath` still reads every message, branches included, on
-every content beat per subscriber (ADR-0027 Experiment 2b), a send that
-supersedes a zombie run reads the chat twice (about 8 MiB ceiling), the project
-directory reads each chat's latest 12 messages and can pass 16 MiB with a few
-tool-heavy chats, and user messages over 1 MiB fail at prepare. When real chats
-approach this, move tool payloads to their own rows (LobeHub `message_plugins`,
-Convex agent component per-step rows). `bun scripts/convex-read-limits-smoke.ts
---target-mib N` measures the ceiling against dev.
 - **Direct request stall recovery:** A durable turn's initiating POST
 (`app/api/chat/chat-turn-runtime.ts`) sends no heartbeat frames, so a half-open
 connection with no page wake waits for the 330 s client budget, and an
@@ -41,10 +8,6 @@ first content) has no client guard at all. Send heartbeats on that stream,
 apply the retained stream's 10 s watchdog to the whole accepted request
 (ADR-0039), and consider AI SDK 7 `timeout: { firstChunkMs, chunkMs }` for
 provider-side stalls, with its own terminal reason.
-- **Checkpoint replay cursor:** Store the retained-stream cursor on Convex
-checkpoints (HuggingChat `materializedSeq`) so a refreshed tab resumes after
-the checkpoint it shows instead of comparing two copies. Today a mismatch hands
-the turn to checkpoints after 2 s (ADR-0039).
 - **Retained stream can stay "active" after completion:** Stream end depends on
 one unretried Redis write whose errors are swallowed
 (`lib/chat-stream/server.ts`), and the reader loop never checks the run's
@@ -245,30 +208,9 @@ short ADR-0026 amendment recording the rule and the label source of truth.
 Details, evidence, and how the references handle each one:
 [`docs/audits/2026-09-26-open-source-reference-gaps.md`](docs/audits/2026-09-26-open-source-reference-gaps.md).
 
-- **Text files on text-only models:** The Composer gates every upload on
-`vision` (`app/components/chat-input/composer.tsx`), but text-like files are now
-inlined as text for any model; allow text-type uploads on non-vision models
-with a narrowed accept list.
-- **Current-turn PDFs on text-only routes:** `turnRequiresVision`
-(`app/api/chat/api.ts`) gates only images, so a PDF in the current turn on a
-non-vision route becomes a note instead of steering the resolver to a vision
-route.
 - **Final answer at the tool-step cap:** A tool call on the last allowed step
 ends the turn with no reply. Make the last step tools-off.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-step-cap-can-end-a-turn-with-no-answer))
-- **Confirm Claude prompt caching live:** #196 sends Anthropic `cacheControl`
-on every Claude request (direct and through OpenRouter `anthropic/*`), covered
-by request-shaping tests but not yet seen on a real BYOK Claude turn. Send two
-turns in a long chat with a Claude key and check generation stats show cached
-input tokens.
-- **OpenAI storage with hosted search:** OpenAI turns that pair hosted web
-search with Exa, content or MCP tools still keep response storage, because
-`@ai-sdk/openai` drops hosted search calls from later steps when `store` is
-false. Switch them to `store: false` once the SDK replays hosted calls inline
-(ADR-0021, "Storage exception").
-- **Encrypted reasoning size:** With `store: false`, OpenAI and xAI reasoning
-parts persist the encrypted reasoning once per summary part. Measure message
-size on long tool turns; if it matters, keep one copy per reasoning item.
 - **Send only the new message:** The client uploads the whole conversation on
 every send, although signed-in turns read history from Convex.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#every-send-uploads-the-whole-conversation))

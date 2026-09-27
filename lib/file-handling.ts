@@ -5,7 +5,11 @@ import {
 } from "@/lib/file/policy"
 import type { ConvexReactClient } from "convex/react"
 
-export { ACCEPTED_FILE_PICKER_TYPES, validateFile } from "@/lib/file/validation"
+export {
+  ACCEPTED_FILE_PICKER_TYPES,
+  TEXT_FILE_PICKER_TYPES,
+  validateFile,
+} from "@/lib/file/validation"
 
 /** A staged image that never commits fails its upload instead of blocking Send. */
 const STAGED_IMAGE_READY_TIMEOUT_MS = 60_000
