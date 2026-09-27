@@ -36,9 +36,9 @@ References (sibling checkouts):
 | [Images are never resized](#images-are-never-resized) | Medium | Attachments and model input |
 | [Text-file budget drops the newest file](#text-file-budget-drops-the-newest-file) | Medium | Attachments and model input |
 | [Tool-step cap can end a turn with no answer](#tool-step-cap-can-end-a-turn-with-no-answer) | Medium | Turn runtime and provider requests |
-| [Anthropic prompt caching is never turned on](#anthropic-prompt-caching-is-never-turned-on) | Medium | Turn runtime and provider requests |
-| [OpenAI keeps response storage on and gets no user id](#openai-keeps-response-storage-on-and-gets-no-user-id) | Medium | Turn runtime and provider requests |
-| [Cached input tokens are billed at full price](#cached-input-tokens-are-billed-at-full-price) | Medium | Turn runtime and provider requests |
+| [Anthropic prompt caching is never turned on](#anthropic-prompt-caching-is-never-turned-on) (fixed) | Medium | Turn runtime and provider requests |
+| [OpenAI keeps response storage on and gets no user id](#openai-keeps-response-storage-on-and-gets-no-user-id) (fixed) | Medium | Turn runtime and provider requests |
+| [Cached input tokens are billed at full price](#cached-input-tokens-are-billed-at-full-price) (fixed) | Medium | Turn runtime and provider requests |
 | [Every send uploads the whole conversation](#every-send-uploads-the-whole-conversation) | Medium | Turn runtime and provider requests |
 | [MCP tool names break provider name rules](#mcp-tool-names-break-provider-name-rules) | Medium | Tools and MCP |
 | [Large MCP results are dropped instead of trimmed](#large-mcp-results-are-dropped-instead-of-trimmed) | Medium | Tools and MCP |
@@ -63,7 +63,7 @@ References (sibling checkouts):
 | [Dependency alerts cannot see the lockfile](#dependency-alerts-cannot-see-the-lockfile) | Medium | Dependencies and tooling |
 | [Local test and lint runs scan agent worktrees](#local-test-and-lint-runs-scan-agent-worktrees) | Medium | Dependencies and tooling |
 | [PDF cost is estimated at about 20 tokens](#pdf-cost-is-estimated-at-about-20-tokens) | Low | Attachments and model input |
-| [The model is never told the date](#the-model-is-never-told-the-date) | Low | Turn runtime and provider requests |
+| [The model is never told the date](#the-model-is-never-told-the-date) (fixed) | Low | Turn runtime and provider requests |
 | [Follow-up user messages are saved as the browser sends them](#follow-up-user-messages-are-saved-as-the-browser-sends-them) | Low | Turn runtime and provider requests |
 | [Title model costs more than the answer model](#title-model-costs-more-than-the-answer-model) | Low | Turn runtime and provider requests |
 | [Signed-in chats keep New chat when the title fails](#signed-in-chats-keep-new-chat-when-the-title-fails) | Low | Turn runtime and provider requests |
@@ -462,6 +462,9 @@ covers the 265 s deadline, which is a different stop.
 
 Severity: Medium.
 
+Status: fixed 2026-09-27 (#196). Claude answer requests send `cacheControl`,
+direct and through OpenRouter; a live BYOK Claude check is still open in TODO.md.
+
 **What is wrong.** Claude only discounts the repeated start of a prompt when
 the app asks for caching, and we never ask, even though the installed SDKs
 support it. Every new message in a Claude chat resends the whole history at
@@ -524,6 +527,11 @@ ledger must first price cache writes (1.25x the input price) and cache reads
 ### OpenAI keeps response storage on and gets no user id
 
 Severity: Medium.
+
+Status: fixed 2026-09-27 (#196). OpenAI and xAI send `store: false`, except
+OpenAI turns that pair hosted search with app tools (ADR-0021 storage
+exception). An HMAC actor id (WorkOS subject, or the ADR-0045 signed guest id)
+goes to OpenAI, Anthropic, OpenRouter and the title call.
 
 **What is wrong.** Guests and free signed-in users on gpt-5-mini chat through
 our one platform OpenAI key, and we never tell OpenAI (or Anthropic) which
@@ -592,6 +600,9 @@ attribution.
 ### Cached input tokens are billed at full price
 
 Severity: Medium.
+
+Status: fixed 2026-09-27 (#196) on the completion and worker-receipt paths.
+Durable per-step cache counts remain a TODO.md follow-up.
 
 **What is wrong.** OpenAI caches gpt-5-mini prompts automatically and charges
 about 10% of the normal input price for tokens read from that cache. Our usage
@@ -715,6 +726,9 @@ body.
 ### The model is never told the date
 
 Severity: Low.
+
+Status: fixed 2026-09-27 (#196). Every prompt ends with the day in the
+`x-vercel-ip-timezone` zone, or UTC.
 
 **What is wrong.** The model never gets today's date. Its instructions are the
 user's custom prompt or a one-line default, plus one OpenAI-only sentence
