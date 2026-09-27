@@ -1,4 +1,5 @@
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import { fetchQuery } from "convex/nextjs"
 import { decryptSecret, isSupportedCiphertext } from "./encryption"
 import { getProviderStrategy } from "./openproviders/provider-strategy"
@@ -78,6 +79,8 @@ export async function getUserKeyFromConvex(
       provider,
     })
   } catch (error) {
+    // A rejected account must not fall back to the platform key (ADR-0044).
+    if (isAccountRejectedError(error)) throw error
     console.error("Error fetching user key from Convex:", error)
     return null
   }

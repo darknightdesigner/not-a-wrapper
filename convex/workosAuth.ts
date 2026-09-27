@@ -29,6 +29,8 @@ function appUserSyncInputFromWorkOSUser(user: WorkOSUserEventData) {
   }
 }
 
+// Signature-verified WorkOS events are the only writers of profile sync fields
+// and the only non-operator path to account deletion (ADR-0044).
 export const { authKitEvent } = authKit.events({
   "user.created": async (ctx, event) => {
     await upsertAppUserFromWorkOS(
@@ -45,10 +47,6 @@ export const { authKitEvent } = authKit.events({
   "user.deleted": async (ctx, event) => {
     await softDeleteAppUserFromWorkOS(ctx, {
       workosUserId: event.data.id,
-      email: event.data.email,
-      firstName: event.data.firstName,
-      lastName: event.data.lastName,
-      profileImage: event.data.profilePictureUrl,
       workosUpdatedAt: event.data.updatedAt,
     })
   },

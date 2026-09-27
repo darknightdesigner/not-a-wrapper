@@ -399,25 +399,46 @@ export function planSelectedPathAfterUserMessage(
   return getSelectedPathMessagesFromContext(contextFor(planned.messages))
 }
 
+type CreateMessageBranchWriterOptions = MessageBranchWriterOptions & {
+  /**
+   * The chat's complete message list exactly as this mutation last read it.
+   * Convex bills every document read against the transaction's 16 MiB read
+   * limit, repeats included, so a caller that already holds the list passes it
+   * instead of letting the writer read the chat again. Omitted: read on first
+   * use.
+   */
+  messages?: ChatMessage[]
+}
+
+/**
+ * The writer reads the chat at most once per mutation and then advances its
+ * own copy by exactly the writes it makes, so consecutive operations and the
+ * caller's post-write projection (`messages()`) share that one read. Inside a
+ * transaction a reload returns the same array; only a caller that writes
+ * messages outside the writer must stop using it or reload.
+ */
 export function createMessageBranchWriter(
   ctx: MutationCtx,
-  { chatId, now }: MessageBranchWriterOptions
+  { chatId, now, messages: seed }: CreateMessageBranchWriterOptions
 ) {
-  async function loadMessages() {
-    return await ctx.db
+  let current = seed
+
+  async function currentMessages(): Promise<ChatMessage[]> {
+    current ??= await ctx.db
       .query("messages")
       .withIndex("by_chat_order", (query) => query.eq("chatId", chatId))
       .collect()
+    return current
   }
 
   async function requireTarget(
     messageId: Id<"messages">,
     role: "user" | "assistant"
   ) {
-    const message = await ctx.db.get(messageId)
-    if (!message || message.chatId !== chatId) {
-      throw new Error("Message not found")
-    }
+    const message = (await currentMessages()).find(
+      (candidate) => candidate._id === messageId
+    )
+    if (!message) throw new Error("Message not found")
     if (message.role !== role) {
       const article = role === "assistant" ? "an" : "a"
       throw new Error(
@@ -427,44 +448,63 @@ export function createMessageBranchWriter(
     return message
   }
 
+  async function patchMessage(
+    messageId: Id<"messages">,
+    patch: Partial<ChatMessage>
+  ) {
+    await ctx.db.patch(messageId, patch)
+    current = applyPatchToMessages(await currentMessages(), messageId, patch)
+  }
+
+  async function insertMessage(planned: PlannedMessage) {
+    const messageId = await ctx.db.insert("messages", planned)
+    const inserted = await ctx.db.get(messageId)
+    if (!inserted) throw new Error("Inserted message not found")
+    current = [...(await currentMessages()), inserted]
+    return messageId
+  }
+
   async function applyPlannedBranchChanges(
     before: ChatMessage[],
     after: ChatMessage[]
   ) {
     const afterById = new Map(after.map((message) => [message._id, message]))
+    const next: ChatMessage[] = []
     for (const message of before) {
       const planned = afterById.get(message._id)
-      if (!planned) continue
-      const patch = branchPatch(message, planned, now)
+      const patch = planned ? branchPatch(message, planned, now) : null
       if (patch) await ctx.db.patch(message._id, patch)
+      next.push(patch ? { ...message, ...patch } : message)
     }
+    current = next
   }
 
   /**
-   * Post-write validate-and-repair pass: reload, re-normalize, assert the
-   * target is reachable on the Selected path, and apply any repair patches.
-   * The second pass is deliberate (CONTEXT.md: post-write validation), not
-   * accidental rework — it proves the write left the chat in a legal state.
+   * Post-write validate-and-repair pass over the post-write array: re-normalize,
+   * assert the target is reachable on the Selected path, and apply any repair
+   * patches. The second pass is deliberate (CONTEXT.md: post-write
+   * validation), not accidental rework: it proves the write left the chat in a
+   * legal state.
    */
   async function finish(messageId: Id<"messages">): Promise<ChatMessage> {
-    const messages = await loadMessages()
+    const messages = await currentMessages()
     const normalized = planSelectedPathNormalization(messages)
     assertSelectedPathContains(normalized, messageId)
     await applyPlannedBranchChanges(messages, normalized)
 
-    const message = await ctx.db.get(messageId)
+    const message = (await currentMessages()).find(
+      (candidate) => candidate._id === messageId
+    )
     if (!message)
       throw new Error("Selected message not found after branch write")
     return message
   }
 
   async function select(messageId: Id<"messages">): Promise<ChatMessage> {
-    const target = await ctx.db.get(messageId)
-    if (!target || target.chatId !== chatId) {
-      throw new Error("Message not found")
-    }
+    const messages = await currentMessages()
+    const target = messages.find((message) => message._id === messageId)
+    if (!target) throw new Error("Message not found")
 
-    const messages = await loadMessages()
     const selected = planMessageSelection(messages, target._id)
     await applyPlannedBranchChanges(messages, selected.messages)
     return await finish(target._id)
@@ -487,7 +527,7 @@ export function createMessageBranchWriter(
       replacement: ChatMessage | undefined
     }) => PlannedMessage
   ): Promise<ChatMessage> {
-    const messages = await loadMessages()
+    const messages = await currentMessages()
     const planned = planBranchInsertion(
       messages,
       { chatId, now },
@@ -496,8 +536,7 @@ export function createMessageBranchWriter(
       buildPlanned
     )
     await applyPlannedBranchChanges(messages, planned.messages)
-    const messageId = await ctx.db.insert("messages", planned.plannedMessage)
-    return await finish(messageId)
+    return await finish(await insertMessage(planned.plannedMessage))
   }
 
   async function writeUserMessage(
@@ -505,9 +544,10 @@ export function createMessageBranchWriter(
   ): Promise<ChatMessage> {
     if (input.replaces) await requireTarget(input.replaces, "user")
 
-    const messages = await loadMessages()
+    const messages = await currentMessages()
     const planned = planUserMessageWrite(messages, { chatId, now, input })
     if (planned.kind === "existing") {
+      await applyPlannedBranchChanges(messages, planned.messages)
       // The generation claiming a first-turn row (written pre-request, so
       // un-stamped) adopts its provenance here; an already-stamped row keeps
       // its original stamp.
@@ -515,20 +555,18 @@ export function createMessageBranchWriter(
         planned.message.requestId === undefined &&
         input.requestId !== undefined
       ) {
-        await ctx.db.patch(planned.message._id, {
+        await patchMessage(planned.message._id, {
           requestId: input.requestId,
           model: input.model,
           provider: input.provider,
           updatedAt: now,
         })
       }
-      await applyPlannedBranchChanges(messages, planned.messages)
       return await finish(planned.message._id)
     }
 
     await applyPlannedBranchChanges(messages, planned.messages)
-    const messageId = await ctx.db.insert("messages", planned.plannedMessage)
-    return await finish(messageId)
+    return await finish(await insertMessage(planned.plannedMessage))
   }
 
   async function writeAssistantPlaceholder(
@@ -560,5 +598,9 @@ export function createMessageBranchWriter(
     writeUserMessage,
     writeAssistantPlaceholder,
     select,
+    /** The chat's messages after every write this writer has made. */
+    messages: currentMessages,
   }
 }
+
+export type MessageBranchWriter = ReturnType<typeof createMessageBranchWriter>

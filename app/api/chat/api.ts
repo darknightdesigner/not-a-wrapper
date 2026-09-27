@@ -1,5 +1,6 @@
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import {
   reserveAuthorizedPlatformUsage,
   resolveModelRoute,
@@ -94,7 +95,23 @@ export async function admitServerSideUsage(
   token: string | undefined,
   anonymousId?: string
 ): Promise<void> {
-  const usage = await fetchMutation(api.usage.admit, { anonymousId }, { token })
+  const usage = await fetchMutation(
+    api.usage.admit,
+    { anonymousId },
+    { token }
+  ).catch((error: unknown) => {
+    // A deleted or disabled account with a still-valid token (ADR-0044):
+    // refused here, never retried as a guest.
+    if (isAccountRejectedError(error)) {
+      throw new PublicChatHttpError({
+        message: "This account is no longer active.",
+        cause: error,
+        statusCode: 403,
+        code: "ACCOUNT_REJECTED",
+      })
+    }
+    throw error
+  })
 
   if (!usage.canSend) {
     // Surface specific usage-check failures before falling back to the generic
