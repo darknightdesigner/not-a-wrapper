@@ -43,5 +43,13 @@ describe("guest identity (ADR-0045)", () => {
     expect(network("2001:db8:1:3::1", { VERCEL: "1" })).not.toBe(
       network("2001:db8:1:2::1", { VERCEL: "1" })
     )
+    // Every spelling of an IPv4-mapped address is the IPv4 address.
+    for (const mapped of [
+      "::ffff:192.0.2.1",
+      "::ffff:c000:201",
+      "0:0:0:0:0:ffff:c000:0201",
+    ]) {
+      expect(network(mapped, { VERCEL: "1" })).toBe("192.0.2.1")
+    }
   })
 })

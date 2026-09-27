@@ -68,14 +68,23 @@ export function verifyGuestCookie(
  */
 export function networkPrefix(ip: string): string {
   const address = (ip.replace(/^\[|\]$/g, "").split("%")[0] ?? "").toLowerCase()
-  const mappedIpv4 = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/.exec(address)?.[1]
-  if (mappedIpv4) return mappedIpv4
   if (!address.includes(":")) return address
 
+  // A dotted IPv4 tail becomes its two hex groups, so every spelling of one
+  // address expands to the same eight groups.
+  const toGroups = (part: string) =>
+    part
+      ? part.split(":").flatMap((group) => {
+          const octets = group.split(".").map(Number)
+          if (octets.length !== 4) return [group]
+          const [a = 0, b = 0, c = 0, d = 0] = octets
+          return [((a << 8) | b).toString(16), ((c << 8) | d).toString(16)]
+        })
+      : []
   const [head = "", tail] = address.split("::")
-  const headGroups = head ? head.split(":") : []
-  const tailGroups = tail ? tail.split(":") : []
-  const groups =
+  const headGroups = toGroups(head)
+  const tailGroups = toGroups(tail ?? "")
+  const groups = (
     tail === undefined
       ? headGroups
       : [
@@ -85,11 +94,20 @@ export function networkPrefix(ip: string): string {
           ).fill("0"),
           ...tailGroups,
         ]
-  const prefix = groups
+  ).map((group) => Number.parseInt(group, 16) || 0)
+
+  // IPv4-mapped (::ffff:a.b.c.d in any spelling) is the IPv4 address itself.
+  if (
+    groups.slice(0, 5).every((group) => group === 0) &&
+    groups[5] === 0xffff
+  ) {
+    const [high = 0, low = 0] = groups.slice(6)
+    return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".")
+  }
+  return `${groups
     .slice(0, 4)
-    .map((group) => group.replace(/^0+(?=.)/, ""))
-    .join(":")
-  return `${prefix}::/64`
+    .map((group) => group.toString(16))
+    .join(":")}::/64`
 }
 
 /**
