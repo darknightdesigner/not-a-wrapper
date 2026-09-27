@@ -5,15 +5,19 @@ upload; prevent `saveStagedAttachment` from claiming another attachment's or
 profile image's blob through a caller-supplied storage ID. Share reference-aware
 deletion rules across explicit deletion and staged-attachment cleanup so duplicate
 references cannot delete a blob still in use.
-- **Account deletion must revoke application access:** Enforce `deletedAt` and
-`disabledAt` in the shared Convex auth boundary, including requests with an
-existing valid JWT. Prevent public `users.createOrUpdate` bootstrap calls from
-clearing these flags; reserve account reactivation for verified server lifecycle
-events and preserve the distinction between rejected accounts and guests.
-Also cascade deletion to the user's chats, files, BYOK keys, MCP servers, and
-share links by reusing the ADR-0014 deletion jobs. Also stop the public
-bootstrap from writing `workosUpdatedAt`, email, and avatar from browser input
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#user-bootstrap-trusts-browser-sent-sync-fields)).
+- **Account deletion webhook gap:** `@convex-dev/workos-authkit` 0.2.9 (the
+latest release) returns early on `user.deleted` for a user missing from its
+mirror, so our account deletion never runs for that user. Keep the mirror
+complete with `workosAuth:backfillUsers` after any reset, run
+`users:deleteAccount` for a missed user (ADR-0044, docs/environment.md), and
+upstream a fix that still calls the app handler.
+- **Reapers can starve behind a blocked Project deletion job:**
+`reapExpiredGenerationRunsPass` and `reapExpiredToolApprovalsPass`
+(`convex/chatRuntime.ts`) read a fixed 25-row window with no cursor and skip
+inactive chats, so the live runs and approvals of a Project whose deletion job
+blocked stay at the head of the range forever. Page them with a
+`reaperCheckpoints` cursor like `reapResolvedApprovalPausesPass`, or close live
+work at the start of Project jobs as ADR-0044 does for account jobs.
 - **Guest abuse and spending limits:** The five-message guest limit resets when
 the client changes its anonymous ID. Add server-enforced network and concurrency
 limits plus an aggregate guest spending ceiling, reusing existing admission

@@ -15,10 +15,10 @@ import {
 } from "./lib/runTimingReceipt"
 import {
   isIgnoredSignal,
-  isSupersedableGenerationRunStatus,
   resolveGenerationRunTransition,
   resolveTerminalAssistantMessageResolution,
   SUPERSEDABLE_MESSAGE_STATUSES,
+  SUPERSEDABLE_RUN_STATUSES,
   type AssistantMessageFacts,
   type LifecycleVerdict,
   type MessageResolution,
@@ -325,8 +325,6 @@ type CanonicalApprovalDecision = {
   approved: boolean
   reason?: string
 }
-
-const ACTIVE_RUN_SCAN_LIMIT = 50
 
 /**
  * Execution-grant lifetime (ADR-0011), budget-derived from route max,
@@ -940,22 +938,28 @@ export async function closeSupersededGenerationsForChat(
   userId: Id<"users">,
   now: number
 ): Promise<boolean> {
-  const runs = await ctx.db
-    .query("generationRuns")
-    .withIndex("by_chat_updated", (q) => q.eq("chatId", chatId))
-    .order("desc")
-    .take(ACTIVE_RUN_SCAN_LIMIT)
+  // Every live run in the chat, read by status rather than a recency window,
+  // so no older live run keeps its grant and reservation past the sweep.
+  const runs = (
+    await Promise.all(
+      SUPERSEDABLE_RUN_STATUSES.map((status) =>
+        ctx.db
+          .query("generationRuns")
+          .withIndex("by_chat_status", (q) =>
+            q.eq("chatId", chatId).eq("status", status)
+          )
+          .collect()
+      )
+    )
+  )
+    .flat()
+    .sort((left, right) => right.updatedAt - left.updatedAt)
 
-  const supersededRunIds = new Set<Id<"generationRuns">>()
   const supersededMessageIds = new Set<Id<"messages">>()
   const reason = "superseded by a new generation"
+  let wrote = false
 
   for (const run of runs) {
-    // Fast-path pre-filter with the lifecycle predicate. The supersede resolve
-    // below is authoritative, but gathering facts for every run in the scan
-    // window (most already terminal) would be wasteful — same predicate, same
-    // answer, so a non-supersedable run never reaches the gather.
-    if (!isSupersedableGenerationRunStatus(run.status)) continue
     if (run.userId !== undefined && run.userId !== userId) continue
 
     const resolved = await gatherAssistantMessageFacts(ctx, run, undefined)
@@ -965,7 +969,7 @@ export async function closeSupersededGenerationsForChat(
     )
     if (verdict.kind === "ignore") continue
 
-    supersededRunIds.add(run._id)
+    wrote = true
     const assistantMessageId = await applyLifecycleVerdict(
       ctx,
       run,
@@ -995,16 +999,15 @@ export async function closeSupersededGenerationsForChat(
     .flat()
     .filter((message) => message.role === "assistant")
     .sort((left, right) => left._creationTime - right._creationTime)
-  let closedOrphan = false
 
   for (const message of liveMessages) {
     if (supersededMessageIds.has(message._id)) continue
-    closedOrphan = true
+    wrote = true
 
-    // Orphan messages whose run fell outside the scan window: the terminal
-    // policy runs with no reused-regeneration restore (there is no run in hand
-    // to date the message against), so an empty message keeps/deletes and a
-    // semantic one is stamped aborted — the pre-extraction split, unchanged.
+    // Orphan messages whose run is no longer live (every live run closed
+    // above): the terminal policy runs with no reused-regeneration restore
+    // (there is no run in hand to date the message against), so an empty
+    // message keeps/deletes and a semantic one is stamped aborted.
     const hasSemantic = hasSemanticAssistantParts(message)
     let orphanMessages: Doc<"messages">[] | null = null
     let fallbackSiblingId: Id<"messages"> | null = null
@@ -1012,7 +1015,7 @@ export async function closeSupersededGenerationsForChat(
       orphanMessages = await listMessages(ctx, chatId)
       fallbackSiblingId = resolveFallbackSibling(orphanMessages, message)
     }
-    const supersededMessageId = await applyMessageResolution(
+    await applyMessageResolution(
       ctx,
       message,
       resolveTerminalAssistantMessageResolution(
@@ -1027,74 +1030,9 @@ export async function closeSupersededGenerationsForChat(
       orphanMessages,
       now
     )
-
-    if (
-      message.generationRunId &&
-      !supersededRunIds.has(message.generationRunId)
-    ) {
-      const run = await ctx.db.get(message.generationRunId)
-      if (run && run.chatId === chatId) {
-        // The message half was already resolved above; the run closes via the
-        // lifecycle's supersede rule like the in-window runs, with message:null
-        // so the verdict does not restate it.
-        const verdict = resolveGenerationRunTransition(
-          { runStatus: run.status, message: null },
-          { kind: "supersede", reason }
-        )
-        if (verdict.kind === "transition") {
-          // Pre-terminal snapshot for the accounting hooks (see
-          // applyLifecycleVerdict): the patch below revokes the grant the
-          // deferral must copy.
-          const preTerminalRun: Doc<"generationRuns"> = { ...run }
-          await ctx.db.patch(run._id, {
-            status: verdict.run.status,
-            error: verdict.run.error,
-            completedAt: verdict.run.settle ? now : undefined,
-            updatedAt: now,
-            activeStreamId: undefined,
-            ...(verdict.run.terminalReason
-              ? { terminalReason: verdict.run.terminalReason }
-              : {}),
-            ...grantRevocationForStatus(verdict.run.status),
-            // Same receipt-attach capability as the in-window supersede
-            // (ADR-0030): this run's worker may still be live and needs it to
-            // land its partial receipt after the grant above is revoked.
-            ...timingReceiptAttachGrant(
-              run,
-              verdict.run.status,
-              undefined,
-              now
-            ),
-            ...LEASE_CLEAR,
-            assistantMessageId: supersededMessageId,
-          })
-          if (verdict.run.settle) {
-            // Same deferral as the in-window supersede: cancellation-like
-            // terminals mark accounting pending instead of settling blind.
-            const deferred =
-              verdict.run.terminalReason === "superseded" &&
-              (await deferUsageSettlementForTerminalRun(
-                ctx,
-                preTerminalRun,
-                "superseded",
-                now
-              ))
-            if (!deferred) {
-              await settleUsageForTerminalRun(
-                ctx,
-                preTerminalRun,
-                {},
-                "superseded",
-                verdict.run.terminalReason
-              )
-            }
-          }
-        }
-      }
-    }
   }
 
-  return supersededRunIds.size > 0 || closedOrphan
+  return wrote
 }
 
 type StoredUserMessage = {

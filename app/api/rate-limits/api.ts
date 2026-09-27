@@ -1,4 +1,5 @@
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import {
   AUTH_DAILY_MESSAGE_LIMIT,
   NON_AUTH_DAILY_MESSAGE_LIMIT,
@@ -40,6 +41,8 @@ export async function getMessageUsage(
       remaining: regularUsage.remaining,
     }
   } catch (error) {
+    // A rejected account is refused, never shown default usage (ADR-0044).
+    if (isAccountRejectedError(error)) throw error
     console.error("Error fetching usage from Convex:", error)
     // Usage lookup failures must not block messaging.
     return {

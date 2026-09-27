@@ -489,9 +489,16 @@ export function isIgnoredSignal(
 }
 
 // Lifecycle vocabulary, not chatRuntime plumbing — supersedable run statuses are
-// the pre-terminal, pre-pause states the sweep may close.
+// the pre-terminal, pre-pause states the sweep may close. The sweep reads
+// exactly these through `generationRuns.by_chat_status`.
+export const SUPERSEDABLE_RUN_STATUSES = [
+  "queued",
+  "running",
+  "streaming",
+] as const satisfies readonly GenerationRunStatus[]
+
 export function isSupersedableGenerationRunStatus(status: unknown): boolean {
-  return status === "queued" || status === "running" || status === "streaming"
+  return SUPERSEDABLE_RUN_STATUSES.some((live) => live === status)
 }
 
 // A message is supersedable while its own status is still live (a run that never

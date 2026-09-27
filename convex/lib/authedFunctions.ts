@@ -14,10 +14,14 @@
  * builder declares the resource id arg itself and passes it through, so handlers
  * keep using `args.<id>` and simply drop their own ownership check.
  *
+ * Every builder resolves the caller through `getOptionalAuth`, so a deleted or
+ * disabled account is rejected with the typed `account_rejected` ConvexError
+ * before any handler runs, even while its access token is valid. Optional and
+ * maybe builders never turn a rejected identity into a guest (ADR-0044).
+ *
  * Deliberately out of scope: `internalQuery`/`internalMutation` (no client
- * identity), `httpAction` (the chat-route token path), pure-public reads with no
- * user concept, and the self-identity-match handlers in `users.ts` (a different
- * predicate). See ADR-0003.
+ * identity), `httpAction` (the chat-route token path), and pure-public reads
+ * with no user concept. See ADR-0003.
  */
 
 import {
@@ -31,14 +35,14 @@ import { mutation, query } from "../_generated/server"
 import {
   getCurrentUser,
   getOptionalAuth,
-  getReadableChatByPublicId,
   requireCurrentUser,
-  requireIdentity,
   requireOwnedChatByPublicId,
   requireOwnedGenerationRun,
   requireOwnedMcpServer,
   requireOwnedProject,
   requireOwnedToolApproval,
+  requireSignedInCaller,
+  resolveReadableChatByPublicId,
 } from "./auth"
 
 /**
@@ -57,29 +61,30 @@ export const authenticatedMutation = customMutation(
 )
 
 /**
- * A query that requires a signed-in identity but not a resolved user row.
- * Injects `ctx.identity` — for self-identity-match handlers that compare
- * `identity.subject` to a client argument.
+ * A query that requires a signed-in identity but not a synced user row.
+ * Injects `ctx.identity` and `ctx.user: Doc<"users"> | null` — for
+ * self-identity-match handlers. A rejected row still throws.
  */
 export const identityQuery = customQuery(
   query,
-  customCtx(async (ctx) => ({ identity: await requireIdentity(ctx) }))
+  customCtx(async (ctx) => await requireSignedInCaller(ctx))
 )
 
 /**
- * A mutation that requires a signed-in identity but not a resolved user row.
- * Injects `ctx.identity` — for self-identity-match handlers and the create-user
- * bootstrap path where the user row may not exist yet.
+ * A mutation that requires a signed-in identity but not a synced user row.
+ * Injects `ctx.identity` and `ctx.user: Doc<"users"> | null` — for the
+ * insert-only account bootstrap. A rejected row still throws, so the bootstrap
+ * can never resurrect a deleted account.
  */
 export const identityMutation = customMutation(
   mutation,
-  customCtx(async (ctx) => ({ identity: await requireIdentity(ctx) }))
+  customCtx(async (ctx) => await requireSignedInCaller(ctx))
 )
 
 /**
- * A query that resolves the caller if present but never throws. Injects
+ * A query that resolves the caller if present. Injects
  * `ctx.user: Doc<"users"> | null` — for authenticated reads that degrade to an
- * empty/null result for signed-out callers.
+ * empty/null result for signed-out callers. Throws only for a rejected account.
  */
 export const maybeAuthQuery = customQuery(
   query,
@@ -87,9 +92,9 @@ export const maybeAuthQuery = customQuery(
 )
 
 /**
- * A mutation that resolves the caller if present but never throws. Injects
- * `ctx.user: Doc<"users"> | null` — for optional-auth / anonymous write paths
- * (usage, rate limits) that key off an anonymous id when signed out.
+ * A mutation that resolves the caller if present. Injects
+ * `ctx.user: Doc<"users"> | null` — for writes that no-op for signed-out
+ * callers. Throws only for a rejected account.
  */
 export const maybeAuthMutation = customMutation(
   mutation,
@@ -99,7 +104,8 @@ export const maybeAuthMutation = customMutation(
 /**
  * A query for optional-auth / anonymous read paths. Injects both
  * `ctx.identity` (raw, nullable) and `ctx.user` (nullable), so the handler can
- * distinguish a guest from an unsynced user. Never throws.
+ * distinguish a guest from an unsynced user. Throws only for a rejected
+ * account.
  */
 export const optionalAuthQuery = customQuery(
   query,
@@ -109,7 +115,7 @@ export const optionalAuthQuery = customQuery(
 /**
  * A mutation for optional-auth / anonymous write paths (usage counters, rate
  * limits). Injects `ctx.identity` and `ctx.user`, both nullable. Never throws on
- * a missing caller.
+ * a missing caller; throws for a rejected account.
  */
 export const optionalAuthMutation = customMutation(
   mutation,
@@ -124,7 +130,8 @@ export const optionalAuthMutation = customMutation(
 /**
  * A read of a chat the caller may view: the owner, or anyone when the chat is
  * public (share links). Injects `ctx.chat: Doc<"chats"> | null` (null when not
- * authorized) and `ctx.user: Doc<"users"> | null`. Consumes a `chatId` arg
+ * authorized) and `ctx.user: Doc<"users"> | null`. A rejected account throws
+ * instead of reading public chats as a guest. Consumes a `chatId` arg
  * (publicId) and passes it through.
  */
 export const readableChatQuery = customQuery(
@@ -132,8 +139,7 @@ export const readableChatQuery = customQuery(
   customCtxAndArgs({
     args: { chatId: v.string() },
     input: async (ctx, { chatId }) => {
-      const chat = await getReadableChatByPublicId(ctx, chatId)
-      const user = await getCurrentUser(ctx)
+      const { user, chat } = await resolveReadableChatByPublicId(ctx, chatId)
       return { ctx: { chat, user }, args: { chatId } }
     },
   })
