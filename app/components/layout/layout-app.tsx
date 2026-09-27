@@ -6,6 +6,7 @@ import {
 } from "@/app/components/chat/activity/activity-panel-host"
 import { HistorySearchProvider } from "@/app/components/history/history-search-provider"
 import { Header } from "@/app/components/layout/header"
+import { MainContentErrorBoundary } from "@/app/components/layout/route-error-fallback"
 import { AppSidebar } from "@/app/components/layout/sidebar/app-sidebar"
 import { ProjectPinningProvider } from "@/app/components/projects/use-project-pinning"
 import { MainContent } from "@/components/ui/main-content"
@@ -60,7 +61,9 @@ export function LayoutApp({
                         id="main"
                         className="@container/main min-h-0 min-w-0 flex-1 self-stretch"
                       >
-                        {children}
+                        <MainContentErrorBoundary>
+                          {children}
+                        </MainContentErrorBoundary>
                       </MainContent>
                     </ScrollRoot>
                   </div>

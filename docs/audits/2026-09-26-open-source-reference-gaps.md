@@ -2329,7 +2329,9 @@ today the user has to know to refresh by hand.
   `lib/chat-store/messages/provider.tsx:104-111`,
   `lib/chat-store/chats/provider.tsx:240-243`.
 - `app/global-error.tsx:7-22`: renders `NextError statusCode={0}`, with no
-  Reload button. No `app/**/error.tsx` exists.
+  Reload button. `app/error.tsx` (added 2026-09-27) catches child segments,
+  but these providers mount in `app/layout.tsx`, so their throws still reach
+  `global-error.tsx`.
 - `lib/observability/build-identity.ts:24-34`: the only build id is
   server-side. The client has no build id, version check, or reload logic.
 - `node_modules/next/dist/esm/client/components/router-reducer/fetch-server-response.js:134-137`:
@@ -2362,7 +2364,8 @@ today the user has to know to refresh by hand.
    navigation (including the `pushState` commit in
    `lib/chat-store/session/provider.tsx`) a full page load, and show one
    "Update available, Reload" toast while no turn is streaming.
-4. In the `error.tsx` planned under the TODO "Error boundaries" item, treat
+4. In `RouteErrorFallback` (`app/components/layout/route-error-fallback.tsx`,
+   shared by `app/error.tsx` and the shell's main-pane boundary), treat
    Convex "Could not find public function" and `ArgumentValidationError` as
    version skew and reload once behind a `sessionStorage` guard, instead of
    offering Retry.
@@ -2372,8 +2375,8 @@ incompatible change to a query the old UI uses, and a manual refresh recovers.
 Convex docs (docs.convex.dev/production) warn that users can still run the old
 website after the backend changes; the argument rule belongs in "No
 backward-compatibility rule for Convex functions" below. Vercel Skew Protection
-does not cover the Convex websocket. The TODO "Error boundaries" item adds a
-retry screen but not version detection, and retry cannot fix skew.
+does not cover the Convex websocket. The error boundaries added on 2026-09-27
+offer Retry but not version detection, and retry cannot fix skew.
 
 ### A missing lazy chunk crashes the app
 
@@ -2427,8 +2430,10 @@ which has Reload and Back).
    message containing "Failed to load chunk" or "Loading chunk"), plus a
    reload-once guard in `sessionStorage` (at most once per 60 s, reads and
    writes in try/catch; after that, a "New version available, Reload" toast).
-3. Call it from `global-error.tsx` and from the planned `error.tsx` and
-   per-row boundaries before they render a fallback. Optionally also call it
+3. Call it from `global-error.tsx`, `RouteErrorFallback`
+   (`app/components/layout/route-error-fallback.tsx`) and `MessageRowBoundary`
+   (`app/components/chat/message-row-boundary.tsx`) before they render a
+   fallback. Optionally also call it
    from a `window` `unhandledrejection` listener in the root client layout. Do
    not call it from the hover and send preload catch blocks: those are
    warm-ups, and a reload there could interrupt someone who only hovered Share.
@@ -2438,9 +2443,9 @@ which has Reload and Back).
 **Notes.** Narrower than it looks. The sign-in dialog
 (`app/components/chat/chat.tsx:48-51`) is always mounted at `chat.tsx:445`, so
 its chunk loads at page load, not at the sign-in wall. Route navigation is
-already safe (Next reloads on a build mismatch). Fold this into the TODO
-"Error boundaries" item: its planned retry cannot recover a cached failed
-chunk. Share the reload-once guard with "Open tabs never learn about a new
+already safe (Next reloads on a build mismatch). The error boundaries added on
+2026-09-27 offer Retry, which cannot recover a cached failed chunk, so this
+still needs the reload-once guard. Share the reload-once guard with "Open tabs never learn about a new
 version".
 
 ### Chat API cannot recognize an outdated tab
@@ -3248,8 +3253,8 @@ Severity: Low.
 
 **What is wrong.** `SearchImages` renders image results in the message body
 with `next/image` but gives no size and no `unoptimized` flag. In development,
-Next throws "missing required width", and with no error boundary that takes
-down the whole page. In production the image optimizer refuses every host
+Next throws "missing required width"; since 2026-09-27 the message-row
+boundary keeps that to one row. In production the image optimizer refuses every host
 outside `remotePatterns`, so every tile fails and hides itself. No built-in
 tool produces this data today, so the whole image-results path, including the
 Activity panel's copy, is dead code with a latent dev crash.
@@ -3282,8 +3287,9 @@ Activity panel's copy, is dead code with a latent dev crash.
 
 **Notes.** If image results come back, do not copy the Activity panel's
 pattern (an unoptimized image loaded straight from any https host in tool
-output). That is the auto-load leak the TODO.md item "Block remote markdown
-images" wants to close. Build one shared grid under that allowlist instead
+output). That is the auto-load leak closed on 2026-09-27: Markdown renders
+images as links and `img-src` allows only self, `data:`, `blob:` and our
+Convex origin, so the CSP would now block that grid. Build one shared grid under that allowlist instead
 (see TODO.md "Assistant Response UI Widgets").
 
 ### Dead analytics script blocked by our CSP
