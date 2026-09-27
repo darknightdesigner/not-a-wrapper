@@ -35,6 +35,7 @@ import {
   CANCELLATION_SETTLEMENT_PROTOCOL_VERSION,
   signChatAdmissionProof,
 } from "@/convex/lib/chatAdmissionProof"
+import { createChatPublicId } from "@/lib/chat-store/identity"
 import { WorkOS } from "@workos-inc/node"
 import { ConvexHttpClient } from "convex/browser"
 import { getConvexSize } from "convex/values"
@@ -120,10 +121,10 @@ async function main() {
   const createdChats: string[] = []
 
   async function createChat() {
-    const publicId = `read-limits-${randomUUID()}`
+    // A bare UUID like the app mints (ADR-0033); CHAT_TITLE marks the rows.
     const firstMessage = { clientMessageId: randomUUID(), text: "seed" }
     const created = await client.mutation(api.chats.createWithFirstTurn, {
-      publicId,
+      publicId: createChatPublicId(),
       title: CHAT_TITLE,
       message: firstMessage,
       attachmentIds: [],
@@ -250,8 +251,13 @@ async function main() {
     result.omittedToolOutputs = storedParts.filter((part) =>
       JSON.stringify(part).includes('"_truncated":true')
     ).length
+    // Field order is not preserved in storage, so compare the answer text.
+    const answerPart = storedParts.at(-1)
     result.answerIntact =
-      JSON.stringify(storedParts.at(-1)) === JSON.stringify(parts.at(-1))
+      typeof answerPart === "object" &&
+      answerPart !== null &&
+      "text" in answerPart &&
+      answerPart.text === answer.text
     return result
   }
 

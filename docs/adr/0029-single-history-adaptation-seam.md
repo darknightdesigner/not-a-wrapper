@@ -42,4 +42,6 @@ contract across every origin, target, and search-policy combination.
   layer already emits, so adapters replay it as ordinary tool output.
   Model-bound validation still passes: provider-executed parts are lowered to
   text first, no client tool declares an output schema, and the SDK validates
-  inputs only on pending calls, which the cap never touches.
+  inputs only on pending calls, which the cap never touches. A cut reasoning
+  part drops its provider metadata (Anthropic signature, OpenAI item id), so
+  replay skips it instead of sending edited text under the original signature.

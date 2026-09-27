@@ -127,10 +127,16 @@ export function capMessagePayload(
     part.type === type && typeof part.text === "string"
 
   compactOldestFirst(isToolPart, omitToolPayloads)
-  compactOldestFirst(isTextOf("reasoning"), (part) => ({
-    ...part,
-    text: truncateText(String(part.text), overBytes()),
-  }))
+  // Cut reasoning is no longer the provider's signed block, so it drops the
+  // signature (Anthropic) or item id (OpenAI) and replay skips it instead of
+  // sending edited text under the original signature.
+  compactOldestFirst(
+    isTextOf("reasoning"),
+    ({ providerMetadata: _signed, ...part }) => ({
+      ...part,
+      text: truncateText(String(part.text), overBytes()),
+    })
+  )
   if (overBytes() > 0) {
     content = extractTextFromMessageParts(next)
     contentBytes = getConvexSize(content)
