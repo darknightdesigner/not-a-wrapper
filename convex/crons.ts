@@ -15,12 +15,15 @@ import { REAPER_INTERVAL_MS } from "./domain/generation_run_liveness"
 // age-thresholded pass, never by lease logic.
 const crons = cronJobs()
 
-crons.interval(
-  "reap expired generation run leases",
-  { seconds: REAPER_INTERVAL_MS / 1000 },
-  internal.chatRuntime.reapExpiredGenerationRuns,
-  {}
-)
+// One cron per leased status: each sweep keeps its own checkpoint cursor.
+for (const status of ["running", "streaming"] as const) {
+  crons.interval(
+    `reap expired ${status} generation run leases`,
+    { seconds: REAPER_INTERVAL_MS / 1000 },
+    internal.chatRuntime.reapExpiredGenerationRuns,
+    { status }
+  )
+}
 
 crons.interval(
   "reap expired tool approvals",

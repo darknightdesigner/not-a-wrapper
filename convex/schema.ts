@@ -262,6 +262,9 @@ export default defineSchema({
     finishReason: v.optional(v.string()),
     inputTokens: v.optional(v.number()),
     outputTokens: v.optional(v.number()),
+    // Cache-read share of inputTokens, summed from usageSteps, so fallback
+    // settlement prices it at the pinned cache rate (ADR-0021).
+    cacheReadTokens: v.optional(v.number()),
     // Compatibility field written by the first cancellation-settlement
     // implementation. Current workers use usageSteps below because a scalar
     // high-water mark loses valid out-of-order writes.
@@ -275,6 +278,7 @@ export default defineSchema({
           stepNumber: v.number(),
           inputTokens: v.optional(v.number()),
           outputTokens: v.optional(v.number()),
+          cacheReadTokens: v.optional(v.number()),
         })
       )
     ),
@@ -361,6 +365,9 @@ export default defineSchema({
   reaperCheckpoints: defineTable({
     name: v.string(),
     cursor: v.optional(v.string()),
+    // An expiry sweep's pinned upper bound. The cursor is only valid for the
+    // range it came from, so the bound holds until the sweep finishes.
+    rangeEnd: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_name", ["name"]),
 
@@ -597,6 +604,7 @@ export default defineSchema({
     cancellationSettlementVersion: v.optional(v.literal(1)),
     observedInputTokens: v.optional(v.number()),
     observedOutputTokens: v.optional(v.number()),
+    observedCacheReadTokens: v.optional(v.number()),
     titleUsageEvidence: v.optional(vTitleTerminalUsageEvidence),
     pricingSnapshot: vPricingSnapshot,
     payloadFingerprint: v.string(),

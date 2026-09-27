@@ -1669,6 +1669,7 @@ export function createChatTurnRuntime(args: {
             usage: {
               inputTokens: usage?.inputTokens,
               outputTokens: usage?.outputTokens,
+              cacheReadTokens: usage?.inputTokenDetails?.cacheReadTokens,
             },
             toolCalls,
             toolResults,

@@ -70,9 +70,8 @@ blocked on invariant or storage failure, never auto-resumed). Phases:
    revokes its worker grant, and every pending approval is denied through the
    next turn's deny-pending path, which closes the paused run and settles its
    usage. One Chat per batch. This goes first because the lease and approval
-   reapers skip a deleted account's Chats and scan a fixed window from the
-   head of their ranges: live rows left behind a later blocked phase would
-   never drain and could starve the reapers for everyone.
+   reapers skip a deleted account's Chats: live rows left behind a later
+   blocked phase would never drain.
 2. `chats`: every owned Chat, one at a time, through the Chat phases, with
    its share link row (ADR-0043) deleted in the same commit, as in direct
    Chat deletion.
@@ -125,8 +124,10 @@ a 5xx and no data.
   checkpoint cursor.** Either removes the starvation risk for every job kind,
   but it changes the reapers' contract. Closing live work at the start of the
   drain keeps the reapers unchanged and matches direct Chat deletion, which
-  also closes live runs before anything can block. Project jobs keep the
-  older, narrower form of this risk.
+  also closes live runs before anything can block. Project jobs kept the
+  older, narrower form of this risk until the lease and approval reapers
+  moved to checkpoint cursors (2026-09-27), so no skipped row can hide the
+  rows behind it.
 - **Amend ADR-0014 only.** The rejected-account rule changes the ADR-0003
   builder contract and the bootstrap contract, which is more than a deletion
   policy, so it gets its own record.

@@ -6,13 +6,6 @@ mirror, so our account deletion never runs for that user. Keep the mirror
 complete with `workosAuth:backfillUsers` after any reset, run
 `users:deleteAccount` for a missed user (ADR-0044, docs/environment.md), and
 upstream a fix that still calls the app handler.
-- **Reapers can starve behind a blocked Project deletion job:**
-`reapExpiredGenerationRunsPass` and `reapExpiredToolApprovalsPass`
-(`convex/chatRuntime.ts`) read a fixed 25-row window with no cursor and skip
-inactive chats, so the live runs and approvals of a Project whose deletion job
-blocked stay at the head of the range forever. Page them with a
-`reaperCheckpoints` cursor like `reapResolvedApprovalPausesPass`, or close live
-work at the start of Project jobs as ADR-0044 does for account jobs.
 - **Guest limit follow-ups (ADR-0045):** Drop the vestigial guest `userId` from
 the chat wire contract and client builder, remove `anonymousUsage` from
 `convex/schema.ts` once production is drained, and add a trusted client-IP
@@ -268,12 +261,6 @@ on every Claude request (direct and through OpenRouter `anthropic/*`), covered
 by request-shaping tests but not yet seen on a real BYOK Claude turn. Send two
 turns in a long chat with a Claude key and check generation stats show cached
 input tokens.
-- **Durable cache-read evidence:** Failure, lease-expiry and deadline
-settlements still charge cached input at the full rate, because run step usage
-and reservations do not store the cache-read count. Add optional
-`cacheReadTokens` to `generationRuns.usageSteps`, the run totals and
-`usageReservations`, and feed it to the fallback settlement evidence
-(ADR-0021).
 - **OpenAI storage with hosted search:** OpenAI turns that pair hosted web
 search with Exa, content or MCP tools still keep response storage, because
 `@ai-sdk/openai` drops hosted search calls from later steps when `store` is
