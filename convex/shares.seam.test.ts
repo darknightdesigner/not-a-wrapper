@@ -165,7 +165,7 @@ describe("share links", () => {
     expect(JSON.stringify(view)).not.toMatch(/SECRET|owner@|workos_|gpt-5/)
   })
 
-  it("snapshot at share time, 404 on revoke, and a new id on re-share", async () => {
+  it("snapshot the path and title at share time, 404 on revoke, and a new id on re-share", async () => {
     vi.useFakeTimers()
     const t = makeT()
     const { chatId } = await seedChat(t, turn("first"))
@@ -175,11 +175,19 @@ describe("share links", () => {
         (message) => message.text
       ) ?? null
 
+    const title = async (shareId: string) =>
+      (await t.query(api.shares.getPublic, { shareId }))?.title
+
     const { shareId } = await owner.mutation(api.shares.publish, {
       chatId: CHAT,
     })
     await addMessages(t, chatId, ["later private turn"])
+    await owner.mutation(api.chats.updateTitle, {
+      chatId: CHAT,
+      title: "Later private title",
+    })
     expect(await texts(shareId)).toEqual(["first", "Re: first"])
+    expect(await title(shareId)).toBe("Calendar")
 
     // Sharing again moves the snapshot forward and keeps the link.
     await expect(
@@ -190,6 +198,7 @@ describe("share links", () => {
       "Re: first",
       "later private turn",
     ])
+    expect(await title(shareId)).toBe("Later private title")
 
     await owner.mutation(api.shares.revoke, { chatId: CHAT })
     expect(await texts(shareId)).toBeNull()

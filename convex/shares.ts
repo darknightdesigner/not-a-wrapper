@@ -29,8 +29,8 @@ async function findShareForChat(
 
 /**
  * Share the chat as it is now. Sharing again while a link exists moves its
- * snapshot to the current path and keeps its id; after a revoke the next
- * share mints a new id, so a revoked URL never comes back.
+ * snapshot (path and title) to the current chat and keeps its id; after a
+ * revoke the next share mints a new id, so a revoked URL never comes back.
  */
 export async function publishChatShare(
   ctx: MutationCtx,
@@ -40,20 +40,18 @@ export async function publishChatShare(
   if (!tail) throw new Error("Nothing to share")
 
   const now = Date.now()
+  const snapshot = { throughMessageId: tail._id, title: chat.title }
   const existing = await findShareForChat(ctx, chat._id)
   let shareId: string
   if (existing) {
     shareId = existing.shareId
-    await ctx.db.patch(existing._id, {
-      throughMessageId: tail._id,
-      updatedAt: now,
-    })
+    await ctx.db.patch(existing._id, { ...snapshot, updatedAt: now })
   } else {
     shareId = mintShareId()
     await ctx.db.insert("chatShares", {
       shareId,
       chatId: chat._id,
-      throughMessageId: tail._id,
+      ...snapshot,
       createdAt: now,
       updatedAt: now,
     })
@@ -109,7 +107,7 @@ export async function getSharedChatView(
     await listMessagesByChatOrder(ctx, chat._id),
     share.throughMessageId
   )
-  return path ? projectSharedChat(chat, path) : null
+  return path ? projectSharedChat(share, chat, path) : null
 }
 
 export const getPublic = query({

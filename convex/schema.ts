@@ -151,14 +151,16 @@ export default defineSchema({
     }),
 
   // A chat's share link (ADR-0043): at most one per chat. `shareId` is a
-  // random id, never the chat's publicId. The public view is the visible path
-  // ending at `throughMessageId` (the snapshot tail at share time), so turns
-  // sent later stay private until the owner shares again. Revoking deletes the
-  // row; the next share mints a new id.
+  // random id, never the chat's publicId. The public view is the snapshot
+  // taken at share time: `title` and the visible path ending at
+  // `throughMessageId`, so later turns and renames stay private until the
+  // owner shares again. Revoking deletes the row; the next share mints a new
+  // id.
   chatShares: defineTable({
     shareId: v.string(),
     chatId: v.id("chats"),
     throughMessageId: v.id("messages"),
+    title: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

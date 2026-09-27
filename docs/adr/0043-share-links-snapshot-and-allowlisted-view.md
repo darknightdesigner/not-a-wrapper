@@ -39,13 +39,17 @@ characters, no dashes) can never match a publicId. A chat has at most one
 row. The page is `/share/[shareId]`; the public read is `shares.getPublic`.
 
 **A snapshot, not a live view.** The row stores `throughMessageId`, the last
-visible selected message when the owner shared. The view is that message and
-its ancestors through the branch context's effective parents, so later turns,
-edits, regenerations, and branch switches never change what the link shows.
-The snapshot names messages, not a copy of their text: a tail that was still
-streaming finishes, as LibreChat's message references do. Sharing again while
-a link exists moves the tail to the current path and keeps the id; that is an
-explicit owner action, and a new id would break links already sent.
+visible selected message when the owner shared, and `title`, the chat title at
+that moment. The view is that message and its ancestors through the branch
+context's effective parents, under the stored title, so later turns, edits,
+regenerations, branch switches, and renames never change what the link or its
+Open Graph preview shows. The title is copied because it is live chat state:
+editing the first message regenerates it from text that was never shared
+(LibreChat also stores the title on the link). The messages are referenced,
+not copied: a tail that was still streaming finishes, as LibreChat's message
+references do. Sharing again while a link exists moves the tail and the title
+to the current chat and keeps the id; that is an explicit owner action, and a
+new id would break links already sent.
 
 **Revoke deletes the link.** `shares.revoke` deletes the row, so the URL is
 not found from that commit on. The next `shares.publish` mints a new id, so a
@@ -58,9 +62,9 @@ everyone else, so `chats.getById`, `messages.getSelectedPath`, and
 paths are gone; the selected path also fails closed for a non-owner viewer.
 
 **An allowlisted view.** `convex/domain/share_view.ts` builds the only shape
-a stranger receives: the chat title and creation time, and per message the
-role (user or assistant), the text (`content`, which holds only text parts),
-and web citations as `{ url, title }`. Citations come only from provider
+a stranger receives: the snapshot title, the chat's creation time, and per
+message the role (user or assistant), the text (`content`, which holds only
+text parts), and web citations as `{ url, title }`. Citations come only from provider
 `source-url` parts and the static web-search tools (`tool-web_search`,
 `tool-google_search`), and only with http or https URLs. A `dynamic-tool`
 part is an MCP call and never contributes, nor does any other tool output. No
@@ -120,6 +124,6 @@ and `shares.getPublic` replace them.
 - A stranger opening `/c/<publicId>` of a shared chat sees not found.
 - The share read costs the same full message read as the old public read.
 - Links shared before this change are not found.
-- Tests: `convex/shares.seam.test.ts` pins the allowlist, the snapshot, revoke
-  and re-share, deletion, and the owner-only private id;
+- Tests: `convex/shares.seam.test.ts` pins the allowlist, the snapshot (path
+  and title), revoke and re-share, deletion, and the owner-only private id;
   `accountLifecycle.seam.test.ts` pins the account drain of share rows.

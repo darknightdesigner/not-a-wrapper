@@ -123,6 +123,7 @@ function sharedSources(parts: unknown): SharedSource[] {
 }
 
 export function projectSharedChat(
+  share: Doc<"chatShares">,
   chat: Doc<"chats">,
   path: Doc<"messages">[]
 ): SharedChatView {
@@ -135,7 +136,8 @@ export function projectSharedChat(
     return [{ role: message.role, text: message.content, sources }]
   })
   return {
-    title: chat.title ?? null,
+    // The share-time title, never the live one (ADR-0043).
+    title: share.title ?? null,
     createdAt: chat._creationTime,
     messages,
   }

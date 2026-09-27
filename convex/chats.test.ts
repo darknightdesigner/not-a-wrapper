@@ -688,7 +688,7 @@ describe("markChatReadForOwner", () => {
     expect(chat.lastReadAt).toBeUndefined()
   })
 
-  it("no-ops for a chat the caller does not own (opening a public chat)", async () => {
+  it("no-ops for a chat the caller does not own, even a shared one", async () => {
     const owner = createUser("owner")
     const viewer = createUser("viewer")
     const chat = createChat({
