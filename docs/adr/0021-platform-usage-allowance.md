@@ -46,7 +46,9 @@ single Convex mutations (transactional, OCC-serialized).
   Settlement charges the provider-reported cache-read share of input at that
   rate and the rest at the input rate (a third component, `ceil` once); a
   missing rate or count falls back to the full input rate, and reservations
-  stay at the full rate. Only gpt-5-mini declares one today, on both of its
+  stay at the full rate. Each step's cache-read count is stored with its
+  usage on the run and mirrored onto the reservation, so failure, lease-expiry
+  and deadline settlements price it too. Only gpt-5-mini declares one today, on both of its
   routes: the direct record states it, and the generated OpenRouter route
   takes it from the snapshot's `pricing.input_cache_read` (ADR-0007), so the
   rate follows whichever route the platform tier picks. Cache writes are

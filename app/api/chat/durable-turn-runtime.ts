@@ -269,8 +269,13 @@ export type DurableStepRecord = {
    * durable settlement evidence, so abort/failure/reaper accounting does not
    * depend on the happy-path onEnd aggregate. Fired for EVERY step, tool
    * calls or not.
+   * The cache-read share lets fallback settlement price it at the cache rate.
    */
-  usage?: { inputTokens?: number; outputTokens?: number }
+  usage?: {
+    inputTokens?: number
+    outputTokens?: number
+    cacheReadTokens?: number
+  }
   toolCalls: ReadonlyArray<{
     toolCallId: string
     toolName: string
@@ -1904,6 +1909,9 @@ export function createConvexDurableTurn(args: {
                       usage: {
                         inputTokens: usage.inputTokens,
                         outputTokens: usage.outputTokens,
+                        ...(usage.cacheReadTokens !== undefined
+                          ? { cacheReadTokens: usage.cacheReadTokens }
+                          : {}),
                       },
                     }
                   : {}),

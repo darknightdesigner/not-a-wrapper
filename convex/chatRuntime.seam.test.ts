@@ -249,13 +249,59 @@ describe("reapExpiredGenerationRuns (index range semantics)", () => {
       leaseExpiresAt: Date.now() - 1,
     })
 
-    await t.mutation(internal.chatRuntime.reapExpiredGenerationRuns, {})
+    await t.mutation(internal.chatRuntime.reapExpiredGenerationRuns, {
+      status: "running",
+    })
 
     const [a, b] = await t.run((ctx) =>
       Promise.all([ctx.db.get(leaseless.runId), ctx.db.get(expired.runId)])
     )
     expect(a?.status).toBe("running")
     expect(b?.status).not.toBe("running")
+  })
+
+  it("reaches an expired run behind more skipped rows than one scan", async () => {
+    const t = makeT()
+    const owner = await seedOwner(t, OWNER, "chat-owned")
+    // A Chat whose deletion job owns its runs: the reaper skips them, and
+    // their older leases sort ahead of the live Chat's run.
+    await t.run(async (ctx) => {
+      const deletingChatId = await ctx.db.insert("chats", {
+        publicId: "chat-deleting",
+        userId: owner.userId,
+        public: false,
+        pinned: false,
+        updatedAt: 1,
+        deletingAt: 1,
+      })
+      for (let index = 0; index < 210; index++) {
+        await ctx.db.insert("generationRuns", {
+          chatId: deletingChatId,
+          userId: owner.userId,
+          requestId: `request_skipped_${index}`,
+          model: "gpt-5-mini",
+          provider: "openai",
+          status: "running",
+          leaseExpiresAt: 1 + index,
+          updatedAt: 1,
+        })
+      }
+    })
+    const expired = await seedRun(t, owner, {
+      status: "running",
+      leaseExpiresAt: Date.now() - 1,
+    })
+
+    const reap = () =>
+      t.mutation(internal.chatRuntime.reapExpiredGenerationRuns, {
+        status: "running",
+      })
+    // The first page is all skipped rows; the checkpoint moves past them.
+    expect(await reap()).toEqual({ reaped: 0 })
+    expect(await reap()).toEqual({ reaped: 1 })
+    expect(
+      (await t.run((ctx) => ctx.db.get(expired.runId)))?.status
+    ).toBe("failed")
   })
 })
 

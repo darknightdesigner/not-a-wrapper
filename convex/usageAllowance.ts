@@ -859,6 +859,7 @@ export async function deferUsageSettlementForTerminalRun(
     providerMayHaveStarted: true,
     observedInputTokens: run.inputTokens,
     observedOutputTokens: run.outputTokens,
+    observedCacheReadTokens: run.cacheReadTokens,
     titleUsageEvidence: run.titleUsageEvidence,
     terminalEstimatedOutputTokens,
     updatedAt: now,
@@ -872,6 +873,21 @@ export async function deferUsageSettlementForTerminalRun(
     terminalEstimatedOutputTokens,
   })
   return true
+}
+
+/**
+ * Cache-read share of the observed input, from the run's step sum or its
+ * mirror on the reservation, so fallback evidence prices it at the cache rate.
+ * Pricing clamps it to the input it belongs to.
+ */
+function observedCacheReadTokens(
+  run: Doc<"generationRuns"> | null,
+  reservation: Doc<"usageReservations"> | undefined
+): number {
+  return Math.max(
+    run?.cacheReadTokens ?? 0,
+    reservation?.observedCacheReadTokens ?? 0
+  )
 }
 
 /**
@@ -895,6 +911,7 @@ function upgradeEvidenceWithDurableUsage(
     run?.outputTokens ?? 0,
     reservation?.observedOutputTokens ?? 0
   )
+  const observedCacheRead = observedCacheReadTokens(run, reservation)
   let primary = evidence.primary
   if (primary.kind === "actual") {
     const inputTokens = Math.max(primary.inputTokens ?? 0, observedInput)
@@ -908,11 +925,21 @@ function upgradeEvidenceWithDurableUsage(
   } else if (primary.kind === "completed-steps") {
     const inputTokens = Math.max(primary.inputTokens ?? 0, observedInput)
     const outputTokens = Math.max(primary.outputTokens ?? 0, observedOutput)
+    const cacheReadTokens = Math.max(
+      primary.cacheReadTokens ?? 0,
+      observedCacheRead
+    )
     if (
       inputTokens !== (primary.inputTokens ?? 0) ||
-      outputTokens !== (primary.outputTokens ?? 0)
+      outputTokens !== (primary.outputTokens ?? 0) ||
+      cacheReadTokens !== (primary.cacheReadTokens ?? 0)
     ) {
-      primary = { ...primary, inputTokens, outputTokens }
+      primary = {
+        ...primary,
+        inputTokens,
+        outputTokens,
+        ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
+      }
     }
   } else if (
     primary.kind === "started-without-usage" ||
@@ -923,6 +950,9 @@ function upgradeEvidenceWithDurableUsage(
         kind: "completed-steps",
         inputTokens: observedInput,
         outputTokens: observedOutput,
+        ...(observedCacheRead > 0
+          ? { cacheReadTokens: observedCacheRead }
+          : {}),
         ...(evidence.primary.kind === "started-without-usage" &&
         evidence.primary.partialOutputTokens !== undefined
           ? { partialOutputTokens: evidence.primary.partialOutputTokens }
@@ -1067,11 +1097,13 @@ function terminalSettlementFallbackEvidence(
       { kind: "not-run" } as const
     )
   if (observedInput > 0 || observedOutput > 0) {
+    const cacheReadTokens = observedCacheReadTokens(run, reservation)
     return {
       primary: {
         kind: "completed-steps",
         inputTokens: observedInput,
         outputTokens: observedOutput,
+        ...(cacheReadTokens > 0 ? { cacheReadTokens } : {}),
         partialOutputTokens: reservation.terminalEstimatedOutputTokens,
       },
       title,
