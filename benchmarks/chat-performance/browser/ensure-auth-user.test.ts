@@ -1,3 +1,6 @@
+import { mkdtempSync, readFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { getPerfAuthPassword } from "./ensure-auth-user"
 
@@ -36,6 +39,11 @@ describe("benchmark identity isolation", () => {
     vi.stubEnv("PERF_AUTH_PASSWORD", "test-only-password")
     vi.stubEnv("WORKOS_API_KEY", "test-only-key")
     vi.stubEnv("WORKOS_CLIENT_ID", "test-only-client")
+    const usersFile = path.join(
+      mkdtempSync(path.join(tmpdir(), "perf-users-")),
+      "users.txt"
+    )
+    vi.stubEnv("PERF_CAPTURE_USERS_FILE", usersFile)
     vi.spyOn(console, "log").mockImplementation(() => {})
     vi.resetModules()
     const first = await import("./ensure-auth-user")
@@ -55,9 +63,9 @@ describe("benchmark identity isolation", () => {
     })
     expect(workosMocks.listUsers).not.toHaveBeenCalled()
     expect(workosMocks.updateUser).not.toHaveBeenCalled()
-    // The run deletes the user it created, once.
-    await first.releasePerfAuthUser()
-    await first.releasePerfAuthUser()
+    // The job's cleanup step deletes every recorded user once.
+    expect(readFileSync(usersFile, "utf8")).toBe("test-created-user\n")
+    await first.deleteRecordedCaptureUsers()
     expect(workosMocks.deleteUser).toHaveBeenCalledTimes(1)
     expect(workosMocks.deleteUser).toHaveBeenCalledWith("test-created-user")
     workosMocks.createUser.mockRejectedValueOnce(new Error("creation failed"))
@@ -85,7 +93,7 @@ describe("benchmark identity isolation", () => {
       password: "test-only-password",
     })
     expect(workosMocks.createUser).not.toHaveBeenCalled()
-    await local.releasePerfAuthUser()
+    await local.deleteRecordedCaptureUsers()
     expect(workosMocks.deleteUser).not.toHaveBeenCalled()
   })
 })

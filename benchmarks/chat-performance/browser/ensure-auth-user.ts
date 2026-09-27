@@ -2,9 +2,10 @@
  * Ensures the benchmark harness's WorkOS test user exists with a verified
  * email and a known password, using the WORKOS_API_KEY already present in
  * .env.local (bun auto-loads it). CI creates a fresh identity per harness
- * process so previous captures cannot change its sidebar or usage allowance,
- * and deletes it when the run ends (`releasePerfAuthUser`). Local
- * provisioning reuses the configured account and repairs its password.
+ * process so previous captures cannot change its sidebar or usage allowance.
+ * It records each one in PERF_CAPTURE_USERS_FILE, and the workflow's final
+ * always-run step deletes them however the job ends (`--delete-recorded`).
+ * Local provisioning reuses the configured account and repairs its password.
  *
  * The user lives in the SAME WorkOS environment as the app's dev client id,
  * so the harness's real /auth/login flow mints a genuine RS256 access token
@@ -14,6 +15,7 @@
  * required so this real account never receives a source-controlled password.
  */
 import { randomUUID } from "node:crypto"
+import { appendFileSync, existsSync, readFileSync } from "node:fs"
 import { WorkOS } from "@workos-inc/node"
 import { z } from "zod"
 
@@ -32,8 +34,7 @@ export const PERF_AUTH_EMAIL = isIsolatedCapture
   ? createCaptureEmail(configuredEmail)
   : configuredEmail
 
-// Set once this process creates its CI capture user, which it then owns.
-let releaseCaptureUser: (() => Promise<void>) | undefined
+const captureUsersFile = process.env.PERF_CAPTURE_USERS_FILE
 
 export function getPerfAuthPassword(): string {
   const password = process.env.PERF_AUTH_PASSWORD
@@ -67,7 +68,7 @@ export async function ensurePerfAuthUser(): Promise<void> {
       firstName: "Perf",
       lastName: "Harness",
     })
-    releaseCaptureUser = () => workos.userManagement.deleteUser(user.id)
+    if (captureUsersFile) appendFileSync(captureUsersFile, `${user.id}\n`)
     console.log("[ensure-auth-user] created isolated capture user")
     return
   }
@@ -107,24 +108,29 @@ export async function ensurePerfAuthUser(): Promise<void> {
 }
 
 /**
- * Deletes the CI capture user this process created, so runs leave no WorkOS
- * users behind. Call it once the run no longer needs the session. Local runs
- * reuse one account and keep it. Cleanup never fails a capture.
+ * Deletes every capture user this CI job recorded. A failed delete only warns,
+ * so cleanup never fails the job.
  */
-export async function releasePerfAuthUser(): Promise<void> {
-  const release = releaseCaptureUser
-  releaseCaptureUser = undefined
-  if (!release) return
-  try {
-    await release()
-    console.log("[ensure-auth-user] deleted isolated capture user")
-  } catch (error) {
-    console.warn("[ensure-auth-user] could not delete capture user", error)
+export async function deleteRecordedCaptureUsers(): Promise<void> {
+  if (!captureUsersFile || !existsSync(captureUsersFile)) return
+  const ids = new Set(readFileSync(captureUsersFile, "utf8").split("\n"))
+  ids.delete("")
+  const workos = new WorkOS(process.env.WORKOS_API_KEY)
+  for (const id of ids) {
+    try {
+      await workos.userManagement.deleteUser(id)
+      console.log("[ensure-auth-user] deleted capture user")
+    } catch (error) {
+      console.warn("[ensure-auth-user] could not delete capture user", error)
+    }
   }
 }
 
 if (import.meta.main) {
-  ensurePerfAuthUser().catch((error) => {
+  const task = process.argv.includes("--delete-recorded")
+    ? deleteRecordedCaptureUsers()
+    : ensurePerfAuthUser()
+  task.catch((error) => {
     console.error(error)
     process.exit(1)
   })
