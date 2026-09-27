@@ -42,19 +42,17 @@ from a field allowlist and serve files through a share-scoped path (LibreChat
 `share.ts` is the reference). Changes a contract, so record it in an ADR.
 Also mark share pages `noindex`
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#shared-chat-pages-can-be-indexed)).
-- **Convex document and read limits (verify first):** `parts` and `text` are
-both stored per message, and one `prepareGeneration` transaction re-reads the
-whole chat about five to eight times (`convex/chatRuntime.ts`,
-`message_branch_writes.ts`) while `convex/messages.ts` re-reads it on every
-streamed update. Convex caps a document at 1 MiB and a function at 16 MiB of
-reads, and only client-run tool results are capped (100 KB), so a 20-step tool
-turn can overflow a message and lose its tail, and a long branched chat may stop
-accepting messages. First reproduce with a synthetic long chat, including
-whether repeat reads of one document count toward the limit. Then read the chat
-once and pass it down, cap message size on the snapshot and completion writes,
-and consider moving tool payloads to their own rows (LobeHub `message_plugins`,
-Convex agent component per-step rows). Use `messages.by_chat_status` in
-`closeSupersededGenerationsForChat` instead of loading every assistant message.
+- **Convex read ceiling for very large chats:** `prepareGeneration` now reads a
+chat once per turn and each message is capped at 896 KiB (CONTEXT.md "Message
+payload cap"), so sends work up to about 16 MiB of messages (verified to 12 MiB
+on dev). `getSelectedPath` still reads every message, branches included, on
+every content beat per subscriber (ADR-0027 Experiment 2b), a send that
+supersedes a zombie run reads the chat twice (about 8 MiB ceiling), the project
+directory reads each chat's latest 12 messages and can pass 16 MiB with a few
+tool-heavy chats, and user messages over 1 MiB fail at prepare. When real chats
+approach this, move tool payloads to their own rows (LobeHub `message_plugins`,
+Convex agent component per-step rows). `bun scripts/convex-read-limits-smoke.ts
+--target-mib N` measures the ceiling against dev.
 - **Refresh mid-stream can freeze the answer:** `lib/chat-stream/resumable-chat.ts`
 drops replay updates that fail `hasVisiblePrefix` while status is already
 streaming, so Convex checkpoints are not shown either and the UI freezes until
@@ -487,8 +485,9 @@ or whether the exception itself should be removed for consistency. Record the
 decision in ADR-0016.
 - **Simplify message branch bookkeeping:** Every sibling carries `selected` and
 `branchIndex`, legacy parent inference is order-dependent
-(`convex/domain/message_branches.ts`), each write loads, plans, patches,
-reloads, and repairs (`message_branch_writes.ts`), and idempotency scans an
+(`convex/domain/message_branches.ts`), each write plans, patches, and repairs
+over one in-memory copy of the whole chat, read once per mutation
+(`message_branch_writes.ts`), and idempotency scans an
 unindexed `clientMessageId` in JS. ADR-0027 rejects an indexed path because of
 legacy chats, which no longer applies pre-launch. Decide on one
 `activeBranchIndex` pointer on the parent (LobeHub `models/message.ts`) plus a
