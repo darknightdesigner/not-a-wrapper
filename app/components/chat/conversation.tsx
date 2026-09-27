@@ -27,6 +27,7 @@ import {
   deriveConversationTimestampHeaders,
 } from "./conversation-timestamp"
 import { Message } from "./message"
+import { MessageRowBoundary } from "./message-row-boundary"
 import {
   THREAD_GUTTER_VARS,
   THREAD_MAXWIDTH_VARS,
@@ -572,16 +573,20 @@ export function Conversation({
             }
           }
 
+          // Outside Message so the memo contract is unchanged. A throw in the
+          // derivation above is not a row render; the shell boundary gets it.
           const messageContent = (
-            <Message
-              model={rowModel}
-              isReplaying={message.id === replayingMessageId}
-              onEdit={onEdit}
-              onEditingChange={handleEditingChange}
-              onReload={onReload}
-              onSelectBranch={onSelectBranch}
-              onQuote={onQuote}
-            />
+            <MessageRowBoundary model={rowModel}>
+              <Message
+                model={rowModel}
+                isReplaying={message.id === replayingMessageId}
+                onEdit={onEdit}
+                onEditingChange={handleEditingChange}
+                onReload={onReload}
+                onSelectBranch={onSelectBranch}
+                onQuote={onQuote}
+              />
+            </MessageRowBoundary>
           )
 
           const timestampHeader = timestampHeaders[index]

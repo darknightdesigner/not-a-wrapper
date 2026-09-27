@@ -82,6 +82,8 @@ vi.mock("@/components/ui/thinking-bar", () => ({
   ThinkingBar: () => <div data-testid="thinking" />,
 }))
 
+const UNRENDERABLE_TEXT = "Unrenderable answer"
+
 vi.mock("./message", () => ({
   Message: ({
     model,
@@ -100,32 +102,37 @@ vi.mock("./message", () => ({
     }
     onEditingChange?: (messageId: string, isEditing: boolean) => void
     onReload?: (messageId: string) => void
-  }) => (
-    <>
-      <button
-        data-can-reload={Boolean(onReload)}
-        data-finish-reason={model.finishReason}
-        data-reasoning-phase={model.view?.reasoning?.phase}
-        data-retry-disabled={Boolean(model.retryDisabled)}
-        data-status={model.status}
-        data-testid={`message-${model.id}`}
-        disabled={model.retryDisabled}
-        onClick={() => onReload?.(model.id)}
-        type="button"
-      >
-        {model.text}
-      </button>
-      {model.kind === "user" ? (
+  }) => {
+    if (model.text === UNRENDERABLE_TEXT) throw new Error("row render failed")
+    return (
+      <>
         <button
-          data-testid={`toggle-edit-${model.id}`}
-          onClick={() => onEditingChange?.(model.id, !Boolean(model.isEditing))}
+          data-can-reload={Boolean(onReload)}
+          data-finish-reason={model.finishReason}
+          data-reasoning-phase={model.view?.reasoning?.phase}
+          data-retry-disabled={Boolean(model.retryDisabled)}
+          data-status={model.status}
+          data-testid={`message-${model.id}`}
+          disabled={model.retryDisabled}
+          onClick={() => onReload?.(model.id)}
           type="button"
         >
-          Toggle edit
+          {model.text}
         </button>
-      ) : null}
-    </>
-  ),
+        {model.kind === "user" ? (
+          <button
+            data-testid={`toggle-edit-${model.id}`}
+            onClick={() =>
+              onEditingChange?.(model.id, !Boolean(model.isEditing))
+            }
+            type="button"
+          >
+            Toggle edit
+          </button>
+        ) : null}
+      </>
+    )
+  },
 }))
 
 beforeAll(() => {
@@ -237,6 +244,39 @@ describe("Conversation recovered turn contracts", () => {
 
     render(undefined, "chat-a")
     expect(editing()).toBe(false)
+  })
+
+  it("contains a row render failure to that row", () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined)
+    container = document.createElement("div")
+    document.body.append(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(
+        <Conversation
+          messages={[
+            messages[0],
+            {
+              id: "assistant-1",
+              role: "assistant",
+              parts: [{ type: "text", text: UNRENDERABLE_TEXT }],
+            },
+          ]}
+          onEdit={vi.fn()}
+          onReload={vi.fn()}
+        />
+      )
+    })
+    consoleError.mockRestore()
+
+    const failedRow = container.querySelector('[data-turn="assistant"]')
+    expect(container.querySelector('[data-testid="message-user-1"]')).not.toBe(
+      null
+    )
+    expect(failedRow?.querySelector('[role="alert"]')).not.toBeNull()
+    expect(failedRow?.textContent).toContain(UNRENDERABLE_TEXT)
   })
 
   it("preserves assistant deep-link sentinels", () => {
