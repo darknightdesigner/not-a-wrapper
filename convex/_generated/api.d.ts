@@ -38,6 +38,7 @@ import type * as lib_chatAdmissionProof from "../lib/chatAdmissionProof.js";
 import type * as lib_messageMetadata from "../lib/messageMetadata.js";
 import type * as lib_reasoningEffort from "../lib/reasoningEffort.js";
 import type * as lib_runTimingReceipt from "../lib/runTimingReceipt.js";
+import type * as lib_serverCallProof from "../lib/serverCallProof.js";
 import type * as lib_sha256 from "../lib/sha256.js";
 import type * as lib_usageReservationAuthorization from "../lib/usageReservationAuthorization.js";
 import type * as lib_usageValidators from "../lib/usageValidators.js";
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   "lib/messageMetadata": typeof lib_messageMetadata;
   "lib/reasoningEffort": typeof lib_reasoningEffort;
   "lib/runTimingReceipt": typeof lib_runTimingReceipt;
+  "lib/serverCallProof": typeof lib_serverCallProof;
   "lib/sha256": typeof lib_sha256;
   "lib/usageReservationAuthorization": typeof lib_usageReservationAuthorization;
   "lib/usageValidators": typeof lib_usageValidators;
