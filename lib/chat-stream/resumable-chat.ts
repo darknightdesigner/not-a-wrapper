@@ -532,15 +532,14 @@ export class ResumableChat extends Chat<UIMessage> {
           return
         } catch {
           if (signal.aborted) return
+          // Checkpoints stay visible while the replay service is unavailable.
+          this.setStatus({ status: "ready" })
           // A woken page replaces its possibly dead connection at once. The
           // attempt still counts, so repeated wakes cannot defeat the fallback.
           if (woken) {
-            if (++failures < 5) continue
-            this.setStatus({ status: "ready" })
-            return
+            if (++failures >= 5) return
+            continue
           }
-          // Checkpoints stay visible while the replay service is unavailable.
-          this.setStatus({ status: "ready" })
           // A missing log or a route that never delivers, stalls included,
           // falls back instead of polling all turn.
           if (++failures >= 5) return
