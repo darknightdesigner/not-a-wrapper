@@ -194,6 +194,13 @@ bunx convex run workosAuth:backfillUsers        # dev
 bunx convex run --prod workosAuth:backfillUsers # production
 ```
 
+A skipped `user.deleted` also skips the app's account deletion (ADR-0044).
+Apply it by hand for a user WorkOS already deleted:
+
+```bash
+bunx convex run users:deleteAccount '{"workosUserId":"user_..."}'
+```
+
 ```bash
 bunx convex env set WORKOS_WEBHOOK_SECRET "<secret>"
 ```

@@ -1,4 +1,4 @@
-import { internalServerError } from "@/app/api/_lib/convex"
+import { routeFailureResponse } from "@/app/api/_lib/convex"
 import { getWorkosSession } from "@/lib/auth/workos"
 import { resolveGuestIdentity } from "@/lib/guest-identity"
 import { getMessageUsage } from "./api"
@@ -18,6 +18,6 @@ export async function GET(req: Request) {
     return new Response(JSON.stringify(usage), { status: 200 })
   } catch (err: unknown) {
     console.error("Error in /api/rate-limits:", err)
-    return internalServerError()
+    return routeFailureResponse(err)
   }
 }

@@ -84,9 +84,15 @@ policy (10/min/user; each call opens an outbound socket), returning 429 +
 `next.config.ts` now sets baseline security headers on every route: a scoped CSP
 (`connect-src` limited to the env-derived Convex https/wss origins + PostHog;
 Sentry is same-origin via its `/monitoring` tunnel; `frame-ancestors 'none'`,
-`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`; `img-src https:`
-since images are inert), plus `X-Content-Type-Options`, `X-Frame-Options: DENY`,
-`Referrer-Policy`, `Permissions-Policy`, and (production only) HSTS.
+`object-src 'none'`, `base-uri 'self'`, `form-action 'self'`), plus
+`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+`Permissions-Policy`, and (production only) HSTS.
+
+Amended 2026-09-27: `img-src` was `https:` on the belief that images are inert.
+They are not: loading a model-authored image URL sends whatever it encodes to
+its host with no click, so prompt injection could leak a chat. Markdown now
+renders images as links, and `img-src` lists only the hosts the app itself
+loads (`'self'`, `data:`, `blob:`, the env-derived Convex origin).
 
 ### AAD-bound, versioned BYOK envelope (`lib/encryption.ts`)
 

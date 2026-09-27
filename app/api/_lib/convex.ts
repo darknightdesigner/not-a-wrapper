@@ -1,4 +1,5 @@
 import "server-only"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import { ConvexHttpClient } from "convex/browser"
 import { NextResponse } from "next/server"
 
@@ -29,4 +30,19 @@ export function unauthorizedError() {
 
 export function internalServerError() {
   return jsonError("Internal server error", 500)
+}
+
+/** A deleted or disabled account whose session is still valid (ADR-0044). */
+export function accountRejectedError() {
+  return NextResponse.json(
+    { error: "This account is no longer active.", code: "ACCOUNT_REJECTED" },
+    { status: 403 }
+  )
+}
+
+/** A route's failed Convex work: the typed 403 for a rejected account, else 500. */
+export function routeFailureResponse(error: unknown) {
+  return isAccountRejectedError(error)
+    ? accountRejectedError()
+    : internalServerError()
 }

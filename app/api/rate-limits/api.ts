@@ -1,4 +1,5 @@
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import {
   signServerCallProof,
   type GuestActor,
@@ -55,6 +56,8 @@ export async function getMessageUsage(actor: UsageActor): Promise<UsageResult> {
   try {
     return await readUsage(actor)
   } catch (error) {
+    // A rejected account is refused, never shown default usage (ADR-0044).
+    if (isAccountRejectedError(error)) throw error
     console.error("Error fetching usage from Convex:", error)
     // A hint only: /api/chat admission is the enforcing, fail-closed gate, so
     // a failed lookup must not block the send that admission will judge.

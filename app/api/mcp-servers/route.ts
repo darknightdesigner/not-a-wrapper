@@ -1,5 +1,5 @@
 import { authenticatedRoute } from "@/app/api/_lib/authenticated-route"
-import { internalServerError, jsonError } from "@/app/api/_lib/convex"
+import { jsonError, routeFailureResponse } from "@/app/api/_lib/convex"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { encryptSecret } from "@/lib/encryption"
@@ -59,7 +59,7 @@ export const POST = authenticatedRoute(async (request, { session, convex }) => {
     return NextResponse.json({ success: true, serverId })
   } catch (error) {
     console.error("Error in POST /api/mcp-servers:", error)
-    return internalServerError()
+    return routeFailureResponse(error)
   }
 })
 
@@ -146,7 +146,7 @@ export const PATCH = authenticatedRoute(
       return NextResponse.json({ success: true })
     } catch (error) {
       console.error("Error in PATCH /api/mcp-servers:", error)
-      return internalServerError()
+      return routeFailureResponse(error)
     }
   }
 )

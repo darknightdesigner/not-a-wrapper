@@ -6,6 +6,7 @@ import {
 } from "../lib/file/policy"
 import type { Doc, Id } from "./_generated/dataModel"
 import { internalMutation, type MutationCtx } from "./_generated/server"
+import { isRejectedAccount } from "./lib/auth"
 import {
   authenticatedMutation,
   identityMutation,
@@ -13,7 +14,10 @@ import {
   maybeAuthMutation,
   maybeAuthQuery,
 } from "./lib/authedFunctions"
-import { upsertAppUserFromWorkOS } from "./userSync"
+import {
+  insertAppUserFromIdentity,
+  softDeleteAppUserFromWorkOS,
+} from "./userSync"
 
 export function isProfileImageMetadataValid(
   metadata: { size: number; contentType?: string | null } | null,
@@ -67,11 +71,7 @@ export const getByWorkosUserId = identityQuery({
     if (ctx.identity.subject !== workosUserId) {
       throw new Error("Cannot read a different user")
     }
-
-    return await ctx.db
-      .query("users")
-      .withIndex("by_workos_user_id", (q) => q.eq("workosUserId", workosUserId))
-      .unique()
+    return ctx.user
   },
 })
 
@@ -81,36 +81,27 @@ export const getCurrent = maybeAuthQuery({
 })
 
 /**
- * Create or update user from the authenticated WorkOS session. Self-identity-
- * match on a bootstrap path: the user row may not exist yet, so this resolves
- * the identity rather than an existing user.
+ * Insert-only bootstrap for a signed-in caller whose row does not exist yet
+ * (the verified webhook has not arrived). Takes nothing from the browser:
+ * identity and any profile claims come from the verified access token. An
+ * existing row is returned untouched, and a deleted or disabled row is
+ * rejected by the builder, so this can never clear lifecycle flags or
+ * resurrect a tombstone (ADR-0044).
  */
-export const createOrUpdate = identityMutation({
-  args: {
-    workosUserId: v.string(),
-    email: v.string(),
-    firstName: v.optional(v.string()),
-    lastName: v.optional(v.string()),
-    displayName: v.optional(v.string()),
-    profileImage: v.optional(v.string()),
-    workosUpdatedAt: v.optional(v.string()),
-  },
-  handler: async (ctx, args) => {
-    if (ctx.identity.subject !== args.workosUserId) {
-      throw new Error("Cannot sync a different user")
-    }
+export const ensureCurrent = identityMutation({
+  args: {},
+  handler: async (ctx) =>
+    ctx.user?._id ?? (await insertAppUserFromIdentity(ctx, ctx.identity)),
+})
 
-    return await upsertAppUserFromWorkOS(ctx, {
-      workosUserId: args.workosUserId,
-      email: args.email,
-      firstName: args.firstName,
-      lastName: args.lastName,
-      displayName: args.displayName,
-      profileImage: args.profileImage,
-      workosUpdatedAt: args.workosUpdatedAt,
-      markActive: true,
-    })
-  },
+/**
+ * Operator account deletion, for accounts WorkOS deleted without our webhook
+ * handler running. Same path as the verified `user.deleted` event.
+ */
+export const deleteAccount = internalMutation({
+  args: { workosUserId: v.string() },
+  handler: async (ctx, { workosUserId }) =>
+    await softDeleteAppUserFromWorkOS(ctx, { workosUserId }),
 })
 
 export const updateLastActive = maybeAuthMutation({
@@ -171,6 +162,8 @@ export const commitUploadedProfileImage = internalMutation({
       .withIndex("by_workos_user_id", (q) => q.eq("workosUserId", workosUserId))
       .unique()
     if (!user) throw new Error("User not found")
+    // The HTTP action checked only the identity; the row decides.
+    if (isRejectedAccount(user)) throw new Error("Account rejected")
 
     return await commitProfileImageHandler(
       { ...ctx, user },

