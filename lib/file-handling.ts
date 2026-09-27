@@ -1,3 +1,7 @@
+import {
+  ATTACHMENT_NAME_HEADER,
+  DAILY_FILE_LIMIT_CODE,
+} from "@/lib/file/policy"
 import type { ConvexReactClient } from "convex/react"
 
 export { ACCEPTED_FILE_PICKER_TYPES, validateFile } from "@/lib/file/validation"
@@ -21,17 +25,32 @@ export type UploadFileOptions = {
   uploadBinary?: typeof uploadBinaryWithProgress
 }
 
+/** An upload target from `files.generateUploadUrl`, bound to its caller. */
+export type AttachmentUploadTarget = { url: string; ticket: string }
+
+/**
+ * Upload one file to the attachment upload action, which stores and stages it
+ * in one request (ADR-0046). Resolves its attachment id, or null when the
+ * server refuses it over the daily limit. A cancel after the body is sent
+ * no longer aborts: the server stages the file anyway, so the id still
+ * resolves and the caller releases it.
+ */
 export function uploadBinaryWithProgress(
-  uploadUrl: string,
+  target: AttachmentUploadTarget,
   file: File,
   options: Pick<UploadFileOptions, "signal" | "onProgress"> = {}
-): Promise<string> {
+): Promise<string | null> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    const abort = () => xhr.abort()
+    let bodySent = false
+    const abort = () => {
+      if (!bodySent) xhr.abort()
+    }
 
-    xhr.open("POST", uploadUrl)
+    xhr.open("POST", target.url)
+    xhr.setRequestHeader("Authorization", `Bearer ${target.ticket}`)
     xhr.setRequestHeader("Content-Type", file.type)
+    xhr.setRequestHeader(ATTACHMENT_NAME_HEADER, encodeURIComponent(file.name))
     xhr.responseType = "json"
     xhr.upload.addEventListener("progress", (event) => {
       if (!event.lengthComputable || event.total <= 0) return
@@ -41,18 +60,32 @@ export function uploadBinaryWithProgress(
         percent: Math.min(100, Math.round((event.loaded / event.total) * 100)),
       })
     })
+    xhr.upload.addEventListener("load", () => {
+      bodySent = true
+    })
     xhr.addEventListener("load", () => {
       options.signal?.removeEventListener("abort", abort)
+      const response = xhr.response as {
+        attachmentId?: unknown
+        code?: unknown
+      } | null
+      if (xhr.status === 429 && response?.code === DAILY_FILE_LIMIT_CODE) {
+        resolve(null)
+        return
+      }
+      if (xhr.status === 429) {
+        reject(new Error("Too many uploads. Try again in a minute."))
+        return
+      }
       if (xhr.status < 200 || xhr.status >= 300) {
         reject(new Error(`Failed to upload file (${xhr.status})`))
         return
       }
-      const response = xhr.response as { storageId?: unknown } | null
-      if (!response || typeof response.storageId !== "string") {
-        reject(new Error("Upload response did not include a storage id"))
+      if (!response || typeof response.attachmentId !== "string") {
+        reject(new Error("Upload response did not include an attachment id"))
         return
       }
-      resolve(response.storageId)
+      resolve(response.attachmentId)
     })
     xhr.addEventListener("error", () => {
       options.signal?.removeEventListener("abort", abort)
@@ -80,25 +113,18 @@ export async function uploadStagedFile(
   // Dynamic import avoids the file/Convex API cycle.
   const { api } = await import("@/convex/_generated/api")
 
-  const uploadUrl = await convex.mutation(api.files.generateUploadUrl, {})
-  if (!uploadUrl) {
+  const target = await convex.mutation(api.files.generateUploadUrl, {})
+  if (!target) {
     throw new FileUploadLimitError("Daily file upload limit reached.")
   }
 
-  const storageId = await (options.uploadBinary ?? uploadBinaryWithProgress)(
-    uploadUrl,
+  // Staging is owner-bound but deliberately independent of a chat. The
+  // server stages the file it stored, so the browser never names a blob.
+  const attachmentId = await (options.uploadBinary ?? uploadBinaryWithProgress)(
+    target,
     file,
     options
   )
-
-  // Staging is owner-bound but deliberately independent of a chat.
-  const attachmentId = await convex.mutation(api.files.saveStagedAttachment, {
-    storageId:
-      storageId as unknown as typeof api.files.saveStagedAttachment._args.storageId,
-    fileName: file.name,
-    fileType: file.type,
-    fileSize: file.size,
-  })
   if (!attachmentId) {
     throw new FileUploadLimitError("Daily file upload limit reached.")
   }
@@ -139,7 +165,7 @@ export class FileUploadLimitError extends Error {
   code: string
   constructor(message: string) {
     super(message)
-    this.code = "DAILY_FILE_LIMIT_REACHED"
+    this.code = DAILY_FILE_LIMIT_CODE
   }
 }
 

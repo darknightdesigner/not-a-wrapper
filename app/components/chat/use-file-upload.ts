@@ -98,6 +98,8 @@ export const useFilePickerState = ({
         .then(({ fileUrl, attachmentId }) => {
           const active = activeUploadsRef.current.get(attachment.id)
           if (!active || active.attemptId !== attemptId) {
+            // Cancelled after its body was sent: release the staged row and
+            // its daily slot.
             void deleteUploadedAttachment(convex, attachmentId)
             return
           }

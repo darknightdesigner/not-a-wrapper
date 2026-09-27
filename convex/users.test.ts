@@ -5,6 +5,8 @@ import { commitProfileImageHandler, isProfileImageMetadataValid } from "./users"
 const userId = "user-1" as Id<"users">
 const storageId = "storage-new" as Id<"_storage">
 const previousStorageId = "storage-old" as Id<"_storage">
+// No attachment or other profile image references either blob.
+const unreferenced = () => ({ withIndex: () => ({ take: async () => [] }) })
 
 describe("profile image validation", () => {
   it("accepts supported images with matching stored metadata", () => {
@@ -48,6 +50,7 @@ describe("profile image validation", () => {
       user,
       db: {
         patch,
+        query: unreferenced,
         system: {
           get: vi.fn().mockResolvedValue({
             size: 42,
@@ -71,7 +74,7 @@ describe("profile image validation", () => {
     expect(deleteStoredFile).toHaveBeenCalledWith(previousStorageId)
   })
 
-  it("does not persist or delete caller-supplied invalid storage", async () => {
+  it("does not persist or delete invalid storage", async () => {
     const patch = vi.fn()
     const deleteStoredFile = vi.fn()
     const ctx = {
@@ -81,6 +84,7 @@ describe("profile image validation", () => {
       },
       db: {
         patch,
+        query: unreferenced,
         system: {
           get: vi.fn().mockResolvedValue({
             size: 42,

@@ -139,6 +139,10 @@ function createHarness(
 
   const ctx = {
     db: {
+      system: {
+        get: async (_table: "_storage", id: Id<"_storage">) =>
+          deletedStorageIds.includes(id) ? null : { _id: id },
+      },
       get: async (id: string) => find(id)?.document ?? null,
       insert: async (
         tableName: TableName,
@@ -326,7 +330,8 @@ function activeJob(harness: ReturnType<typeof createHarness>) {
 
 describe("asynchronous Chat deletion", () => {
   it("drains the full graph, deletes exclusive storage, and preserves shared data", async () => {
-    const owner = user()
+    const avatarStorage = asId<"_storage">("storage-avatar")
+    const owner = { ...user(), profileImageStorageId: avatarStorage }
     const chatDoc = chat("chat-1")
     const otherChat = chat("chat-2")
     const exclusiveStorage = asId<"_storage">("storage-exclusive")
@@ -359,6 +364,11 @@ describe("asynchronous Chat deletion", () => {
         row("shared-survivor", {
           chatId: otherChat._id,
           storageId: sharedStorage,
+        }),
+        // A legacy row that claimed the owner's profile image blob.
+        row("avatar-attachment", {
+          chatId: chatDoc._id,
+          storageId: avatarStorage,
         }),
       ],
     })

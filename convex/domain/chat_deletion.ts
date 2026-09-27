@@ -20,6 +20,7 @@ import {
   isSupersedableGenerationRunStatus,
   SUPERSEDABLE_RUN_STATUSES,
 } from "./generation_run_lifecycle"
+import { deleteStorageIfUnreferenced } from "./storage_refs"
 
 export const DELETION_PHASES = [
   "toolInvocations",
@@ -27,7 +28,7 @@ export const DELETION_PHASES = [
   "toolCallLog",
   "messages",
   "generationRuns",
-  "attachments", // includes stored-file reference handling
+  "attachments", // blobs follow the shared reference rule (storage_refs)
   "chatRoot",
 ] as const
 // Project jobs: phase "chats" (drain linked chats through the phases above,
@@ -163,18 +164,8 @@ async function deleteRow(
   progress.bytesObserved += getConvexSize(row as unknown as Value)
 }
 
-function isMissingStorageError(error: unknown): boolean {
-  if (!(error instanceof Error)) return false
-  const message = error.message.toLowerCase()
-  return (
-    message.includes("not found") ||
-    message.includes("does not exist") ||
-    message.includes("already deleted")
-  )
-}
-
-// Deletes each row and its stored file, unless another attachment still
-// references the same blob (in-transaction by_storage exclusivity check).
+// Deletes each row and its stored file, unless another attachment or a
+// profile image still references the same blob.
 async function deleteAttachmentPage(
   ctx: ChatDeletionCtx,
   attachments: Doc<"chatAttachments">[],
@@ -182,33 +173,23 @@ async function deleteAttachmentPage(
 ): Promise<void> {
   for (const attachment of attachments) {
     if (attachment.storageId) {
-      const references = await ctx.db
-        .query("chatAttachments")
-        .withIndex("by_storage", (q) =>
-          q.eq("storageId", attachment.storageId)
-        )
-        .take(2)
-      if (
-        references.length === 1 &&
-        references[0]?._id === attachment._id
-      ) {
-        await deleteStoredFile(ctx, attachment.storageId)
-      }
+      await deleteStoredFile(ctx, attachment.storageId, attachment._id)
     }
     await deleteRow(ctx, attachment, progress)
   }
 }
 
+// Blob before its reference: a batch that fails here commits as blocked with
+// the reference intact, so the resumed job retries instead of orphaning it.
 async function deleteStoredFile(
   ctx: ChatDeletionCtx,
-  storageId: Id<"_storage">
+  storageId: Id<"_storage">,
+  releasing: Id<"chatAttachments"> | Id<"users">
 ): Promise<void> {
   try {
-    await ctx.storage.delete(storageId)
-  } catch (error) {
-    if (!isMissingStorageError(error)) {
-      throw new DeletionFailure("storage_delete_failed")
-    }
+    await deleteStorageIfUnreferenced(ctx, storageId, releasing)
+  } catch {
+    throw new DeletionFailure("storage_delete_failed")
   }
 }
 
@@ -507,15 +488,8 @@ async function runAccountBatch(
   }
 
   invariant(phase === "accountRoot")
-  const profileImageStorageId = account.profileImageStorageId
-  if (profileImageStorageId) {
-    const sharedWithAttachment = await ctx.db
-      .query("chatAttachments")
-      .withIndex("by_storage", (q) => q.eq("storageId", profileImageStorageId))
-      .first()
-    if (!sharedWithAttachment) {
-      await deleteStoredFile(ctx, profileImageStorageId)
-    }
+  if (account.profileImageStorageId) {
+    await deleteStoredFile(ctx, account.profileImageStorageId, account._id)
   }
   await ctx.db.patch(account._id, ACCOUNT_TOMBSTONE_SCRUB)
   return { phase, complete: true }

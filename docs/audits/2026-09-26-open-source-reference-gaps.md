@@ -3832,8 +3832,8 @@ bug.
 **Notes.** Try one upload just under the new cap on a preview deploy to
 confirm it passes. `convex/users.ts:22` also checks stored metadata against
 `MAX_FILE_SIZE`. It can stay at 10 MB, since it does not cause the bug.
-Uploading straight to Convex storage, as chat attachments already do
-(`lib/file-handling.ts:75-92`), would remove the Vercel hop entirely. That is a
+Uploading straight to Convex, as chat attachments now do through the
+ticketed `/attachments` HTTP action (ADR-0046), would remove the Vercel hop entirely. That is a
 bigger change, because the route exists so the server can attach the WorkOS
 access token (`app/api/profile-image/route.ts:73-80`). "Images are never
 resized" covers chat attachments, not this path, and "Every send uploads the
