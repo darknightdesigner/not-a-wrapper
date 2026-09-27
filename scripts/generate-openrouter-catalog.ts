@@ -55,7 +55,11 @@ export type OpenRouterSnapshotModel = {
   expiration_date: string | null
   context_length: number
   top_provider: { max_completion_tokens: number | null }
-  pricing: { prompt: string; completion: string }
+  /**
+   * Per-token USD decimal strings. `input_cache_read` is the prompt-cache
+   * read price, present only when OpenRouter publishes one for the model.
+   */
+  pricing: { prompt: string; completion: string; input_cache_read?: string }
   supported_parameters: string[]
   architecture: { input_modalities: string[] }
   /**
@@ -84,7 +88,7 @@ type OpenRouterLiveModel = {
   expiration_date?: string | null
   context_length: number
   top_provider?: { max_completion_tokens?: number | null }
-  pricing?: { prompt?: string; completion?: string }
+  pricing?: { prompt?: string; completion?: string; input_cache_read?: string }
   supported_parameters?: string[]
   architecture?: { input_modalities?: string[] }
   reasoning?: {
@@ -183,6 +187,9 @@ export function buildSnapshot(
       pricing: {
         prompt: live.pricing?.prompt ?? "0",
         completion: live.pricing?.completion ?? "0",
+        ...(typeof live.pricing?.input_cache_read === "string"
+          ? { input_cache_read: live.pricing.input_cache_read }
+          : {}),
       },
       supported_parameters: [...(live.supported_parameters ?? [])].sort(),
       architecture: {
@@ -354,6 +361,15 @@ export function buildModelConfig(
     ...(maxCompletionTokens == null ? {} : { maxOutput: maxCompletionTokens }),
     inputCost: pricePerMillionTokens(snapshotModel.pricing.prompt),
     outputCost: pricePerMillionTokens(snapshotModel.pricing.completion),
+    // Cache reads settle at this rate (ADR-0021); without it the allowance
+    // bills cached input at `inputCost`.
+    ...(snapshotModel.pricing.input_cache_read === undefined
+      ? {}
+      : {
+          cachedInputCost: pricePerMillionTokens(
+            snapshotModel.pricing.input_cache_read
+          ),
+        }),
     priceUnit: "per 1M tokens",
     vision: snapshotModel.architecture.input_modalities.includes("image"),
     tools: snapshotModel.supported_parameters.includes("tools"),

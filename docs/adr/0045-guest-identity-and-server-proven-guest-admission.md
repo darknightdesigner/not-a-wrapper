@@ -191,5 +191,6 @@ own continuation.
   it, and a later change removes it from the schema once production is empty.
 - The wire contract still requires a guest `userId`; it is now vestigial and
   can be dropped with the client builder.
-- Follow-ups: per-request provider `safetyIdentifier` for guests can hash the
-  trusted `anonymousId`; Vercel BotID can sit in front of guest admission.
+- Provider attribution for guests hashes the trusted `anonymousId` (ADR-0021,
+  "Provider retention and attribution").
+- Follow-up: Vercel BotID can sit in front of guest admission.

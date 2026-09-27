@@ -1,6 +1,7 @@
 import { ANTHROPIC_BETA_HEADERS } from "@/lib/config"
 import type { ModelConfig, ModelReasoningEffort } from "@/lib/models/types"
 import { clampToNearestEffortLevel } from "@/lib/models/types"
+import type { Provider } from "@/lib/provider-identity"
 import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fixedThinkingBudgetTokens } from "./output-budget"
 
@@ -8,8 +9,9 @@ import { fixedThinkingBudgetTokens } from "./output-budget"
  * Request shaping (CONTEXT.md): everything provider-specific about issuing
  * one model request, resolved from the model config plus request context —
  * provider options (thinking/reasoning configuration, per-model thinking
- * budgets) and provider beta headers. Callers spread the result into
- * streamText and never branch on provider.
+ * budgets, response storage, actor attribution, prompt caching) and provider
+ * beta headers. Callers spread the result into streamText and never branch
+ * on provider.
  */
 
 export type RequestShapingContext = {
@@ -18,10 +20,21 @@ export type RequestShapingContext = {
   /** The request carries any tools at all (any Tool layer). */
   hasTools: boolean
   /**
+   * The request offers tools the app executes (Exa, content, MCP), beyond
+   * provider-hosted search, so the model can take a later step.
+   */
+  appToolsActive: boolean
+  /**
    * Optional per-turn wire override (ADR-0026), already clamped to a level
    * this route's provider accepts. Absent means send no effort override.
    */
   wireReasoningEffort?: ModelReasoningEffort
+  /**
+   * Opaque per-actor id for provider abuse attribution (ADR-0021), from
+   * `deriveProviderSafetyIdentifier` (signed-in users and signed-cookie
+   * guests). Absent sends none.
+   */
+  safetyIdentifier?: string
 }
 
 function usesFixedBudgetSearchThinking(
@@ -88,9 +101,97 @@ export function shapeRequest(
   ctx: RequestShapingContext
 ): ShapedRequest {
   return {
-    providerOptions: resolveProviderOptions(modelConfig, ctx),
+    providerOptions: mergeProviderOptions(
+      resolveReasoningOptions(modelConfig, ctx),
+      resolveRequestPolicyOptions(modelConfig.providerId, ctx),
+      resolvePromptCachingOptions(modelConfig)
+    ),
     headers: resolveHeaders(modelConfig, ctx),
   }
+}
+
+/**
+ * Options every request to a provider carries, reasoning or not, the title
+ * call included (ADR-0021, provider data retention and attribution).
+ *
+ * Storage: OpenAI and xAI send `store: false` (Convex already holds the
+ * conversation; the SDKs then request encrypted reasoning themselves and
+ * replay it inline between steps). One exception: an OpenAI turn that pairs
+ * hosted search with app tools keeps the default storage. Without it the
+ * SDK drops the hosted `web_search_call` from later steps but still sends
+ * the reasoning item that preceded it, which OpenAI rejects ("reasoning ...
+ * without its required following item"). The xAI SDK drops hosted calls
+ * whatever `store` says, so storage changes nothing there.
+ *
+ * Attribution: the hashed actor id goes out as OpenAI `safetyIdentifier`,
+ * Anthropic `metadata.userId`, and OpenRouter `user`; the xAI SDK has no
+ * id field.
+ */
+export function resolveRequestPolicyOptions(
+  providerId: Provider,
+  ctx: Pick<
+    RequestShapingContext,
+    "searchToolsActive" | "appToolsActive" | "safetyIdentifier"
+  >
+): ProviderOptions {
+  const { safetyIdentifier } = ctx
+  switch (providerId) {
+    case "openai":
+      return {
+        openai: {
+          ...(ctx.searchToolsActive && ctx.appToolsActive
+            ? {}
+            : { store: false }),
+          ...(safetyIdentifier !== undefined ? { safetyIdentifier } : {}),
+        },
+      }
+    case "anthropic":
+      return safetyIdentifier !== undefined
+        ? { anthropic: { metadata: { userId: safetyIdentifier } } }
+        : {}
+    case "xai":
+      return { xai: { store: false } }
+    case "openrouter":
+      return safetyIdentifier !== undefined
+        ? { openrouter: { user: safetyIdentifier } }
+        : {}
+    default:
+      return {}
+  }
+}
+
+/**
+ * Anthropic automatic prompt caching on every Claude answer request, direct
+ * or through OpenRouter (its provider sends `cacheControl` as the top-level
+ * `cache_control`). Each step of a tool loop and each later turn re-reads
+ * the shared prefix at the cache rate; prompts below the model's minimum
+ * cacheable size are not cached. The one-shot title call skips it.
+ */
+function resolvePromptCachingOptions(
+  modelConfig: Pick<ModelConfig, "providerId" | "baseProviderId">
+): ProviderOptions {
+  const cacheControl = { type: "ephemeral" }
+  if (modelConfig.providerId === "anthropic") {
+    return { anthropic: { cacheControl } }
+  }
+  if (
+    modelConfig.providerId === "openrouter" &&
+    modelConfig.baseProviderId === "anthropic"
+  ) {
+    return { openrouter: { cacheControl } }
+  }
+  return {}
+}
+
+/** Merge per-provider option objects one namespace level deep. */
+function mergeProviderOptions(...sources: ProviderOptions[]): ProviderOptions {
+  const merged: ProviderOptions = {}
+  for (const source of sources) {
+    for (const [namespace, options] of Object.entries(source)) {
+      merged[namespace] = { ...merged[namespace], ...options }
+    }
+  }
+  return merged
 }
 
 /**
@@ -102,7 +203,7 @@ export function shapeRequest(
  * response. Never apply that workaround to later models that reject fixed
  * budgets; fix renewed `pause_turn` failures at the SDK continuation layer.
  */
-function resolveProviderOptions(
+function resolveReasoningOptions(
   modelConfig: ModelConfig,
   ctx: RequestShapingContext
 ): ProviderOptions {
@@ -168,9 +269,9 @@ function resolveProviderOptions(
       // enabling value the installed adapter sends); there is no per-turn
       // effort knob, so the catalog flag alone decides.
       return { mistral: { reasoningEffort: "high" } }
-    // OpenRouter reasoning remains construction-time provider state in its V4
-    // provider API; the catalog setting (and the per-turn effort override)
-    // is mapped in provider-strategy.ts at model construction.
+    // OpenRouter reasoning is mapped at model construction (ADR-0026): the
+    // catalog setting and the per-turn effort override live in
+    // provider-strategy.ts.
     default:
       return {}
   }

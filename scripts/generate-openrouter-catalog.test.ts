@@ -57,7 +57,11 @@ describe("generate-openrouter-catalog invariants", () => {
           id: "vendor/reasoner",
           supported_parameters: ["reasoning", "tools"],
           architecture: { input_modalities: ["text", "image", "audio"] },
-          pricing: { prompt: "0.000000574", completion: "0.000001804" },
+          pricing: {
+            prompt: "0.000000574",
+            completion: "0.000001804",
+            input_cache_read: "0.0000000574",
+          },
         }),
         snapshotModel({
           id: "vendor/plain",
@@ -110,6 +114,10 @@ describe("generate-openrouter-catalog invariants", () => {
     // Textual decimal shift — no IEEE 754 dust in generated prices.
     expect(reasoner?.inputCost).toBe(0.574)
     expect(reasoner?.outputCost).toBe(1.804)
+    // A published cache-read price becomes the billable cache rate; none
+    // leaves cached input at the input rate (ADR-0021).
+    expect(reasoner?.cachedInputCost).toBe(0.0574)
+    expect(plain && "cachedInputCost" in plain).toBe(false)
 
     // Reasoning derivation OFF: no live param → no config, flag false.
     expect(plain?.reasoningText).toBe(false)
@@ -132,7 +140,7 @@ describe("generate-openrouter-catalog invariants", () => {
     })
   })
 
-  it("preserves OpenRouter expiration evidence in the pruned snapshot", () => {
+  it("preserves OpenRouter expiration and cache-read pricing in the pruned snapshot", () => {
     const snapshot = buildSnapshot(
       [
         {
@@ -142,7 +150,11 @@ describe("generate-openrouter-catalog invariants", () => {
           expiration_date: "2026-12-31",
           context_length: 131072,
           top_provider: { max_completion_tokens: 8192 },
-          pricing: { prompt: "0.000002", completion: "0.00001" },
+          pricing: {
+            prompt: "0.000002",
+            completion: "0.00001",
+            input_cache_read: "0.0000002",
+          },
           supported_parameters: ["tools"],
           architecture: { input_modalities: ["text"] },
         },
@@ -152,6 +164,7 @@ describe("generate-openrouter-catalog invariants", () => {
     )
 
     expect(snapshot.models[0]?.expiration_date).toBe("2026-12-31")
+    expect(snapshot.models[0]?.pricing.input_cache_read).toBe("0.0000002")
   })
 
   it("refuses to discard either editorial or OpenRouter lifecycle evidence", () => {

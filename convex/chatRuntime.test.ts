@@ -5679,6 +5679,50 @@ describe("allowance settlement rides terminal transitions (ADR-0021)", () => {
     })
   })
 
+  it("completion prices the cache-read share at the pinned cache rate", async () => {
+    const fixture = createAllowanceFixture({ workStartedAt: 1_000 })
+    fixture.tables.usageReservations[0] = {
+      ...fixture.tables.usageReservations[0]!,
+      pricingSnapshot: {
+        ...pricingSnapshot,
+        primary: {
+          ...pricingSnapshot.primary,
+          cacheReadCreditsPerMTok: 75_000,
+        },
+      },
+    }
+    const { ctx, tables } = createMutationCtx(fixture.tables)
+
+    await markGenerationRunCompletedForChat(
+      ctx,
+      await runOwner(ctx, fixture.runId),
+      {
+        messageId: fixture.messageId,
+        content: "done",
+        parts: [{ type: "text", text: "done" }],
+        usage: {
+          inputTokens: 1_000,
+          outputTokens: 100,
+          totalTokens: 1_100,
+          cacheReadTokens: 800,
+        },
+        titleUsage: "not-run",
+      }
+    )
+
+    // 200 uncached × 0.75 + 800 cached × 0.075 + 100 × 4.5.
+    expect(tables.usageReservations[0]).toMatchObject({
+      status: "settled",
+      actualCredits: 150 + 60 + 450,
+    })
+    // The cache split is settlement evidence; messages.usage keeps its shape.
+    expect(tables.messages[0]?.usage).toEqual({
+      inputTokens: 1_000,
+      outputTokens: 100,
+      totalTokens: 1_100,
+    })
+  })
+
   it("a pre-provider-work failure releases the full reservation", async () => {
     const fixture = createAllowanceFixture() // no workStartedAt
     const { ctx, tables } = createMutationCtx(fixture.tables)
