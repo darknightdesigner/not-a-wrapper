@@ -16,9 +16,10 @@ type MessageRowBoundaryState = { failed: boolean }
 /**
  * Keeps a render failure inside its own message row, so one saved message
  * that cannot render (odd tool output, say) does not take down the thread on
- * every reload. The fallback keeps the row's plain text. It retries when the
- * row model changes under the Message memo contract, so a streaming row can
- * recover while a broken saved row stays put. Renders no DOM of its own.
+ * every reload. Derivation failures arrive here too, through `Rethrow`. The
+ * fallback keeps the row's plain text. It retries when the row model changes
+ * under the Message memo contract, so a streaming row can recover while a
+ * broken saved row stays put. Renders no DOM of its own.
  */
 export class MessageRowBoundary extends Component<
   MessageRowBoundaryProps,
@@ -67,4 +68,10 @@ export class MessageRowBoundary extends Component<
       </div>
     )
   }
+}
+
+/** Throws while rendering, so an error caught outside render (the row's
+ * derivation) takes the same path as a row render failure. */
+export function Rethrow({ error }: { error: unknown }): never {
+  throw error
 }

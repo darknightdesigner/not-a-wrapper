@@ -83,6 +83,29 @@ vi.mock("@/components/ui/thinking-bar", () => ({
 }))
 
 const UNRENDERABLE_TEXT = "Unrenderable answer"
+const UNDERIVABLE_TEXT = "Underivable answer"
+
+// Stands in for persisted tool output that the row derivation cannot parse.
+vi.mock("@/lib/chat-messages/assistant-turn", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("@/lib/chat-messages/assistant-turn")>()
+  return {
+    ...actual,
+    deriveAssistantTurnView: (
+      ...args: Parameters<typeof actual.deriveAssistantTurnView>
+    ) => {
+      const [message] = args
+      if (
+        message.parts?.some(
+          (part) => part.type === "text" && part.text === UNDERIVABLE_TEXT
+        )
+      ) {
+        throw new Error("row derivation failed")
+      }
+      return actual.deriveAssistantTurnView(...args)
+    },
+  }
+})
 
 vi.mock("./message", () => ({
   Message: ({
@@ -246,7 +269,7 @@ describe("Conversation recovered turn contracts", () => {
     expect(editing()).toBe(false)
   })
 
-  it("contains a row render failure to that row", () => {
+  it("contains render and derivation failures to their rows", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => undefined)
@@ -263,7 +286,19 @@ describe("Conversation recovered turn contracts", () => {
               role: "assistant",
               parts: [{ type: "text", text: UNRENDERABLE_TEXT }],
             },
+            {
+              id: "user-2",
+              role: "user",
+              parts: [{ type: "text", text: "Again" }],
+            },
+            {
+              id: "assistant-2",
+              role: "assistant",
+              parts: [{ type: "text", text: UNDERIVABLE_TEXT }],
+            },
           ]}
+          // The underivable last turn also goes through the live-turn resolver.
+          status="streaming"
           onEdit={vi.fn()}
           onReload={vi.fn()}
         />
@@ -271,12 +306,21 @@ describe("Conversation recovered turn contracts", () => {
     })
     consoleError.mockRestore()
 
-    const failedRow = container.querySelector('[data-turn="assistant"]')
-    expect(container.querySelector('[data-testid="message-user-1"]')).not.toBe(
+    const assistantRows = [
+      ...container.querySelectorAll('[data-turn="assistant"]'),
+    ]
+    expect(container.querySelector('[data-testid="message-user-2"]')).not.toBe(
       null
     )
-    expect(failedRow?.querySelector('[role="alert"]')).not.toBeNull()
-    expect(failedRow?.textContent).toContain(UNRENDERABLE_TEXT)
+    expect(
+      assistantRows.map((row) => [
+        row.querySelector('[role="alert"]') !== null,
+        row.textContent,
+      ])
+    ).toEqual([
+      [true, expect.stringContaining(UNRENDERABLE_TEXT)],
+      [true, expect.stringContaining(UNDERIVABLE_TEXT)],
+    ])
   })
 
   it("preserves assistant deep-link sentinels", () => {
@@ -1133,6 +1177,10 @@ describe("Conversation optimistic-to-durable timestamp lifecycle", () => {
       "[data-turn-id-container]"
     )
     expect(pendingAssistantWrapper).toBeTruthy()
+    const pendingContent = pendingAssistant?.querySelector(
+      '[data-testid^="message-"]'
+    )
+    expect(pendingContent).toBeTruthy()
 
     await act(async () => {
       lifecycle.authGate.resolve("fixture-user")
@@ -1197,6 +1245,10 @@ describe("Conversation optimistic-to-durable timestamp lifecycle", () => {
     expect(streamingAssistant).toBe(pendingAssistant)
     expect(streamingAssistant?.closest("[data-turn-id-container]")).toBe(
       pendingAssistantWrapper
+    )
+    // The row's content reconciles in place too; it is not remounted.
+    expect(streamingAssistant?.querySelector('[data-testid^="message-"]')).toBe(
+      pendingContent
     )
 
     await act(async () => {
