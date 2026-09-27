@@ -1,5 +1,7 @@
 import { v } from "convex/values"
+import { resolveToolLimitPolicy } from "../lib/tools/limit-policy"
 import { optionalAuthMutation } from "./lib/authedFunctions"
+import { requireServerCallProof } from "./lib/serverCallProof"
 
 const MAX_SCOPE_ITEMS = 25
 
@@ -25,6 +27,15 @@ function formatDomainLimitCode(
   return `${normalizedToolName || "TOOL"}_DOMAIN_LIMIT_EXCEEDED`
 }
 
+/**
+ * Sliding-window tool budget and domain limits (Tool budget, CONTEXT.md).
+ *
+ * Callable only by the Next server (ADR-0045): every call carries a
+ * server-call proof over its arguments, the window policy is resolved here by
+ * tool name, and the actor is the caller's Convex identity or, for guests, the
+ * cookie-verified guest id the server signed. A browser cannot reach it with
+ * a chosen id or policy.
+ */
 export const checkAndConsume = optionalAuthMutation({
   args: {
     limitType: v.union(v.literal("domain"), v.literal("budget")),
@@ -36,11 +47,11 @@ export const checkAndConsume = optionalAuthMutation({
         count: v.number(),
       })
     ),
-    windowMs: v.number(),
-    maxCount: v.number(),
-    bucketSizeMs: v.number(),
-    anonymousId: v.optional(v.string()),
-    consume: v.optional(v.boolean()),
+    consume: v.boolean(),
+    /** Guests only: the cookie-verified id, bound by the proof. */
+    guestId: v.optional(v.string()),
+    issuedAt: v.number(),
+    proof: v.string(),
   },
   handler: async (ctx, args) => {
     const {
@@ -48,36 +59,51 @@ export const checkAndConsume = optionalAuthMutation({
       toolName,
       keyMode,
       scopeCounts,
-      windowMs,
-      maxCount,
-      bucketSizeMs,
-      anonymousId,
-      consume = true,
+      consume,
+      guestId,
+      issuedAt,
+      proof,
     } = args
-
-    if (scopeCounts.length === 0) {
-      return { allowed: true, remaining: maxCount }
-    }
-
+    // Bound the payload before hashing it.
     if (scopeCounts.length > MAX_SCOPE_ITEMS) {
       throw new Error(
         `Too many scopes (${scopeCounts.length}); max ${MAX_SCOPE_ITEMS}`
       )
     }
+    requireServerCallProof(
+      {
+        purpose: "tool_limit",
+        guestId: guestId ?? null,
+        limitType,
+        toolName,
+        keyMode,
+        scopeCounts,
+        consume,
+        issuedAt,
+      },
+      proof
+    )
 
-    if (windowMs <= 0 || maxCount <= 0 || bucketSizeMs <= 0) {
-      throw new Error("Invalid limit configuration")
-    }
-
+    // Signed-in callers are their Convex identity; the server never signs a
+    // guest id alongside a user token.
     const identity = ctx.identity
     let actorKey: string
-    if (identity) {
+    if (identity && !guestId) {
       actorKey = `user:${identity.subject}`
+    } else if (!identity && guestId) {
+      actorKey = `guest:${guestId}`
     } else {
-      if (!anonymousId) {
-        throw new Error("Anonymous ID required for unauthenticated tool limits")
-      }
-      actorKey = `guest:${anonymousId}`
+      throw new Error("Tool limits need exactly one signed-in or guest actor")
+    }
+
+    const { windowMs, maxCount, bucketSizeMs } = resolveToolLimitPolicy(
+      limitType,
+      toolName,
+      keyMode
+    )
+
+    if (scopeCounts.length === 0) {
+      return { allowed: true, remaining: maxCount }
     }
 
     const now = Date.now()

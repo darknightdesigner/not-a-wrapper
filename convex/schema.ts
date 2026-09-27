@@ -599,6 +599,9 @@ export default defineSchema({
     .index("by_bucket", ["bucketId"])
     .index("by_user_created", ["userId", "createdAt"]),
 
+  // Retired client-keyed guest counters (ADR-0045 moved guest admission to
+  // server-derived `apiRateLimits` windows). Nothing reads or writes it; the
+  // limiter sweep cron drains production rows before the table is removed.
   anonymousUsage: defineTable({
     anonymousId: v.string(),
     dailyMessageCount: v.number(),
@@ -606,6 +609,7 @@ export default defineSchema({
   }).index("by_anonymous_id", ["anonymousId"]),
 
   // Persistent sliding-window buckets for domain and tool-budget limits.
+  // `by_updated_at` serves the bounded limiter sweep (convex/rateLimits.ts).
   toolLimitBuckets: defineTable({
     actorKey: v.string(),
     limitType: v.union(v.literal("domain"), v.literal("budget")),
@@ -615,24 +619,43 @@ export default defineSchema({
     bucketStartMs: v.number(),
     count: v.number(),
     updatedAt: v.number(),
-  }).index("by_actor_limit_scope_bucket", [
-    "actorKey",
-    "limitType",
-    "toolName",
-    "scopeKey",
-    "keyMode",
-    "bucketStartMs",
-  ]),
+  })
+    .index("by_actor_limit_scope_bucket", [
+      "actorKey",
+      "limitType",
+      "toolName",
+      "scopeKey",
+      "keyMode",
+      "bucketStartMs",
+    ])
+    .index("by_updated_at", ["updatedAt"]),
 
-  // Fixed-window per-identity throttle for expensive API routes (e.g. the MCP
-  // "test connection" endpoint, which opens an outbound connection per call).
-  // Keyed by the authenticated user; see convex/rateLimits.ts.
+  // Fixed-window throttles keyed by a server-derived actor: expensive API
+  // routes per user (e.g. the MCP "test connection" endpoint) and guest turn
+  // admission per guest, per network, and across all guests (ADR-0045). See
+  // convex/rateLimits.ts.
   apiRateLimits: defineTable({
     actorKey: v.string(),
     bucket: v.string(),
     windowStartMs: v.number(),
     count: v.number(),
-  }).index("by_actor_bucket_window", ["actorKey", "bucket", "windowStartMs"]),
+  })
+    .index("by_actor_bucket_window", ["actorKey", "bucket", "windowStartMs"])
+    .index("by_window_start", ["windowStartMs"]),
+
+  // One row per running guest answer (ADR-0045): admission counts unexpired
+  // leases for the concurrency cap; the route deletes its lease when the
+  // response ends, and `expiresAt` frees a crashed function's slot.
+  guestTurnLeases: defineTable({
+    requestId: v.string(),
+    guestId: v.string(),
+    networkKey: v.string(),
+    expiresAt: v.number(),
+  })
+    .index("by_request", ["requestId"])
+    .index("by_guest_expires", ["guestId", "expiresAt"])
+    .index("by_network_expires", ["networkKey", "expiresAt"])
+    .index("by_expires", ["expiresAt"]),
 
   mcpServers: defineTable({
     userId: v.id("users"),

@@ -2,6 +2,25 @@ export const NON_AUTH_DAILY_MESSAGE_LIMIT = 5
 export const AUTH_DAILY_MESSAGE_LIMIT = 1000
 export const REMAINING_QUERY_ALERT_THRESHOLD = 2
 
+/**
+ * Guest turn admission (ADR-0045), enforced in Convex against the signed
+ * guest cookie and the client network. The network allowance equals the
+ * guest allowance so a new cookie never resets it; guests behind one shared
+ * address (office NAT, carrier NAT) share it until they sign in.
+ */
+export const GUEST_TURN_LIMITS = {
+  dailyTurnsPerGuest: NON_AUTH_DAILY_MESSAGE_LIMIT,
+  dailyTurnsPerNetwork: NON_AUTH_DAILY_MESSAGE_LIMIT,
+  activeTurnsPerGuest: 1,
+  activeTurnsPerNetwork: 2,
+  /**
+   * Aggregate guest spend ceiling: admitted guest turns per UTC day across
+   * all guests. The Convex env `GUEST_DAILY_TURN_CEILING` overrides it; 0
+   * turns guest chat off.
+   */
+  dailyTurnsAllGuests: 1_000,
+} as const
+
 export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini"]
 
 export const FREE_MODELS_IDS = [
