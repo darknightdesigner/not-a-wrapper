@@ -3,6 +3,16 @@ import type { NextConfig } from "next"
 
 const isProduction = process.env.NODE_ENV === "production"
 
+function convexHost(): string | null {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL
+  if (!url) return null
+  try {
+    return new URL(url).host
+  } catch {
+    return null
+  }
+}
+
 /**
  * Derive the Convex deployment origins (https + wss) the browser talks to from
  * `NEXT_PUBLIC_CONVEX_URL`. The Convex client opens a WebSocket to the
@@ -10,19 +20,20 @@ const isProduction = process.env.NODE_ENV === "production"
  * Falls back to the wildcard if the env var is absent at build time.
  */
 function convexConnectSources(): string[] {
-  const url = process.env.NEXT_PUBLIC_CONVEX_URL
-  if (!url) return ["https://*.convex.cloud", "wss://*.convex.cloud"]
-  try {
-    const { host } = new URL(url)
-    return [
-      `https://${host}`,
-      `wss://${host}`,
-      // File storage is served from sibling *.convex.cloud subdomains.
-      "https://*.convex.cloud",
-    ]
-  } catch {
-    return ["https://*.convex.cloud", "wss://*.convex.cloud"]
-  }
+  const host = convexHost()
+  if (!host) return ["https://*.convex.cloud", "wss://*.convex.cloud"]
+  return [
+    `https://${host}`,
+    `wss://${host}`,
+    // File storage is served from sibling *.convex.cloud subdomains.
+    "https://*.convex.cloud",
+  ]
+}
+
+/** Storage URLs from `ctx.storage.getUrl` live on the deployment host. */
+function convexImageSource(): string {
+  const host = convexHost()
+  return host ? `https://${host}` : "https://*.convex.cloud"
 }
 
 /**
@@ -58,10 +69,14 @@ function contentSecurityPolicy(): string {
       ...posthog,
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
-    // Images are inert and can arrive from arbitrary hosts (markdown in model
-    // responses, web-search source favicons/og-images), so allow any https
-    // source — this still blocks mixed-content http: and non-image schemes.
-    "img-src": ["'self'", "data:", "blob:", "https:"],
+    // Images are not inert: an image load is a request with no click, so a
+    // prompt-injected reply could load `https://host/?d=<chat>` and leak the
+    // chat. Markdown renders images as links; this backstops it with only the
+    // hosts the app itself loads: same-origin assets (`/_next/image`, the
+    // `/api/favicon` proxy), local previews (data:/blob:), and Convex storage
+    // (attachments, uploaded avatars). Password and email-code sign-in carry
+    // no identity-provider avatar; add that host here if OAuth sign-in ships.
+    "img-src": ["'self'", "data:", "blob:", convexImageSource()],
     "font-src": ["'self'", "data:"],
     "connect-src": ["'self'", ...convex, ...posthog],
   }
