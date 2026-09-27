@@ -38,7 +38,11 @@ import {
 } from "@/components/ui/prompt-input"
 import { toast } from "@/components/ui/toast"
 import { TooltipShortcut } from "@/components/ui/tooltip"
-import { type Attachment } from "@/lib/file-handling"
+import {
+  ACCEPTED_FILE_PICKER_TYPES,
+  TEXT_FILE_PICKER_TYPES,
+  type Attachment,
+} from "@/lib/file-handling"
 import { StopBulkRoundedIcon } from "@/lib/icons"
 import { getLogicalModelInfo } from "@/lib/models"
 import type { ChatUiWindow } from "@/lib/observability/chat-ui-observer"
@@ -241,7 +245,8 @@ export const Composer = memo(
     } = useTurnContext()
 
     const selectModelConfig = getLogicalModelInfo(selectedModel)
-    const isFileUploadAvailable = Boolean(selectModelConfig?.vision)
+    // Every model reads text files; images and PDFs need a vision model.
+    const acceptsVisionFiles = Boolean(selectModelConfig?.vision)
     // Mirrors EffortControl's own render predicate: when the thinking pill is
     // present, the model trigger joins it as one segmented control — tight
     // facing paddings and squared inner corners on the shared edge.
@@ -311,6 +316,7 @@ export const Composer = memo(
     } = useFilePickerState({
       convex,
       uploadGeneratedPastes: shouldUploadGeneratedPastes,
+      vision: acceptsVisionFiles,
     })
 
     const handleAttachmentUpload = useCallback(
@@ -608,7 +614,12 @@ export const Composer = memo(
         />
         <InputDropZone
           onFileUpload={handleAttachmentUpload}
-          disabled={!isUserAuthenticated || !isFileUploadAvailable}
+          accept={
+            acceptsVisionFiles
+              ? ACCEPTED_FILE_PICKER_TYPES
+              : TEXT_FILE_PICKER_TYPES
+          }
+          disabled={!isUserAuthenticated}
         >
           <div
             className={cn(
@@ -643,7 +654,7 @@ export const Composer = memo(
                 <ButtonPlusMenu
                   actionQuery={actionQuery}
                   isUserAuthenticated={isUserAuthenticated}
-                  isFileUploadAvailable={isFileUploadAvailable}
+                  acceptsImages={acceptsVisionFiles}
                   enableSearch={enableSearch}
                   onActivateActionQuery={handleActivateActionQuery}
                   onToggleSearch={setEnableSearch}

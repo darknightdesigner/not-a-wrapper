@@ -31,7 +31,6 @@ export type SendFilePart = {
 
 type BuildChatTurnRequestBodyArgs = {
   chatId: string
-  userId: string
   selectedModel: string
   systemPrompt?: string
   enableSearch?: boolean
@@ -49,7 +48,6 @@ type BuildChatTurnRequestBodyArgs = {
 // there is no extras spread — a new wire field is added on the contract first.
 export function buildChatTurnRequestBody({
   chatId,
-  userId,
   selectedModel,
   systemPrompt,
   enableSearch,
@@ -62,7 +60,6 @@ export function buildChatTurnRequestBody({
 }: BuildChatTurnRequestBodyArgs): ChatTurnBodyFields {
   return {
     chatId,
-    userId,
     model: selectedModel,
     systemPrompt: systemPrompt || SYSTEM_PROMPT_DEFAULT,
     ...(enableSearch !== undefined ? { enableSearch } : {}),

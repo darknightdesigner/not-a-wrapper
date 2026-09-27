@@ -71,7 +71,11 @@ describe("useFilePickerState immediate upload lifecycle", () => {
 
   const Harness = React.forwardRef<Picker>(
     function Harness(_props, forwardedRef) {
-      const picker = useFilePickerState({ convex, uploadGeneratedPastes: true })
+      const picker = useFilePickerState({
+        convex,
+        uploadGeneratedPastes: true,
+        vision: true,
+      })
       React.useImperativeHandle(forwardedRef, () => picker, [picker])
       return null
     }

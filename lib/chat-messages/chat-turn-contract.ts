@@ -13,11 +13,9 @@ import type { UIMessage } from "ai"
 // field added or renamed on one side is a compile error on the other, not a
 // production bug.
 //
-// Trust notes (ADR-0010): caller identity is derived server-side from the
-// WorkOS session, never from this body. `userId` is read only for guest
-// (unauthenticated) turns, as a stable rate-limit key; for authenticated
-// sessions it is ignored. There is deliberately no `isAuthenticated` field on
-// the wire.
+// Trust notes (ADR-0010, ADR-0045): caller identity is derived server-side
+// from the WorkOS session or the signed guest cookie, never from this body.
+// There is deliberately no user id or `isAuthenticated` field on the wire.
 
 /**
  * Server-owned edit: a durable Chat turn that rewrites a prior user message,
@@ -67,10 +65,6 @@ export type ChatTurnSelectedPathToken = {
  */
 export type ChatTurnBodyFields = {
   chatId: string
-  /** Client-minted guest id. Required for unauthenticated turns
-   * (`MISSING_GUEST_ID` otherwise) but never a limit key: the route keys
-   * guest limits on the signed guest cookie (ADR-0045). */
-  userId?: string
   model: string
   /** Optional on the wire: the parser does not require it and the Chat turn
    * runtime falls back to `SYSTEM_PROMPT_DEFAULT`. The client builder always
@@ -100,7 +94,7 @@ export type ChatTurnWireRequest = ChatTurnBodyFields & {
 export type ChatTurnRequestRejection = {
   ok: false
   status: number
-  code: "INVALID_REQUEST" | "INVALID_GENERATION_BUDGET" | "MISSING_GUEST_ID"
+  code: "INVALID_REQUEST" | "INVALID_GENERATION_BUDGET"
   error: string
   details?: Record<string, string>
   /** True when the rejection represents a state our own client should never
@@ -122,13 +116,11 @@ function isNonEmptyString(value: unknown): value is string {
 
 /**
  * Validate an already-JSON-parsed request body against the wire contract.
- * `isAuthenticated` comes from the server-side session (never the body) and
- * gates only the guest-id rule. Unknown keys are ignored, not rejected — the
- * contract is closed at the type level, tolerant at the wire level.
+ * Unknown keys are ignored, not rejected — the contract is closed at the type
+ * level, tolerant at the wire level.
  */
 export function parseChatTurnRequest(
-  body: unknown,
-  context: { isAuthenticated: boolean }
+  body: unknown
 ): ChatTurnRequestParseResult {
   const record: Record<string, unknown> = isRecord(body) ? body : {}
   const { messages, chatId, model } = record
@@ -163,15 +155,6 @@ export function parseChatTurnRequest(
       code: "INVALID_REQUEST",
       error: "Regeneration cannot be combined with edit generation",
       unexpected: true,
-    }
-  }
-
-  if (!context.isAuthenticated && !record.userId) {
-    return {
-      ok: false,
-      status: 400,
-      code: "MISSING_GUEST_ID",
-      error: "Guest ID required for anonymous users",
     }
   }
 

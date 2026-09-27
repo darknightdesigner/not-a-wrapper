@@ -216,7 +216,6 @@ describe("chat turn plans", () => {
   it("builds consistent request bodies for send, edit, and regeneration turns", () => {
     const base = {
       chatId: "chat-1",
-      userId: "user-1",
       selectedModel: "model-1",
     }
 
@@ -233,7 +232,6 @@ describe("chat turn plans", () => {
       })
     ).toEqual({
       chatId: "chat-1",
-      userId: "user-1",
       model: "model-1",
       systemPrompt: "custom system",
       enableSearch: false,
@@ -249,7 +247,6 @@ describe("chat turn plans", () => {
       })
     ).toEqual({
       chatId: "chat-1",
-      userId: "user-1",
       model: "model-1",
       systemPrompt: SYSTEM_PROMPT_DEFAULT,
       chatVersion: 1,
@@ -269,7 +266,6 @@ describe("chat turn plans", () => {
       })
     ).toEqual({
       chatId: "chat-1",
-      userId: "user-1",
       model: "model-1",
       systemPrompt: SYSTEM_PROMPT_DEFAULT,
       chatVersion: 2,

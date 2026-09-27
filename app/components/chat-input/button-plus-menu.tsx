@@ -72,12 +72,11 @@ const touchMenuCheck = <Icon icon={RiCheckLine} slotSize={16} />
 
 type ButtonPlusMenuProps = {
   isUserAuthenticated: boolean
-  isFileUploadAvailable: boolean
+  /** False for a text-only model: file uploads take text files only. */
+  acceptsImages: boolean
   enableSearch: boolean
   onToggleSearch: (enabled: boolean) => void
   searchMode: SearchMode
-  /** Override the default disabled tooltip for file upload */
-  fileUploadDisabledMessage?: string
   actionQuery?: PromptInputActionQuery | null
   onActivateActionQuery?: (
     actionId: ComposerActionId,
@@ -131,7 +130,7 @@ function NativeMobileMenuRowContent({
 
 type NativeMobileMenuContentProps = {
   touchOptimized: boolean
-  isFileUploadAvailable: boolean
+  acceptsImages: boolean
   commandItems: readonly ComposerActionMenuItem[]
   toggleItems: readonly ComposerActionMenuItem[]
   connectors: readonly ComposerMenuConnector[] | undefined
@@ -143,7 +142,7 @@ type NativeMobileMenuContentProps = {
 
 function NativeMobileMenuContent({
   touchOptimized,
-  isFileUploadAvailable,
+  acceptsImages,
   commandItems,
   toggleItems,
   connectors,
@@ -181,7 +180,7 @@ function NativeMobileMenuContent({
       }}
     >
       <DropdownMenuGroup>
-        {touchOptimized && isFileUploadAvailable && (
+        {touchOptimized && acceptsImages && (
           <DropdownMenuItem
             geometry="custom"
             className={rowClassName}
@@ -194,7 +193,7 @@ function NativeMobileMenuContent({
             />
           </DropdownMenuItem>
         )}
-        {touchOptimized && isFileUploadAvailable && (
+        {touchOptimized && acceptsImages && (
           <DropdownMenuItem
             geometry="custom"
             className={rowClassName}
@@ -347,11 +346,10 @@ function ComposerActionMenuRow({
 
 export function ButtonPlusMenu({
   isUserAuthenticated,
-  isFileUploadAvailable,
+  acceptsImages,
   enableSearch,
   onToggleSearch,
   searchMode,
-  fileUploadDisabledMessage,
   actionQuery = null,
   onActivateActionQuery,
   connectors,
@@ -385,10 +383,9 @@ export function ButtonPlusMenu({
   const availability = useMemo<ComposerActionAvailability>(
     () => ({
       "add-files": {
-        disabled: !isFileUploadAvailable,
-        disabledMessage:
-          fileUploadDisabledMessage ??
-          "This model doesn’t support file uploads",
+        disabled: false,
+        disabledMessage: "",
+        ...(acceptsImages ? {} : { label: "Add files" }),
       },
       "web-search": {
         disabled: searchMode !== "optional",
@@ -404,12 +401,7 @@ export function ButtonPlusMenu({
           : {}),
       },
     }),
-    [
-      enableSearch,
-      fileUploadDisabledMessage,
-      isFileUploadAvailable,
-      searchMode,
-    ]
+    [acceptsImages, enableSearch, searchMode]
   )
 
   const runAction = useCallback(
@@ -624,7 +616,7 @@ export function ButtonPlusMenu({
               narrow fine-pointer windows keep the compact presentation. */}
           <NativeMobileMenuContent
             touchOptimized={isTouchMenu}
-            isFileUploadAvailable={isFileUploadAvailable}
+            acceptsImages={acceptsImages}
             commandItems={commandItems}
             toggleItems={toggleItems}
             connectors={connectors}
@@ -634,7 +626,7 @@ export function ButtonPlusMenu({
             onOpenPhotos={() => photosInputRef.current?.click()}
           />
         </DropdownMenu>
-        {isTouchMenu && isFileUploadAvailable && (
+        {isTouchMenu && acceptsImages && (
           /* Camera and photo-library sources are hidden file inputs mounted
              outside the menu so they survive row activation closing it. */
           <>
