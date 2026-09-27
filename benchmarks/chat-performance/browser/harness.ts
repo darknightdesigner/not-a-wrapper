@@ -48,6 +48,7 @@ import {
   ensurePerfAuthUser,
   getPerfAuthPassword,
   PERF_AUTH_EMAIL,
+  releasePerfAuthUser,
 } from "./ensure-auth-user"
 import {
   durationsOverlappingRun,
@@ -1765,13 +1766,15 @@ async function main() {
   // Playwright closes its CDP transport here; attached Chrome is not terminated.
   await browser.close()
   stopPerfServer()
+  await releasePerfAuthUser()
   if (anyCorrectnessFailure) {
     fail("one or more scenarios failed correctness — timings are invalid")
   }
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   stopPerfServer()
+  await releasePerfAuthUser()
   console.error(error)
   process.exit(1)
 })

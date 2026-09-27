@@ -2,8 +2,9 @@
  * Ensures the benchmark harness's WorkOS test user exists with a verified
  * email and a known password, using the WORKOS_API_KEY already present in
  * .env.local (bun auto-loads it). CI creates a fresh identity per harness
- * process so previous captures cannot change its sidebar or usage allowance.
- * Local provisioning reuses the configured account and repairs its password.
+ * process so previous captures cannot change its sidebar or usage allowance,
+ * and deletes it when the run ends (`releasePerfAuthUser`). Local
+ * provisioning reuses the configured account and repairs its password.
  *
  * The user lives in the SAME WorkOS environment as the app's dev client id,
  * so the harness's real /auth/login flow mints a genuine RS256 access token
@@ -31,6 +32,9 @@ export const PERF_AUTH_EMAIL = isIsolatedCapture
   ? createCaptureEmail(configuredEmail)
   : configuredEmail
 
+// Set once this process creates its CI capture user, which it then owns.
+let releaseCaptureUser: (() => Promise<void>) | undefined
+
 export function getPerfAuthPassword(): string {
   const password = process.env.PERF_AUTH_PASSWORD
   if (!password) {
@@ -56,13 +60,14 @@ export async function ensurePerfAuthUser(): Promise<void> {
 
   if (isIsolatedCapture) {
     // Fail on creation errors; reusing an account would invalidate isolation.
-    await workos.userManagement.createUser({
+    const user = await workos.userManagement.createUser({
       email: PERF_AUTH_EMAIL,
       password,
       emailVerified: true,
       firstName: "Perf",
       lastName: "Harness",
     })
+    releaseCaptureUser = () => workos.userManagement.deleteUser(user.id)
     console.log("[ensure-auth-user] created isolated capture user")
     return
   }
@@ -98,6 +103,23 @@ export async function ensurePerfAuthUser(): Promise<void> {
       emailVerified: true,
     })
     console.log(`[ensure-auth-user] reset password for ${PERF_AUTH_EMAIL}`)
+  }
+}
+
+/**
+ * Deletes the CI capture user this process created, so runs leave no WorkOS
+ * users behind. Call it once the run no longer needs the session. Local runs
+ * reuse one account and keep it. Cleanup never fails a capture.
+ */
+export async function releasePerfAuthUser(): Promise<void> {
+  const release = releaseCaptureUser
+  releaseCaptureUser = undefined
+  if (!release) return
+  try {
+    await release()
+    console.log("[ensure-auth-user] deleted isolated capture user")
+  } catch (error) {
+    console.warn("[ensure-auth-user] could not delete capture user", error)
   }
 }
 

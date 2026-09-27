@@ -8,6 +8,7 @@ const workosMocks = vi.hoisted(() => ({
   listUsers: vi.fn(async () => ({ data: [{ id: "existing-user" }] })),
   authenticateWithPassword: vi.fn(async () => ({})),
   updateUser: vi.fn(async () => ({})),
+  deleteUser: vi.fn(async () => {}),
 }))
 
 vi.mock("@workos-inc/node", () => ({
@@ -54,6 +55,11 @@ describe("benchmark identity isolation", () => {
     })
     expect(workosMocks.listUsers).not.toHaveBeenCalled()
     expect(workosMocks.updateUser).not.toHaveBeenCalled()
+    // The run deletes the user it created, once.
+    await first.releasePerfAuthUser()
+    await first.releasePerfAuthUser()
+    expect(workosMocks.deleteUser).toHaveBeenCalledTimes(1)
+    expect(workosMocks.deleteUser).toHaveBeenCalledWith("test-created-user")
     workosMocks.createUser.mockRejectedValueOnce(new Error("creation failed"))
     await expect(second.ensurePerfAuthUser()).rejects.toThrow("creation failed")
     expect(workosMocks.authenticateWithPassword).not.toHaveBeenCalled()
@@ -79,6 +85,8 @@ describe("benchmark identity isolation", () => {
       password: "test-only-password",
     })
     expect(workosMocks.createUser).not.toHaveBeenCalled()
+    await local.releasePerfAuthUser()
+    expect(workosMocks.deleteUser).not.toHaveBeenCalled()
   })
 })
 
