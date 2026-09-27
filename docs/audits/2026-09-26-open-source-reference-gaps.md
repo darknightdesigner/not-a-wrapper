@@ -75,7 +75,7 @@ References (sibling checkouts):
 | [User bootstrap trusts browser-sent sync fields](#user-bootstrap-trusts-browser-sent-sync-fields) | Low | Accounts, sessions and privacy |
 | [One user can exhaust the shared free-model quota](#one-user-can-exhaust-the-shared-free-model-quota) | Low | Admission limits |
 | [Platform throttle shows the wrong error](#platform-throttle-shows-the-wrong-error) | Low | Admission limits |
-| [Tool-limit rows are never deleted](#tool-limit-rows-are-never-deleted) | Low | Admission limits |
+| [Tool-limit rows are never deleted](#tool-limit-rows-are-never-deleted) (fixed, ADR-0045) | Low | Admission limits |
 | [Feedback has no length or rate limit](#feedback-has-no-length-or-rate-limit) | Low | Admission limits |
 | [A missing lazy chunk crashes the app](#a-missing-lazy-chunk-crashes-the-app) | Low | Deploys and version skew |
 | [Chat API cannot recognize an outdated tab](#chat-api-cannot-recognize-an-outdated-tab) | Low | Deploys and version skew |
@@ -1033,8 +1033,9 @@ with one real-shape case: a single large text item keeps its trimmed start.
 
 **Notes.** Do not simply raise the inline image budget. The trimmed result is
 saved in message parts and replayed on later turns, so it must fit Convex's
-1 MiB document limit. Moving large images to file storage belongs with the
-TODO.md item "Convex document and read limits". The TODO.md note about
+1 MiB document limit. Since 2026-09-27 messages are capped at 896 KiB, oldest
+tool payloads first; moving large images to file storage belongs with the
+TODO.md item "Convex read ceiling for very large chats". The TODO.md note about
 capping MCP response size covers bytes read from the network, not this
 trimmer.
 
@@ -1535,8 +1536,8 @@ the on-path check and the first paint. Idle answers (204 or 404) return at once
 (`lib/chat-stream/resumable-chat.ts:314`); retries happen only on 5xx or
 network errors (`:377-382`). Convex's server query cache may already serve the
 page's later `getSelectedPath` subscription from the probe's result, so measure
-before assuming the cost doubles. Related TODO item: "Convex document and read
-limits".
+before assuming the cost doubles. Related TODO item: "Convex read ceiling for very
+large chats".
 
 ## Accounts, sessions and privacy
 
@@ -1767,8 +1768,8 @@ send button stops working with no explanation until a reload.
    401 with a new `SESSION_EXPIRED` code when there is no session but the body
    looks signed-in: `userId` fails `isGuestUserId`, or the body carries
    `chatVersion`, `expectedVisibleMessageCount`, `edit` or `regeneration`. The
-   field check keeps working if guest identity later moves to a server-signed
-   cookie (TODO "Guest abuse").
+   field check keeps working now that guest identity is a server-signed cookie
+   (ADR-0045).
 2. Client: add one session-ended handler, called from
    `AcceptanceAwareChatTransport`
    (`app/components/chat/use-detachable-chat-stream.ts`) on 401
@@ -1781,7 +1782,7 @@ send button stops working with no explanation until a reload.
 **Notes.** The silent guest turn needs a cross-tab sign-out and then a send
 within about 5 minutes (Convex refetches its token 10 seconds before expiry),
 so it is uncommon. The blocked composer after any session end is the likelier
-symptom. Neither the TODO "Account deletion" nor "Guest abuse" item covers
+symptom. Neither the account-deletion fix (ADR-0044) nor guest admission (ADR-0045) covers
 this, and a server-signed guest cookie alone would not fix it.
 
 ### Shared chat pages can be indexed
@@ -1883,6 +1884,11 @@ only: chat ids are random UUIDs that are never reused (ADR-0033).
 ### User bootstrap trusts browser-sent sync fields
 
 Severity: Low.
+
+Status: fixed 2026-09-27 (ADR-0044). `users.ensureCurrent` replaced
+`createOrUpdate`: it takes no arguments, is insert-only, and uses verified token
+claims only. Only the verified webhook writes profile fields and
+`workosUpdatedAt`, and soft delete has no older-update skip.
 
 **What is wrong.** When a signed-in user has no row yet, the browser calls the
 public `users.createOrUpdate` mutation, which writes whatever email, names,
@@ -1997,7 +2003,8 @@ load shared Convex, Vercel and Redis capacity for everyone.
    (`app/api/chat/public-http-error.ts`) has no retry field and
    `createErrorResponse` (`app/api/chat/utils.ts:57-67`) sets no headers, so
    add an optional `retryAfterSeconds` there once.
-3. Leave the per-IP bucket to the guest-abuse TODO.
+3. The per-IP guest bucket and guest running-answer caps shipped with ADR-0045
+   (`usage.admitGuestTurn`); signed-in users still need steps 1 and 2.
 
 **Notes.** Using the run row as the counter keeps the check in the same
 transaction that inserts the run, so slots cannot leak: a crashed worker frees
@@ -2132,6 +2139,11 @@ ADR-0021 only describes falling through on insufficient allowance
 
 Severity: Low.
 
+Status: fixed by ADR-0045 (fix steps 1, 2 and 4: the `by_updated_at` index, the
+10-minute `sweepExpiredLimiterRows` cron, and server-resolved policy by tool
+name); step 3 shipped with the account-deletion cascade (ADR-0044). Guest tool
+limits now key on the client network of the admitted guest turn.
+
 **What is wrong.** Each time a tool such as web search or page reading runs,
 `checkAndConsume` adds to a counter row in `toolLimitBuckets` (one row per
 scope for each minute of use), and page reading keeps a separate row per
@@ -2170,8 +2182,8 @@ keyed by their WorkOS id, even after the account is deleted.
    longest tool window (15 minutes, `lib/config.ts:74` and `lib/config.ts:81`).
    A sweep on write like `convex/rateLimits.ts` is not enough alone, because a
    domain that is never read again is never swept.
-3. Add `toolLimitBuckets` to the account-deletion cascade already listed in
-   TODO.md.
+3. Add `toolLimitBuckets` to the account-deletion cascade. Done 2026-09-27
+   (ADR-0044): account deletion drains the `user:<WorkOS id>` rows.
 4. Optional: resolve `windowMs`, `maxCount` and `bucketSizeMs` on the server by
    tool name, like `API_RATE_LIMIT_POLICIES` in `convex/rateLimits.ts:20-23`,
    so callers send only the tool name and scopes.
@@ -2180,8 +2192,9 @@ keyed by their WorkOS id, even after the account is deleted.
 (`convex/toolLimits.ts:28-44`) does not let anyone raise the enforced limit:
 the server always sends its own policy (`lib/tools/policy.ts:288-317`), and
 signed-in actor keys come from the login token (`convex/toolLimits.ts:72-81`).
-Making the mutation internal and fixing the fakeable guest id are already in
-the TODO.md item "Guest abuse and spending limits". Growth costs storage only,
+ADR-0045 now requires a server-call proof on every call and keys guests on the
+network of their admitted turn, so browsers can no longer reach it with a
+chosen id or policy. Growth costs storage only,
 since reads are index range scans bounded to the 15-minute window.
 
 ### Feedback has no length or rate limit
@@ -2232,8 +2245,8 @@ planned account-deletion cleanup does not list them.
    `consume` handler (`convex/rateLimits.ts:100-150`), so first move it into a
    helper that takes `ctx` and the user id, then call that helper from
    `submit`. The window math in `evaluateFixedWindow` can stay as is.
-4. Add "feedback" to the table list in the TODO.md item "Account deletion must
-   revoke application access".
+4. Add "feedback" to the account-deletion cascade. Done 2026-09-27
+   (ADR-0044).
 
 **Notes.** The internal `list` query (`convex/feedback.ts:24-28`) loads the
 whole table in one read, but nothing calls it. Feedback is read in the Convex

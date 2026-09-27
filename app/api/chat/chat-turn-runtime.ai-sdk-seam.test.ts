@@ -8,7 +8,7 @@ import { jsonSchema, streamText, tool } from "ai"
 import { MockLanguageModelV4, simulateReadableStream } from "ai/test"
 import { fetchMutation as convexNextjsFetchMutation } from "convex/nextjs"
 import { getFunctionName } from "convex/server"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   createChatTurnRuntime,
   type ChatTurnDeps,
@@ -475,6 +475,11 @@ function makeDeps(
 beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, "log").mockImplementation(() => {})
+  // The budget store signs each call with the server secret (ADR-0045).
+  vi.stubEnv(
+    "CHAT_ADMISSION_SECRET",
+    "test-chat-admission-secret-with-32-bytes"
+  )
   vi.mocked(getEffectiveToolKeyWithMode).mockResolvedValue({
     key: undefined,
     keyMode: undefined,
@@ -487,6 +492,8 @@ beforeEach(() => {
     return null
   })
 })
+
+afterEach(() => vi.unstubAllEnvs())
 
 describe("chat turn runtime × real ai@7 streamText", () => {
   it("forwards real reasoning lifecycle events into finite finish metadata", async () => {

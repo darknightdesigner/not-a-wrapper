@@ -1,42 +1,30 @@
+import type { UserIdentity } from "convex/server"
+import type { Id } from "./_generated/dataModel"
 import type { MutationCtx } from "./_generated/server"
+import { ensureAccountDeletionJob } from "./domain/account_deletion"
 
-type AppUserSyncInput = {
+// Profile facts from a signature-verified WorkOS webhook (ADR-0044). Only
+// these handlers may write email, names, avatar, or `workosUpdatedAt`.
+type VerifiedWorkOSUser = {
   workosUserId: string
   email: string
   firstName?: string | null
   lastName?: string | null
-  displayName?: string
   profileImage?: string | null
   workosUpdatedAt?: string | null
-  markActive?: boolean
 }
 
-type AppUserDeleteInput = Pick<
-  AppUserSyncInput,
-  | "workosUserId"
-  | "email"
-  | "firstName"
-  | "lastName"
-  | "displayName"
-  | "profileImage"
-  | "workosUpdatedAt"
->
-
-function displayNameFromWorkOSUser(user: {
-  email: string
-  firstName?: string | null
+function fullName(
+  firstName?: string | null,
   lastName?: string | null
-  displayName?: string | null
-}) {
-  if (user.displayName?.trim()) {
-    return user.displayName.trim()
-  }
+): string | undefined {
+  const name = [firstName, lastName].filter(Boolean).join(" ").trim()
+  return name || undefined
+}
 
-  const fullName = [user.firstName, user.lastName]
-    .filter(Boolean)
-    .join(" ")
-    .trim()
-  if (fullName) return fullName
+function displayNameFromWorkOSUser(user: VerifiedWorkOSUser) {
+  const name = fullName(user.firstName, user.lastName)
+  if (name) return name
 
   const [localPart] = user.email.split("@")
   return localPart || user.email
@@ -55,17 +43,24 @@ function isOlderWorkOSUpdate(
   return incomingTime < existingTime
 }
 
+async function findAppUser(ctx: MutationCtx, workosUserId: string) {
+  return await ctx.db
+    .query("users")
+    .withIndex("by_workos_user_id", (q) => q.eq("workosUserId", workosUserId))
+    .unique()
+}
+
+/**
+ * Verified `user.created` / `user.updated` sync. Never touches the lifecycle
+ * flags: WorkOS deletions are permanent, so a deleted tombstone ignores every
+ * later profile event instead of being repopulated or reactivated.
+ */
 export async function upsertAppUserFromWorkOS(
   ctx: MutationCtx,
-  input: AppUserSyncInput
-) {
-  const existingUser = await ctx.db
-    .query("users")
-    .withIndex("by_workos_user_id", (q) =>
-      q.eq("workosUserId", input.workosUserId)
-    )
-    .unique()
-
+  input: VerifiedWorkOSUser
+): Promise<Id<"users">> {
+  const existingUser = await findAppUser(ctx, input.workosUserId)
+  if (existingUser?.deletedAt !== undefined) return existingUser._id
   if (
     existingUser &&
     isOlderWorkOSUpdate(existingUser.workosUpdatedAt, input.workosUpdatedAt)
@@ -74,96 +69,92 @@ export async function upsertAppUserFromWorkOS(
   }
 
   const now = Date.now()
-  const displayName = displayNameFromWorkOSUser(input)
-  const profileImage =
-    input.profileImage === null ? undefined : input.profileImage
-  const workosUpdatedAt = input.workosUpdatedAt ?? existingUser?.workosUpdatedAt
+  const profile = {
+    email: input.email,
+    displayName: displayNameFromWorkOSUser(input),
+    workosUpdatedAt:
+      input.workosUpdatedAt ?? existingUser?.workosUpdatedAt ?? undefined,
+    lastSyncedFromWorkOSAt: now,
+    // null = WorkOS removed the picture; undefined = not in this payload.
+    ...(input.profileImage !== undefined
+      ? { profileImage: input.profileImage ?? undefined }
+      : {}),
+  }
 
   if (existingUser) {
-    const updates: {
-      email: string
-      displayName: string
-      profileImage?: string | undefined
-      workosUpdatedAt: string | undefined
-      lastSyncedFromWorkOSAt: number
-      lastActiveAt?: number
-      deletedAt: undefined
-      disabledAt: undefined
-    } = {
-      email: input.email,
-      displayName,
-      workosUpdatedAt,
-      lastSyncedFromWorkOSAt: now,
-      ...(input.markActive ? { lastActiveAt: now } : {}),
-      deletedAt: undefined,
-      disabledAt: undefined,
-    }
-
-    if (input.profileImage !== undefined) {
-      updates.profileImage = profileImage
-    }
-
-    await ctx.db.patch(existingUser._id, updates)
+    await ctx.db.patch(existingUser._id, profile)
     return existingUser._id
   }
 
   return await ctx.db.insert("users", {
     workosUserId: input.workosUserId,
-    email: input.email,
-    displayName,
-    profileImage,
+    ...profile,
     anonymous: false,
     premium: false,
     messageCount: 0,
     dailyMessageCount: 0,
-    lastSyncedFromWorkOSAt: now,
-    workosUpdatedAt,
-    ...(input.markActive ? { lastActiveAt: now } : {}),
   })
 }
 
+/**
+ * The public bootstrap's core: insert-only, from the verified access token.
+ * Profile fields come only from claims the token actually carries (WorkOS
+ * access tokens carry none by default); the verified webhook fills the rest.
+ * The caller's builder has already rejected a deleted or disabled row.
+ */
+export async function insertAppUserFromIdentity(
+  ctx: MutationCtx,
+  identity: UserIdentity
+): Promise<Id<"users">> {
+  const existingUser = await findAppUser(ctx, identity.subject)
+  if (existingUser) return existingUser._id
+
+  return await ctx.db.insert("users", {
+    workosUserId: identity.subject,
+    email: identity.email,
+    displayName:
+      identity.name?.trim() ||
+      fullName(identity.givenName, identity.familyName),
+    profileImage: identity.pictureUrl,
+    anonymous: false,
+    premium: false,
+    messageCount: 0,
+    dailyMessageCount: 0,
+    lastActiveAt: Date.now(),
+  })
+}
+
+/**
+ * Verified account deletion (WorkOS `user.deleted`, or the operator's
+ * `users.deleteAccount`). Always applies: there is no older-update skip, so no
+ * stored timestamp can block it. Keeps the row as a permanent tombstone so the
+ * bootstrap cannot resurrect it, and schedules the owned-data drain.
+ */
 export async function softDeleteAppUserFromWorkOS(
   ctx: MutationCtx,
-  input: AppUserDeleteInput
-) {
-  const existingUser = await ctx.db
-    .query("users")
-    .withIndex("by_workos_user_id", (q) =>
-      q.eq("workosUserId", input.workosUserId)
-    )
-    .unique()
-
+  input: { workosUserId: string; workosUpdatedAt?: string | null }
+): Promise<Id<"users">> {
+  const existingUser = await findAppUser(ctx, input.workosUserId)
   const now = Date.now()
 
-  if (!existingUser) {
-    return await ctx.db.insert("users", {
-      workosUserId: input.workosUserId,
-      email: input.email,
-      displayName: displayNameFromWorkOSUser(input),
-      profileImage: input.profileImage ?? undefined,
-      anonymous: false,
-      premium: false,
-      messageCount: 0,
-      dailyMessageCount: 0,
-      deletedAt: now,
-      disabledAt: now,
-      lastSyncedFromWorkOSAt: now,
-      workosUpdatedAt: input.workosUpdatedAt ?? undefined,
-    })
-  }
+  const userId = existingUser
+    ? existingUser._id
+    : await ctx.db.insert("users", {
+        workosUserId: input.workosUserId,
+        anonymous: false,
+        premium: false,
+        messageCount: 0,
+        dailyMessageCount: 0,
+      })
 
-  if (
-    isOlderWorkOSUpdate(existingUser.workosUpdatedAt, input.workosUpdatedAt)
-  ) {
-    return existingUser._id
-  }
-
-  await ctx.db.patch(existingUser._id, {
-    deletedAt: existingUser.deletedAt ?? now,
-    disabledAt: existingUser.disabledAt ?? now,
+  await ctx.db.patch(userId, {
+    deletedAt: existingUser?.deletedAt ?? now,
+    disabledAt: existingUser?.disabledAt ?? now,
     lastSyncedFromWorkOSAt: now,
-    workosUpdatedAt: input.workosUpdatedAt ?? existingUser.workosUpdatedAt,
+    workosUpdatedAt:
+      input.workosUpdatedAt ?? existingUser?.workosUpdatedAt ?? undefined,
   })
+  await ensureAccountDeletionJob(ctx, userId)
 
-  return existingUser._id
+  return userId
 }

@@ -1,5 +1,6 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
+import { getConvexSize, getDocumentSize } from "convex/values"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { api, internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
@@ -7,6 +8,7 @@ import {
   CANCELLATION_SETTLEMENT_PROTOCOL_VERSION,
   signChatAdmissionProof,
 } from "./lib/chatAdmissionProof"
+import { sha256Hex } from "./lib/sha256"
 import schema from "./schema"
 import { modules } from "./test.setup"
 
@@ -254,5 +256,148 @@ describe("reapExpiredGenerationRuns (index range semantics)", () => {
     )
     expect(a?.status).toBe("running")
     expect(b?.status).not.toBe("running")
+  })
+})
+
+describe("Convex document and read limits", () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  const toolTurn = (steps: number, outputBytes: number, answer: string) => [
+    ...Array.from({ length: steps }, (_, step) => ({
+      type: "dynamic-tool",
+      toolName: "fetch_page",
+      toolCallId: `call_${step}`,
+      state: "output-available",
+      input: { url: `https://example.com/${step}` },
+      output: {
+        content: [{ type: "text", text: `${step}`.padEnd(outputBytes, "x") }],
+      },
+    })),
+    { type: "text", text: answer },
+  ]
+
+  it("reads a long branched chat once per turn and stores an oversized tool turn under 1 MiB", async () => {
+    vi.stubEnv("CHAT_ADMISSION_SECRET", SECRET)
+    // 40 turns, every fifth answer carrying 400 KB of tool output, plus a
+    // deselected regeneration of one of them: about 3.6 MiB. Before the
+    // read-once prepare this chat cost ~29 MiB of reads per send.
+    const turns = Array.from({ length: 40 }, (_, turn) => ({
+      user: `question ${turn}`,
+      parts:
+        turn % 5 === 0
+          ? toolTurn(4, 100_000, `answer ${turn}`)
+          : toolTurn(0, 0, `answer ${turn}`),
+    }))
+    // Answers dominate; turn 0's answer is stored twice (the regeneration).
+    const chatBytes = turns.reduce(
+      (sum, turn) => sum + getConvexSize(turn.parts),
+      getConvexSize(turns[0]!.parts)
+    )
+    const t = convexTest({
+      schema,
+      modules,
+      // One full read plus the handful of small rows each function touches.
+      transactionLimits: { bytesRead: Math.ceil(chatBytes * 1.5) },
+    })
+    const owner = await seedOwner(t, OWNER, "chat-long")
+    const tailMessageId = await t.run(async (ctx) => {
+      let parentMessageId: Id<"messages"> | undefined
+      let orderId = 0
+      for (const [turn, { user, parts }] of turns.entries()) {
+        const base = {
+          chatId: owner.chatId,
+          status: "completed" as const,
+          createdAt: turn,
+          updatedAt: turn,
+        }
+        const userMessageId: Id<"messages"> = await ctx.db.insert("messages", {
+          ...base,
+          orderId: ++orderId,
+          clientMessageId: `user-${turn}`,
+          userId: owner.userId,
+          role: "user",
+          content: user,
+          parts: [{ type: "text", text: user }],
+          parentMessageId,
+          branchIndex: 0,
+          selected: true,
+        })
+        const answer = {
+          ...base,
+          role: "assistant" as const,
+          content: `answer ${turn}`,
+          parts,
+          parentMessageId: userMessageId,
+        }
+        if (turn === 0) {
+          await ctx.db.insert("messages", {
+            ...answer,
+            orderId: ++orderId,
+            branchIndex: 0,
+            selected: false,
+          })
+        }
+        parentMessageId = await ctx.db.insert("messages", {
+          ...answer,
+          orderId: ++orderId,
+          branchIndex: turn === 0 ? 1 : 0,
+          selected: true,
+        })
+      }
+      return parentMessageId!
+    })
+
+    const grantDigest = sha256Hex("worker-secret")
+    const turn = {
+      chatId: "chat-long",
+      expectedVisibleMessageCount: 80,
+      tailMessageId,
+      latestUserMessage: {
+        id: "user-next",
+        role: "user" as const,
+        content: "one more",
+        parts: [{ type: "text", text: "one more" }],
+      },
+    }
+    const signedIn = t.withIdentity({ subject: OWNER })
+    const plan = await signedIn.query(api.chatRuntime.planGenerationInput, turn)
+    const proof = {
+      chatId: turn.chatId,
+      requestId: "request_long",
+      model: "gpt-5-mini",
+      provider: "openai",
+      grantDigest,
+      generationInputHash: plan.inputHash,
+      cancellationSettlementVersion: CANCELLATION_SETTLEMENT_PROTOCOL_VERSION,
+    }
+    const issuedAt = Date.now()
+    const { runId, assistantMessageId } = await signedIn.mutation(
+      api.chatRuntime.prepareGeneration,
+      {
+        ...turn,
+        ...proof,
+        admissionIssuedAt: issuedAt,
+        admissionProof: signChatAdmissionProof({ ...proof, issuedAt }, SECRET),
+      }
+    )
+
+    // A 20-step turn of 100 KB tool results is ~2 MiB: Convex would reject
+    // the whole completion write and keep the empty placeholder.
+    const answer = "final answer"
+    const parts = toolTurn(20, 100_000, answer)
+    await t.mutation(internal.chatRuntimeWorker.markGenerationRunCompleted, {
+      runId,
+      grantDigest,
+      messageId: assistantMessageId,
+      content: answer,
+      parts,
+    })
+
+    const stored = await t.run((ctx) => ctx.db.get(assistantMessageId))
+    expect(getDocumentSize(stored!)).toBeLessThan(1024 * 1024)
+    expect(stored).toMatchObject({ status: "completed", content: answer })
+    expect(stored!.parts[0].output).toMatchObject({ _truncated: true })
+    expect(stored!.parts.at(-2)).toEqual(parts.at(-2))
+    expect(stored!.parts.at(-1)).toEqual({ type: "text", text: answer })
   })
 })

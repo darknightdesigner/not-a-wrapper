@@ -1,5 +1,5 @@
 import { authenticatedRoute } from "@/app/api/_lib/authenticated-route"
-import { internalServerError, jsonError } from "@/app/api/_lib/convex"
+import { jsonError, routeFailureResponse } from "@/app/api/_lib/convex"
 import { api } from "@/convex/_generated/api"
 import { encryptSecret } from "@/lib/encryption"
 import { NextResponse } from "next/server"
@@ -50,7 +50,7 @@ export const POST = authenticatedRoute(async (request, { session, convex }) => {
     })
   } catch (error) {
     console.error("Error in POST /api/user-keys:", error)
-    return internalServerError()
+    return routeFailureResponse(error)
   }
 })
 
@@ -67,6 +67,6 @@ export const DELETE = authenticatedRoute(async (request, { convex }) => {
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error("Error in DELETE /api/user-keys:", error)
-    return internalServerError()
+    return routeFailureResponse(error)
   }
 })

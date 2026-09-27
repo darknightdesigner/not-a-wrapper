@@ -15,10 +15,10 @@ import {
 } from "./lib/runTimingReceipt"
 import {
   isIgnoredSignal,
-  isSupersedableGenerationRunStatus,
-  isSupersedableMessageStatus,
   resolveGenerationRunTransition,
   resolveTerminalAssistantMessageResolution,
+  SUPERSEDABLE_MESSAGE_STATUSES,
+  SUPERSEDABLE_RUN_STATUSES,
   type AssistantMessageFacts,
   type LifecycleVerdict,
   type MessageResolution,
@@ -33,6 +33,7 @@ import {
 import {
   createMessageBranchWriter,
   planSelectedPathAfterUserMessage,
+  type MessageBranchWriter,
 } from "./domain/message_branch_writes"
 import {
   createBranchContext,
@@ -50,7 +51,10 @@ import {
   logChatPerfConvex,
   shouldSampleChatPerfConvex,
 } from "./domain/chat_perf"
-import { extractTextFromMessageParts } from "./domain/message_parts"
+import {
+  capMessagePayload,
+  extractTextFromMessageParts,
+} from "./domain/message_parts"
 import { MAX_STOP_OBSERVED_TEXT_CHARS } from "./domain/message_facts"
 import {
   hasSemanticAssistantParts,
@@ -322,8 +326,6 @@ type CanonicalApprovalDecision = {
   reason?: string
 }
 
-const ACTIVE_RUN_SCAN_LIMIT = 50
-
 /**
  * Execution-grant lifetime (ADR-0011), budget-derived from route max,
  * settlement reserve, and slack. Must comfortably exceed the
@@ -525,14 +527,6 @@ function validateSelectedPathToken(
   throw new Error("Stale chat state: selected path changed")
 }
 
-async function validateSelectedPathTokenForChat(
-  ctx: MutationCtx,
-  chatId: Id<"chats">,
-  token: SelectedPathToken
-) {
-  validateSelectedPathToken(await listMessages(ctx, chatId), token)
-}
-
 // Resolves the semantic sibling an empty terminal placeholder reverts to,
 // preferring the branch a regeneration forked from (regenerationSourceMessageId),
 // else the latest. Pure over the messages array — the Generation run lifecycle
@@ -668,9 +662,12 @@ async function applyMessageResolution(
           (candidate) => candidate._id === resolution.siblingId
         )
         if (sibling) {
+          // `messages` was read in this transaction's gather step and nothing
+          // has written since, so the writer reuses it.
           await createMessageBranchWriter(ctx, {
             chatId: message.chatId,
             now,
+            messages,
           }).select(sibling._id)
         }
       }
@@ -930,28 +927,39 @@ function resolveWorkDurationMs(
   )
 }
 
+/**
+ * Closes every live-looking run and message a new generation supersedes.
+ * Returns true when it wrote anything, so a caller holding the chat's messages
+ * knows its copy is stale.
+ */
 export async function closeSupersededGenerationsForChat(
   ctx: MutationCtx,
   chatId: Id<"chats">,
   userId: Id<"users">,
   now: number
-) {
-  const runs = await ctx.db
-    .query("generationRuns")
-    .withIndex("by_chat_updated", (q) => q.eq("chatId", chatId))
-    .order("desc")
-    .take(ACTIVE_RUN_SCAN_LIMIT)
+): Promise<boolean> {
+  // Every live run in the chat, read by status rather than a recency window,
+  // so no older live run keeps its grant and reservation past the sweep.
+  const runs = (
+    await Promise.all(
+      SUPERSEDABLE_RUN_STATUSES.map((status) =>
+        ctx.db
+          .query("generationRuns")
+          .withIndex("by_chat_status", (q) =>
+            q.eq("chatId", chatId).eq("status", status)
+          )
+          .collect()
+      )
+    )
+  )
+    .flat()
+    .sort((left, right) => right.updatedAt - left.updatedAt)
 
-  const supersededRunIds = new Set<Id<"generationRuns">>()
   const supersededMessageIds = new Set<Id<"messages">>()
   const reason = "superseded by a new generation"
+  let wrote = false
 
   for (const run of runs) {
-    // Fast-path pre-filter with the lifecycle predicate. The supersede resolve
-    // below is authoritative, but gathering facts for every run in the scan
-    // window (most already terminal) would be wasteful — same predicate, same
-    // answer, so a non-supersedable run never reaches the gather.
-    if (!isSupersedableGenerationRunStatus(run.status)) continue
     if (run.userId !== undefined && run.userId !== userId) continue
 
     const resolved = await gatherAssistantMessageFacts(ctx, run, undefined)
@@ -961,7 +969,7 @@ export async function closeSupersededGenerationsForChat(
     )
     if (verdict.kind === "ignore") continue
 
-    supersededRunIds.add(run._id)
+    wrote = true
     const assistantMessageId = await applyLifecycleVerdict(
       ctx,
       run,
@@ -972,24 +980,34 @@ export async function closeSupersededGenerationsForChat(
     if (assistantMessageId) supersededMessageIds.add(assistantMessageId)
   }
 
-  const assistantMessages = await ctx.db
-    .query("messages")
-    .withIndex("by_chat_role", (q) =>
-      q.eq("chatId", chatId).eq("role", "assistant")
+  // Terminal statuses are settled turns — completed answers and first-class
+  // failed/aborted stubs alike. The sweep must not delete or restate them; it
+  // only closes out messages a live-looking run left behind, so it reads just
+  // those rows instead of every assistant message in the chat.
+  const liveMessages = (
+    await Promise.all(
+      SUPERSEDABLE_MESSAGE_STATUSES.map((status) =>
+        ctx.db
+          .query("messages")
+          .withIndex("by_chat_status", (q) =>
+            q.eq("chatId", chatId).eq("status", status)
+          )
+          .collect()
+      )
     )
-    .collect()
+  )
+    .flat()
+    .filter((message) => message.role === "assistant")
+    .sort((left, right) => left._creationTime - right._creationTime)
 
-  for (const message of assistantMessages) {
+  for (const message of liveMessages) {
     if (supersededMessageIds.has(message._id)) continue
-    // Terminal statuses are settled turns — completed answers and first-class
-    // failed/aborted stubs alike. The sweep must not delete or restate them;
-    // it only closes out messages a live-looking run left behind.
-    if (!isSupersedableMessageStatus(message.status)) continue
+    wrote = true
 
-    // Orphan messages whose run fell outside the scan window: the terminal
-    // policy runs with no reused-regeneration restore (there is no run in hand
-    // to date the message against), so an empty message keeps/deletes and a
-    // semantic one is stamped aborted — the pre-extraction split, unchanged.
+    // Orphan messages whose run is no longer live (every live run closed
+    // above): the terminal policy runs with no reused-regeneration restore
+    // (there is no run in hand to date the message against), so an empty
+    // message keeps/deletes and a semantic one is stamped aborted.
     const hasSemantic = hasSemanticAssistantParts(message)
     let orphanMessages: Doc<"messages">[] | null = null
     let fallbackSiblingId: Id<"messages"> | null = null
@@ -997,7 +1015,7 @@ export async function closeSupersededGenerationsForChat(
       orphanMessages = await listMessages(ctx, chatId)
       fallbackSiblingId = resolveFallbackSibling(orphanMessages, message)
     }
-    const supersededMessageId = await applyMessageResolution(
+    await applyMessageResolution(
       ctx,
       message,
       resolveTerminalAssistantMessageResolution(
@@ -1012,72 +1030,9 @@ export async function closeSupersededGenerationsForChat(
       orphanMessages,
       now
     )
-
-    if (
-      message.generationRunId &&
-      !supersededRunIds.has(message.generationRunId)
-    ) {
-      const run = await ctx.db.get(message.generationRunId)
-      if (run && run.chatId === chatId) {
-        // The message half was already resolved above; the run closes via the
-        // lifecycle's supersede rule like the in-window runs, with message:null
-        // so the verdict does not restate it.
-        const verdict = resolveGenerationRunTransition(
-          { runStatus: run.status, message: null },
-          { kind: "supersede", reason }
-        )
-        if (verdict.kind === "transition") {
-          // Pre-terminal snapshot for the accounting hooks (see
-          // applyLifecycleVerdict): the patch below revokes the grant the
-          // deferral must copy.
-          const preTerminalRun: Doc<"generationRuns"> = { ...run }
-          await ctx.db.patch(run._id, {
-            status: verdict.run.status,
-            error: verdict.run.error,
-            completedAt: verdict.run.settle ? now : undefined,
-            updatedAt: now,
-            activeStreamId: undefined,
-            ...(verdict.run.terminalReason
-              ? { terminalReason: verdict.run.terminalReason }
-              : {}),
-            ...grantRevocationForStatus(verdict.run.status),
-            // Same receipt-attach capability as the in-window supersede
-            // (ADR-0030): this run's worker may still be live and needs it to
-            // land its partial receipt after the grant above is revoked.
-            ...timingReceiptAttachGrant(
-              run,
-              verdict.run.status,
-              undefined,
-              now
-            ),
-            ...LEASE_CLEAR,
-            assistantMessageId: supersededMessageId,
-          })
-          if (verdict.run.settle) {
-            // Same deferral as the in-window supersede: cancellation-like
-            // terminals mark accounting pending instead of settling blind.
-            const deferred =
-              verdict.run.terminalReason === "superseded" &&
-              (await deferUsageSettlementForTerminalRun(
-                ctx,
-                preTerminalRun,
-                "superseded",
-                now
-              ))
-            if (!deferred) {
-              await settleUsageForTerminalRun(
-                ctx,
-                preTerminalRun,
-                {},
-                "superseded",
-                verdict.run.terminalReason
-              )
-            }
-          }
-        }
-      }
-    }
   }
+
+  return wrote
 }
 
 type StoredUserMessage = {
@@ -1113,20 +1068,16 @@ type SelectedPathToken = {
 // the client could not have counted yet. Re-validating here after the sweep
 // falsely rejected the first send following a reaped zombie run.
 async function selectOrInsertLatestUserMessageForGeneration(
-  ctx: MutationCtx,
+  writer: MessageBranchWriter,
   owner: AuthenticatedChatOwner,
   args: {
     requestId: string
     model: string
     provider: string
   },
-  latestUserMessage: StoredUserMessage,
-  now: number
+  latestUserMessage: StoredUserMessage
 ) {
-  const message = await createMessageBranchWriter(ctx, {
-    chatId: owner.chat._id,
-    now,
-  }).writeUserMessage({
+  const message = await writer.writeUserMessage({
     clientMessageId: latestUserMessage.id,
     userId: owner.user._id,
     content:
@@ -1150,24 +1101,26 @@ export async function applyRegenerationIntentForGeneration(
     runId: Id<"generationRuns">
     regeneration: GenerationRegenerationIntent
   },
-  now: number
+  now: number,
+  /** The chat's messages as this transaction last read them, if still exact. */
+  messages?: Doc<"messages">[]
 ) {
-  const currentMessages = await listMessages(ctx, owner.chat._id)
+  const currentMessages = messages ?? (await listMessages(ctx, owner.chat._id))
   const regenerationPlan = resolveRegenerationInputPlan(
     currentMessages,
     args.regeneration
   )
 
-  await denyPendingApprovalsForChat(
-    ctx,
-    owner.chat._id,
-    owner.user._id,
-    "auto-denied: new generation started"
-  )
-
   const assistantMessage = await createMessageBranchWriter(ctx, {
     chatId: owner.chat._id,
     now,
+    messages: await denyPendingApprovalsForChat(
+      ctx,
+      owner.chat._id,
+      owner.user._id,
+      "auto-denied: new generation started",
+      currentMessages
+    ),
   }).writeAssistantPlaceholder({
     generationRunId: args.runId,
     requestId: args.requestId,
@@ -1259,15 +1212,11 @@ export async function applyEditIntentForGeneration(
     provider: string
     edit: GenerationEditIntent
   },
-  now: number
+  writer: MessageBranchWriter
 ): Promise<number | undefined> {
-  const currentMessages = await listMessages(ctx, owner.chat._id)
-  const editPlan = resolveEditInputPlan(currentMessages, args.edit)
+  const editPlan = resolveEditInputPlan(await writer.messages(), args.edit)
 
-  await createMessageBranchWriter(ctx, {
-    chatId: owner.chat._id,
-    now,
-  }).writeUserMessage({
+  await writer.writeUserMessage({
     clientMessageId: args.edit.replacementMessage.id,
     userId: owner.user._id,
     content: args.edit.replacementMessage.content,
@@ -1417,30 +1366,44 @@ export function resolveCanonicalApprovalDecision(
   }
 }
 
+/**
+ * Denies the user's pending approvals in a chat. Given the chat's messages as
+ * this transaction last read them, it returns them with its own writes
+ * applied; without them it returns undefined.
+ */
 export async function denyPendingApprovalsForChat(
   ctx: MutationCtx,
   chatId: Id<"chats">,
   userId: Id<"users">,
-  reason: string
-) {
-  const pending = await ctx.db
-    .query("toolApprovalRequests")
-    .withIndex("by_chat_status", (q) =>
-      q.eq("chatId", chatId).eq("status", "pending")
-    )
-    .collect()
-  const now = nowMs()
-
-  for (const request of pending) {
-    if (request.userId !== userId) continue
-    const run = await ctx.db.get(request.runId)
-    const assistantMessages = await ctx.db
-      .query("messages")
-      .withIndex("by_chat_role", (q) =>
-        q.eq("chatId", chatId).eq("role", "assistant")
+  reason: string,
+  messages?: Doc<"messages">[]
+): Promise<Doc<"messages">[] | undefined> {
+  const pending = (
+    await ctx.db
+      .query("toolApprovalRequests")
+      .withIndex("by_chat_status", (q) =>
+        q.eq("chatId", chatId).eq("status", "pending")
       )
       .collect()
-    const associatedMessages = assistantMessages.filter(
+  ).filter((request) => request.userId === userId)
+  if (pending.length === 0) return messages
+  const now = nowMs()
+  // Kept current below: several approvals can share a message.
+  const assistantMessages = new Map(
+    (
+      messages?.filter((message) => message.role === "assistant") ??
+      (await ctx.db
+        .query("messages")
+        .withIndex("by_chat_role", (q) =>
+          q.eq("chatId", chatId).eq("role", "assistant")
+        )
+        .collect())
+    ).map((message) => [message._id, message])
+  )
+
+  for (const request of pending) {
+    const run = await ctx.db.get(request.runId)
+    const associatedMessages = [...assistantMessages.values()].filter(
       (message) =>
         message._id === request.assistantMessageId ||
         message.generationRunId === request.runId
@@ -1479,7 +1442,7 @@ export async function denyPendingApprovalsForChat(
     })
 
     for (const message of associatedMessages) {
-      await ctx.db.patch(message._id, {
+      const patch: Partial<Doc<"messages">> = {
         parts: applyApprovalResponseToParts(message.parts, {
           approvalId: request.approvalId,
           toolCallId: request.toolCallId,
@@ -1490,7 +1453,9 @@ export async function denyPendingApprovalsForChat(
           ? { status: "aborted" as const, error: reason }
           : {}),
         updatedAt: now,
-      })
+      }
+      await ctx.db.patch(message._id, patch)
+      assistantMessages.set(message._id, { ...message, ...patch })
     }
 
     for (const invocation of associatedInvocations) {
@@ -1541,6 +1506,9 @@ export async function denyPendingApprovalsForChat(
       }
     }
   }
+  return messages?.map(
+    (message) => assistantMessages.get(message._id) ?? message
+  )
 }
 
 export async function applyApprovalResponses(
@@ -1554,7 +1522,9 @@ export async function applyApprovalResponses(
     toolName: string
     approved: boolean
     reason?: string
-  }>
+  }>,
+  /** The chat's messages as this transaction last read them, if still exact. */
+  currentMessages?: Doc<"messages">[]
 ): Promise<{
   message: Doc<"messages">
   /**
@@ -1576,7 +1546,7 @@ export async function applyApprovalResponses(
 } | null> {
   if (responses.length === 0) return null
 
-  const messages = await listMessages(ctx, owner.chat._id)
+  const messages = currentMessages ?? (await listMessages(ctx, owner.chat._id))
   const messageById = new Map(messages.map((message) => [message._id, message]))
   let updatedMessage: Doc<"messages"> | null = null
   let pausedRunId: Id<"generationRuns"> | null = null
@@ -1860,10 +1830,15 @@ export async function planGenerationInputForChat(
   ctx: QueryCtx | MutationCtx,
   owner: AuthenticatedChatOwner,
   args: GenerationInputPlanArgs,
-  options: { continuationProvider?: string } = {}
+  options: {
+    continuationProvider?: string
+    /** The chat's messages as this transaction already read them. */
+    messages?: Doc<"messages">[]
+  } = {}
 ): Promise<GenerationInputPlan> {
   validateGenerationInputIntent(args)
-  const currentMessages = await listMessages(ctx, owner.chat._id)
+  const currentMessages =
+    options.messages ?? (await listMessages(ctx, owner.chat._id))
   const approvalResponses = args.approvalResponses ?? []
   let modelHistory: Doc<"messages">[]
   let pinnedProvider: string | undefined
@@ -1999,12 +1974,20 @@ export async function prepareGenerationForChat(
   args: PrepareGenerationForChatArgs
 ) {
   const now = nowMs()
+  const chatId = owner.chat._id
   const approvalResponses = args.approvalResponses ?? []
 
   validateGenerationInputIntent(args)
+  // Convex bills every document read against the transaction's 16 MiB read
+  // limit, repeats included, so prepare reads the chat once and hands that
+  // copy down. It stays exact until a step writes messages outside the branch
+  // writer; that step drops it and the next consumer reads again.
+  let messages: Doc<"messages">[] | undefined = await listMessages(ctx, chatId)
+
   if (args.generationInputHash) {
     const currentPlan = await planGenerationInputForChat(ctx, owner, args, {
       continuationProvider: args.provider,
+      messages,
     })
     if (!timingSafeEqualHex(currentPlan.inputHash, args.generationInputHash)) {
       throw new ConvexError({
@@ -2021,31 +2004,42 @@ export async function prepareGenerationForChat(
       : args.latestUserMessage
 
   if (latestUserMessage && !args.edit) {
-    await validateSelectedPathTokenForChat(ctx, owner.chat._id, {
+    validateSelectedPathToken(messages, {
       expectedVisibleMessageCount: args.expectedVisibleMessageCount,
       tailMessageId: args.tailMessageId,
     })
   }
 
-  await closeSupersededGenerationsForChat(ctx, owner.chat._id, owner.user._id, now)
+  if (
+    await closeSupersededGenerationsForChat(ctx, chatId, owner.user._id, now)
+  ) {
+    messages = undefined
+  }
 
   const continuation = await applyApprovalResponses(
     ctx,
     owner,
     args.provider,
-    approvalResponses
+    approvalResponses,
+    messages
   )
   const continuationMessage = continuation?.message ?? null
+  if (continuation) messages = undefined
 
   let titleGeneration: number | undefined
+  // One writer serves the user write, the placeholder write, and the final
+  // history projection, all from the same read.
+  let writer: MessageBranchWriter | null = null
 
   if (latestUserMessage) {
-    await denyPendingApprovalsForChat(
+    messages = await denyPendingApprovalsForChat(
       ctx,
-      owner.chat._id,
+      chatId,
       owner.user._id,
-      "auto-denied: new generation started"
+      "auto-denied: new generation started",
+      messages
     )
+    writer = createMessageBranchWriter(ctx, { chatId, now, messages })
 
     if (args.edit) {
       titleGeneration = await applyEditIntentForGeneration(
@@ -2057,15 +2051,14 @@ export async function prepareGenerationForChat(
           provider: args.provider,
           edit: args.edit,
         },
-        now
+        writer
       )
     } else {
       await selectOrInsertLatestUserMessageForGeneration(
-        ctx,
+        writer,
         owner,
         args,
-        latestUserMessage as StoredUserMessage,
-        now
+        latestUserMessage as StoredUserMessage
       )
       if (owner.chat.titleSource === "provisional") {
         titleGeneration = owner.chat.titleGeneration
@@ -2134,8 +2127,7 @@ export async function prepareGenerationForChat(
   }
 
   let assistantMessageId: Id<"messages">
-  let includeAssistantInModelHistory = false
-  let preparedModelHistory: Doc<"messages">[] | null = null
+  let modelHistory: Doc<"messages">[]
   let resumedOutputTokensBaseline: number | undefined
 
   if (args.regeneration) {
@@ -2149,10 +2141,11 @@ export async function prepareGenerationForChat(
         runId,
         regeneration: args.regeneration,
       },
-      now
+      now,
+      messages
     )
     assistantMessageId = preparedRegeneration.assistantMessageId
-    preparedModelHistory = preparedRegeneration.messages
+    modelHistory = preparedRegeneration.messages
   } else if (continuationMessage) {
     // Approval-continuation idempotency, layer 1 of 3:
     // the paused run records its continuation inside this transaction, so of
@@ -2231,7 +2224,6 @@ export async function prepareGenerationForChat(
       }
     }
     assistantMessageId = continuationMessage._id
-    includeAssistantInModelHistory = true
     // The reused message's existing parts were billed to the PAUSED run's
     // settled reservation. Freeze their partial-output estimate as this run's
     // baseline so cancellation settlement only ever charges the delta this
@@ -2245,17 +2237,25 @@ export async function prepareGenerationForChat(
       status: "streaming",
       updatedAt: now,
     })
+    // History includes the continued assistant message; read after the
+    // continuation writes above.
+    modelHistory = projectModelHistoryMessages(
+      getSelectedPath(await listMessages(ctx, chatId))
+    )
   } else {
-    const assistantMessage = await createMessageBranchWriter(ctx, {
-      chatId: owner.chat._id,
-      now,
-    }).writeAssistantPlaceholder({
+    writer ??= createMessageBranchWriter(ctx, { chatId, now, messages })
+    const assistantMessage = await writer.writeAssistantPlaceholder({
       generationRunId: runId,
       requestId: args.requestId,
       model: args.model,
       provider: args.provider,
     })
     assistantMessageId = assistantMessage._id
+    modelHistory = projectModelHistoryMessages(
+      getSelectedPath(await writer.messages()).filter(
+        (message) => message._id !== assistantMessage._id
+      )
+    )
   }
 
   await ctx.db.patch(runId, {
@@ -2285,15 +2285,6 @@ export async function prepareGenerationForChat(
     },
     now
   )
-
-  const modelHistory =
-    preparedModelHistory ??
-    projectModelHistoryMessages(
-      getSelectedPath(await listMessages(ctx, owner.chat._id)).filter(
-        (message) =>
-          includeAssistantInModelHistory || message._id !== assistantMessageId
-      )
-    )
 
   return {
     runId,
@@ -2584,6 +2575,10 @@ export async function updateAssistantSnapshotForChat(
     return { kind: "stale" as const, lastSequence }
   }
 
+  // Stored capped (see capMessagePayload): an over-limit write would be
+  // rejected whole, freezing the message at its last checkpoint that fit.
+  const payload = capMessagePayload(args.textSnapshot, args.partsSnapshot)
+
   // Write-storm guard: a checkpoint whose content is byte-identical to what the
   // message already carries advances the sequence but must not rewrite the
   // (potentially large) message doc. Historical storms wrote identical
@@ -2591,8 +2586,8 @@ export async function updateAssistantSnapshotForChat(
   // reject them because sequences advance.
   const nextMetadata = resolveSnapshotMetadata(message.metadata, args)
   const contentUnchanged =
-    message.content === args.textSnapshot &&
-    JSON.stringify(message.parts) === JSON.stringify(args.partsSnapshot) &&
+    message.content === payload.content &&
+    JSON.stringify(message.parts) === JSON.stringify(payload.parts) &&
     nextMetadata === undefined
 
   const now = nowMs()
@@ -2608,8 +2603,8 @@ export async function updateAssistantSnapshotForChat(
     const workerExecuting = isWorkerExecutingStatus(run.status)
     if (!contentUnchanged) {
       await ctx.db.patch(args.messageId, {
-        content: args.textSnapshot,
-        parts: args.partsSnapshot,
+        content: payload.content,
+        parts: payload.parts,
         ...(nextMetadata ? { metadata: nextMetadata } : {}),
         ...(workerExecuting && { status: "streaming" as const }),
         updatedAt: now,
@@ -2734,10 +2729,20 @@ export async function markGenerationRunCompletedForChat(
   await requireAssistantMessageForRun(ctx, run, args.messageId)
   const now = nowMs()
   const status = verdict.message.status
+  const payload = capMessagePayload(args.content, args.parts)
+  if (payload.omittedBytes > 0) {
+    console.warn(
+      JSON.stringify({
+        _tag: "message_payload_capped",
+        runId: run._id,
+        omittedBytes: payload.omittedBytes,
+      })
+    )
+  }
 
   await ctx.db.patch(args.messageId, {
-    content: args.content,
-    parts: args.parts,
+    content: payload.content,
+    parts: payload.parts,
     metadata: args.metadata,
     status,
     finishReason: args.finishReason,
