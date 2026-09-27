@@ -322,6 +322,8 @@ export default defineSchema({
   })
     .index("by_chat", ["chatId"])
     // An account deletion job closes the account's live runs first (ADR-0044).
+    // Complete per account: prepareGenerationForChat, the only writer, always
+    // sets userId to the Chat owner (optional by declaration, never absent).
     .index("by_user_status", ["userId", "status"])
     .index("by_status", ["status"])
     .index("by_chat_updated", ["chatId", "updatedAt"])

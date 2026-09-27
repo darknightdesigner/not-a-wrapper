@@ -65,7 +65,8 @@ machinery: one bounded page per scheduled mutation, idempotent, restart-safe,
 blocked on invariant or storage failure, never auto-resumed). Phases:
 
 1. `liveRuns`: every live run of the account (queued, running, streaming;
-   `generationRuns.by_user_status`) is closed through the supersede path, which
+   `generationRuns.by_user_status`, complete because every run carries its
+   Chat owner's `userId`) is closed through the supersede path, which
    revokes its worker grant, and every pending approval is denied through the
    next turn's deny-pending path, which closes the paused run and settles its
    usage. One Chat per batch. This goes first because the lease and approval

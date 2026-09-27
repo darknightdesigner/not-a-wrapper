@@ -377,6 +377,8 @@ const SUPERSEDABLE_RUN_STATUSES = GENERATION_RUN_STATUSES.filter(
   isSupersedableGenerationRunStatus
 )
 
+// Every run carries its Chat owner's userId (see the by_user_status index), so
+// this reaches each live run in the account's Chats.
 async function findLiveRun(
   ctx: ChatDeletionCtx,
   userId: Id<"users">
