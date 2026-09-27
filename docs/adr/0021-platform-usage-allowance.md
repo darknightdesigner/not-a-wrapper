@@ -46,7 +46,10 @@ single Convex mutations (transactional, OCC-serialized).
   Settlement charges the provider-reported cache-read share of input at that
   rate and the rest at the input rate (a third component, `ceil` once); a
   missing rate or count falls back to the full input rate, and reservations
-  stay at the full rate. Only gpt-5-mini declares one today. Cache writes are
+  stay at the full rate. Only gpt-5-mini declares one today, on both of its
+  routes: the direct record states it, and the generated OpenRouter route
+  takes it from the snapshot's `pricing.input_cache_read` (ADR-0007), so the
+  rate follows whichever route the platform tier picks. Cache writes are
   not priced separately because no metered route bills them yet; Claude
   requests turn prompt caching on, so a platform-funded Claude route must
   first price writes (1.25x input).
@@ -376,13 +379,16 @@ balance negative. Estimation is admission control, not the final charge.
 
 - **Retention.** OpenAI and xAI requests send `store: false` (Request
   shaping). Convex already holds each conversation, so a provider-stored
-  response adds nothing. The SDKs then replay statelessly: they request
-  `reasoning.encrypted_content` themselves and send reasoning items inline
-  between steps. The encrypted content rides each reasoning part's provider
-  metadata, so it is persisted with the message; an approval continuation
-  (whose trailing message skips history adaptation) replays the paused
-  step's reasoning from it, the way the stored item used to be referenced.
-  History replay still strips reasoning metadata (ADR-0041). Hosted-tool
+  response adds nothing. The SDKs then replay statelessly within a request:
+  they request `reasoning.encrypted_content` themselves and send reasoning
+  items inline between steps. The encrypted content rides each reasoning
+  part's provider metadata and is persisted with the message, but no later
+  request replays it. History replay strips reasoning metadata (ADR-0041),
+  and an approval continuation's paused step is history too (only its
+  approval parts skip adaptation), so the SDK drops that reasoning and sends
+  the id-less call and its output, as it did with storage on. Replaying it
+  would tie the continuation to the key that produced it, and the route can
+  change credentials between the pause and the continuation. Hosted-tool
   results are never replayed without storage, which is why historical hosted
   activity stays lowered to text (ADR-0029). OpenAI still keeps
   abuse-monitoring logs for up to 30 days; BYOK responses land in the key
@@ -390,10 +396,10 @@ balance negative. Estimation is admission control, not the final charge.
 - **Storage exception.** An OpenAI turn that offers hosted web search
   together with app-executed tools (Exa, content, MCP) keeps the default
   storage. With `store: false`, `@ai-sdk/openai` 4.0.45 drops the hosted
-  `web_search_call` from later steps and from an approval continuation's
-  paused step, but still sends the reasoning item that preceded it; OpenAI
-  requires every item since the last user message to be replayed untouched
-  and rejects a reasoning item without its following item (vercel/ai#8379).
+  `web_search_call` from later steps of the same request but still sends
+  the reasoning item that preceded it; OpenAI requires every item since the
+  last user message to be replayed untouched and rejects a reasoning item
+  without its following item (vercel/ai#8379).
   Stored turns replay by `item_reference`, as before this amendment. The
   decision follows the request's search toggle and tool set, so toggling
   search while an approval is pending can flip the mode between the paused

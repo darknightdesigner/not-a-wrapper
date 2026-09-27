@@ -653,9 +653,11 @@ contract.
 
 **Notes.** The error favors the business: users are overcharged, and we never
 lose money. Only signed-in gpt-5-mini turns (and possibly Mistral) are
-affected today; anonymous turns are subsidized, not metered, and the metered
-OpenRouter routes are free. Cache-write rates and OpenRouter cache prices can
-wait until a metered route needs them. Fix this before the TODO.md
+affected today; anonymous turns are subsidized, not metered. gpt-5-mini's
+OpenRouter route is metered too when the platform tier picks it, so the
+OpenRouter generator carries the snapshot's `pricing.input_cache_read` as
+`cachedInputCost`. Cache-write rates can wait until a metered route needs
+them. Fix this before the TODO.md
 "Monetization" work bills real money from this ledger. The TODO.md "Hosted
 search fees" item is a separate undercharge in the same ledger.
 

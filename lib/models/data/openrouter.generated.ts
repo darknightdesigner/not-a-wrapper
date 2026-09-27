@@ -2810,6 +2810,7 @@ export const openrouterModels: ModelConfig[] = [
     maxOutput: 128000,
     inputCost: 0.25,
     outputCost: 2,
+    cachedInputCost: 0.025,
     priceUnit: "per 1M tokens",
     vision: true,
     tools: true,
