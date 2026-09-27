@@ -1,6 +1,7 @@
 import type { ChatStatus, UIMessage, UIMessageChunk } from "ai"
 import { afterEach, expect, it, vi } from "vitest"
-import { consumeRetainedResponse, ResumableChat } from "./resumable-chat"
+import { RETAINED_STREAM_STALL_MS } from "./protocol"
+import { ResumableChat, RetainedReplay } from "./resumable-chat"
 
 const base: UIMessage = {
   id: "assistant",
@@ -14,6 +15,20 @@ const chunks: UIMessageChunk[] = [
 ]
 const frame = (value: unknown) =>
   new TextEncoder().encode(`${JSON.stringify(value)}\n`)
+
+async function consumeOnce(
+  body: ReadableStream<Uint8Array>,
+  publish: (message: UIMessage) => void,
+  signal: AbortSignal,
+  callbacks?: Parameters<RetainedReplay["consume"]>[2]
+) {
+  const replay = new RetainedReplay(publish, signal)
+  try {
+    await replay.consume(body, signal, callbacks)
+  } finally {
+    await replay.close()
+  }
+}
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -45,7 +60,7 @@ it.each(["text", "reasoning"] as const)(
       },
       { type: "end" },
     ]
-    await consumeRetainedResponse(
+    await consumeOnce(
       new ReadableStream({
         start(controller) {
           events.forEach((event) => controller.enqueue(frame(event)))
@@ -62,9 +77,10 @@ it.each(["text", "reasoning"] as const)(
         updates.push(part.text)
       },
       new AbortController().signal,
-      undefined,
-      () => {
-        caughtUp = true
+      {
+        onCaughtUp: () => {
+          caughtUp = true
+        },
       }
     )
     expect(updates).toEqual([history, history + live])
@@ -75,7 +91,7 @@ it("cancels reconstruction without exposing partial history", async () => {
   const abort = new AbortController()
   const publish = vi.fn()
   let source!: ReadableStreamDefaultController<Uint8Array>
-  const consuming = consumeRetainedResponse(
+  const consuming = consumeOnce(
     new ReadableStream({
       start(controller) {
         source = controller
@@ -116,7 +132,7 @@ it("restores an approval baseline and retained output together before live updat
       controller.close()
     },
   })
-  await consumeRetainedResponse(
+  await consumeOnce(
     stream,
     (message) => {
       updates.push(
@@ -196,10 +212,11 @@ it("reconnects by GET without erasing visible text or dispatching another genera
   expect(fetchMock).toHaveBeenCalledTimes(1)
 })
 
-it("preserves live output across an interrupted retained reader and catches up before publishing again", async () => {
+it("replaces a silent retained connection and resumes after its cursor", async () => {
+  vi.useFakeTimers()
   const sources: ReadableStreamDefaultController<Uint8Array>[] = []
   const fetchMock = vi.fn(
-    async () =>
+    async (_url: string, _init?: RequestInit) =>
       new Response(
         new ReadableStream<Uint8Array>({
           start(source) {
@@ -221,15 +238,6 @@ it("preserves live output across an interrupted retained reader and catches up b
       .join("")
   const published: string[] = []
   chat["~registerMessagesCallback"](() => published.push(text() ?? ""))
-  const history = (
-    source: ReadableStreamDefaultController<Uint8Array>,
-    highWater: string
-  ) => {
-    source.enqueue(frame({ type: "base", highWater }))
-    chunks.forEach((chunk, i) =>
-      source.enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
-    )
-  }
   const delta = (
     source: ReadableStreamDefaultController<Uint8Array>,
     id: string,
@@ -253,31 +261,94 @@ it("preserves live output across an interrupted retained reader and catches up b
   )
   try {
     await vi.waitFor(() => expect(sources).toHaveLength(1))
-    history(sources[0], "3-0")
+    sources[0].enqueue(frame({ type: "base", highWater: "3-0" }))
+    chunks.forEach((chunk, i) =>
+      sources[0].enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
+    )
     sources[0].enqueue(frame({ type: "caught-up" }))
     delta(sources[0], "4-0", " world")
     await vi.waitFor(() => expect(text()).toBe("Hello world"))
-    published.length = 0
-    sources[0].close() // EOF without an end frame forces the same-document retry.
+    // A heartbeat keeps an idle connection; silence past the window replaces it.
+    await vi.advanceTimersByTimeAsync(RETAINED_STREAM_STALL_MS - 1_000)
+    sources[0].enqueue(frame({ type: "heartbeat" }))
+    await vi.advanceTimersByTimeAsync(RETAINED_STREAM_STALL_MS - 1_000)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(2_000)
     await vi.waitFor(() => expect(sources).toHaveLength(2))
-    history(sources[1], "4-0")
-    await vi.waitFor(() => expect(sources[1].desiredSize).toBe(1))
-    expect(text()).toBe("Hello world")
-    delta(sources[1], "4-0", " world")
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/chat/chat/stream?runId=run&after=4-0"
+    )
+    published.length = 0
+    sources[1].enqueue(frame({ type: "base", highWater: "4-0" }))
     sources[1].enqueue(frame({ type: "caught-up" }))
-    await vi.waitFor(() => expect(chat.status).toBe("streaming"))
-    expect(text()).toBe("Hello world")
     delta(sources[1], "5-0", " again")
     await vi.waitFor(() => expect(text()).toBe("Hello world again"))
-    expect(chat.status).toBe("streaming")
     expect(published.every((value) => value.startsWith("Hello world"))).toBe(
       true
     )
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(chat.status).toBe("streaming")
     expect(sendMessages).not.toHaveBeenCalled()
     expect(onFinish).not.toHaveBeenCalled()
   } finally {
     chat.detachObserver()
+    vi.useRealTimers()
+  }
+})
+
+it("hands the turn to checkpoints when replay cannot extend the displayed copy", async () => {
+  vi.useFakeTimers()
+  const checkpoint: UIMessage = {
+    id: "assistant",
+    role: "assistant",
+    parts: [{ type: "text", text: "Checkpoint copy" }],
+  }
+  let source!: ReadableStreamDefaultController<Uint8Array>
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            source = controller
+          },
+        })
+      )
+  )
+  vi.stubGlobal("fetch", fetchMock)
+  const run = {
+    chatId: "chat",
+    runId: "run",
+    assistantMessageId: "assistant",
+    status: "streaming",
+  }
+  const chat = new ResumableChat({ messages: [checkpoint] })
+  chat.syncRun(run, [checkpoint])
+  try {
+    await vi.waitFor(() => expect(source).toBeDefined())
+    source.enqueue(
+      frame({
+        type: "selection",
+        runId: "run",
+        assistantMessageId: "assistant",
+        messages: [checkpoint],
+      })
+    )
+    source.enqueue(frame({ type: "base", highWater: "3-0" }))
+    chunks.forEach((chunk, i) =>
+      source.enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
+    )
+    source.enqueue(frame({ type: "caught-up" }))
+    await vi.waitFor(() => expect(chat.status).toBe("streaming"))
+    await vi.waitFor(() => expect(chat.replayingMessageId).toBeNull())
+    // Streaming status pauses checkpoint projection: this is the frozen answer.
+    expect(chat.messages).toEqual([checkpoint])
+    await vi.advanceTimersByTimeAsync(2_000)
+    expect(chat.status).toBe("ready")
+    expect(chat.replayRunId).toBeNull()
+    chat.syncRun(run, [checkpoint])
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  } finally {
+    chat.detachObserver()
+    vi.useRealTimers()
   }
 })
 

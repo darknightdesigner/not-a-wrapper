@@ -283,6 +283,11 @@ The product module that publishes a chat and then selects its browser presentati
 _Avoid_: duplicated copy/X/link bodies, opening a fallback behind a dismissed system share sheet, calling native share before the public link exists
 _Status_: implemented 2026-08-23.
 
+**Connection wake**:
+The shared browser module (`lib/browser/connection-wake.ts`) that reports moments after which an open connection may be silently dead: the tab becomes visible, the network returns, or the back/forward cache restores the page. Listeners attach only while something subscribes. Callers decide what a wake means for their connection (ADR-0024, ADR-0039).
+_Avoid_: per-caller visibility/online/pageshow listeners, effect-owned global listeners, reconnecting a healthy connection on every wake
+_Status_: implemented 2026-09-27.
+
 **Streaming renderer**:
 The active conversation surface that presents canonical assistant text as it arrives. It may coalesce presentation work within one browser frame, but it never owns a second delayed copy of the text or animates prose word by word; durable and shared recovery remain a separate concern.
 _Avoid_: presentation reveal, displayed-text store, prefix scheduler, word queue, prose animation, durable renderer
@@ -308,7 +313,7 @@ The active tab's local AI SDK message state, fed by the direct HTTP response or 
 _Avoid_: Convex-driven foreground streaming, dual foreground authority, snapshot-as-token-state
 
 **Retained generation stream**:
-The short-lived ordered Redis log of one execution's structured UI chunks and immutable starting assistant state. Its identity is the generation run, including a new run for each approval continuation. It supports replay followed by live reads without starting generation; ownership, selected path, Stop and settlement remain in Convex. Reader disconnection never cancels the producer. Refresh restores saved text immediately, reconstructs retained history silently, then presents new live output; old text is never animated from the beginning.
+The short-lived ordered Redis log of one execution's structured UI chunks and immutable starting assistant state. Its identity is the generation run, including a new run for each approval continuation. It supports replay followed by live reads without starting generation; ownership, selected path, Stop and settlement remain in Convex. Reader disconnection never cancels the producer. Refresh restores saved text immediately, reconstructs retained history silently, then presents new live output; old text is never animated from the beginning. Idle readers send heartbeats; a reader silent for 10 s, or woken by the **Connection wake** Module, reconnects after its last entry id (`after`). A replay that cannot extend the displayed checkpoint within 2 s hands that turn to checkpoints.
 _Avoid_: second run lifecycle, snapshot smoothing, worker-crash continuation guarantee
 
 **Foreground notification cadence**:

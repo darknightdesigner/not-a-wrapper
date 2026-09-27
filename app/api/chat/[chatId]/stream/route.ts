@@ -1,6 +1,7 @@
 import { api } from "@/convex/_generated/api"
 import { getAuthenticatedWorkosSession } from "@/lib/auth/workos"
 import { durableStoredMessageToUiMessage } from "@/lib/chat-messages/ui-message-adapter"
+import { retainedChatStreamCursorSchema } from "@/lib/chat-stream/protocol"
 import { readRetainedChatStream } from "@/lib/chat-stream/server"
 import { fetchQuery } from "convex/nextjs"
 
@@ -13,7 +14,16 @@ export async function GET(
   const session = await getAuthenticatedWorkosSession()
   if (!session) return new Response(null, { status: 401 })
   const { chatId } = await params
-  const runId = new URL(request.url).searchParams.get("runId")
+  const search = new URL(request.url).searchParams
+  const runId = search.get("runId")
+  // A reconnect resumes after its last applied entry. The cursor belongs to
+  // one run's log, so it is never applied to whichever run is selected now.
+  const after = search.get("after")
+  if (
+    after !== null &&
+    (runId === null || !retainedChatStreamCursorSchema.safeParse(after).success)
+  )
+    return new Response(null, { status: 400 })
   const options = { token: session.accessToken }
   const [run, path] = await Promise.all([
     fetchQuery(api.messages.getSelectedRunState, { chatId }, options),
@@ -35,6 +45,7 @@ export async function GET(
     return new Response(null, { status: 204 })
 
   const stream = await readRetainedChatStream(run.runId, {
+    after: after ?? undefined,
     signal: request.signal,
   })
   if (!stream) {
