@@ -274,15 +274,25 @@ PDF cost from file size instead of URL length.
 - **Final answer at the tool-step cap:** A tool call on the last allowed step
 ends the turn with no reply. Make the last step tools-off.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-step-cap-can-end-a-turn-with-no-answer))
-- **Provider request settings:** Turn on Anthropic prompt caching, send OpenAI
-`store: false` with a hashed per-user `safetyIdentifier`, and put today's date
-in the system prompt.
-([caching](docs/audits/2026-09-26-open-source-reference-gaps.md#anthropic-prompt-caching-is-never-turned-on),
-[OpenAI](docs/audits/2026-09-26-open-source-reference-gaps.md#openai-keeps-response-storage-on-and-gets-no-user-id),
-[date](docs/audits/2026-09-26-open-source-reference-gaps.md#the-model-is-never-told-the-date))
-- **Bill cached input at the cache rate:** The allowance charges cached tokens
-at the full input price, so users run out early on longer chats.
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#cached-input-tokens-are-billed-at-full-price))
+- **Confirm Claude prompt caching live:** #196 sends Anthropic `cacheControl`
+on every Claude request (direct and through OpenRouter `anthropic/*`), covered
+by request-shaping tests but not yet seen on a real BYOK Claude turn. Send two
+turns in a long chat with a Claude key and check generation stats show cached
+input tokens.
+- **Durable cache-read evidence:** Failure, lease-expiry and deadline
+settlements still charge cached input at the full rate, because run step usage
+and reservations do not store the cache-read count. Add optional
+`cacheReadTokens` to `generationRuns.usageSteps`, the run totals and
+`usageReservations`, and feed it to the fallback settlement evidence
+(ADR-0021).
+- **OpenAI storage with hosted search:** OpenAI turns that pair hosted web
+search with Exa, content or MCP tools still keep response storage, because
+`@ai-sdk/openai` drops hosted search calls from later steps when `store` is
+false. Switch them to `store: false` once the SDK replays hosted calls inline
+(ADR-0021, "Storage exception").
+- **Encrypted reasoning size:** With `store: false`, OpenAI and xAI reasoning
+parts persist the encrypted reasoning once per summary part. Measure message
+size on long tool turns; if it matters, keep one copy per reasoning item.
 - **Send only the new message:** The client uploads the whole conversation on
 every send, although signed-in turns read history from Convex.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#every-send-uploads-the-whole-conversation))

@@ -27,6 +27,10 @@ describe("billable route pricing (ADR-0021)", () => {
     )
     expect(Number.isSafeInteger(rate!.inputCreditsPerMTok)).toBe(true)
     expect(Number.isSafeInteger(rate!.outputCreditsPerMTok)).toBe(true)
+    // The platform default's cached-input price compiles alongside.
+    expect(rate!.cacheReadCreditsPerMTok).toBe(
+      Math.round((route.config.cachedInputCost ?? Number.NaN) * 1_000_000)
+    )
   })
 
   it("fails closed for routes without valid numeric pricing", () => {

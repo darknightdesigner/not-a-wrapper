@@ -30,8 +30,11 @@ export type RoutePricingRate = Infer<typeof vRoutePricingRate>
 export type PricingSnapshot = Infer<typeof vPricingSnapshot>
 
 export type UsageTokens = {
+  /** All input tokens, cache reads included (the AI SDK 7 total). */
   inputTokens?: number
   outputTokens?: number
+  /** The provider-reported cache-read share of `inputTokens`. */
+  cacheReadTokens?: number
 }
 
 /** A component cost: ceil((tokens × ratePerMTok) / 1M), rounded ONCE. */
@@ -59,13 +62,35 @@ function normalizeTokenCount(tokens: number | undefined): number {
   return Math.floor(tokens)
 }
 
-/** Cost of one generation's usage at one route's rates (two components). */
+/**
+ * Cost of one generation's usage at one route's rates. Cache-read input is
+ * its own component at the cache rate when the route pins one and the
+ * provider reported a count; otherwise every input token is charged at the
+ * input rate (the pre-cache math).
+ */
 export function computeUsageCredits(
-  rate: Pick<RoutePricingRate, "inputCreditsPerMTok" | "outputCreditsPerMTok">,
+  rate: Pick<
+    RoutePricingRate,
+    "inputCreditsPerMTok" | "outputCreditsPerMTok" | "cacheReadCreditsPerMTok"
+  >,
   usage: UsageTokens
 ): number {
+  const cacheRate = rate.cacheReadCreditsPerMTok
+  const inputTokens = normalizeTokenCount(usage.inputTokens)
+  // A cache read can never exceed the input it is a share of.
+  const cacheReadTokens =
+    cacheRate === undefined
+      ? 0
+      : Math.min(normalizeTokenCount(usage.cacheReadTokens), inputTokens)
   return safeNumberFromBigInt(
-    BigInt(creditsForTokens(usage.inputTokens, rate.inputCreditsPerMTok)) +
+    BigInt(
+      creditsForTokens(inputTokens - cacheReadTokens, rate.inputCreditsPerMTok)
+    ) +
+      BigInt(
+        cacheRate === undefined
+          ? 0
+          : creditsForTokens(cacheReadTokens, cacheRate)
+      ) +
       BigInt(creditsForTokens(usage.outputTokens, rate.outputCreditsPerMTok)),
     "Usage credit result"
   )
@@ -144,6 +169,8 @@ export type TerminalSettlementDecision =
       titleBasis: TitleSettlementBasis
       inputTokens?: number
       outputTokens?: number
+      /** Cache-read share of `inputTokens`, when the evidence reported one. */
+      cacheReadTokens?: number
       /** Present when the reservation cap clamped a fallback total. */
       uncappedCredits?: number
       /** Evidence named a route the pinned snapshot does not know. */
@@ -159,10 +186,12 @@ export function isValidTerminalUsageEvidence(
     primary.kind === "not-started" ||
     (primary.kind === "actual"
       ? isValidTokenEstimate(primary.inputTokens) &&
-        isValidTokenEstimate(primary.outputTokens)
+        isValidTokenEstimate(primary.outputTokens) &&
+        isValidTokenEstimate(primary.cacheReadTokens)
       : primary.kind === "completed-steps"
         ? isValidTokenEstimate(primary.inputTokens) &&
           isValidTokenEstimate(primary.outputTokens) &&
+          isValidTokenEstimate(primary.cacheReadTokens) &&
           isValidTokenEstimate(primary.partialOutputTokens)
         : isValidTokenEstimate(primary.partialOutputTokens))
   const titleValid =
@@ -238,6 +267,7 @@ export function resolveTerminalUsageSettlement(
   let primaryCredits = 0
   let inputTokens: number | undefined
   let outputTokens: number | undefined
+  let cacheReadTokens: number | undefined
   let estimateBased = false
   switch (evidence.primary.kind) {
     case "not-started": {
@@ -251,9 +281,11 @@ export function resolveTerminalUsageSettlement(
     case "actual": {
       inputTokens = evidence.primary.inputTokens
       outputTokens = evidence.primary.outputTokens
+      cacheReadTokens = evidence.primary.cacheReadTokens
       primaryCredits = computeUsageCredits(snapshot.primary, {
         inputTokens,
         outputTokens,
+        cacheReadTokens,
       })
       basis = "actual"
       break
@@ -266,9 +298,11 @@ export function resolveTerminalUsageSettlement(
         normalizeTokenCount(evidence.primary.outputTokens),
         cappedPartial(evidence.primary.partialOutputTokens)
       )
+      cacheReadTokens = evidence.primary.cacheReadTokens
       primaryCredits = computeUsageCredits(snapshot.primary, {
         inputTokens,
         outputTokens,
+        cacheReadTokens,
       })
       basis = "observed_partial"
       break
@@ -322,6 +356,7 @@ export function resolveTerminalUsageSettlement(
     titleBasis,
     inputTokens,
     outputTokens,
+    ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
     ...(uncappedCredits !== undefined ? { uncappedCredits } : {}),
     titleRouteUnrecognized,
   }
@@ -457,6 +492,7 @@ function pricingRateFingerprintValue(rate: RoutePricingRate) {
     upstreamModelId,
     inputCreditsPerMTok,
     outputCreditsPerMTok,
+    cacheReadCreditsPerMTok,
     ...unserialized
   } = rate
   unserialized satisfies Record<string, never>
@@ -467,6 +503,8 @@ function pricingRateFingerprintValue(rate: RoutePricingRate) {
     upstreamModelId,
     inputCreditsPerMTok,
     outputCreditsPerMTok,
+    // Appended only when pinned, so a rate without it keeps its old value.
+    ...(cacheReadCreditsPerMTok !== undefined ? [cacheReadCreditsPerMTok] : []),
   ] as const
 }
 
@@ -538,6 +576,8 @@ export function isValidPricingSnapshot(snapshot: PricingSnapshot): boolean {
   const rateValid = (rate: RoutePricingRate) =>
     isValidCreditAmount(rate.inputCreditsPerMTok) &&
     isValidCreditAmount(rate.outputCreditsPerMTok) &&
+    (rate.cacheReadCreditsPerMTok === undefined ||
+      isValidCreditAmount(rate.cacheReadCreditsPerMTok)) &&
     rate.modelId.length > 0 &&
     rate.routeId.length > 0 &&
     rate.providerId.length > 0 &&

@@ -25,6 +25,36 @@ describe("credit math (ADR-0021)", () => {
     ).toBe(5_000 + 15_000)
   })
 
+  it("prices cache-read input at the pinned cache rate, else at the input rate", () => {
+    // gpt-5-mini: $0.25 in, $0.025 cached in, $2 out per 1M.
+    const rate = {
+      inputCreditsPerMTok: 250_000,
+      outputCreditsPerMTok: 2_000_000,
+      cacheReadCreditsPerMTok: 25_000,
+    }
+    const usage = {
+      inputTokens: 10_000,
+      cacheReadTokens: 8_000,
+      outputTokens: 500,
+    }
+    // 2_000 uncached × 0.25 + 8_000 cached × 0.025 + 500 × 2.
+    expect(computeUsageCredits(rate, usage)).toBe(500 + 200 + 1_000)
+    // Fallback to full input rate: no pinned cache rate, or no reported count.
+    expect(
+      computeUsageCredits(
+        { ...rate, cacheReadCreditsPerMTok: undefined },
+        usage
+      )
+    ).toBe(2_500 + 1_000)
+    expect(
+      computeUsageCredits(rate, { inputTokens: 10_000, outputTokens: 500 })
+    ).toBe(2_500 + 1_000)
+    // A cache read can never exceed the input it is a share of.
+    expect(
+      computeUsageCredits(rate, { inputTokens: 1_000, cacheReadTokens: 5_000 })
+    ).toBe(25)
+  })
+
   it("rounds ONCE per component with ceil, never per token", () => {
     // 3 credits per MTok: 1 token = 0.000003 credits → ceil = 1 credit, not
     // 1-per-token accumulated. 999_999 tokens at 1 credit/MTok = 0.999999 →

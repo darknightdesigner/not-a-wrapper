@@ -76,6 +76,7 @@ const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 function makeRequest(): Request {
   return new Request("http://test.local/api/chat", {
     method: "POST",
+    headers: { "x-vercel-ip-timezone": "America/Chicago" },
     body: JSON.stringify({
       messages: [
         { id: "u1", role: "user", parts: [{ type: "text", text: "hello" }] },
@@ -202,6 +203,7 @@ describe("/api/chat route", () => {
       expect(args.input.credential).toBe(admission.credential)
       expect(args.input.route).toBe(admission.route)
       expect(args.input.generationInput).toBe(generationInput)
+      expect(args.input.requestTimeZone).toBe("America/Chicago")
       return { prepare, toResponse, fail: vi.fn() }
     })
 
