@@ -993,7 +993,7 @@ describe("Composer primary action", () => {
     expect(onTurn).not.toHaveBeenCalled()
     expect(promptInputMockCalls.at(-1)?.value).toBe("Read this")
     await act(async () => {
-      validate({ isValid: true })
+      validate({ isValid: true, file: selected })
     })
     expect(send.getAttribute("aria-disabled")).not.toBe("true")
     await act(async () => {

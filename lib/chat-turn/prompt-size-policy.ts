@@ -1,3 +1,4 @@
+import { isTextLikeMediaType } from "@/lib/file/policy"
 import { getModelInfo } from "@/lib/models"
 
 const PROMPT_TOKEN_ESTIMATE_CHARACTERS_PER_TOKEN = 4
@@ -48,7 +49,7 @@ function textCharactersInMessages(messages: readonly PromptMessage[]): number {
       if (
         part.type === "file" &&
         typeof part.mediaType === "string" &&
-        part.mediaType.split(";")[0]?.trim().toLowerCase() === "text/plain"
+        isTextLikeMediaType(part.mediaType)
       ) {
         textFileBytes = Math.min(
           TEXT_FILE_MODEL_INPUT_TOTAL_BYTES,
@@ -64,12 +65,7 @@ function textCharactersInMessages(messages: readonly PromptMessage[]): number {
 function textBytesInSubmittedFiles(files: readonly File[]): number {
   let total = 0
   for (const file of files) {
-    if (
-      typeof file.type !== "string" ||
-      file.type.split(";")[0]?.trim().toLowerCase() !== "text/plain"
-    ) {
-      continue
-    }
+    if (!isTextLikeMediaType(file.type)) continue
     total = Math.min(
       TEXT_FILE_MODEL_INPUT_TOTAL_BYTES,
       total + Math.min(file.size, TEXT_FILE_MODEL_INPUT_BYTES_PER_FILE)

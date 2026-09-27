@@ -1,6 +1,9 @@
 import { v } from "convex/values"
 import {
   isAllowedFileMimeType,
+  isImageMediaType,
+  isPdfMediaType,
+  isTextLikeMediaType,
   MAX_FILE_SIZE,
   normalizeFileMimeType,
 } from "../lib/file/policy"
@@ -39,7 +42,7 @@ type FileUploadLimitUser = {
   premium?: boolean
 }
 
-type TrustedTextAttachmentForModelInput = {
+type TrustedModelInputAttachment = {
   attachmentId: Id<"chatAttachments">
   url: string
   filename?: string
@@ -47,12 +50,12 @@ type TrustedTextAttachmentForModelInput = {
   size?: number
 }
 
-type TrustedTextAttachmentReference = {
+type TrustedModelInputAttachmentReference = {
   attachmentId?: string
   url?: string
 }
 
-type TrustedTextAttachmentCandidate = {
+type TrustedModelInputAttachmentCandidate = {
   _id: Id<"chatAttachments">
   chatId?: Id<"chats">
   userId: Id<"users">
@@ -64,6 +67,22 @@ type TrustedTextAttachmentCandidate = {
 }
 
 const STAGED_ATTACHMENT_TTL_MS = 24 * 60 * 60 * 1000
+
+/**
+ * A staged image has no canonical URL until `attachmentImages` commits the
+ * stored copy every model can take, so it cannot be bound, and its URL
+ * persisted into a message, before then.
+ */
+const PENDING_ATTACHMENT_URL = ""
+
+export function isAttachmentReady(
+  attachment: Pick<Doc<"chatAttachments">, "storageId" | "fileUrl">
+): boolean {
+  return (
+    attachment.storageId !== undefined &&
+    attachment.fileUrl !== PENDING_ATTACHMENT_URL
+  )
+}
 
 export function isStoredFileMetadataValid(
   metadata: { size: number; contentType?: string | null } | null,
@@ -116,16 +135,16 @@ export function getFileUploadLimitStatus(
   }
 }
 
-function normalizeMediaType(mediaType: string | undefined): string {
-  return mediaType?.split(";")[0]?.trim().toLowerCase() ?? ""
-}
-
-export function selectTrustedTextAttachmentsForModelInput(args: {
-  attachments: readonly TrustedTextAttachmentCandidate[]
-  references: readonly TrustedTextAttachmentReference[]
+/**
+ * Text-like rows are read and inlined as text; PDF rows are only sized for
+ * the platform usage estimate.
+ */
+export function selectTrustedModelInputAttachments(args: {
+  attachments: readonly TrustedModelInputAttachmentCandidate[]
+  references: readonly TrustedModelInputAttachmentReference[]
   chatId: Id<"chats">
   userId: Id<"users">
-}): TrustedTextAttachmentCandidate[] {
+}): TrustedModelInputAttachmentCandidate[] {
   const requestedAttachmentIds = new Set(
     args.references
       .map((reference) => reference.attachmentId)
@@ -145,7 +164,12 @@ export function selectTrustedTextAttachmentsForModelInput(args: {
     if (attachment.chatId !== args.chatId) return false
     if (attachment.userId !== args.userId) return false
     if (!attachment.storageId) return false
-    if (normalizeMediaType(attachment.fileType) !== "text/plain") return false
+    if (
+      !isTextLikeMediaType(attachment.fileType) &&
+      !isPdfMediaType(attachment.fileType)
+    ) {
+      return false
+    }
     return (
       requestedAttachmentIds.has(attachment._id) ||
       requestedUrls.has(attachment.fileUrl)
@@ -254,7 +278,8 @@ type SaveStagedAttachmentArgs = {
 /**
  * Stage a blob the upload action stored for `ctx.user`. Throws or returns
  * null (daily limit) without deleting it: the action that stored the blob
- * releases it on any refusal.
+ * releases it on any refusal. An image stages pending and is normalized
+ * (`attachmentImages`) before it can be bound.
  */
 export async function saveStagedAttachmentHandler(
   ctx: SaveStagedAttachmentCtx,
@@ -277,8 +302,11 @@ export async function saveStagedAttachmentHandler(
   // Authoritative re-check: concurrent uploads can all pass admission.
   if (await isDailyUploadLimitReached(ctx, user)) return null
 
-  const fileUrl = await ctx.storage.getUrl(args.storageId)
-  if (!fileUrl) throw new Error("Failed to get file URL")
+  const normalizesImage = isImageMediaType(storedType)
+  const fileUrl = normalizesImage
+    ? PENDING_ATTACHMENT_URL
+    : await ctx.storage.getUrl(args.storageId)
+  if (fileUrl === null) throw new Error("Failed to get file URL")
 
   const attachmentId = await ctx.db.insert("chatAttachments", {
     userId: user._id,
@@ -295,6 +323,13 @@ export async function saveStagedAttachmentHandler(
     internal.files.cleanupStagedAttachment,
     { attachmentId }
   )
+  if (normalizesImage) {
+    await ctx.scheduler.runAfter(
+      0,
+      internal.attachmentImages.normalizeStagedImage,
+      { attachmentId, storageId: args.storageId, mediaType: storedType }
+    )
+  }
 
   return attachmentId
 }
@@ -397,7 +432,7 @@ export async function bindStagedAttachmentsToChat(
     if (attachment.chatId && attachment.chatId !== owner.chatId) {
       throw new Error("Attachment belongs to another chat")
     }
-    if (!attachment.storageId) {
+    if (!isAttachmentReady(attachment)) {
       throw new Error("Attachment is not ready")
     }
   }
@@ -479,6 +514,112 @@ export const cleanupStagedAttachment = internalMutation({
   },
 })
 
+/** Composer upload readiness: a staged image stays pending until committed. */
+export const getStagedAttachmentStatus = authenticatedQuery({
+  args: { attachmentId: v.id("chatAttachments") },
+  handler: async (ctx, { attachmentId }) => {
+    const attachment = await ctx.db.get(attachmentId)
+    if (!attachment || attachment.userId !== ctx.user._id) return null
+    return isAttachmentReady(attachment)
+      ? ("ready" as const)
+      : ("pending" as const)
+  },
+})
+
+type CommitStagedImageArgs = {
+  attachmentId: Id<"chatAttachments">
+  originalStorageId: Id<"_storage">
+  normalized?: {
+    storageId: Id<"_storage">
+    fileType: string
+    fileSize: number
+  }
+}
+
+/** The staged row still waits on the normalization run for this blob. */
+async function getAwaitingStagedImage(
+  ctx: MutationCtx,
+  attachmentId: Id<"chatAttachments">,
+  originalStorageId: Id<"_storage">
+) {
+  const attachment = await ctx.db.get(attachmentId)
+  return attachment &&
+    !isAttachmentReady(attachment) &&
+    attachment.storageId === originalStorageId
+    ? attachment
+    : null
+}
+
+/**
+ * Make a staged image bindable, pointing it at the normalized copy when one
+ * was made. Runs only while the row is still pending, so a message can never
+ * hold the URL of a blob this replaces.
+ */
+export async function commitStagedImageHandler(
+  ctx: MutationCtx,
+  { attachmentId, originalStorageId, normalized }: CommitStagedImageArgs
+) {
+  if (!(await getAwaitingStagedImage(ctx, attachmentId, originalStorageId))) {
+    // Removed or already committed: nothing references the fresh copy.
+    if (normalized) {
+      await deleteStorageIfUnreferenced(ctx, normalized.storageId)
+    }
+    return
+  }
+
+  const storageId = normalized?.storageId ?? originalStorageId
+  const fileUrl = await ctx.storage.getUrl(storageId)
+  if (!fileUrl) throw new Error("Failed to get file URL")
+  await ctx.db.patch(attachmentId, {
+    fileUrl,
+    ...(normalized
+      ? {
+          storageId,
+          fileType: normalized.fileType,
+          fileSize: normalized.fileSize,
+        }
+      : {}),
+  })
+  if (normalized) await deleteStorageIfUnreferenced(ctx, originalStorageId)
+}
+
+export const commitStagedImage = internalMutation({
+  args: {
+    attachmentId: v.id("chatAttachments"),
+    originalStorageId: v.id("_storage"),
+    normalized: v.optional(
+      v.object({
+        storageId: v.id("_storage"),
+        fileType: v.string(),
+        fileSize: v.number(),
+      })
+    ),
+  },
+  handler: commitStagedImageHandler,
+})
+
+/**
+ * Drop a staged image that could not be normalized (too large or unreadable)
+ * instead of storing an original some models reject. The composer sees the
+ * row disappear and fails that upload.
+ */
+export const rejectStagedImage = internalMutation({
+  args: {
+    attachmentId: v.id("chatAttachments"),
+    originalStorageId: v.id("_storage"),
+  },
+  handler: async (ctx, { attachmentId, originalStorageId }) => {
+    if (!(await getAwaitingStagedImage(ctx, attachmentId, originalStorageId)))
+      return
+    await ctx.db.delete(attachmentId)
+    await deleteStorageIfUnreferenced(ctx, originalStorageId)
+  },
+})
+
+/**
+ * Owner-checked model-input attachments for one chat. The name predates PDF
+ * sizing and stays for deploy compatibility with the Next.js caller.
+ */
 export const getTrustedTextAttachmentsForChat = ownedChatQuery({
   args: {
     references: v.array(
@@ -495,14 +636,14 @@ export const getTrustedTextAttachmentsForChat = ownedChatQuery({
       .withIndex("by_chat", (q) => q.eq("chatId", chatId))
       .collect()
 
-    const trustedAttachments = selectTrustedTextAttachmentsForModelInput({
+    const trustedAttachments = selectTrustedModelInputAttachments({
       attachments,
       references,
       chatId,
       userId: ctx.user._id,
     })
 
-    const result: TrustedTextAttachmentForModelInput[] = []
+    const result: TrustedModelInputAttachment[] = []
     for (const attachment of trustedAttachments) {
       if (!attachment.storageId) continue
       const url = await ctx.storage.getUrl(attachment.storageId)

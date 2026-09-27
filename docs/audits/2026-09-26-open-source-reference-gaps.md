@@ -31,10 +31,10 @@ References (sibling checkouts):
 
 | Problem | Severity | Area |
 | --- | --- | --- |
-| [Text-like uploads break the chat](#text-like-uploads-break-the-chat) | High | Attachments and model input |
-| [Old images break text-only models](#old-images-break-text-only-models) | Medium | Attachments and model input |
-| [Images are never resized](#images-are-never-resized) | Medium | Attachments and model input |
-| [Text-file budget drops the newest file](#text-file-budget-drops-the-newest-file) | Medium | Attachments and model input |
+| [Text-like uploads break the chat](#text-like-uploads-break-the-chat) (fixed) | High | Attachments and model input |
+| [Old images break text-only models](#old-images-break-text-only-models) (fixed) | Medium | Attachments and model input |
+| [Images are never resized](#images-are-never-resized) (fixed) | Medium | Attachments and model input |
+| [Text-file budget drops the newest file](#text-file-budget-drops-the-newest-file) (fixed) | Medium | Attachments and model input |
 | [Tool-step cap can end a turn with no answer](#tool-step-cap-can-end-a-turn-with-no-answer) | Medium | Turn runtime and provider requests |
 | [Anthropic prompt caching is never turned on](#anthropic-prompt-caching-is-never-turned-on) (fixed) | Medium | Turn runtime and provider requests |
 | [OpenAI keeps response storage on and gets no user id](#openai-keeps-response-storage-on-and-gets-no-user-id) (fixed) | Medium | Turn runtime and provider requests |
@@ -62,7 +62,7 @@ References (sibling checkouts):
 | [Large profile photos fail on Vercel](#large-profile-photos-fail-on-vercel) | Medium | Web security and platform limits |
 | [Dependency alerts cannot see the lockfile](#dependency-alerts-cannot-see-the-lockfile) | Medium | Dependencies and tooling |
 | [Local test and lint runs scan agent worktrees](#local-test-and-lint-runs-scan-agent-worktrees) | Medium | Dependencies and tooling |
-| [PDF cost is estimated at about 20 tokens](#pdf-cost-is-estimated-at-about-20-tokens) | Low | Attachments and model input |
+| [PDF cost is estimated at about 20 tokens](#pdf-cost-is-estimated-at-about-20-tokens) (fixed) | Low | Attachments and model input |
 | [The model is never told the date](#the-model-is-never-told-the-date) (fixed) | Low | Turn runtime and provider requests |
 | [Follow-up user messages are saved as the browser sends them](#follow-up-user-messages-are-saved-as-the-browser-sends-them) | Low | Turn runtime and provider requests |
 | [Title model costs more than the answer model](#title-model-costs-more-than-the-answer-model) | Low | Turn runtime and provider requests |
@@ -104,6 +104,8 @@ References (sibling checkouts):
 ### Text-like uploads break the chat
 
 Severity: High.
+
+Status: fixed 2026-09-27 (#191).
 
 **What is wrong.** The file picker offers Markdown, CSV, JSON and Excel files,
 and the upload checks accept all of them except old `.xls` files. On the
@@ -173,6 +175,8 @@ entry needs, so build it once.
 ### Old images break text-only models
 
 Severity: Medium.
+
+Status: fixed 2026-09-27 (#191).
 
 **What is wrong.** We only check that the model can see images when the
 newest message has an image. Images from earlier turns are still replayed on
@@ -244,6 +248,8 @@ effort preference.
 
 Severity: Medium.
 
+Status: fixed 2026-09-27 (#191).
+
 **What is wrong.** We store and replay every image exactly as uploaded, at
 full size. Claude rejects any image over 8000 px on a side, and a full-page
 website screenshot is often that large. Because history replays every image
@@ -298,6 +304,8 @@ own Claude key.
 
 Severity: Medium.
 
+Status: fixed 2026-09-27 (#191).
+
 **What is wrong.** On every turn the server re-reads the text files from the
 whole chat, up to 4 files and 256 KB, and it spends that budget oldest first.
 So once a chat already holds 4 text files (fewer if they are large), the file
@@ -348,6 +356,8 @@ fix.
 ### PDF cost is estimated at about 20 tokens
 
 Severity: Low.
+
+Status: fixed 2026-09-27 (#191).
 
 **What is wrong.** Before a platform-paid turn runs, we estimate its cost and
 reserve that amount from the user's free allowance. A PDF is counted as the

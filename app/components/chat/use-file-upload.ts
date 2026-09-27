@@ -244,7 +244,7 @@ export const useFilePickerState = ({
                   return {
                     attachment,
                     result: {
-                      isValid: false,
+                      isValid: false as const,
                       error: "Failed to read file for validation",
                     },
                   }
@@ -258,7 +258,7 @@ export const useFilePickerState = ({
               updateAttachments((current) =>
                 current.filter(({ id }) => id !== attachment.id)
               )
-              const message = result.error ?? "File validation failed"
+              const message = result.error
               toast({
                 title: "File validation failed",
                 description: message,
@@ -269,7 +269,18 @@ export const useFilePickerState = ({
               )
               continue
             }
-            startUpload(attachment, attachment.attemptId)
+            // Upload the file as validated: typed by content, not the browser.
+            const admitted = { ...attachment, file: result.file }
+            if (result.file !== attachment.file) {
+              updateAttachments((current) =>
+                current.map((candidate) =>
+                  candidate.id === attachment.id
+                    ? { ...candidate, file: result.file }
+                    : candidate
+                )
+              )
+            }
+            startUpload(admitted, attachment.attemptId)
             setAnnouncement(`${attachment.file.name} upload started.`)
           }
         } finally {

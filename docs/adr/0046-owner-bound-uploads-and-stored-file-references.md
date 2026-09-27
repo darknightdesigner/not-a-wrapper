@@ -85,10 +85,16 @@ keeping its own partial check.
   stays and the staged row expires through its TTL cleanup. The old orphan (a
   refused caller-supplied id nobody could safely delete) is gone. Success is
   `{ attachmentId }`; the client never sees a storage id.
+- Normalization is part of staging (ADR-0036): the staging mutation stores an
+  image pending and schedules `attachmentImages.normalizeStagedImage`, so an
+  image cannot be bound before its normalized copy commits. For an image the
+  client resolves the upload only once `files.getStagedAttachmentStatus` reads
+  ready, and fails it when the server rejects the image.
 - The client stops honoring a cancel once the request body is sent: the server
   stages the file anyway, so the attachment id still resolves and the Composer
-  deletes that row, releasing its daily slot. A cancel before then aborts the
-  transfer and nothing is stored.
+  deletes that row, releasing its daily slot. An image cancelled while it waits
+  for readiness is deleted the same way. A cancel before the body is sent
+  aborts the transfer and nothing is stored.
 - CORS: `Access-Control-Allow-Origin: *` plus an OPTIONS preflight. The
   ticket is a bearer credential only an authenticated mutation mints, and no
   cookie is involved, so no origin gains anything by sending one.
@@ -108,7 +114,9 @@ A blob's references are `chatAttachments.storageId` and
 when no reference other than the caller's own remains, and skips a blob that is
 already gone. Explicit deletion, staged cleanup, Chat, Project, and account
 deletion jobs (attachments and the account's profile image), profile-image
-replacement, and failed-upload cleanup all use it. Deletion jobs release the
+replacement, failed-upload cleanup, and image normalization (the replaced
+original, a rejected image, and a normalized copy its row no longer waits for)
+all use it. Deletion jobs release the
 blob before deleting its row, so a storage failure blocks the job with the
 reference intact and a resumed batch retries (ADR-0014).
 
@@ -125,9 +133,8 @@ reference intact and a resumed batch retries (ADR-0014).
 - A blob orphaned by an action crash between store and staging, or by a failed
   release, has no row, so no reference rule reaches it; a sweep for
   unreferenced storage stays open.
-- Image normalization (open PR #191) schedules from
-  `saveStagedAttachmentHandler`, whose flow is unchanged; its local
-  `deleteStorageIfUnreferenced` is replaced by this module's, which has the same
-  call shape and also checks profile images.
+- Image normalization schedules from `saveStagedAttachmentHandler`, the core
+  every upload stages through, so the ticketed action cannot stage an image
+  that skips it.
 - The profile image keeps its Next proxy; switching it to a ticketed direct
   upload would remove the Vercel body cap there too.

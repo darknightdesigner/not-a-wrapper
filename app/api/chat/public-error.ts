@@ -180,6 +180,23 @@ export function normalizeChatError(
     }
   }
 
+  // Anthropic's per-image pixel/byte limits (8000 px, 2000 px once a request
+  // holds many images, 5 MB). Staged images are resized, but one stored
+  // before that fails every later turn the same way, so Retry cannot help.
+  if (
+    includesAny(evidence.messages, [
+      "image dimensions exceed",
+      "image exceeds",
+    ])
+  ) {
+    return {
+      ...base,
+      code: "PROVIDER_ERROR",
+      message: `An image in this chat is too large for ${providerName(context.provider) ?? "this model"}. Try a different model or start a new chat.`,
+      retryable: false,
+    }
+  }
+
   if (evidence.messages.length > 0) {
     return {
       ...base,

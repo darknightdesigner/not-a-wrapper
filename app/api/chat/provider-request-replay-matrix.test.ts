@@ -2,6 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic"
 import { createGoogle } from "@ai-sdk/google"
 import { createOpenAI } from "@ai-sdk/openai"
 import { createXai } from "@ai-sdk/xai"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
 import {
   convertToModelMessages,
   dynamicTool,
@@ -16,6 +17,7 @@ import {
 import { describe, expect, it } from "vitest"
 import { adaptHistoryForProvider } from "./adapters"
 import { splitAndValidateApprovalContinuation } from "./approval-continuation"
+import { lowerUnsupportedFileParts } from "./file-part-lowering"
 import { lowerForeignHostedToolParts } from "./hosted-tool-lowering"
 
 type Provider = "openai" | "anthropic" | "google" | "xai"
@@ -235,13 +237,15 @@ async function captureRequest(options: {
       tools,
     }
   )
+  const context = {
+    targetModelId: modelIds[options.target],
+    hasTools: options.searchEnabled,
+    vision: true,
+  }
   const adapted = await adaptHistoryForProvider(
-    projection.messages,
+    lowerUnsupportedFileParts(projection.messages, context).messages,
     options.target,
-    {
-      targetModelId: modelIds[options.target],
-      hasTools: options.searchEnabled,
-    }
+    context
   )
   const validation = await safeValidateUIMessages({
     messages: adapted.messages,
@@ -660,6 +664,86 @@ describe("hosted replay final provider-request matrix", () => {
     expect(bodyJson).not.toContain("item_reference")
     expect(bodyJson).not.toContain("msg_commentary_id")
     expect(bodyJson).not.toContain("msg_final_id")
+  })
+
+  it("lowers history images and unsupported files for a non-vision OpenRouter target", async () => {
+    let body: unknown
+    const openrouter = createOpenRouter({
+      apiKey: "offline",
+      compatibility: "strict",
+      fetch: async (_url, init) => {
+        body = JSON.parse(String(init?.body))
+        return new Response(
+          JSON.stringify({ error: { message: "offline stub" } }),
+          { status: 400, headers: { "content-type": "application/json" } }
+        )
+      },
+    })
+    const routeId = "openrouter:deepseek/deepseek-v4-flash"
+    const context = {
+      targetModelId: routeId,
+      targetRouteId: routeId,
+      hasTools: false,
+      vision: false,
+    }
+    const history: UIMessage[] = [
+      {
+        id: "user-with-files",
+        role: "user",
+        parts: [
+          { type: "text", text: "What is in this screenshot?" },
+          {
+            type: "file",
+            mediaType: "image/png",
+            filename: "screenshot.png",
+            url: CURRENT_IMAGE_URL,
+          },
+          {
+            type: "file",
+            mediaType:
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename: "legacy.xlsx",
+            url: "https://example.com/legacy.xlsx",
+          },
+        ],
+      },
+      {
+        id: "assistant-answer",
+        role: "assistant",
+        metadata: { provider: "openai" },
+        parts: [{ type: "text", text: "A settings page." }],
+      },
+      {
+        id: "current-user",
+        role: "user",
+        parts: [{ type: "text", text: "Summarize it in one line" }],
+      },
+    ]
+
+    const lowered = lowerUnsupportedFileParts(history, context)
+    const adapted = await adaptHistoryForProvider(
+      lowered.messages,
+      "openrouter",
+      context
+    )
+    const modelMessages = await convertToModelMessages(adapted.messages)
+    try {
+      await generateText({
+        model: openrouter.chat("deepseek/deepseek-v4-flash"),
+        messages: modelMessages,
+      })
+    } catch {
+      // The offline fetch stub intentionally returns 400 after capturing input.
+    }
+
+    const bodyJson = JSON.stringify(body)
+    expect(lowered.loweredCount).toBe(2)
+    expect(hasFile(modelMessages)).toBe(false)
+    expect(body).toBeDefined()
+    expect(bodyJson).not.toContain(CURRENT_IMAGE_URL)
+    expect(bodyJson).not.toContain("example.com/legacy.xlsx")
+    expect(bodyJson).toContain("this model cannot view images")
+    expect(bodyJson).toContain("Summarize it in one line")
   })
 })
 

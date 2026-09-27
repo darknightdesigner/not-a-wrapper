@@ -6,6 +6,8 @@ export type AdaptationContext = {
   /** Resolved execution route used to identify wrapped providers. */
   targetRouteId?: string
   hasTools: boolean
+  /** Target route accepts image and PDF input; absent means it does not. */
+  vision?: boolean
   sourceProviderHint?: string
   maxHistoryTokens?: number
 }

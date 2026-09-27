@@ -1,3 +1,4 @@
+import { getFunctionName } from "convex/server"
 import { describe, expect, it, vi } from "vitest"
 import type { Doc, Id } from "./_generated/dataModel"
 import {
@@ -6,10 +7,11 @@ import {
   getFileUrlForUserHandler,
   getFileUploadLimit,
   getFileUploadLimitStatus,
+  isAttachmentReady,
   isFileUploadLimitExceeded,
   isStoredFileMetadataValid,
   saveStagedAttachmentHandler,
-  selectTrustedTextAttachmentsForModelInput,
+  selectTrustedModelInputAttachments,
 } from "./files"
 
 const userId = "user-1" as Id<"users">
@@ -19,7 +21,7 @@ const otherChatId = "chat-2" as Id<"chats">
 const storageId = "storage-1" as Id<"_storage">
 const attachmentId = "attachment-1" as Id<"chatAttachments">
 type TrustedAttachmentCandidate = Parameters<
-  typeof selectTrustedTextAttachmentsForModelInput
+  typeof selectTrustedModelInputAttachments
 >[0]["attachments"][number]
 
 function attachment(
@@ -107,8 +109,22 @@ describe("stored file validation", () => {
 })
 
 describe("staging an uploaded blob", () => {
-  function stagingCtx(heldBy?: "chatAttachments" | "users") {
-    const insert = vi.fn().mockResolvedValue(attachmentId)
+  function stagingCtx(
+    heldBy?: "chatAttachments" | "users",
+    contentType = "application/pdf"
+  ) {
+    const insert = vi
+      .fn<
+        (
+          table: "chatAttachments",
+          row: Pick<Doc<"chatAttachments">, "storageId" | "fileUrl">
+        ) => Promise<Id<"chatAttachments">>
+      >()
+      .mockResolvedValue(attachmentId)
+    const runAfter =
+      vi.fn<
+        (delayMs: number, fn: Parameters<typeof getFunctionName>[0]) => void
+      >()
     const ctx = {
       // Premium skips the daily count, which this fake does not model.
       user: { _id: userId, premium: true },
@@ -120,17 +136,14 @@ describe("staging an uploaded blob", () => {
           }),
         }),
         system: {
-          get: vi.fn().mockResolvedValue({
-            size: 42,
-            contentType: "application/pdf",
-          }),
+          get: vi.fn().mockResolvedValue({ size: 42, contentType }),
         },
         insert,
       },
       storage: { getUrl: vi.fn().mockResolvedValue("https://files.test/1") },
-      scheduler: { runAfter: vi.fn() },
+      scheduler: { runAfter },
     } as unknown as Parameters<typeof saveStagedAttachmentHandler>[0]
-    return { ctx, insert }
+    return { ctx, insert, runAfter }
   }
 
   it("never stages a blob another attachment or a profile image already holds", async () => {
@@ -156,6 +169,19 @@ describe("staging an uploaded blob", () => {
       "chatAttachments",
       expect.objectContaining({ userId, storageId })
     )
+  })
+
+  // The upload action stages through here, so no image is bindable before
+  // its normalized copy commits.
+  it("stages an image pending and schedules its normalization", async () => {
+    const { ctx, insert, runAfter } = stagingCtx(undefined, "image/png")
+    await saveStagedAttachmentHandler(ctx, { storageId, fileType: "image/png" })
+
+    const row = insert.mock.calls[0]?.[1]
+    expect(row && isAttachmentReady(row)).toBe(false)
+    expect(
+      runAfter.mock.calls.map(([delayMs, fn]) => [delayMs, getFunctionName(fn)])
+    ).toContainEqual([0, "attachmentImages:normalizeStagedImage"])
   })
 })
 
@@ -230,10 +256,14 @@ describe("attachment reads", () => {
   })
 })
 
-describe("trusted text attachments for model input", () => {
-  it("trusts only same-user same-chat Convex storage text/plain attachments", () => {
+describe("trusted attachments for model input", () => {
+  it("trusts only same-user same-chat Convex storage text-like and PDF attachments", () => {
     const trusted = attachment()
-    const selected = selectTrustedTextAttachmentsForModelInput({
+    const pdf = attachment({
+      _id: "pdf-attachment" as Id<"chatAttachments">,
+      fileType: "application/pdf",
+    })
+    const selected = selectTrustedModelInputAttachments({
       chatId,
       userId,
       references: [
@@ -241,9 +271,12 @@ describe("trusted text attachments for model input", () => {
           attachmentId,
           url: "http://169.254.169.254/latest/meta-data",
         },
+        { attachmentId: pdf._id },
+        { attachmentId: "image-attachment" },
       ],
       attachments: [
         trusted,
+        pdf,
         attachment({
           _id: "other-user-attachment" as Id<"chatAttachments">,
           userId: otherUserId,
@@ -263,12 +296,12 @@ describe("trusted text attachments for model input", () => {
       ],
     })
 
-    expect(selected).toEqual([trusted])
+    expect(selected).toEqual([trusted, pdf])
   })
 
   it("does not trust forged URL-only references", () => {
     expect(
-      selectTrustedTextAttachmentsForModelInput({
+      selectTrustedModelInputAttachments({
         chatId,
         userId,
         references: [
@@ -287,7 +320,7 @@ describe("trusted text attachments for model input", () => {
     })
 
     expect(
-      selectTrustedTextAttachmentsForModelInput({
+      selectTrustedModelInputAttachments({
         chatId,
         userId,
         references: [{ url: "https://convex.cloud/storage/notes.txt" }],

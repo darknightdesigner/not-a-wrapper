@@ -352,8 +352,11 @@ when the active Next build depends on the old signature.
 ## Estimation and the output policy
 
 `estimatePlatformUsage` (pure, documented heuristics): input ≈
-⌈chars/4⌉ across system prompt + history + attachments allowance + a flat
-tool allowance when search/tools are enabled; output comes from ADR-0028's
+⌈chars/4⌉ across system prompt + history + attachments allowance (a flat
+per-image amount; PDFs at ~1,500 tokens per ~55 KB page of stored size, 2,000
+when the size is unknown, all PDFs capped at the route's context window; files
+the route cannot take count as their short note) + a flat tool allowance
+when search/tools are enabled; output comes from ADR-0028's
 route-aware generation-budget resolver. The platform response policy allows
 **8,192 tokens**. Fixed Anthropic thinking adds separately billed reservation
 headroom, while the provider adapter receives only the visible-answer portion

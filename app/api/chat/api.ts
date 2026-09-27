@@ -22,6 +22,7 @@ import type { ModelReasoningEffort } from "@/lib/models/types"
 import type { ChatPerfServerSession } from "@/lib/observability/chat-performance"
 import { getSanitizedExceptionSummary } from "@/lib/observability/sentry-scrubbing"
 import { MODEL_PROVIDER_IDENTITY, type Provider } from "@/lib/provider-identity"
+import type { AttachmentSizes } from "@/lib/usage/platform-usage-estimate"
 import { type ProviderCredentialResolution } from "@/lib/user-keys"
 import type { UIMessage } from "ai"
 import { fetchMutation, fetchQuery } from "convex/nextjs"
@@ -203,6 +204,8 @@ type ChatCredentialAdmissionParams = {
   token?: string
   /** The turn's wire messages: capability requirements + approval pinning. */
   messages: UIMessage[]
+  /** Stored PDF sizes from the durable preflight (platform estimate only). */
+  attachmentSizes?: AttachmentSizes
   /** Platform-funding admission facts (ADR-0021). */
   requestId: string
   chatId: string
@@ -347,6 +350,7 @@ export async function validateAndResolveChatCredential({
   workosUserId,
   token,
   messages,
+  attachmentSizes,
   requestId,
   chatId,
   systemPrompt,
@@ -402,6 +406,7 @@ export async function validateAndResolveChatCredential({
               requestId,
               chatId,
               messages,
+              ...(attachmentSizes ? { attachmentSizes } : {}),
               systemPrompt,
               toolsLikely: effectiveEnableSearch,
               ...(generationBudget !== undefined ? { generationBudget } : {}),

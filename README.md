@@ -7,7 +7,7 @@
 - **Multi-provider chat** — Stream responses through one interface across the configured model catalog
 - **Reasoning and activity** — Stream model-provided reasoning or activity when supported
 - **Web search** — Use native search with OpenAI, Anthropic, Google, and xAI, plus an optional Exa fallback when configured
-- **File attachments** — Upload supported images, PDFs, text, Markdown, JSON, CSV, and spreadsheet files up to 10 MB
+- **File attachments** — Upload supported images, PDFs, text, Markdown, JSON, and CSV files up to 10 MB
 - **MCP tools** — Connect external Model Context Protocol servers with per-tool controls, circuit breaking, and durable audit logs
 - **BYOK** — Store your own provider keys with AES-256-GCM encryption at rest
 - **Guest access** — Try the app without signing up, with five messages per day and a limited model selection

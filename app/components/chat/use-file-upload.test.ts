@@ -89,7 +89,10 @@ describe("useFilePickerState immediate upload lifecycle", () => {
       limit: 5,
       canUpload: true,
     })
-    vi.mocked(validateFile).mockResolvedValue({ isValid: true })
+    vi.mocked(validateFile).mockImplementation(async (nextFile) => ({
+      isValid: true,
+      file: nextFile,
+    }))
     vi.mocked(uploadStagedFile).mockImplementation(
       (_convex, nextFile, options = {}) =>
         new Promise((resolve, reject) => {
@@ -343,7 +346,8 @@ describe("useFilePickerState immediate upload lifecycle", () => {
           validate = resolve
         })
       )
-      act(() => controls().handleFileUpload([file("checking.txt")]))
+      const checking = file("checking.txt")
+      act(() => controls().handleFileUpload([checking]))
       await flush()
       const pending = controls().attachments[0]!
       const dispatch = vi.fn(async () => true)
@@ -358,7 +362,7 @@ describe("useFilePickerState immediate upload lifecycle", () => {
         else root.render(null)
       })
       await act(async () => {
-        validate({ isValid: true })
+        validate({ isValid: true, file: checking })
       })
       expect(uploadCalls).toHaveLength(0)
       if (action === "remove") expect(controls().attachments).toHaveLength(0)

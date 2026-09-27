@@ -22,6 +22,7 @@ function createTestFile({
   slice?: File["slice"]
 } = {}): File {
   return {
+    name: "upload.bin",
     size,
     type,
     slice:
@@ -75,9 +76,9 @@ describe("file validation", () => {
       mime: "image/png",
     })
 
-    await expect(validateFile(createTestFile({ slice }))).resolves.toEqual({
-      isValid: true,
-    })
+    await expect(
+      validateFile(createTestFile({ slice }))
+    ).resolves.toMatchObject({ isValid: true })
 
     expect(slice).toHaveBeenCalledWith(0, 4100)
     expect(sliceArrayBuffer).toHaveBeenCalledTimes(1)
@@ -96,25 +97,20 @@ describe("file validation", () => {
   })
 
   it.each([
-    ["text/plain", "plain notes\n"],
-    ["text/markdown", "# Notes\n\n- item\n"],
-    ["application/json", '{ "ok": true }\n'],
-    ["text/csv", "name,value\nalice,1\n"],
+    ["notes.txt", "", "text/plain"],
+    ["notes.md", "", "text/markdown"],
+    ["config.json", "application/json", "application/json"],
+    // Windows with Excel installed reports .csv this way.
+    ["data.csv", "application/vnd.ms-excel", "text/csv"],
   ])(
-    "accepts undetectable %s files when the sampled bytes are text",
-    async (mimeType, contents) => {
+    "uploads undetectable text %s as its extension's type",
+    async (name, reportedType, uploadType) => {
       vi.mocked(fileType.fileTypeFromBuffer).mockResolvedValue(undefined)
+      const result = await validateFile(
+        new File(["name,value\nalice,1\n"], name, { type: reportedType })
+      )
 
-      await expect(
-        validateFile(
-          createTestFile({
-            type: mimeType,
-            headerBuffer: new TextEncoder().encode(contents).buffer,
-          })
-        )
-      ).resolves.toEqual({
-        isValid: true,
-      })
+      expect(result.isValid && result.file.type).toBe(uploadType)
     }
   )
 
@@ -148,14 +144,15 @@ describe("file validation", () => {
     })
   })
 
-  it("accepts detected MIME types from the allowed list", async () => {
+  it("uploads detected allowed types as the detected type", async () => {
     vi.mocked(fileType.fileTypeFromBuffer).mockResolvedValue({
       ext: "png",
       mime: "image/png",
     })
+    const result = await validateFile(
+      new File(["png"], "photo.jpg", { type: "image/jpeg" })
+    )
 
-    await expect(validateFile(createTestFile())).resolves.toEqual({
-      isValid: true,
-    })
+    expect(result.isValid && result.file.type).toBe("image/png")
   })
 })
