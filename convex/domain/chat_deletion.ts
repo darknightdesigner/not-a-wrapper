@@ -15,8 +15,10 @@ import {
   type AccountTablePhase,
 } from "./account_deletion"
 import { takeLinkedChats } from "./chat_project_link"
-import { isSupersedableGenerationRunStatus } from "./generation_run_lifecycle"
-import { GENERATION_RUN_STATUSES } from "./message_contract"
+import {
+  isSupersedableGenerationRunStatus,
+  SUPERSEDABLE_RUN_STATUSES,
+} from "./generation_run_lifecycle"
 
 export const DELETION_PHASES = [
   "toolInvocations",
@@ -373,10 +375,6 @@ async function beginChatDrain(
   return { phase: "chats", chatId: chat._id, complete: false }
 }
 
-const SUPERSEDABLE_RUN_STATUSES = GENERATION_RUN_STATUSES.filter(
-  isSupersedableGenerationRunStatus
-)
-
 // Every run carries its Chat owner's userId (see the by_user_status index), so
 // this reaches each live run in the account's Chats.
 async function findLiveRun(
@@ -411,8 +409,9 @@ async function runAccountBatch(
 
   if (phase === "liveRuns") {
     // One Chat per batch, through the same lifecycle paths as Chat deletion
-    // (supersede, which revokes the worker grant) and the next turn's
-    // deny-pending (which closes the paused run and settles its usage).
+    // (supersede, which closes every live run in the Chat and revokes its
+    // worker grant) and the next turn's deny-pending (which closes the paused
+    // run and settles its usage).
     const liveRun = await findLiveRun(ctx, account._id)
     if (liveRun) {
       await closeSupersededGenerationsForChat(

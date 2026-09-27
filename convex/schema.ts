@@ -326,7 +326,8 @@ export default defineSchema({
     // sets userId to the Chat owner (optional by declaration, never absent).
     .index("by_user_status", ["userId", "status"])
     .index("by_status", ["status"])
-    .index("by_chat_updated", ["chatId", "updatedAt"])
+    // The supersede sweep reads a Chat's live runs by status.
+    .index("by_chat_status", ["chatId", "status"])
     .index("by_status_lease_expires", ["status", "leaseExpiresAt"])
     // Windowed receipt summaries (runTiming.timingSummary) range over
     // completed runs by completion time.
