@@ -2,6 +2,12 @@ import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 import { isAccountRejectedError } from "@/convex/lib/auth"
 import {
+  signServerCallProof,
+  type GuestActor,
+} from "@/convex/lib/serverCallProof"
+import type { GuestTurnRefusal } from "@/convex/usage"
+import { GUEST_TURN_LIMITS } from "@/lib/config"
+import {
   reserveAuthorizedPlatformUsage,
   resolveModelRoute,
   type ResolvedModelRoute,
@@ -14,6 +20,7 @@ import {
 } from "@/lib/models/catalog"
 import type { ModelReasoningEffort } from "@/lib/models/types"
 import type { ChatPerfServerSession } from "@/lib/observability/chat-performance"
+import { getSanitizedExceptionSummary } from "@/lib/observability/sentry-scrubbing"
 import { MODEL_PROVIDER_IDENTITY, type Provider } from "@/lib/provider-identity"
 import type { AttachmentSizes } from "@/lib/usage/platform-usage-estimate"
 import { type ProviderCredentialResolution } from "@/lib/user-keys"
@@ -22,52 +29,13 @@ import { fetchMutation, fetchQuery } from "convex/nextjs"
 import { extractApprovalResponses } from "./approval-continuation"
 import { PublicChatHttpError } from "./public-http-error"
 
-const USAGE_ERROR_CODES = {
-  ANONYMOUS_ID_REQUIRED: "ANONYMOUS_ID_REQUIRED",
-  USER_NOT_FOUND: "USER_NOT_FOUND",
-} as const
-
 const INTERNAL_SERVER_ERROR_MESSAGE = "Internal server error"
-
-type UsageErrorCode = (typeof USAGE_ERROR_CODES)[keyof typeof USAGE_ERROR_CODES]
-
-function normalizeUsageErrorCode(
-  error: string,
-  errorCode: unknown
-): UsageErrorCode | "UNKNOWN" {
-  if (
-    errorCode === USAGE_ERROR_CODES.ANONYMOUS_ID_REQUIRED ||
-    errorCode === USAGE_ERROR_CODES.USER_NOT_FOUND
-  ) {
-    return errorCode
-  }
-
-  if (error === "Anonymous ID required for usage tracking") {
-    return USAGE_ERROR_CODES.ANONYMOUS_ID_REQUIRED
-  }
-
-  if (error === "User not found") {
-    return USAGE_ERROR_CODES.USER_NOT_FOUND
-  }
-
-  return "UNKNOWN"
-}
 
 function createUsageCheckApiError(
   error: string,
   errorCode?: unknown
 ): PublicChatHttpError {
-  const normalizedCode = normalizeUsageErrorCode(error, errorCode)
-
-  if (normalizedCode === USAGE_ERROR_CODES.ANONYMOUS_ID_REQUIRED) {
-    return new PublicChatHttpError({
-      message: error,
-      statusCode: 400,
-      code: "INVALID_REQUEST",
-    })
-  }
-
-  if (normalizedCode === USAGE_ERROR_CODES.USER_NOT_FOUND) {
+  if (errorCode === "USER_NOT_FOUND" || error === "User not found") {
     return new PublicChatHttpError({
       message: INTERNAL_SERVER_ERROR_MESSAGE,
       cause: new Error(error),
@@ -85,21 +53,17 @@ function createUsageCheckApiError(
 }
 
 /**
- * Atomically admit against the daily-message ABUSE limit before model
- * execution (ADR-0021).
+ * Atomically admit a signed-in turn against the daily-message ABUSE limit
+ * before model execution (ADR-0021).
  * This is not economic admission — platform spend is admitted by the atomic
  * allowance reservation inside the route resolver, and BYOK messages never
- * touch allowance while still counting here as ordinary requests.
+ * touch allowance while still counting here as ordinary requests. Guests are
+ * admitted by `createGuestTurnAdmission` instead.
  */
 export async function admitServerSideUsage(
-  token: string | undefined,
-  anonymousId?: string
+  token: string | undefined
 ): Promise<void> {
-  const usage = await fetchMutation(
-    api.usage.admit,
-    { anonymousId },
-    { token }
-  ).catch((error: unknown) => {
+  const usage = await fetchMutation(api.usage.admit, {}, { token }).catch((error: unknown) => {
     // A deleted or disabled account with a still-valid token (ADR-0044):
     // refused here, never retried as a guest.
     if (isAccountRejectedError(error)) {
@@ -128,6 +92,106 @@ export async function admitServerSideUsage(
       statusCode: 403,
       code: "DAILY_LIMIT_REACHED",
     })
+  }
+}
+
+function toGuestRefusalError(reason: GuestTurnRefusal): PublicChatHttpError {
+  switch (reason) {
+    case "guest_daily_limit":
+    case "network_daily_limit":
+      return new PublicChatHttpError({
+        message: `Daily message limit reached (${GUEST_TURN_LIMITS.dailyTurnsPerGuest}). Sign in to keep chatting, or try again tomorrow.`,
+        statusCode: 403,
+        code: "DAILY_LIMIT_REACHED",
+      })
+    case "guest_active_limit":
+    case "network_active_limit":
+      return new PublicChatHttpError({
+        message:
+          "Too many answers are running. Wait for one to finish, then try again.",
+        statusCode: 429,
+        code: "TOO_MANY_ACTIVE_ANSWERS",
+      })
+    case "guest_ceiling":
+      return new PublicChatHttpError({
+        message:
+          "Guest messages are at capacity for today. Sign in to keep chatting.",
+        statusCode: 429,
+        code: "GUEST_CAPACITY_REACHED",
+      })
+  }
+}
+
+export type GuestTurnAdmission = {
+  /**
+   * Admit against the guest, network, concurrency, and aggregate limits, or
+   * throw the public refusal. Any store failure rejects: fail closed.
+   */
+  admit(): Promise<void>
+  /** Free the concurrency slot. No-op unless one may be held; never throws. */
+  release(): Promise<void>
+}
+
+/**
+ * Guest turn admission (ADR-0045) for one request: server-proven calls keyed
+ * by the cookie-verified guest actor, never the body's anonymous id.
+ */
+export function createGuestTurnAdmission({
+  guest,
+  requestId,
+}: {
+  guest: GuestActor
+  requestId: string
+}): GuestTurnAdmission {
+  let leaseMayExist = false
+  return {
+    async admit() {
+      const issuedAt = Date.now()
+      const proof = signServerCallProof({
+        purpose: "guest_turn_admit",
+        guest,
+        requestId,
+        issuedAt,
+      })
+      // Set before the call: a lost response may still have taken the slot.
+      leaseMayExist = true
+      const result = await fetchMutation(api.usage.admitGuestTurn, {
+        guest,
+        requestId,
+        issuedAt,
+        proof,
+      })
+      if (result.kind === "refused") {
+        leaseMayExist = false
+        throw toGuestRefusalError(result.reason)
+      }
+    },
+    async release() {
+      if (!leaseMayExist) return
+      try {
+        const issuedAt = Date.now()
+        await fetchMutation(api.usage.releaseGuestTurn, {
+          guest,
+          requestId,
+          issuedAt,
+          proof: signServerCallProof({
+            purpose: "guest_turn_release",
+            guest,
+            requestId,
+            issuedAt,
+          }),
+        })
+      } catch (error) {
+        // The lease expires on its own; a failed release only delays the slot.
+        console.warn(
+          JSON.stringify({
+            _tag: "guest_turn_release_failed",
+            requestId,
+            ...getSanitizedExceptionSummary(error),
+          })
+        )
+      }
+    },
   }
 }
 

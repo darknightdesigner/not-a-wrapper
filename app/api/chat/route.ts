@@ -1,6 +1,7 @@
 import { api } from "@/convex/_generated/api"
 import { getWorkosSession } from "@/lib/auth/workos"
 import { parseChatTurnRequest } from "@/lib/chat-messages/chat-turn-contract"
+import { resolveGuestIdentity } from "@/lib/guest-identity"
 import { resolveModelSelection } from "@/lib/models/catalog"
 import {
   classifyChatError,
@@ -17,7 +18,12 @@ import {
 import { MODEL_PROVIDER_IDENTITY, type Provider } from "@/lib/provider-identity"
 import * as Sentry from "@sentry/nextjs"
 import { fetchMutation, fetchQuery } from "convex/nextjs"
-import { admitServerSideUsage, validateAndResolveChatCredential } from "./api"
+import { after } from "next/server"
+import {
+  admitServerSideUsage,
+  createGuestTurnAdmission,
+  validateAndResolveChatCredential,
+} from "./api"
 import {
   createChatTurnRuntime,
   type ChatTurnRuntime,
@@ -44,9 +50,10 @@ function setChatConversationCorrelation(chatId: string): void {
 
 // Thin HTTP adapter over the Chat turn runtime (CONTEXT.md;
 // app/api/chat/chat-turn-runtime.ts; docs/adr/0006-chat-turn-runtime.md). The
-// route owns only HTTP concerns: parse, cookie→token, validation 400/401, usage
-// admission, and returning the Response. The runtime owns prepare + stream +
-// the durable-persistence timeline.
+// route owns only HTTP concerns: parse, cookie→token (or the signed guest
+// cookie, ADR-0045), validation 400/401, usage admission, and returning the
+// Response. The runtime owns prepare + stream + the durable-persistence
+// timeline.
 export async function POST(req: Request) {
   const requestId = crypto.randomUUID()
   // Receipt spans start before the runtime's construction clock. The
@@ -154,7 +161,6 @@ export async function POST(req: Request) {
       chatVersion,
       expectedVisibleMessageCount,
       tailMessageId,
-      userId: clientUserId,
       edit,
       regeneration,
     } = parsed.request
@@ -190,9 +196,24 @@ export async function POST(req: Request) {
       )
     }
 
-    // The wire contract guarantees a guest id when unauthenticated.
-    const userId = authUserId ?? clientUserId!
-    const anonymousId = !isAuthenticated ? clientUserId! : undefined
+    // Guest identity comes from the server-signed guest cookie (ADR-0045);
+    // the body's client-minted id is never a limit key. The trusted id rides
+    // the runtime's `anonymousId` (tool limits, telemetry).
+    const { userId, guest } = authUserId
+      ? { userId: authUserId, guest: undefined }
+      : await resolveGuestIdentity(req).then((guest) => ({
+          userId: guest.guestId,
+          guest,
+        }))
+    const anonymousId = guest?.guestId
+    const guestTurn = guest
+      ? createGuestTurnAdmission({ guest, requestId })
+      : undefined
+    // Frees the guest's concurrency slot once the response ends: stream
+    // completion, client disconnect (which also stops a guest provider
+    // stream), or any error response. Registered before admission so a lost
+    // admission response still releases; lease expiry covers a crashed function.
+    if (guestTurn) after(() => guestTurn.release())
 
     // Server-side usage admission — enforces rate limits before a turn runs.
     const admission = await Sentry.startSpan(
@@ -223,7 +244,9 @@ export async function POST(req: Request) {
                 )
               : undefined
           keySettingsPromise?.catch(() => {})
-          const abuseAdmission = admitServerSideUsage(convexToken, anonymousId)
+          const abuseAdmission = guestTurn
+            ? guestTurn.admit()
+            : admitServerSideUsage(convexToken)
           abuseAdmission.catch(() => {})
           const preflight = isDurableConvexChat({
             isAuthenticated,

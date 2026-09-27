@@ -67,8 +67,9 @@ export type ChatTurnSelectedPathToken = {
  */
 export type ChatTurnBodyFields = {
   chatId: string
-  /** Guest rate-limit key. Required for unauthenticated turns
-   * (`MISSING_GUEST_ID` otherwise); ignored when a session exists. */
+  /** Client-minted guest id. Required for unauthenticated turns
+   * (`MISSING_GUEST_ID` otherwise) but never a limit key: the route keys
+   * guest limits on the signed guest cookie (ADR-0045). */
   userId?: string
   model: string
   /** Optional on the wire: the parser does not require it and the Chat turn
