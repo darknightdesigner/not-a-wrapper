@@ -126,6 +126,7 @@ function createCtx({
           projects.find((project) => project._id === id) ??
           mcpServers.find((server) => server._id === id) ??
           generationRuns.find((run) => run._id === id) ??
+          users.find((user) => user._id === id) ??
           null
         )
       },

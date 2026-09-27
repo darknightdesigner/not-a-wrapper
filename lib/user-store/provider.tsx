@@ -8,6 +8,7 @@
 
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
+import { isAccountRejectedError } from "@/convex/lib/auth"
 import { usePerUserQuery } from "@/lib/convex/use-per-user-query"
 import { noteChatAccountReadiness } from "@/lib/observability/chat-ui-events"
 import { defaultPreferences } from "@/lib/user-preference-store/utils"
@@ -16,6 +17,7 @@ import { useAuth } from "@workos-inc/authkit-nextjs/components"
 import type { User as WorkosUser } from "@workos-inc/node"
 import { useConvexAuth, useMutation } from "convex/react"
 import {
+  Component,
   createContext,
   useCallback,
   useContext,
@@ -24,6 +26,7 @@ import {
   useRef,
   useState,
   type PropsWithChildren,
+  type ReactNode,
 } from "react"
 import { toast as sonnerToast } from "sonner"
 import { mergeUserProfileWithConvexFields } from "./merge-user-profile"
@@ -50,16 +53,70 @@ function getDisplayName(workosUser: WorkosUser) {
   return localPart || workosUser.email
 }
 
-export function UserProvider({
-  children,
-  initialUser,
-}: PropsWithChildren<{
+// Every per-user Convex read throws `account_rejected` once WorkOS deletes (or
+// an operator disables) the signed-in account, while its access token is still
+// valid (ADR-0044). The client answer is to end the session, not crash and not
+// continue as a guest; the sign-out redirect discards in-memory state.
+function EndRejectedSession() {
+  const { signOut } = useAuth()
+  useEffect(() => {
+    void (async () => {
+      try {
+        // Lazy: the persist module opens IndexedDB on import.
+        const { clearAllIndexedDBStores } =
+          await import("@/lib/chat-store/persist")
+        await clearAllIndexedDBStores()
+      } catch (error) {
+        console.error("Sign out cleanup failed:", error)
+      }
+      // A redirect surfaces as a rejection; the text below stays either way.
+      await signOut({ returnTo: "/" }).catch(() => undefined)
+    })()
+  }, [signOut])
+  return (
+    <p className="text-muted-foreground p-4 text-sm">
+      This account is no longer active.
+    </p>
+  )
+}
+
+class RejectedAccountBoundary extends Component<
+  { children: ReactNode },
+  { error: unknown }
+> {
+  state: { error: unknown } = { error: null }
+
+  static getDerivedStateFromError(error: unknown) {
+    return { error }
+  }
+
+  render() {
+    const { error } = this.state
+    if (error === null) return this.props.children
+    if (isAccountRejectedError(error)) return <EndRejectedSession />
+    throw error
+  }
+}
+
+type UserProviderProps = PropsWithChildren<{
   initialUser: UserProfile | null
-}>) {
+}>
+
+export function UserProvider(props: UserProviderProps) {
+  return (
+    <RejectedAccountBoundary>
+      <UserStateProvider {...props} />
+    </RejectedAccountBoundary>
+  )
+}
+
+function UserStateProvider({ children, initialUser }: UserProviderProps) {
   const [user, setUser] = useState<UserProfile | null>(initialUser)
   const [isLoading, setIsLoading] = useState(false)
+  // A rejected bootstrap is rethrown during render for the boundary above.
+  const [accountRejection, setAccountRejection] = useState<unknown>(null)
   const updateProfileMutation = useMutation(api.users.updateProfile)
-  const createOrUpdateMutation = useMutation(api.users.createOrUpdate)
+  const ensureCurrentUserMutation = useMutation(api.users.ensureCurrent)
   const { user: workosUser, loading: isAuthLoading } = useAuth()
   const {
     isAuthenticated: isConvexAuthenticated,
@@ -82,7 +139,8 @@ export function UserProvider({
   // render, so confirmation checks read the latest committed subscription.
   const convexUserRef = useRef(convexUser)
 
-  // Sync the first WorkOS session load into Convex for local dev and webhook-free auth.
+  // Insert the signed-in caller's row when the verified webhook has not yet.
+  // Nothing is sent: identity and profile claims come from the access token.
   useEffect(() => {
     if (isAuthLoading || !workosUser || !isConvexAuthenticated) return
     // A stale row from the previous account must not consume this identity's
@@ -97,14 +155,7 @@ export function UserProvider({
         userId: workosUser.id,
         retry: bootstrapRetry,
         result: (async () => {
-          await createOrUpdateMutation({
-            workosUserId: workosUser.id,
-            email: workosUser.email,
-            firstName: workosUser.firstName ?? undefined,
-            lastName: workosUser.lastName ?? undefined,
-            profileImage: workosUser.profilePictureUrl ?? undefined,
-            workosUpdatedAt: workosUser.updatedAt,
-          })
+          await ensureCurrentUserMutation({})
         })(),
       }
       bootstrapRequestRef.current = request
@@ -112,7 +163,9 @@ export function UserProvider({
     // Convex reconnects pending mutations itself. Rejected mutations need an
     // explicit retry; sharing the promise prevents duplicate setup on effect replays.
     void request.result.catch((error) => {
-      if (active) {
+      if (active && isAccountRejectedError(error)) {
+        setAccountRejection(error)
+      } else if (active) {
         console.error("[UserProvider] Failed to sync user to Convex:", error)
         errorToastId = toast({
           title: "Couldn't finish account setup",
@@ -137,7 +190,7 @@ export function UserProvider({
     workosUser,
     isConvexAuthenticated,
     convexUser,
-    createOrUpdateMutation,
+    ensureCurrentUserMutation,
     bootstrapRetry,
   ])
 
@@ -242,6 +295,8 @@ export function UserProvider({
     noteChatAccountReadiness(isChatAdmissionReady)
     return () => noteChatAccountReadiness(undefined)
   }, [isChatAdmissionReady])
+
+  if (accountRejection !== null) throw accountRejection
 
   return (
     <UserContext.Provider value={{ user, isLoading, isChatAdmissionReady, updateUser }}>
