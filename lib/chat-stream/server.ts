@@ -8,6 +8,8 @@ import {
 import { createClient } from "redis"
 import { z } from "zod"
 import {
+  compareRetainedCursors,
+  RETAINED_STREAM_HEARTBEAT_MS,
   retainedChatStreamCursorSchema,
   type RetainedChatStreamFrame,
 } from "./protocol"
@@ -258,24 +260,17 @@ export async function initializeRetainedChatStream({
   }
 }
 
-function compareCursors(left: string, right: string) {
-  const [leftTime, leftSequence] = left.split("-").map(BigInt)
-  const [rightTime, rightSequence] = right.split("-").map(BigInt)
-  return leftTime === rightTime
-    ? leftSequence < rightSequence
-      ? -1
-      : leftSequence > rightSequence
-        ? 1
-        : 0
-    : leftTime < rightTime
-      ? -1
-      : 1
-}
-
-/** The route must authorize run ownership before opening this private replay. */
+/**
+ * The route must authorize run ownership before opening this private replay.
+ * Heartbeats are opt-in: tabs loaded before they existed reject unknown frames.
+ */
 export async function readRetainedChatStream(
   runId: string,
-  { after = "0-0", signal }: { after?: string; signal?: AbortSignal } = {}
+  {
+    after = "0-0",
+    heartbeat = false,
+    signal,
+  }: { after?: string; heartbeat?: boolean; signal?: AbortSignal } = {}
 ): Promise<ReadableStream<Uint8Array> | null> {
   if (
     !retainedChatStreamCursorSchema.safeParse(after).success ||
@@ -311,7 +306,7 @@ export async function readRetainedChatStream(
       [base] = await validateUIMessages({ messages: [parsed] })
     const latest = await client.xRevRange(key.events, "+", "-", { COUNT: 1 })
     highWater = latest[0]?.id ?? "0-0"
-    if (compareCursors(after, highWater) > 0) {
+    if (compareRetainedCursors(after, highWater) > 0) {
       close()
       return null
     }
@@ -326,6 +321,7 @@ export async function readRetainedChatStream(
   let caughtUp = false
   const queued: RetainedChatStreamFrame[] = []
   let ended = false
+  let lastFrameAt = Date.now()
   return new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
@@ -338,7 +334,7 @@ export async function readRetainedChatStream(
           })
         }
         while (queued.length === 0 && !ended) {
-          if (!caughtUp && compareCursors(cursor, highWater) >= 0) {
+          if (!caughtUp && compareRetainedCursors(cursor, highWater) >= 0) {
             caughtUp = true
             queued.push({ type: "caught-up" })
             break
@@ -366,7 +362,7 @@ export async function readRetainedChatStream(
             })
             queued.push({ type: "chunk", id: message.id, chunk })
             cursor = message.id
-            if (!caughtUp && compareCursors(cursor, highWater) >= 0) {
+            if (!caughtUp && compareRetainedCursors(cursor, highWater) >= 0) {
               caughtUp = true
               queued.push({ type: "caught-up" })
             }
@@ -374,11 +370,21 @@ export async function readRetainedChatStream(
           if (messages.length === 0 && metadata.data.status === "finished") {
             queued.push({ type: "end" })
             ended = true
+          } else if (
+            heartbeat &&
+            queued.length === 0 &&
+            Date.now() - lastFrameAt >= RETAINED_STREAM_HEARTBEAT_MS
+          ) {
+            // Proves this reader is alive to the client's stall watchdog.
+            // Reader-only: the producer's Redis writes are unchanged.
+            queued.push({ type: "heartbeat" })
           }
         }
         const frame = queued.shift()
-        if (frame)
+        if (frame) {
           controller.enqueue(encoder.encode(`${JSON.stringify(frame)}\n`))
+          lastFrameAt = Date.now()
+        }
         if (ended && queued.length === 0) {
           close()
           controller.close()

@@ -95,6 +95,9 @@ export function useGenerationPresentationController({
 
   const deferredDeadline = activeState.deferredStop?.expiresAt ?? null
   const deferredDeadlineReached = useDeadlineReached(deferredDeadline)
+  // Outer backstop. Retained replays replace a dead connection after 10 s of
+  // silence or on page wake (ADR-0039); the direct request has no heartbeats,
+  // so this budget still bounds it.
   const fallbackStreamDeadline = useMemo(
     () => (localStatus === "streaming" ? Date.now() + streamTimeoutMs : null),
     [localStatus, streamTimeoutMs]

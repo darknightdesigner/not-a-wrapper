@@ -28,6 +28,16 @@ beforeEach(() => {
 it("never reads Redis without a session or an owned selected run on the selected path", async () => {
   vi.mocked(getAuthenticatedWorkosSession).mockResolvedValueOnce(null)
   expect((await GET(request(), params)).status).toBe(401)
+  // A resume cursor is meaningful only inside the run whose log issued it.
+  for (const search of ["after=1-0", "runId=run&after=latest"])
+    expect(
+      (
+        await GET(
+          new Request(`http://localhost/api/chat/chat/stream?${search}`),
+          params
+        )
+      ).status
+    ).toBe(400)
   expect(fetchQuery).not.toHaveBeenCalled()
   for (const [selected, path] of [
     [null, { selectedMessages: [] }],
@@ -45,7 +55,7 @@ it("never reads Redis without a session or an owned selected run on the selected
   expect(readRetainedChatStream).not.toHaveBeenCalled()
 })
 
-it("retries preparation, settles an expired replay, and serves an authorized stream without caching", async () => {
+it("retries preparation, settles an expired replay, and serves an authorized stream after its cursor without caching", async () => {
   vi.mocked(readRetainedChatStream).mockResolvedValue(null)
   for (const [status, expected] of [
     ["streaming", 503],
@@ -65,11 +75,15 @@ it("retries preparation, settles an expired replay, and serves an authorized str
     },
   })
   vi.mocked(readRetainedChatStream).mockResolvedValue(stream)
-  const req = request()
+  const req = new Request(
+    "http://localhost/api/chat/chat/stream?heartbeat=1&runId=run&after=5-0"
+  )
   const response = await GET(req, params)
   expect(response.status).toBe(200)
   expect(response.headers.get("Cache-Control")).toContain("no-store")
   expect(readRetainedChatStream).toHaveBeenLastCalledWith("run", {
+    after: "5-0",
+    heartbeat: true,
     signal: req.signal,
   })
   expect(fetchQuery).toHaveBeenLastCalledWith(

@@ -28,6 +28,12 @@ Conversation scroll placement is armed by local submission or preflight, never b
 
 The Markdown offscreen-layout optimization excludes semantic list roots and blocks containing lists, including blockquotes. A partial next item can briefly parse as a sibling paragraph, which previously switched a long list into first-time containment with a 3rem fallback. Chrome then clamped the scroll position as the apparent content height collapsed. The exclusion persists after settlement so a concluding paragraph cannot trigger the same transition. Blocks without lists retain containment; offscreen lists trade that optimization for correct geometry.
 
+If replay cannot extend the displayed checkpoint and no update is adopted within 2 seconds, the observer disconnects but keeps the run marked as seen. Convex checkpoints then drive the rest of that turn instead of a frozen answer; they only ever replace a checkpoint, so the prefix rule holds.
+
+Each observer keeps one ordered SDK reducer across connections. A reconnect sends its last applied entry id as `after`, together with its `runId`; the route rejects a cursor without one. The server resends the immutable base, sends only newer entries, and sends a new caught-up fence. The client ignores the repeated base and any entry at or before its cursor. Idle readers send a `heartbeat` frame after 2.5 seconds without a frame (about every 3 seconds) and write nothing to Redis. Heartbeats are opt-in (`heartbeat=1`), because tabs loaded before they existed reject unknown frames. A connection that delivers nothing for 10 seconds, response headers included, is replaced from its cursor. That stall counts toward the same five-failure budget as other transport failures, with checkpoints shown while it retries, so a route that never delivers falls back to checkpoints instead of polling all turn. A visible tab, `online`, or a back/forward-cache `pageshow` replaces at once a connection that has delivered nothing for 5 seconds (two missed heartbeats), and ends a retry backoff early (the shared Connection wake Module, ADR-0024). A connection still receiving heartbeats is healthy and is kept.
+
+A durable run outlives its initiating request. On the same wake signals, a direct request that has not changed the message for 10 seconds is ended, and the next sync resumes from the retained stream. It ends as a transport handoff: its response stream closes as if the server had ended it, so abort cleanup never removes the in-flight assistant. The direct request has no heartbeats, so it gets no silence watchdog; the 330-second client stream budget remains its outer backstop.
+
 Successful server completion does not cut an exact retained reader while its historical output is still reaching the screen. The shared presentation resolver keeps that reader active until it drains. Stop, branch changes and new Send/regenerate commands disconnect it immediately. Terminal content and generation ownership remain authoritative in Convex.
 
 Approval continuations reuse messages but create new runs: the Redis key belongs to the run, never the assistant message alone. An approval pause closes the execution; the next execution gets a new replay log and starting message.
@@ -106,6 +112,40 @@ The final 14,851-character answer matched exactly after another reload. Continuo
 60 fps recordings and timestamped DOM data are retained under
 `output/thinking-ui-parity-20260908/hard-refresh/`. This verifies the local flow;
 it is not a new production or provider-matrix acceptance claim.
+
+### Stall recovery and checkpoint handoff (2026-09-27)
+
+Two freezes remained. First, when the replayed copy differed from the displayed
+checkpoint in a way the prefix guard does not model, every replay update was
+rejected while streaming status paused checkpoint projection, so the answer froze
+until the run ended. HuggingChat avoids the comparison: each saved message records
+the log sequence it contains (`materializedSeq`) and resume starts there. Doing
+that here means stamping the retained cursor on Convex checkpoints, which changes
+the schema and the durable checkpoint writer. The 2-second handoff removes the
+freeze without that change. Within one document, reconnects now continue one
+reducer from a cursor, so no reconnect replays the log from the start.
+
+Second, a sleeping phone or network switch could leave a reader that never
+errors, and the only guard was the 330-second client budget. The recovery above
+follows HuggingChat's `reattachStream.ts`: a 10-second stall window over server
+heartbeats, resubscription from the client's own last sequence, and reactions to
+visibility, `online` and `pageshow`. A provider that stops producing on a healthy
+connection is a server concern; AI SDK 7 `timeout: { firstChunkMs, chunkMs }` in
+the Chat turn runtime is the follow-up.
+
+Review corrections: a stall counts as a failure, so a route that never delivers
+cannot keep the answer frozen behind endless 10-second reconnects; a wake keeps a
+connection that is still receiving heartbeats; a direct-request handoff closes the
+response stream instead of aborting it; and heartbeats are sent only to readers
+that ask, so a tab loaded before this change never receives a frame it rejects.
+HuggingChat's SSE readers ignore unknown events, so it needs no such opt-in.
+
+Focused tests cover the stall reconnect with its cursor, heartbeat keepalive, the
+stall failure budget, and the handoff. Live acceptance: a refresh during a long
+answer keeps growing; a response body that stops delivering reconnects with
+`after` within about 10 seconds and resumes; after 5 seconds of silence, `online`,
+`visibilitychange` and `pageshow` reconnect at once, while a connection still
+receiving heartbeats is kept.
 
 ## References
 

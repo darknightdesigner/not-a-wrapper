@@ -1,3 +1,4 @@
+import { subscribeToConnectionWake } from "@/lib/browser/connection-wake"
 import { mergeStreamMetadata } from "@/lib/chat-messages/metadata"
 import { readTextPhase } from "@/lib/chat-messages/turn-evidence"
 import { Chat } from "@ai-sdk/react"
@@ -5,15 +6,25 @@ import {
   isToolUIPart,
   readUIMessageStream,
   type ChatInit,
+  type ChatStatus,
   type UIMessage,
   type UIMessageChunk,
 } from "ai"
 import {
+  compareRetainedCursors,
+  RETAINED_STREAM_HEARTBEAT_MS,
+  RETAINED_STREAM_STALL_MS,
   retainedChatStreamFrameSchema,
   type RetainedChatStreamFrame,
 } from "./protocol"
 
 type Selection = Extract<RetainedChatStreamFrame, { type: "selection" }>
+
+// A replay the displayed checkpoint keeps rejecting gets this long to catch
+// up. After that, Convex checkpoints drive the turn instead of a frozen answer.
+const CHECKPOINT_HANDOFF_MS = 2_000
+// A wake replaces only a connection that has missed two heartbeats.
+const WAKE_REPLACE_QUIET_MS = 2 * RETAINED_STREAM_HEARTBEAT_MS
 
 function containsValue(
   next: unknown,
@@ -101,97 +112,183 @@ function hasVisiblePrefix(next: UIMessage, previous: UIMessage | undefined) {
   })
 }
 
-/** Rebuild history silently; publish the restored answer and then live chunks. */
-export async function consumeRetainedResponse(
-  body: ReadableStream<Uint8Array>,
-  publish: (message: UIMessage) => void,
-  signal: AbortSignal,
-  onSelection?: (selection: Selection) => void,
-  onCaughtUp?: () => void
-) {
-  let input: WritableStreamDefaultWriter<UIMessageChunk> | undefined
-  let consume: Promise<void> | undefined
-  let ended = false
-  let caughtUp = false
-  let restored: UIMessage | undefined
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  const cancel = () => {
-    void reader.cancel().catch(() => {})
-  }
-  signal.addEventListener("abort", cancel, { once: true })
-  let pending = ""
-  try {
-    while (!signal.aborted) {
-      const { value, done } = await reader.read()
-      if (done) break
-      pending += decoder.decode(value, { stream: true })
-      let newline: number
-      while ((newline = pending.indexOf("\n")) >= 0) {
-        if (signal.aborted) break
-        const line = pending.slice(0, newline)
-        pending = pending.slice(newline + 1)
-        if (!line.trim()) continue
-        const frame = await retainedChatStreamFrameSchema.parseAsync(
-          JSON.parse(line)
-        )
-        if (frame.type === "selection") {
-          onSelection?.(frame)
-        } else if (frame.type === "base") {
-          if (input) throw new Error("Repeated stream base")
-          restored = frame.message
-          const pipe = new TransformStream<UIMessageChunk, UIMessageChunk>()
-          input = pipe.writable.getWriter()
-          consume = (async () => {
-            for await (const message of readUIMessageStream({
-              message: frame.message,
-              stream: pipe.readable,
-              terminateOnError: true,
-            })) {
-              if (signal.aborted) break
-              restored = message
-              if (caughtUp) publish(message)
-            }
-          })()
-          // Attach rejection immediately, including while the reader is waiting.
-          void consume.catch(() => {})
-        } else if (frame.type === "chunk") {
-          if (!input) throw new Error("Missing stream base")
-          // Convex owns generation errors; only transport/reducer failures retry.
-          if (frame.chunk.type === "error") continue
-          await input.write(frame.chunk)
-        } else if (frame.type === "caught-up") {
-          if (!input) throw new Error("Missing stream base")
-          if (restored && !signal.aborted) publish(restored)
-          caughtUp = true
-          onCaughtUp?.()
-        } else if (frame.type === "end") {
-          ended = true
-        } else {
-          throw new Error("Stream replay unavailable")
+/**
+ * One observer's ordered SDK reducer. Each connection rebuilds silently until
+ * its caught-up fence, then publishes live chunks. A reconnect resumes after
+ * `cursor`, so the log is never applied twice and the reducer never restarts.
+ */
+export class RetainedReplay {
+  cursor: string | null = null
+  private input: WritableStreamDefaultWriter<UIMessageChunk> | undefined
+  private reducer: Promise<void> | undefined
+  private restored: UIMessage | undefined
+  private live = false
+
+  constructor(
+    private readonly publish: (message: UIMessage) => void,
+    private readonly signal: AbortSignal
+  ) {}
+
+  /** Reads one connection. Throws unless it ends or the observer aborts. */
+  async consume(
+    body: ReadableStream<Uint8Array>,
+    connection: AbortSignal,
+    {
+      onActivity,
+      onSelection,
+      onCaughtUp,
+    }: {
+      onActivity?: () => void
+      onSelection?: (selection: Selection) => void
+      onCaughtUp?: () => void
+    } = {}
+  ) {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    const cancel = () => {
+      void reader.cancel().catch(() => {})
+    }
+    connection.addEventListener("abort", cancel, { once: true })
+    // Entries at or before the resume cursor are already reduced.
+    const resumedAfter = this.cursor
+    this.live = false
+    let ended = false
+    let pending = ""
+    try {
+      while (!connection.aborted) {
+        const { value, done } = await reader.read()
+        if (done) break
+        onActivity?.()
+        pending += decoder.decode(value, { stream: true })
+        let newline: number
+        while ((newline = pending.indexOf("\n")) >= 0) {
+          if (connection.aborted) break
+          const line = pending.slice(0, newline)
+          pending = pending.slice(newline + 1)
+          if (!line.trim()) continue
+          const frame = await retainedChatStreamFrameSchema.parseAsync(
+            JSON.parse(line)
+          )
+          if (frame.type === "selection") {
+            onSelection?.(frame)
+          } else if (frame.type === "base") {
+            this.start(frame.message)
+          } else if (frame.type === "chunk") {
+            if (!this.input) throw new Error("Missing stream base")
+            if (
+              resumedAfter !== null &&
+              compareRetainedCursors(frame.id, resumedAfter) <= 0
+            )
+              continue
+            // Convex owns generation errors; only transport/reducer failures retry.
+            if (frame.chunk.type !== "error")
+              await this.input.write(frame.chunk)
+            this.cursor = frame.id
+          } else if (frame.type === "caught-up") {
+            if (!this.input) throw new Error("Missing stream base")
+            if (this.restored && !this.signal.aborted)
+              this.publish(this.restored)
+            this.live = true
+            onCaughtUp?.()
+          } else if (frame.type === "end") {
+            ended = true
+          } else if (frame.type === "unavailable") {
+            throw new Error("Stream replay unavailable")
+          }
+          // Heartbeats only prove liveness, through onActivity above.
         }
       }
+      if (!ended && !this.signal.aborted)
+        throw new Error("Stream connection interrupted")
+    } finally {
+      connection.removeEventListener("abort", cancel)
+      await reader.cancel().catch(() => {})
     }
-    if (!ended && !signal.aborted)
-      throw new Error("Stream connection interrupted")
-  } finally {
-    signal.removeEventListener("abort", cancel)
-    await reader.cancel().catch(() => {})
-    await input?.close().catch(() => {})
-    await consume
+  }
+
+  /** Lets queued chunks reach the reducer, then ends it. */
+  async close() {
+    await this.input?.close().catch(() => {})
+    await this.reducer?.catch(() => {})
+  }
+
+  private start(message: UIMessage | undefined) {
+    // Every connection resends the immutable base; the first one seeds it.
+    if (this.input) return
+    this.restored = message
+    const pipe = new TransformStream<UIMessageChunk, UIMessageChunk>()
+    this.input = pipe.writable.getWriter()
+    this.reducer = (async () => {
+      for await (const next of readUIMessageStream({
+        message,
+        stream: pipe.readable,
+        terminateOnError: true,
+      })) {
+        if (this.signal.aborted) break
+        this.restored = next
+        if (this.live) this.publish(next)
+      }
+    })()
+    // Attach rejection immediately, including while the reader is waiting.
+    void this.reducer.catch(() => {})
+  }
+}
+
+/** Aborts a connection that delivers nothing, heartbeats included, for too long. */
+function watchConnection(connection: AbortController) {
+  let lastActivity = Date.now()
+  const check = () => {
+    const quiet = Date.now() - lastActivity
+    if (quiet >= RETAINED_STREAM_STALL_MS) connection.abort()
+    else timer = setTimeout(check, RETAINED_STREAM_STALL_MS - quiet)
+  }
+  let timer = setTimeout(check, RETAINED_STREAM_STALL_MS)
+  return {
+    touch: () => {
+      lastActivity = Date.now()
+    },
+    quietFor: () => Date.now() - lastActivity,
+    stop: () => clearTimeout(timer),
   }
 }
 
 /** Receiving an existing run never invokes send, tool callbacks, or auto-approval. */
 export class ResumableChat extends Chat<UIMessage> {
   private observer: AbortController | null = null
+  private reconnectObserver: (() => void) | null = null
   private seenRunId: string | null = null
   private nativeRunId: string | null = null
   private discoveredChatId: string | null = null
   private historicalAssistantId: string | null = null
+  private stopWakeListener: (() => void) | null = null
+  // The latest direct request: chunk arrival is its only liveness signal, and
+  // `end` closes its stream as if the response ended there.
+  private readonly direct: { lastChunkAt: number; end: () => void }
 
-  constructor(options: ChatInit<UIMessage>) {
-    super(options)
+  constructor({ transport, ...options }: ChatInit<UIMessage>) {
+    const direct = { lastChunkAt: 0, end: () => {} }
+    super({
+      ...options,
+      transport: transport && {
+        async sendMessages(request) {
+          const stream = await transport.sendMessages(request)
+          direct.lastChunkAt = Date.now()
+          return stream.pipeThrough(
+            new TransformStream<UIMessageChunk, UIMessageChunk>({
+              start(controller) {
+                direct.end = () => controller.terminate()
+              },
+              transform(chunk, controller) {
+                direct.lastChunkAt = Date.now()
+                controller.enqueue(chunk)
+              },
+            })
+          )
+        },
+        reconnectToStream: (request) => transport.reconnectToStream(request),
+      },
+    })
+    this.direct = direct
     const sendMessage = this.sendMessage
     this.sendMessage = (...args) => {
       this.detachObserver()
@@ -210,6 +307,11 @@ export class ResumableChat extends Chat<UIMessage> {
     }
   }
 
+  protected override setStatus(update: { status: ChatStatus; error?: Error }) {
+    super.setStatus(update)
+    this.syncWakeListener()
+  }
+
   get replayRunId() {
     return this.observer ? this.seenRunId : null
   }
@@ -222,8 +324,10 @@ export class ResumableChat extends Chat<UIMessage> {
     if (!this.observer) return
     this.observer.abort()
     this.observer = null
+    this.reconnectObserver = null
     this.historicalAssistantId = null
     this.setStatus({ status: "ready" })
+    this.syncWakeListener()
   }
 
   detachObserver() {
@@ -231,6 +335,36 @@ export class ResumableChat extends Chat<UIMessage> {
     this.disconnectObserver()
     this.seenRunId = null
     this.discoveredChatId = null
+  }
+
+  // Wake listeners exist only while this chat holds a live connection.
+  private syncWakeListener() {
+    const live = this.observer !== null || this.status === "streaming"
+    if (live && !this.stopWakeListener) {
+      this.stopWakeListener = subscribeToConnectionWake(() => this.wake())
+    } else if (!live && this.stopWakeListener) {
+      this.stopWakeListener()
+      this.stopWakeListener = null
+    }
+  }
+
+  /** A woken page replaces a connection that may have died while it slept. */
+  private wake() {
+    if (this.observer) {
+      this.reconnectObserver?.()
+      return
+    }
+    // A durable run outlives its initiating request, so after a silent gap
+    // that request ends and the next sync resumes the retained stream. It
+    // ends as a transport handoff, not an abort: abort cleanup would remove
+    // the in-flight assistant. It has no heartbeats, so a shorter gap may be
+    // the model thinking.
+    if (
+      this.status === "streaming" &&
+      this.nativeRunId !== null &&
+      Date.now() - this.direct.lastChunkAt >= RETAINED_STREAM_STALL_MS
+    )
+      this.direct.end()
   }
 
   syncRun(
@@ -282,6 +416,7 @@ export class ResumableChat extends Chat<UIMessage> {
     this.discoveredChatId = chatId
     const controller = new AbortController()
     this.observer = controller
+    this.syncWakeListener()
     if (
       run &&
       !this.messages.some((message) => message.id === run.assistantMessageId)
@@ -302,50 +437,71 @@ export class ResumableChat extends Chat<UIMessage> {
     controller: AbortController
   ) {
     const { signal } = controller
+    const onWake = (reconnect: () => void) => {
+      if (this.observer === controller) this.reconnectObserver = reconnect
+    }
     let failures = 0
+    // Per connection: the first update must extend what is displayed.
+    let adopted = false
+    let handoff: ReturnType<typeof setTimeout> | undefined
     this.nativeRunId = null
+    const replay = new RetainedReplay((message) => {
+      if (signal.aborted || message.id !== run.assistantMessageId) return
+      const index = this.messages.findIndex((item) => item.id === message.id)
+      const previous = this.messages[index]
+      if (!adopted && !hasVisiblePrefix(message, previous)) {
+        // Streaming status pauses checkpoint projection. A replay that cannot
+        // extend the displayed checkpoint hands the turn back to checkpoints.
+        handoff ??= setTimeout(() => {
+          if (this.observer === controller) this.disconnectObserver()
+        }, CHECKPOINT_HANDOFF_MS)
+        return
+      }
+      // Once this reader reaches the checkpoint, its ordered SDK
+      // updates own mutable tool/data parts until the next reconnect.
+      adopted = true
+      clearTimeout(handoff)
+      handoff = undefined
+      failures = 0
+      this.setStatus({ status: "streaming" })
+      const messages = [...this.messages]
+      const merged = {
+        ...previous,
+        ...message,
+        metadata: mergeStreamMetadata(previous?.metadata, message.metadata),
+      }
+      if (index < 0) messages.push(merged)
+      else messages[index] = merged
+      this.messages = messages
+    }, signal)
     try {
       while (!signal.aborted) {
+        const connection = new AbortController()
+        const release = () => connection.abort()
+        signal.addEventListener("abort", release, { once: true })
+        const watchdog = watchConnection(connection)
+        let woken = false
+        onWake(() => {
+          if (watchdog.quietFor() < WAKE_REPLACE_QUIET_MS) return
+          woken = true
+          connection.abort()
+        })
         try {
+          const query = new URLSearchParams({ heartbeat: "1" })
+          if (run.runId) query.set("runId", run.runId)
+          if (replay.cursor) query.set("after", replay.cursor)
           const response = await fetch(
-            `/api/chat/${encodeURIComponent(run.chatId)}/stream${run.runId ? `?runId=${encodeURIComponent(run.runId)}` : ""}`,
-            { signal, cache: "no-store" }
+            `/api/chat/${encodeURIComponent(run.chatId)}/stream?${query}`,
+            { signal: connection.signal, cache: "no-store" }
           )
-          if ([204, 401, 403, 404].includes(response.status)) return
+          watchdog.touch()
+          if ([204, 400, 401, 403, 404].includes(response.status)) return
           if (!response.ok || !response.body)
             throw new Error("Stream temporarily unavailable")
-          let restoredCheckpoint = false
-          await consumeRetainedResponse(
-            response.body,
-            (message) => {
-              if (signal.aborted || message.id !== run.assistantMessageId)
-                return
-              const index = this.messages.findIndex(
-                (item) => item.id === message.id
-              )
-              const previous = this.messages[index]
-              if (!restoredCheckpoint && !hasVisiblePrefix(message, previous))
-                return
-              // Once this reader reaches the checkpoint, its ordered SDK
-              // updates own mutable tool/data parts until the next reconnect.
-              restoredCheckpoint = true
-              failures = 0
-              this.setStatus({ status: "streaming" })
-              const messages = [...this.messages]
-              const merged = {
-                ...previous,
-                ...message,
-                metadata: mergeStreamMetadata(
-                  previous?.metadata,
-                  message.metadata
-                ),
-              }
-              if (index < 0) messages.push(merged)
-              else messages[index] = merged
-              this.messages = messages
-            },
-            signal,
-            (selection) => {
+          adopted = false
+          await replay.consume(response.body, connection.signal, {
+            onActivity: watchdog.touch,
+            onSelection: (selection) => {
               if (signal.aborted) return
               if (
                 (run.runId && run.runId !== selection.runId) ||
@@ -366,39 +522,55 @@ export class ResumableChat extends Chat<UIMessage> {
                 this.messages = selection.messages
               }
             },
-            () => {
+            onCaughtUp: () => {
               if (signal.aborted || this.historicalAssistantId === null) return
               this.historicalAssistantId = null
               // Publish the phase transition even if no live delta follows.
               this.messages = [...this.messages]
-            }
-          )
+            },
+          })
           return
         } catch {
           if (signal.aborted) return
           // Checkpoints stay visible while the replay service is unavailable.
           this.setStatus({ status: "ready" })
-          // A permanently missing log falls back instead of polling all turn.
+          // A woken page replaces its possibly dead connection at once. The
+          // attempt still counts, so repeated wakes cannot defeat the fallback.
+          if (woken) {
+            if (++failures >= 5) return
+            continue
+          }
+          // A missing log or a route that never delivers, stalls included,
+          // falls back instead of polling all turn.
           if (++failures >= 5) return
-          await new Promise<void>((resolve) => {
-            const finish = () => {
-              clearTimeout(timer)
-              signal.removeEventListener("abort", finish)
-              resolve()
-            }
-            const timer = setTimeout(
-              finish,
-              Math.min(750 * 2 ** (failures - 1), 5000)
-            )
-            signal.addEventListener("abort", finish, { once: true })
-          })
+        } finally {
+          watchdog.stop()
+          signal.removeEventListener("abort", release)
         }
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            clearTimeout(timer)
+            signal.removeEventListener("abort", finish)
+            resolve()
+          }
+          const timer = setTimeout(
+            finish,
+            Math.min(750 * 2 ** (failures - 1), 5000)
+          )
+          signal.addEventListener("abort", finish, { once: true })
+          // A wake retries now instead of waiting out the backoff.
+          onWake(finish)
+        })
       }
     } finally {
+      clearTimeout(handoff)
+      await replay.close()
       if (this.observer === controller) {
         this.observer = null
+        this.reconnectObserver = null
         this.historicalAssistantId = null
         this.setStatus({ status: "ready" })
+        this.syncWakeListener()
       }
     }
   }
