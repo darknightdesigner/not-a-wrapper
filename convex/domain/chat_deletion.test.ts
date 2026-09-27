@@ -12,6 +12,7 @@ type TableName =
   | "users"
   | "projects"
   | "chats"
+  | "chatShares"
   | "messages"
   | "generationRuns"
   | "toolInvocations"
@@ -39,6 +40,7 @@ const tableNames: TableName[] = [
   "users",
   "projects",
   "chats",
+  "chatShares",
   "messages",
   "generationRuns",
   "toolInvocations",

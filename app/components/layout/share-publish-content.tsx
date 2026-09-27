@@ -9,18 +9,22 @@ import { useId, useState } from "react"
 import { getPublicChatShareDetails } from "./public-chat-share"
 
 type SharePublishContentProps = {
-  chatId: string
+  shareId: string
   onClose: () => void
+  /** Revokes the link; the adapter closes its surface on success. */
+  onStopSharing: () => Promise<void>
 }
 
 /** One custom share body for the desktop Dialog and mobile Drawer adapters. */
 export function SharePublishContent({
-  chatId,
+  shareId,
   onClose,
+  onStopSharing,
 }: SharePublishContentProps) {
   const [copied, setCopied] = useState(false)
+  const [isStopping, setIsStopping] = useState(false)
   const inputId = useId()
-  const { publicLink, xIntentUrl } = getPublicChatShareDetails(chatId)
+  const { publicLink, xIntentUrl } = getPublicChatShareDetails(shareId)
 
   const openPage = () => {
     onClose()
@@ -39,6 +43,15 @@ export function SharePublishContent({
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
       setCopied(false)
+    }
+  }
+
+  const stopSharing = async () => {
+    setIsStopping(true)
+    try {
+      await onStopSharing()
+    } finally {
+      setIsStopping(false)
     }
   }
 
@@ -80,6 +93,13 @@ export function SharePublishContent({
           Share on <XIcon className="text-primary-foreground size-4" />
         </Button>
       </div>
+      <Button
+        variant="ghost"
+        onClick={() => void stopSharing()}
+        loading={isStopping}
+      >
+        Stop sharing
+      </Button>
     </div>
   )
 }

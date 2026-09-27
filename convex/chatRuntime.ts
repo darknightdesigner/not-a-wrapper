@@ -688,8 +688,9 @@ async function applyMessageResolution(
 // Sidebar status projection — mirror a run's lifecycle phase onto its chat doc
 // so every sidebar row derives its indicator from the chat it already subscribes
 // to, with no separate query/store/hydrator
-// (CONTEXT.md "Sidebar status projection"). These fields are owner-only;
-// chats.getById/getPublicById strip them from non-owner reads.
+// (CONTEXT.md "Sidebar status projection"). These fields are owner-only:
+// chat docs reach only their owner, and the share view (ADR-0043) never
+// carries them.
 //
 // `queued`/`running`/`streaming` map to the live spinner (only the run-start
 // claim ever writes them, inline below — `queued` is never persisted); the

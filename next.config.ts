@@ -118,7 +118,15 @@ const nextConfig: NextConfig = {
   // build/serve never touches the dev server's .next.
   ...(process.env.NEXT_DIST_DIR ? { distDir: process.env.NEXT_DIST_DIR } : {}),
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }]
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Share links are unlisted (ADR-0043). The header also covers the
+      // not-found response of a revoked link, which has no page metadata.
+      {
+        source: "/share/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ]
   },
   experimental: {
     // Avoid recurring ENOENT crashes from corrupted persistent SST cache files.

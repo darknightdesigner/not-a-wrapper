@@ -81,14 +81,17 @@ export default defineSchema({
     model: v.optional(v.string()),
     systemPrompt: v.optional(v.string()),
     projectId: v.optional(v.id("projects")),
+    // Mirrors whether a share link (chatShares) exists, for the owner's share
+    // controls only. Public reads go through the link, never this flag
+    // (ADR-0043).
     public: v.boolean(),
     pinned: v.boolean(),
     pinnedAt: v.optional(v.number()),
     // Required so recency indexes never sort null keys to the tail, which would
     // hide chats from paginated history/sidebar windows.
     updatedAt: v.number(),
-    // Owner-only run projection mirrored for the sidebar; public reads must
-    // strip every field in this group.
+    // Owner-only run projection mirrored for the sidebar. Chat docs reach only
+    // their owner; the share view is a separate allowlist (ADR-0043).
     liveRunStatus: v.optional(
       v.union(v.literal("streaming"), v.literal("awaiting"))
     ),
@@ -146,6 +149,23 @@ export default defineSchema({
       searchField: "title",
       filterFields: ["userId"],
     }),
+
+  // A chat's share link (ADR-0043): at most one per chat. `shareId` is a
+  // random id, never the chat's publicId. The public view is the snapshot
+  // taken at share time: `title` and the visible path ending at
+  // `throughMessageId`, so later turns and renames stay private until the
+  // owner shares again. Revoking deletes the row; the next share mints a new
+  // id.
+  chatShares: defineTable({
+    shareId: v.string(),
+    chatId: v.id("chats"),
+    throughMessageId: v.id("messages"),
+    title: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_share_id", ["shareId"])
+    .index("by_chat", ["chatId"]),
 
   messages: defineTable({
     chatId: v.id("chats"),

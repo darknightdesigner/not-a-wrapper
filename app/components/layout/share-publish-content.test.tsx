@@ -33,7 +33,13 @@ describe("SharePublishContent", () => {
     const onClose = vi.fn()
     const open = vi.spyOn(window, "open").mockImplementation(() => null)
     await act(async () => {
-      root.render(<SharePublishContent chatId="chat-a" onClose={onClose} />)
+      root.render(
+        <SharePublishContent
+          shareId="share-a"
+          onClose={onClose}
+          onStopSharing={async () => undefined}
+        />
+      )
     })
 
     const input = container.querySelector("input") as HTMLInputElement

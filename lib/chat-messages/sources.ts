@@ -1,5 +1,17 @@
-import type { SourceUrlUIPart, UIMessage } from "ai"
-import { isToolUIPart } from "ai"
+import type {
+  DynamicToolUIPart,
+  SourceUrlUIPart,
+  ToolUIPart,
+  UIMessage,
+} from "ai"
+
+// The SDK's `isToolUIPart`, inlined so this module has no runtime `ai`
+// import: the Convex share view (ADR-0043) bundles it.
+function isToolPart(
+  part: UIMessage["parts"][number]
+): part is ToolUIPart | DynamicToolUIPart {
+  return part.type === "dynamic-tool" || part.type.startsWith("tool-")
+}
 
 type SourceLike = {
   url: string
@@ -125,7 +137,7 @@ export function getPartSources(
   if (part.type === "source-url") {
     return [normalizeSource(part as SourceLike)]
   }
-  if (!isToolUIPart(part) || part.state !== "output-available") return []
+  if (!isToolPart(part) || part.state !== "output-available") return []
   return dedupeSources(sourceCandidates(part.output).map(normalizeSource))
 }
 
