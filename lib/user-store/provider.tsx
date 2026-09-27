@@ -6,6 +6,8 @@
  */
 "use client"
 
+import { signOutAndClearLocalState } from "@/app/components/layout/sign-out"
+import { Button } from "@/components/ui/button"
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
 import { isAccountRejectedError } from "@/convex/lib/auth"
@@ -53,30 +55,35 @@ function getDisplayName(workosUser: WorkosUser) {
   return localPart || workosUser.email
 }
 
+// The chat stores sit below the boundary and are already unmounted; the
+// sign-out redirect discards their memory.
+const skipUnmountedStoreReset = async () => {}
+
 // Every per-user Convex read throws `account_rejected` once WorkOS deletes (or
 // an operator disables) the signed-in account, while its access token is still
-// valid (ADR-0044). The client answer is to end the session, not crash and not
-// continue as a guest; the sign-out redirect discards in-memory state.
+// valid (ADR-0044). The client answer is to end the session through the shared
+// sign-out, not crash and not continue as a guest. The button retries it.
 function EndRejectedSession() {
   const { signOut } = useAuth()
+  const endSession = useCallback(
+    () =>
+      signOutAndClearLocalState({
+        signOut,
+        resetChats: skipUnmountedStoreReset,
+        resetMessages: skipUnmountedStoreReset,
+      }),
+    [signOut]
+  )
   useEffect(() => {
-    void (async () => {
-      try {
-        // Lazy: the persist module opens IndexedDB on import.
-        const { clearAllIndexedDBStores } =
-          await import("@/lib/chat-store/persist")
-        await clearAllIndexedDBStores()
-      } catch (error) {
-        console.error("Sign out cleanup failed:", error)
-      }
-      // A redirect surfaces as a rejection; the text below stays either way.
-      await signOut({ returnTo: "/" }).catch(() => undefined)
-    })()
-  }, [signOut])
+    void endSession()
+  }, [endSession])
   return (
-    <p className="text-muted-foreground p-4 text-sm">
-      This account is no longer active.
-    </p>
+    <div className="flex items-center gap-3 p-4 text-sm">
+      <p className="text-muted-foreground">This account is no longer active.</p>
+      <Button variant="outline" size="sm" onClick={() => void endSession()}>
+        Sign out
+      </Button>
+    </div>
   )
 }
 

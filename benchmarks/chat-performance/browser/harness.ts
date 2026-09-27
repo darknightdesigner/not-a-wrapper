@@ -262,7 +262,7 @@ async function acquireAuthState(
     await page.locator("#password").fill(password)
     await page.getByRole("button", { name: "Log in" }).click()
     // The action redirects home; the composer appearing proves the session
-    // is live (and the users.createOrUpdate bootstrap has a chance to run).
+    // is live (and the users.ensureCurrent bootstrap has a chance to run).
     await page.waitForURL((url) => !url.pathname.startsWith("/auth"), {
       timeout: 20000,
     })

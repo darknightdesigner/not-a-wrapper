@@ -1,5 +1,9 @@
 import { authenticatedRoute } from "@/app/api/_lib/authenticated-route"
-import { internalServerError, jsonError } from "@/app/api/_lib/convex"
+import {
+  internalServerError,
+  jsonError,
+  routeFailureResponse,
+} from "@/app/api/_lib/convex"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
 
@@ -48,7 +52,7 @@ export const GET = authenticatedRoute(
       })
     } catch (error) {
       console.error("Attachment preview failed:", error)
-      return internalServerError()
+      return routeFailureResponse(error)
     }
   }
 )

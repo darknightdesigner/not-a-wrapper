@@ -376,7 +376,9 @@ describe("UserProvider", () => {
     await act(async () => { await Promise.resolve() })
     expect(providerMocks.signOut).toHaveBeenCalledWith({ returnTo: "/" })
     expect(container?.querySelector("[data-chat-admission-ready]")).toBeNull()
-    expect(container?.textContent).toBe("This account is no longer active.")
+    expect(container?.textContent).toContain(
+      "This account is no longer active."
+    )
   })
 
   it("applies Convex-managed fields after WorkOS hydrates later", () => {
