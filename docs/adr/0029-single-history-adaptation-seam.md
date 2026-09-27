@@ -45,3 +45,4 @@ contract across every origin, target, and search-policy combination.
   inputs only on pending calls, which the cap never touches. A cut reasoning
   part drops its provider metadata (Anthropic signature, OpenAI item id), so
   replay skips it instead of sending edited text under the original signature.
+  A part the cap replaces whole is a plain text marker, replayed as text.

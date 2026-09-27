@@ -39,8 +39,21 @@ function isToolPart(part: PartRecord): boolean {
   )
 }
 
+/** The text a part adds to `content` (see extractTextFromMessageParts). */
+function contentText(part: PartRecord): string {
+  return part.type === "text" && typeof part.text === "string" ? part.text : ""
+}
+
 function kib(bytes: number): string {
   return `${Math.ceil(bytes / 1024)} KB`
+}
+
+/** Replaces a whole part with a text marker, so `content` shows the cut too. */
+function omitPart(part: PartRecord): PartRecord {
+  return {
+    type: "text",
+    text: `\n\n[Omitted to fit the message size limit: ${kib(getConvexSize(part))}]\n\n`,
+  }
 }
 
 function omitToolPayloads(part: PartRecord): PartRecord {
@@ -88,9 +101,9 @@ type CappedMessagePayload = {
 /**
  * Fits an assistant payload under MESSAGE_PAYLOAD_BUDGET_BYTES, oldest material
  * first so the newest steps and the final answer survive longest: settled tool
- * payloads, then reasoning text, then answer text. Every cut leaves an explicit
- * marker. `content` mirrors the text parts, so it is re-derived when answer
- * text is cut.
+ * payloads, then reasoning text, then answer text, then (last resort) whole
+ * parts. Every cut leaves an explicit marker. `content` mirrors the text
+ * parts, so it is re-derived from them once text can change.
  */
 export function capMessagePayload(
   content: string,
@@ -116,10 +129,13 @@ export function capMessagePayload(
       const part = next[index]
       if (!isRecord(part) || !matches(part)) continue
       const compacted = compact(part)
-      partsBytes += getConvexSize(compacted) - getConvexSize(part)
-      if (part.type === "text") {
-        contentBytes += getConvexSize(compacted.text) - getConvexSize(part.text)
-      }
+      const partDelta = getConvexSize(compacted) - getConvexSize(part)
+      const contentDelta =
+        getConvexSize(contentText(compacted)) - getConvexSize(contentText(part))
+      // A part smaller than its marker stays: cutting it would grow the doc.
+      if (partDelta + contentDelta >= 0) continue
+      partsBytes += partDelta
+      contentBytes += contentDelta
       next[index] = compacted
     }
   }
@@ -127,24 +143,31 @@ export function capMessagePayload(
     part.type === type && typeof part.text === "string"
 
   compactOldestFirst(isToolPart, omitToolPayloads)
-  // Cut reasoning is no longer the provider's signed block, so it drops the
-  // signature (Anthropic) or item id (OpenAI) and replay skips it instead of
-  // sending edited text under the original signature.
-  compactOldestFirst(
-    isTextOf("reasoning"),
-    ({ providerMetadata: _signed, ...part }) => ({
-      ...part,
-      text: truncateText(String(part.text), overBytes()),
-    })
-  )
   if (overBytes() > 0) {
     content = extractTextFromMessageParts(next)
     contentBytes = getConvexSize(content)
+    // Cut reasoning is no longer the provider's signed block, so it drops the
+    // signature (Anthropic) or item id (OpenAI) and replay skips it instead of
+    // sending edited text under the original signature.
+    compactOldestFirst(
+      isTextOf("reasoning"),
+      ({ providerMetadata: _signed, ...part }) => ({
+        ...part,
+        text: truncateText(String(part.text), overBytes()),
+      })
+    )
     // Each byte cut from a text part is also cut from `content`.
     compactOldestFirst(isTextOf("text"), (part) => ({
       ...part,
       text: truncateText(String(part.text), Math.ceil(overBytes() / 2)),
     }))
+    // Last resort for what no cut above shrinks (a file or data part, tool
+    // metadata): whole parts, oldest first. A pending call stays, since its
+    // input is validated when it resumes.
+    compactOldestFirst(
+      (part) => !isToolPart(part) || SETTLED_TOOL_STATES.has(part.state),
+      omitPart
+    )
     content = extractTextFromMessageParts(next)
   }
 
