@@ -19,7 +19,9 @@ files afterward. During admission, Send and another selection could not see them
   indeterminate uploading presentation covers both admission and transfer; no new
   controls, labels, or animated loading treatment are introduced.
 - A staged image stays unbindable until the server stores a copy every model can
-  take (JPEG or PNG, long side at most 2000 px, `convex/attachmentImages.ts`); its
+  take (JPEG or PNG, long side at most 2000 px, `convex/attachmentImages.ts`).
+  Normalization is part of staging: the mutation the `/attachments` upload
+  action stages through (ADR-0046) stores an image pending and schedules it. Its
   upload stays in the uploading state until `files.getStagedAttachmentStatus`
   reads ready. An image the server cannot read or resize is removed and its upload
   fails; it is never stored unresized. Tabs loaded before this rule do not wait,

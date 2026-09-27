@@ -85,7 +85,8 @@ export async function normalizeAttachmentImage(
 }
 
 /**
- * Scheduled by `files.saveStagedAttachment` for every staged image. An image
+ * Scheduled by staging (`files.stageUploadedAttachment`, which the
+ * `/attachments` upload action runs) for every staged image. An image
  * that cannot be normalized is rejected (the row and blob are removed and the
  * composer shows the failure), so an unsafe original is never bound. If the
  * action itself dies, the row stays pending and the composer's wait times out.

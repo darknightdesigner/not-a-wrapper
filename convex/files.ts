@@ -278,7 +278,8 @@ type SaveStagedAttachmentArgs = {
 /**
  * Stage a blob the upload action stored for `ctx.user`. Throws or returns
  * null (daily limit) without deleting it: the action that stored the blob
- * releases it on any refusal.
+ * releases it on any refusal. An image stages pending and is normalized
+ * (`attachmentImages`) before it can be bound.
  */
 export async function saveStagedAttachmentHandler(
   ctx: SaveStagedAttachmentCtx,
@@ -560,7 +561,9 @@ export async function commitStagedImageHandler(
 ) {
   if (!(await getAwaitingStagedImage(ctx, attachmentId, originalStorageId))) {
     // Removed or already committed: nothing references the fresh copy.
-    if (normalized) await ctx.storage.delete(normalized.storageId)
+    if (normalized) {
+      await deleteStorageIfUnreferenced(ctx, normalized.storageId)
+    }
     return
   }
 

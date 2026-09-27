@@ -1,3 +1,4 @@
+import { getFunctionName } from "convex/server"
 import { describe, expect, it, vi } from "vitest"
 import type { Doc, Id } from "./_generated/dataModel"
 import {
@@ -6,6 +7,7 @@ import {
   getFileUrlForUserHandler,
   getFileUploadLimit,
   getFileUploadLimitStatus,
+  isAttachmentReady,
   isFileUploadLimitExceeded,
   isStoredFileMetadataValid,
   saveStagedAttachmentHandler,
@@ -107,8 +109,22 @@ describe("stored file validation", () => {
 })
 
 describe("staging an uploaded blob", () => {
-  function stagingCtx(heldBy?: "chatAttachments" | "users") {
-    const insert = vi.fn().mockResolvedValue(attachmentId)
+  function stagingCtx(
+    heldBy?: "chatAttachments" | "users",
+    contentType = "application/pdf"
+  ) {
+    const insert = vi
+      .fn<
+        (
+          table: "chatAttachments",
+          row: Pick<Doc<"chatAttachments">, "storageId" | "fileUrl">
+        ) => Promise<Id<"chatAttachments">>
+      >()
+      .mockResolvedValue(attachmentId)
+    const runAfter =
+      vi.fn<
+        (delayMs: number, fn: Parameters<typeof getFunctionName>[0]) => void
+      >()
     const ctx = {
       // Premium skips the daily count, which this fake does not model.
       user: { _id: userId, premium: true },
@@ -120,17 +136,14 @@ describe("staging an uploaded blob", () => {
           }),
         }),
         system: {
-          get: vi.fn().mockResolvedValue({
-            size: 42,
-            contentType: "application/pdf",
-          }),
+          get: vi.fn().mockResolvedValue({ size: 42, contentType }),
         },
         insert,
       },
       storage: { getUrl: vi.fn().mockResolvedValue("https://files.test/1") },
-      scheduler: { runAfter: vi.fn() },
+      scheduler: { runAfter },
     } as unknown as Parameters<typeof saveStagedAttachmentHandler>[0]
-    return { ctx, insert }
+    return { ctx, insert, runAfter }
   }
 
   it("never stages a blob another attachment or a profile image already holds", async () => {
@@ -156,6 +169,19 @@ describe("staging an uploaded blob", () => {
       "chatAttachments",
       expect.objectContaining({ userId, storageId })
     )
+  })
+
+  // The upload action stages through here, so no image is bindable before
+  // its normalized copy commits.
+  it("stages an image pending and schedules its normalization", async () => {
+    const { ctx, insert, runAfter } = stagingCtx(undefined, "image/png")
+    await saveStagedAttachmentHandler(ctx, { storageId, fileType: "image/png" })
+
+    const row = insert.mock.calls[0]?.[1]
+    expect(row && isAttachmentReady(row)).toBe(false)
+    expect(
+      runAfter.mock.calls.map(([delayMs, fn]) => [delayMs, getFunctionName(fn)])
+    ).toContainEqual([0, "attachmentImages:normalizeStagedImage"])
   })
 })
 

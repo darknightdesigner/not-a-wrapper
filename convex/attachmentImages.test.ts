@@ -58,7 +58,7 @@ describe("attachment image normalization", () => {
 
 async function seedStagedImage(bytes: Uint8Array<ArrayBuffer>) {
   const t = convexTest(schema, modules)
-  // Seeded as saveStagedAttachment stages an image: no canonical URL yet.
+  // Seeded as the upload action stages an image: no canonical URL yet.
   // (convex-test does not record a stored blob's content type.)
   const ids = await t.run(async (ctx) => {
     const userId = await ctx.db.insert("users", {
