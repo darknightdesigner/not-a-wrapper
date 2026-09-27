@@ -1,5 +1,7 @@
 import { httpRouter } from "convex/server"
 import {
+  ATTACHMENT_NAME_HEADER,
+  isAllowedFileMimeType,
   isAllowedProfileImageMimeType,
   MAX_FILE_SIZE,
   normalizeFileMimeType,
@@ -16,6 +18,7 @@ import {
 } from "./chatRuntimeWorker"
 import { requireIdentity } from "./lib/auth"
 import { sha256Hex } from "./lib/sha256"
+import { ATTACHMENT_UPLOAD_PATH, verifyUploadTicket } from "./lib/uploadTicket"
 import { authKit } from "./workosAuth"
 
 const http = httpRouter()
@@ -95,16 +98,19 @@ type ProfileImageUploadCtx = Pick<
   "auth" | "runAction" | "runMutation" | "storage"
 >
 
-async function cleanupStoredProfileImage(
-  ctx: ProfileImageUploadCtx,
-  storageId: Awaited<ReturnType<ProfileImageUploadCtx["storage"]["store"]>>
+type StoredUploadId = Awaited<ReturnType<ActionCtx["storage"]["store"]>>
+
+// Only for a blob this request stored and no row references (the commit
+// threw or refused), so there is no other owner to check.
+async function cleanupStoredUpload(
+  ctx: Pick<ActionCtx, "storage">,
+  storageId: StoredUploadId,
+  failureTag: string
 ) {
   try {
     await ctx.storage.delete(storageId)
   } catch {
-    console.warn(
-      JSON.stringify({ _tag: "profile_image_upload_cleanup_failed" })
-    )
+    console.warn(JSON.stringify({ _tag: failureTag }))
   }
 }
 
@@ -172,8 +178,7 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(415, { error: "Unsupported profile image type" })
   }
 
-  let storageId:
-    Awaited<ReturnType<ProfileImageUploadCtx["storage"]["store"]>> | undefined
+  let storageId: StoredUploadId | undefined
   try {
     storageId = await ctx.storage.store(blob)
     const validation = await ctx.runAction(
@@ -181,7 +186,11 @@ export async function handleProfileImageUploadRequest(
       { storageId, fileType }
     )
     if (!validation.valid) {
-      await cleanupStoredProfileImage(ctx, storageId)
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "profile_image_upload_cleanup_failed"
+      )
       return jsonResponse(415, { error: "Unsupported profile image type" })
     }
 
@@ -196,10 +205,119 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(200, { profileImageUrl })
   } catch {
     if (storageId !== undefined) {
-      await cleanupStoredProfileImage(ctx, storageId)
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "profile_image_upload_cleanup_failed"
+      )
     }
     console.warn(JSON.stringify({ _tag: "profile_image_upload_failed" }))
     return jsonResponse(500, { error: "Profile image upload failed" })
+  }
+}
+
+type AttachmentUploadCtx = Pick<ActionCtx, "runMutation" | "storage">
+
+// Browsers upload attachments straight to this origin, because Vercel caps a
+// function body below MAX_FILE_SIZE. The ticket is a bearer credential only
+// an authenticated mutation mints, and no cookie is involved, so any origin
+// may present one.
+const ATTACHMENT_UPLOAD_CORS = { "Access-Control-Allow-Origin": "*" }
+
+export function handleAttachmentUploadPreflight(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      ...ATTACHMENT_UPLOAD_CORS,
+      "Access-Control-Allow-Methods": "POST",
+      "Access-Control-Allow-Headers": `Authorization, Content-Type, ${ATTACHMENT_NAME_HEADER}`,
+      "Access-Control-Max-Age": "600",
+    },
+  })
+}
+
+function readAttachmentName(request: Request): string | undefined {
+  const encoded = request.headers.get(ATTACHMENT_NAME_HEADER)
+  if (!encoded) return undefined
+  try {
+    return decodeURIComponent(encoded) || undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Store an attachment and stage it for the user its upload ticket names, in
+ * one request (ADR-0046). The client never sees or sends a storage id, and a
+ * blob this request stored is deleted here whenever staging refuses it.
+ */
+export async function handleAttachmentUploadRequest(
+  ctx: AttachmentUploadCtx,
+  request: Request
+): Promise<Response> {
+  const respond = (status: number, body: Record<string, unknown>) =>
+    jsonResponse(status, body, ATTACHMENT_UPLOAD_CORS)
+
+  const authorization = request.headers.get("Authorization")
+  const userId = verifyUploadTicket(
+    authorization?.startsWith("Bearer ")
+      ? authorization.slice("Bearer ".length)
+      : undefined
+  )
+  if (!userId) return respond(401, { error: "Unauthorized" })
+
+  const fileType = normalizeFileMimeType(request.headers.get("Content-Type"))
+  if (!isAllowedFileMimeType(fileType)) {
+    return respond(415, { error: "Unsupported file type" })
+  }
+
+  const contentLength = Number(request.headers.get("Content-Length"))
+  if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
+    return respond(413, { error: "File is too large" })
+  }
+
+  let blob: Blob
+  try {
+    blob = await request.blob()
+  } catch {
+    return respond(400, { error: "Invalid file body" })
+  }
+  if (blob.size === 0) return respond(400, { error: "Invalid file body" })
+  if (blob.size > MAX_FILE_SIZE) {
+    return respond(413, { error: "File is too large" })
+  }
+
+  let storageId: StoredUploadId | undefined
+  try {
+    storageId = await ctx.storage.store(blob)
+    const attachmentId = await ctx.runMutation(
+      internal.files.stageUploadedAttachment,
+      {
+        userId,
+        storageId,
+        fileName: readAttachmentName(request),
+        fileType,
+      }
+    )
+    if (!attachmentId) {
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "attachment_upload_cleanup_failed"
+      )
+      return respond(429, { error: "Daily file upload limit reached" })
+    }
+    return respond(200, { attachmentId })
+  } catch {
+    if (storageId !== undefined) {
+      await cleanupStoredUpload(
+        ctx,
+        storageId,
+        "attachment_upload_cleanup_failed"
+      )
+    }
+    console.warn(JSON.stringify({ _tag: "attachment_upload_failed" }))
+    return respond(500, { error: "Attachment upload failed" })
   }
 }
 
@@ -276,6 +394,18 @@ http.route({
   path: "/profile-image",
   method: "POST",
   handler: httpAction(handleProfileImageUploadRequest),
+})
+
+http.route({
+  path: ATTACHMENT_UPLOAD_PATH,
+  method: "POST",
+  handler: httpAction(handleAttachmentUploadRequest),
+})
+
+http.route({
+  path: ATTACHMENT_UPLOAD_PATH,
+  method: "OPTIONS",
+  handler: httpAction(async () => handleAttachmentUploadPreflight()),
 })
 
 export default http

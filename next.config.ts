@@ -1,5 +1,6 @@
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
+import { getConvexSiteUrl } from "./app/api/_lib/convex-site-url"
 
 const isProduction = process.env.NODE_ENV === "production"
 
@@ -14,19 +15,39 @@ function convexHost(): string | null {
 }
 
 /**
+ * The deployment's HTTP-action origin, where the browser uploads attachments
+ * (ADR-0046). Wildcard when it cannot be resolved at build time.
+ */
+function convexSiteSource(): string {
+  try {
+    return new URL(getConvexSiteUrl()).origin
+  } catch {
+    return "https://*.convex.site"
+  }
+}
+
+/**
  * Derive the Convex deployment origins (https + wss) the browser talks to from
  * `NEXT_PUBLIC_CONVEX_URL`. The Convex client opens a WebSocket to the
- * deployment host and uploads/reads files over https on `*.convex.cloud`.
+ * deployment host, reads files over https on `*.convex.cloud`, and uploads
+ * attachments to the deployment's `.convex.site` HTTP actions.
  * Falls back to the wildcard if the env var is absent at build time.
  */
 function convexConnectSources(): string[] {
   const host = convexHost()
-  if (!host) return ["https://*.convex.cloud", "wss://*.convex.cloud"]
+  if (!host) {
+    return [
+      "https://*.convex.cloud",
+      "wss://*.convex.cloud",
+      convexSiteSource(),
+    ]
+  }
   return [
     `https://${host}`,
     `wss://${host}`,
     // File storage is served from sibling *.convex.cloud subdomains.
     "https://*.convex.cloud",
+    convexSiteSource(),
   ]
 }
 

@@ -59,7 +59,9 @@ export default defineSchema({
     systemPrompt: v.optional(v.string()),
   })
     .index("by_workos_user_id", ["workosUserId"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    // Stored-file reference checks (convex/domain/storage_refs.ts).
+    .index("by_profile_image_storage_id", ["profileImageStorageId"]),
 
   chats: defineTable({
     // Client-minted identity (ADR-0033): the route segment and the only chat
@@ -478,7 +480,8 @@ export default defineSchema({
 
   chatAttachments: defineTable({
     // Files are staged against the authenticated user before a chat exists,
-    // then atomically bound to a chat at turn dispatch.
+    // then atomically bound to a chat at turn dispatch. A row's blob is one
+    // the upload action stored for that user (ADR-0046).
     chatId: v.optional(v.id("chats")),
     userId: v.id("users"),
     storageId: v.optional(v.id("_storage")),

@@ -12,13 +12,18 @@ import {
   type QueryCtx,
 } from "./_generated/server"
 import {
+  deleteStorageIfUnreferenced,
+  isStorageReferenced,
+} from "./domain/storage_refs"
+import { isChatActive, isRejectedAccount } from "./lib/auth"
+import {
   authenticatedMutation,
   authenticatedQuery,
   maybeAuthQuery,
   ownedChatMutation,
   ownedChatQuery,
 } from "./lib/authedFunctions"
-import { isChatActive } from "./lib/auth"
+import { ATTACHMENT_UPLOAD_PATH, signUploadTicket } from "./lib/uploadTicket"
 
 const DAILY_FILE_UPLOAD_LIMIT = 5
 const PREMIUM_FILE_UPLOAD_LIMIT = null
@@ -164,8 +169,8 @@ async function getTodayUploadCount(
 }
 
 /**
- * Generate an upload URL for file storage
- * Enforces daily upload limit server-side
+ * Mint an upload target for the `/attachments` HTTP action: its URL and a
+ * ticket bound to the caller (ADR-0046). Null when the daily limit is spent.
  */
 export const generateUploadUrl = authenticatedMutation({
   args: {},
@@ -181,7 +186,12 @@ export const generateUploadUrl = authenticatedMutation({
       }
     }
 
-    return await ctx.storage.generateUploadUrl()
+    const siteUrl = process.env.CONVEX_SITE_URL
+    if (!siteUrl) throw new Error("CONVEX_SITE_URL is not set")
+    return {
+      url: `${siteUrl}${ATTACHMENT_UPLOAD_PATH}`,
+      ticket: signUploadTicket(user._id),
+    }
   },
 })
 
@@ -228,33 +238,36 @@ type SaveStagedAttachmentArgs = {
   storageId: Id<"_storage">
   fileName?: string
   fileType?: string
-  fileSize?: number
 }
 
+/**
+ * Stage a blob the upload action stored for `ctx.user`. Throws or returns
+ * null (daily limit) without deleting it: the action that stored the blob
+ * deletes it on any refusal.
+ */
 export async function saveStagedAttachmentHandler(
   ctx: SaveStagedAttachmentCtx,
   args: SaveStagedAttachmentArgs
 ) {
   const user = ctx.user
 
+  // A blob is bound once: if any attachment row or profile image already
+  // holds it, no one may stage it.
+  if (await isStorageReferenced(ctx, args.storageId)) {
+    throw new Error("Stored file is already in use")
+  }
+
   const metadata = await ctx.db.system.get("_storage", args.storageId)
   const storedType = normalizeFileMimeType(metadata?.contentType)
   if (!metadata || !isStoredFileMetadataValid(metadata, args.fileType)) {
-    // The storage id is caller-supplied and has no owner-verified attachment
-    // record yet. Leave it unreferenced; cleanup requires a trusted ownership
-    // signal so this mutation cannot delete another user's file.
     throw new Error("Stored file failed server validation")
   }
 
-  // Re-check daily upload limit to prevent bypass via pre-fetched upload URLs.
+  // Re-check the daily limit: a ticket outlives the check that minted it.
   if (getFileUploadLimit(user) !== null) {
     const todayCount = await getTodayUploadCount(ctx, user._id)
 
     if (isFileUploadLimitExceeded(user, todayCount)) {
-      // NOTE: We intentionally do NOT delete args.storageId here because we cannot
-      // verify it belongs to this user. Deleting without ownership verification would
-      // allow an attacker to delete other users' files by passing their storageId.
-      // Orphaned files should be cleaned up by a scheduled background job.
       return null
     }
   }
@@ -281,14 +294,24 @@ export async function saveStagedAttachmentHandler(
   return attachmentId
 }
 
-export const saveStagedAttachment = authenticatedMutation({
+/**
+ * Stage a blob the `/attachments` HTTP action just stored for the user its
+ * upload ticket names. Internal-only, so no client can nominate a storage id.
+ */
+export const stageUploadedAttachment = internalMutation({
   args: {
+    userId: v.id("users"),
     storageId: v.id("_storage"),
     fileName: v.optional(v.string()),
-    fileType: v.optional(v.string()),
-    fileSize: v.optional(v.number()),
+    fileType: v.string(),
   },
-  handler: saveStagedAttachmentHandler,
+  handler: async (ctx, { userId, ...args }) => {
+    const user = await ctx.db.get(userId)
+    if (!user) throw new Error("User not found")
+    // The ticket proved who uploaded; the row decides whether they still may.
+    if (isRejectedAccount(user)) throw new Error("Account rejected")
+    return await saveStagedAttachmentHandler({ ...ctx, user }, args)
+  },
 })
 
 /** The wire descriptor a bound attachment crosses back to the client as. */
@@ -402,7 +425,9 @@ export const cleanupStagedAttachment = internalMutation({
     const attachment = await ctx.db.get(attachmentId)
     if (!attachment?.stagedAt || attachment.chatId) return
     if (Date.now() - attachment.stagedAt < STAGED_ATTACHMENT_TTL_MS) return
-    if (attachment.storageId) await ctx.storage.delete(attachment.storageId)
+    if (attachment.storageId) {
+      await deleteStorageIfUnreferenced(ctx, attachment.storageId, attachmentId)
+    }
     await ctx.db.delete(attachmentId)
   },
 })
@@ -486,7 +511,7 @@ export const deleteFile = authenticatedMutation({
     assertAttachmentCanBeDeletedIndependently(attachment)
 
     if (attachment.storageId) {
-      await ctx.storage.delete(attachment.storageId)
+      await deleteStorageIfUnreferenced(ctx, attachment.storageId, attachmentId)
     }
 
     await ctx.db.delete(attachmentId)

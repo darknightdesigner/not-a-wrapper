@@ -1,6 +1,19 @@
-import { afterAll, afterEach, describe, expect, it, vi } from "vitest"
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
+import { ATTACHMENT_NAME_HEADER } from "../lib/file/policy"
 import type { Id } from "./_generated/dataModel"
-import { handleProfileImageUploadRequest } from "./http"
+import {
+  handleAttachmentUploadRequest,
+  handleProfileImageUploadRequest,
+} from "./http"
+import { signUploadTicket, UPLOAD_TICKET_TTL_MS } from "./lib/uploadTicket"
 
 vi.mock("./workosAuth", () => ({
   authKit: { registerRoutes: vi.fn() },
@@ -217,5 +230,91 @@ describe("profile image HTTP upload", () => {
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       JSON.stringify({ _tag: "profile_image_upload_failed" })
     )
+  })
+})
+
+describe("attachment HTTP upload", () => {
+  const owner = "user-owner" as Id<"users">
+  const attachmentStorageId = "storage-attachment" as Id<"_storage">
+
+  beforeEach(() =>
+    vi.stubEnv(
+      "CHAT_ADMISSION_SECRET",
+      "test-chat-admission-secret-with-32-bytes"
+    )
+  )
+  afterEach(() => vi.unstubAllEnvs())
+
+  function createAttachmentHarness(staged: string | null = "attachment-1") {
+    const runMutation = vi.fn().mockResolvedValue(staged)
+    const store = vi.fn().mockResolvedValue(attachmentStorageId)
+    const deleteStoredFile = vi.fn()
+    return {
+      ctx: {
+        runMutation,
+        storage: { delete: deleteStoredFile, store },
+      } as unknown as Parameters<typeof handleAttachmentUploadRequest>[0],
+      deleteStoredFile,
+      runMutation,
+      store,
+    }
+  }
+
+  function uploadRequest(ticket: string) {
+    return new Request("https://convex.test/attachments", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${ticket}`,
+        "Content-Type": "text/plain",
+        [ATTACHMENT_NAME_HEADER]: encodeURIComponent("notes é.txt"),
+      },
+      body: new Blob(["hello"], { type: "text/plain" }),
+    })
+  }
+
+  it("stages the stored blob for the ticket's user and stores nothing under a forged or expired ticket", async () => {
+    const ticket = signUploadTicket(owner)
+    const [, expiresAt, signature] = ticket.split(".")
+    for (const refused of [
+      `user-other.${expiresAt}.${signature}`,
+      signUploadTicket(owner, Date.now() - UPLOAD_TICKET_TTL_MS - 1),
+    ]) {
+      const harness = createAttachmentHarness()
+      const response = await handleAttachmentUploadRequest(
+        harness.ctx,
+        uploadRequest(refused)
+      )
+      expect(response.status).toBe(401)
+      expect(harness.store).not.toHaveBeenCalled()
+    }
+
+    const harness = createAttachmentHarness()
+    const response = await handleAttachmentUploadRequest(
+      harness.ctx,
+      uploadRequest(ticket)
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      attachmentId: "attachment-1",
+    })
+    expect(harness.runMutation.mock.calls[0]?.[1]).toEqual({
+      userId: owner,
+      storageId: attachmentStorageId,
+      fileName: "notes é.txt",
+      fileType: "text/plain",
+    })
+  })
+
+  it("deletes the blob it stored when staging refuses it", async () => {
+    const harness = createAttachmentHarness(null)
+
+    const response = await handleAttachmentUploadRequest(
+      harness.ctx,
+      uploadRequest(signUploadTicket(owner))
+    )
+
+    expect(response.status).toBe(429)
+    expect(harness.deleteStoredFile).toHaveBeenCalledWith(attachmentStorageId)
   })
 })

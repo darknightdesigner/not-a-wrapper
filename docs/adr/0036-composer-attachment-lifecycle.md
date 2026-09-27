@@ -2,7 +2,8 @@
 
 - Status: accepted
 - Date: 2026-09-04
-- Related: ADR-0012, ADR-0023, ADR-0024, ADR-0033
+- Related: ADR-0012, ADR-0023, ADR-0024, ADR-0033, ADR-0046 (how an upload
+  is stored and bound to its owner)
 
 ## Context
 

@@ -74,3 +74,6 @@ export function sniffProfileImageMimeType(bytes: Uint8Array): string | null {
   }
   return null
 }
+
+/** Carries the URI-encoded file name to the attachment upload action. */
+export const ATTACHMENT_NAME_HEADER = "X-Attachment-Name"

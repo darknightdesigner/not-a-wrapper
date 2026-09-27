@@ -23,8 +23,9 @@ Deletion is a two-stage operation:
    and its Project and fails closed when either is missing or tombstoned.
 2. A `deletionJobs` state machine drains one bounded child-table page per
    scheduled mutation. Destructive pages always restart at `cursor: null`;
-   attachments use bounded `take` reads and an in-transaction
-   `by_storage.take(2)` exclusivity check. Chat roots are deleted only after
+   attachments use bounded `take` reads, and a blob is deleted only when no
+   other attachment row or profile image references it (the shared rule,
+   ADR-0046). Chat roots are deleted only after
    every child range is empty, and Project roots are deleted only after every
    linked Chat is gone.
 

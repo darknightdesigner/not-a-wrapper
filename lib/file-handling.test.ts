@@ -16,7 +16,7 @@ describe("file handling", () => {
     vi.unstubAllGlobals()
   })
 
-  it("turns an upload URL quota denial into a client-side limit error", async () => {
+  it("turns an upload ticket quota denial into a client-side limit error", async () => {
     const convex = {
       mutation: vi.fn().mockResolvedValue(null),
     } as unknown as ConvexReactClient
@@ -26,20 +26,21 @@ describe("file handling", () => {
     ).rejects.toBeInstanceOf(FileUploadLimitError)
   })
 
-  it("turns a staged attachment quota race into a client-side limit error", async () => {
+  it("presents its upload ticket and turns a staging quota race into a client-side limit error", async () => {
     const convex = {
-      mutation: vi
-        .fn()
-        .mockResolvedValueOnce("https://uploads.example/file")
-        .mockResolvedValueOnce(null),
+      mutation: vi.fn().mockResolvedValueOnce({
+        url: "https://deployment.convex.site/attachments",
+        ticket: "ticket-1",
+      }),
     } as unknown as ConvexReactClient
+    const setRequestHeader = vi.fn()
     class MockXMLHttpRequest extends EventTarget {
-      status = 200
-      response = { storageId: "storage-1" }
+      status = 429
+      response = { error: "Daily file upload limit reached" }
       responseType = ""
       upload = new EventTarget()
       open = vi.fn()
-      setRequestHeader = vi.fn()
+      setRequestHeader = setRequestHeader
       abort = vi.fn(() => this.dispatchEvent(new Event("abort")))
       send = vi.fn(() => this.dispatchEvent(new Event("load")))
     }
@@ -48,5 +49,9 @@ describe("file handling", () => {
     await expect(
       uploadStagedFile(convex, createTestFile("raced.png"))
     ).rejects.toBeInstanceOf(FileUploadLimitError)
+    expect(setRequestHeader).toHaveBeenCalledWith(
+      "Authorization",
+      "Bearer ticket-1"
+    )
   })
 })
