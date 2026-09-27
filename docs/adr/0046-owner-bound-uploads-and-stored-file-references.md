@@ -63,8 +63,10 @@ keeping its own partial check.
 - `POST /attachments` on the deployment's `.convex.site` origin: a missing,
   forged, or expired Bearer ticket is 401 before anything is stored; a type
   outside `ALLOWED_FILE_TYPES` is 415; a body over 10 MB is 413 (Convex HTTP
-  actions accept up to 20 MB). The file name travels URI-encoded in
-  `X-Attachment-Name`.
+  actions accept up to 20 MB). The body is counted as it streams in
+  (`lib/file/read-body-capped.ts`, shared with `/profile-image`), so a chunked
+  body without `Content-Length` is refused at the cap, not buffered whole. The
+  file name travels URI-encoded in `X-Attachment-Name`.
 - Admission, before the body is read (where `/profile-image` consumes its rate
   limit): `internal.files.admitAttachmentUpload` answers 403 for a missing or
   rejected account (ADR-0044), 429 with `code: DAILY_FILE_LIMIT_REACHED` for a
@@ -76,9 +78,12 @@ keeping its own partial check.
 - The action stores the body, then runs `internal.files.stageUploadedAttachment`
   with the ticket's user. That mutation refuses a rejected account and
   re-checks the daily limit, which stays authoritative because concurrent
-  uploads can all pass admission. On any refusal the action deletes the blob it
-  just stored: it knows the blob is its own, so the old orphan (a refused
-  caller-supplied id nobody could safely delete) is gone. Success is
+  uploads can all pass admission. On any refusal or failure the action
+  releases the blob it just stored through
+  `internal.files.releaseUploadedStorage`, which applies the reference rule
+  below: a staging commit whose result was lost still holds the blob, so it
+  stays and the staged row expires through its TTL cleanup. The old orphan (a
+  refused caller-supplied id nobody could safely delete) is gone. Success is
   `{ attachmentId }`; the client never sees a storage id.
 - The client stops honoring a cancel once the request body is sent: the server
   stages the file anyway, so the attachment id still resolves and the Composer
@@ -102,10 +107,10 @@ A blob's references are `chatAttachments.storageId` and
 `deleteStorageIfUnreferenced(ctx, storageId, releasing?)` deletes a blob only
 when no reference other than the caller's own remains, and skips a blob that is
 already gone. Explicit deletion, staged cleanup, Chat, Project, and account
-deletion jobs (attachments and the account's profile image), and profile-image
-replacement all use it. Deletion jobs release the blob before deleting its row,
-so a storage failure blocks the job with the reference intact and a resumed
-batch retries (ADR-0014).
+deletion jobs (attachments and the account's profile image), profile-image
+replacement, and failed-upload cleanup all use it. Deletion jobs release the
+blob before deleting its row, so a storage failure blocks the job with the
+reference intact and a resumed batch retries (ADR-0014).
 
 ## Consequences
 
@@ -117,8 +122,9 @@ batch retries (ADR-0014).
 - A ticket is replayable for 15 minutes by whoever holds it; the worst case is
   more staged files for that same user, at most 20 a minute and none once the
   daily limit is spent (premium has no daily limit, as before).
-- A blob orphaned by an action crash between store and staging has no row, so
-  no reference rule reaches it; a sweep for unreferenced storage stays open.
+- A blob orphaned by an action crash between store and staging, or by a failed
+  release, has no row, so no reference rule reaches it; a sweep for
+  unreferenced storage stays open.
 - Image normalization (open PR #191) schedules from
   `saveStagedAttachmentHandler`, whose flow is unchanged; its local
   `deleteStorageIfUnreferenced` is replaced by this module's, which has the same

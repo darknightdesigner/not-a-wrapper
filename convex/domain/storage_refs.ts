@@ -35,8 +35,8 @@ export async function isStorageReferenced(
  * row and no profile image still references it. `releasing` is the caller's
  * own reference, which it removes in the same transaction, before or after
  * this call. Explicit deletion, staged cleanup, Chat and account deletion,
- * and profile-image replacement all go through here, so a duplicate
- * reference never loses its blob.
+ * profile-image replacement, and failed-upload cleanup all go through here,
+ * so a duplicate reference never loses its blob.
  */
 export async function deleteStorageIfUnreferenced(
   ctx: Pick<MutationCtx, "db" | "storage">,

@@ -9,6 +9,7 @@ import {
   PROFILE_IMAGE_SNIFF_BYTES,
   sniffProfileImageMimeType,
 } from "../lib/file/policy"
+import { readBodyCapped } from "../lib/file/read-body-capped"
 import { api, internal } from "./_generated/api"
 import { httpAction, type ActionCtx } from "./_generated/server"
 import {
@@ -101,15 +102,16 @@ type ProfileImageUploadCtx = Pick<
 
 type StoredUploadId = Awaited<ReturnType<ActionCtx["storage"]["store"]>>
 
-// Only for a blob this request stored and no row references (the commit
-// threw or refused), so there is no other owner to check.
+// For a blob this request stored but could not commit. A commit whose result
+// was lost may still have referenced it, so cleanup goes through the one
+// deletion rule instead of `ctx.storage.delete` (ADR-0046).
 async function cleanupStoredUpload(
-  ctx: Pick<ActionCtx, "storage">,
+  ctx: Pick<ActionCtx, "runMutation">,
   storageId: StoredUploadId,
   failureTag: string
 ) {
   try {
-    await ctx.storage.delete(storageId)
+    await ctx.runMutation(internal.files.releaseUploadedStorage, { storageId })
   } catch {
     console.warn(JSON.stringify({ _tag: failureTag }))
   }
@@ -131,6 +133,8 @@ export async function handleProfileImageUploadRequest(
     return jsonResponse(415, { error: "Unsupported profile image type" })
   }
 
+  // Fast pre-reject on the declared length; the capped read below enforces
+  // the cap for chunked bodies that omit it.
   const contentLength = Number(request.headers.get("Content-Length"))
   if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
     return jsonResponse(413, { error: "Profile image is too large" })
@@ -160,15 +164,14 @@ export async function handleProfileImageUploadRequest(
     )
   }
 
-  let blob: Blob
-  try {
-    blob = await request.blob()
-  } catch {
-    return jsonResponse(400, { error: "Invalid profile image body" })
-  }
-  if (blob.size > MAX_FILE_SIZE) {
+  const bodyRead = await readBodyCapped(request, MAX_FILE_SIZE, fileType)
+  if (bodyRead.kind === "too_large") {
     return jsonResponse(413, { error: "Profile image is too large" })
   }
+  if (bodyRead.kind === "invalid") {
+    return jsonResponse(400, { error: "Invalid profile image body" })
+  }
+  const { blob } = bodyRead
   // Cheaply reject obvious mismatches before staging the body. This signature
   // check is only a prefilter; the staged image is fully decoded below before
   // any user record or storage URL can reference it.
@@ -250,7 +253,7 @@ function readAttachmentName(request: Request): string | undefined {
 /**
  * Store an attachment and stage it for the user its upload ticket names, in
  * one request (ADR-0046). The client never sees or sends a storage id, and a
- * blob this request stored is deleted here whenever staging refuses it.
+ * blob this request stored is released whenever staging refuses or fails.
  */
 export async function handleAttachmentUploadRequest(
   ctx: AttachmentUploadCtx,
@@ -280,6 +283,8 @@ export async function handleAttachmentUploadRequest(
     return respond(415, { error: "Unsupported file type" })
   }
 
+  // Fast pre-reject on the declared length; the capped read below enforces
+  // the cap for chunked bodies that omit it.
   const contentLength = Number(request.headers.get("Content-Length"))
   if (Number.isFinite(contentLength) && contentLength > MAX_FILE_SIZE) {
     return respond(413, { error: "File is too large" })
@@ -310,20 +315,17 @@ export async function handleAttachmentUploadRequest(
     )
   }
 
-  let blob: Blob
-  try {
-    blob = await request.blob()
-  } catch {
-    return respond(400, { error: "Invalid file body" })
-  }
-  if (blob.size === 0) return respond(400, { error: "Invalid file body" })
-  if (blob.size > MAX_FILE_SIZE) {
+  const bodyRead = await readBodyCapped(request, MAX_FILE_SIZE, fileType)
+  if (bodyRead.kind === "too_large") {
     return respond(413, { error: "File is too large" })
+  }
+  if (bodyRead.kind === "invalid") {
+    return respond(400, { error: "Invalid file body" })
   }
 
   let storageId: StoredUploadId | undefined
   try {
-    storageId = await ctx.storage.store(blob)
+    storageId = await ctx.storage.store(bodyRead.blob)
     const attachmentId = await ctx.runMutation(
       internal.files.stageUploadedAttachment,
       {

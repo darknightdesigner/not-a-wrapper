@@ -254,7 +254,7 @@ type SaveStagedAttachmentArgs = {
 /**
  * Stage a blob the upload action stored for `ctx.user`. Throws or returns
  * null (daily limit) without deleting it: the action that stored the blob
- * deletes it on any refusal.
+ * releases it on any refusal.
  */
 export async function saveStagedAttachmentHandler(
   ctx: SaveStagedAttachmentCtx,
@@ -345,6 +345,19 @@ export const stageUploadedAttachment = internalMutation({
     if (!user) throw new Error("User not found")
     if (isRejectedAccount(user)) throw new Error("Account rejected")
     return await saveStagedAttachmentHandler({ ...ctx, user }, args)
+  },
+})
+
+/**
+ * Release a blob an upload action stored but could not commit (attachment
+ * staging or the profile-image commit). A commit that landed before its
+ * result was lost still references the blob, so the one deletion rule keeps
+ * it: a staged row still expires through its TTL cleanup.
+ */
+export const releaseUploadedStorage = internalMutation({
+  args: { storageId: v.id("_storage") },
+  handler: async (ctx, { storageId }) => {
+    await deleteStorageIfUnreferenced(ctx, storageId)
   },
 })
 

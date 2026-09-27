@@ -55,6 +55,12 @@ describe("stored-file deletion", () => {
     })
     expect(await exists(seeded.avatar)).toBe(true)
 
+    // A failed upload's cleanup: its commit may have landed after all.
+    await t.mutation(internal.files.releaseUploadedStorage, {
+      storageId: seeded.shared,
+    })
+    expect(await exists(seeded.shared)).toBe(true)
+
     // The last reference releases the blob.
     await t
       .withIdentity({ subject: "workos_owner" })

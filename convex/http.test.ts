@@ -1,3 +1,4 @@
+import { getFunctionName } from "convex/server"
 import {
   afterAll,
   afterEach,
@@ -11,6 +12,7 @@ import {
   ATTACHMENT_NAME_HEADER,
   DAILY_FILE_LIMIT_CODE,
 } from "../lib/file/policy"
+import { internal } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import {
   handleAttachmentUploadRequest,
@@ -25,6 +27,20 @@ vi.mock("./workosAuth", () => ({
 const storageId = "storage-profile-image" as Id<"_storage">
 const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
+// Failed-upload cleanup goes through the reference-aware release mutation,
+// never a direct `storage.delete`: a commit whose result was lost may still
+// hold the blob (ADR-0046).
+function releasedStorageIds(runMutation: ReturnType<typeof vi.fn>) {
+  const release = getFunctionName(internal.files.releaseUploadedStorage)
+  return runMutation.mock.calls
+    .filter(
+      ([ref]) =>
+        getFunctionName(ref as Parameters<typeof getFunctionName>[0]) ===
+        release
+    )
+    .map(([, args]) => (args as { storageId: Id<"_storage"> }).storageId)
+}
+
 function createUploadHarness() {
   const getUserIdentity = vi.fn().mockResolvedValue({
     issuer: "https://auth.test",
@@ -37,16 +53,14 @@ function createUploadHarness() {
     .mockResolvedValueOnce("https://images.test/avatar.png")
   const runAction = vi.fn().mockResolvedValue({ valid: true })
   const store = vi.fn().mockResolvedValue(storageId)
-  const deleteStoredFile = vi.fn()
 
   return {
     ctx: {
       auth: { getUserIdentity },
       runAction,
       runMutation,
-      storage: { delete: deleteStoredFile, store },
+      storage: { store },
     } as unknown as Parameters<typeof handleProfileImageUploadRequest>[0],
-    deleteStoredFile,
     getUserIdentity,
     runAction,
     runMutation,
@@ -168,7 +182,7 @@ describe("profile image HTTP upload", () => {
       harness.runMutation.mock.invocationCallOrder[1] ??
         Number.POSITIVE_INFINITY
     )
-    expect(harness.deleteStoredFile).not.toHaveBeenCalled()
+    expect(releasedStorageIds(harness.runMutation)).toEqual([])
   })
 
   it("deletes a signature-matching JPEG that fails full decoding", async () => {
@@ -189,8 +203,8 @@ describe("profile image HTTP upload", () => {
       error: "Unsupported profile image type",
     })
     expect(harness.runAction).toHaveBeenCalledTimes(1)
-    expect(harness.deleteStoredFile).toHaveBeenCalledWith(storageId)
-    expect(harness.runMutation).toHaveBeenCalledTimes(1)
+    expect(releasedStorageIds(harness.runMutation)).toEqual([storageId])
+    expect(harness.runMutation).toHaveBeenCalledTimes(2)
   })
 
   it("cleans up and returns a generic error when decoder validation fails", async () => {
@@ -206,14 +220,14 @@ describe("profile image HTTP upload", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Profile image upload failed",
     })
-    expect(harness.deleteStoredFile).toHaveBeenCalledWith(storageId)
-    expect(harness.runMutation).toHaveBeenCalledTimes(1)
+    expect(releasedStorageIds(harness.runMutation)).toEqual([storageId])
+    expect(harness.runMutation).toHaveBeenCalledTimes(2)
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       JSON.stringify({ _tag: "profile_image_upload_failed" })
     )
   })
 
-  it("deletes the newly stored file when the owner-bound commit fails", async () => {
+  it("releases the newly stored file when the owner-bound commit fails", async () => {
     const harness = createUploadHarness()
     harness.runMutation
       .mockReset()
@@ -229,7 +243,7 @@ describe("profile image HTTP upload", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Profile image upload failed",
     })
-    expect(harness.deleteStoredFile).toHaveBeenCalledWith(storageId)
+    expect(releasedStorageIds(harness.runMutation)).toEqual([storageId])
     expect(consoleWarnSpy).toHaveBeenCalledWith(
       JSON.stringify({ _tag: "profile_image_upload_failed" })
     )
@@ -249,36 +263,39 @@ describe("attachment HTTP upload", () => {
   afterEach(() => vi.unstubAllEnvs())
 
   function createAttachmentHarness(
-    staged: string | null = "attachment-1",
+    staged: string | null | Error = "attachment-1",
     admission: { status: string } = { status: "allowed" }
   ) {
-    const runMutation = vi
-      .fn()
-      .mockResolvedValueOnce(admission)
-      .mockResolvedValueOnce(staged)
+    const runMutation = vi.fn().mockResolvedValueOnce(admission)
+    if (staged instanceof Error) runMutation.mockRejectedValueOnce(staged)
+    else runMutation.mockResolvedValueOnce(staged)
     const store = vi.fn().mockResolvedValue(attachmentStorageId)
-    const deleteStoredFile = vi.fn()
     return {
       ctx: {
         runMutation,
-        storage: { delete: deleteStoredFile, store },
+        storage: { store },
       } as unknown as Parameters<typeof handleAttachmentUploadRequest>[0],
-      deleteStoredFile,
       runMutation,
       store,
     }
   }
 
-  function uploadRequest(ticket: string) {
-    return new Request("https://convex.test/attachments", {
+  function uploadRequest(
+    ticket: string,
+    body: Blob | ReadableStream<Uint8Array> = new Blob(["hello"])
+  ) {
+    // Fetch requires `duplex` for a stream body; lib.dom does not declare it.
+    const init: RequestInit & { duplex: "half" } = {
       method: "POST",
       headers: {
         Authorization: `Bearer ${ticket}`,
         "Content-Type": "text/plain",
         [ATTACHMENT_NAME_HEADER]: encodeURIComponent("notes é.txt"),
       },
-      body: new Blob(["hello"], { type: "text/plain" }),
-    })
+      body,
+      duplex: "half",
+    }
+    return new Request("https://convex.test/attachments", init)
   }
 
   it("stages the stored blob for the ticket's user and stores nothing under a forged or expired ticket", async () => {
@@ -316,7 +333,7 @@ describe("attachment HTTP upload", () => {
     })
   })
 
-  it("stores nothing when admission refuses, and deletes the blob it stored when staging refuses", async () => {
+  it("stores nothing when admission refuses, and releases the blob it stored when staging refuses or fails", async () => {
     const overLimit = createAttachmentHarness(null, { status: "daily_limit" })
     const refused = await handleAttachmentUploadRequest(
       overLimit.ctx,
@@ -335,6 +352,32 @@ describe("attachment HTTP upload", () => {
       uploadRequest(signUploadTicket(owner))
     )
     expect(response.status).toBe(429)
-    expect(raced.deleteStoredFile).toHaveBeenCalledWith(attachmentStorageId)
+    expect(releasedStorageIds(raced.runMutation)).toEqual([attachmentStorageId])
+
+    // Staging may have committed before its result was lost, so the release
+    // is reference-aware rather than a direct delete.
+    const failed = createAttachmentHarness(new Error("Result lost"))
+    const lost = await handleAttachmentUploadRequest(
+      failed.ctx,
+      uploadRequest(signUploadTicket(owner))
+    )
+    expect(lost.status).toBe(500)
+    expect(releasedStorageIds(failed.runMutation)).toEqual([
+      attachmentStorageId,
+    ])
+  })
+
+  it("refuses a chunked body past the cap while reading it, storing nothing", async () => {
+    // No Content-Length and no end: only a capped read can answer.
+    const endless = new ReadableStream<Uint8Array>({
+      pull: (controller) => controller.enqueue(new Uint8Array(1024 * 1024)),
+    })
+    const harness = createAttachmentHarness()
+    const response = await handleAttachmentUploadRequest(
+      harness.ctx,
+      uploadRequest(signUploadTicket(owner), endless)
+    )
+    expect(response.status).toBe(413)
+    expect(harness.store).not.toHaveBeenCalled()
   })
 })

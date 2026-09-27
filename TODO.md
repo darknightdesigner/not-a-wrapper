@@ -99,7 +99,8 @@ reader.
 - **Upload content type and orphan sweep:** ADR-0046 moved attachment uploads
 to the ticketed `/attachments` HTTP action, which admits before storing (daily
 limit, a 20-a-minute `attachment_upload` window, rejected accounts), enforces
-the 10 MB cap and deletes any blob that staging refuses. Still open: the stored
+the 10 MB cap while reading, and releases any blob that staging refuses or
+fails through the reference rule. Still open: the stored
 Content-Type is the browser's declared header, so sniff content server-side;
 and add a cron that deletes unreferenced storage (blobs orphaned between store
 and staging, and blobs left by the pre-ADR-0046 flow) through
