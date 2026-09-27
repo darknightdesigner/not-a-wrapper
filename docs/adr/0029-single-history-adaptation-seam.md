@@ -37,3 +37,9 @@ contract across every origin, target, and search-policy combination.
 - Canonical history is not narrowed by a second intermediate representation.
 - New provider behavior must extend the adapter registry and shared request
   matrix instead of introducing another rollout path.
+- Canonical history may carry message-size-cap markers (CONTEXT.md "Message
+  payload cap"): an omitted tool result is the `_truncated` envelope the tool
+  layer already emits, so adapters replay it as ordinary tool output.
+  Model-bound validation still passes: provider-executed parts are lowered to
+  text first, no client tool declares an output schema, and the SDK validates
+  inputs only on pending calls, which the cap never touches.
