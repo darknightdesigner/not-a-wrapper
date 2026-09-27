@@ -256,19 +256,14 @@ short ADR-0026 amendment recording the rule and the label source of truth.
 Details, evidence, and how the references handle each one:
 [`docs/audits/2026-09-26-open-source-reference-gaps.md`](docs/audits/2026-09-26-open-source-reference-gaps.md).
 
-- **Text-like uploads break chats:** Markdown, CSV, JSON and Excel pass upload,
-but only `text/plain` is inlined, so Claude and GPT reject that turn and every
-later one in the chat.
-([details](docs/audits/2026-09-26-open-source-reference-gaps.md#text-like-uploads-break-the-chat))
-- **Stored images break later turns:** Old images are replayed to text-only
-models, and images are never resized, so a model switch or one oversized
-screenshot fails every later send.
-([text-only models](docs/audits/2026-09-26-open-source-reference-gaps.md#old-images-break-text-only-models),
-[resizing](docs/audits/2026-09-26-open-source-reference-gaps.md#images-are-never-resized))
-- **Attachment budgets:** Spend the text-file budget newest-first, and estimate
-PDF cost from file size instead of URL length.
-([newest file](docs/audits/2026-09-26-open-source-reference-gaps.md#text-file-budget-drops-the-newest-file),
-[PDF](docs/audits/2026-09-26-open-source-reference-gaps.md#pdf-cost-is-estimated-at-about-20-tokens))
+- **Text files on text-only models:** The Composer gates every upload on
+`vision` (`app/components/chat-input/composer.tsx`), but text-like files are now
+inlined as text for any model; allow text-type uploads on non-vision models
+with a narrowed accept list.
+- **Current-turn PDFs on text-only routes:** `turnRequiresVision`
+(`app/api/chat/api.ts`) gates only images, so a PDF in the current turn on a
+non-vision route becomes a note instead of steering the resolver to a vision
+route.
 - **Final answer at the tool-step cap:** A tool call on the last allowed step
 ends the turn with no reply. Make the last step tools-off.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#tool-step-cap-can-end-a-turn-with-no-answer))
