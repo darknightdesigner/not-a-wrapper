@@ -1781,7 +1781,7 @@ send button stops working with no explanation until a reload.
 **Notes.** The silent guest turn needs a cross-tab sign-out and then a send
 within about 5 minutes (Convex refetches its token 10 seconds before expiry),
 so it is uncommon. The blocked composer after any session end is the likelier
-symptom. Neither the TODO "Account deletion" nor "Guest abuse" item covers
+symptom. Neither the account-deletion fix (ADR-0044) nor the "Guest abuse" item covers
 this, and a server-signed guest cookie alone would not fix it.
 
 ### Shared chat pages can be indexed
@@ -1883,6 +1883,11 @@ only: chat ids are random UUIDs that are never reused (ADR-0033).
 ### User bootstrap trusts browser-sent sync fields
 
 Severity: Low.
+
+Status: fixed 2026-09-27 (ADR-0044). `users.ensureCurrent` replaced
+`createOrUpdate`: it takes no arguments, is insert-only, and uses verified token
+claims only. Only the verified webhook writes profile fields and
+`workosUpdatedAt`, and soft delete has no older-update skip.
 
 **What is wrong.** When a signed-in user has no row yet, the browser calls the
 public `users.createOrUpdate` mutation, which writes whatever email, names,
@@ -2170,8 +2175,8 @@ keyed by their WorkOS id, even after the account is deleted.
    longest tool window (15 minutes, `lib/config.ts:74` and `lib/config.ts:81`).
    A sweep on write like `convex/rateLimits.ts` is not enough alone, because a
    domain that is never read again is never swept.
-3. Add `toolLimitBuckets` to the account-deletion cascade already listed in
-   TODO.md.
+3. Add `toolLimitBuckets` to the account-deletion cascade. Done 2026-09-27
+   (ADR-0044): account deletion drains the `user:<WorkOS id>` rows.
 4. Optional: resolve `windowMs`, `maxCount` and `bucketSizeMs` on the server by
    tool name, like `API_RATE_LIMIT_POLICIES` in `convex/rateLimits.ts:20-23`,
    so callers send only the tool name and scopes.
@@ -2232,8 +2237,8 @@ planned account-deletion cleanup does not list them.
    `consume` handler (`convex/rateLimits.ts:100-150`), so first move it into a
    helper that takes `ctx` and the user id, then call that helper from
    `submit`. The window math in `evaluateFixedWindow` can stay as is.
-4. Add "feedback" to the table list in the TODO.md item "Account deletion must
-   revoke application access".
+4. Add "feedback" to the account-deletion cascade. Done 2026-09-27
+   (ADR-0044).
 
 **Notes.** The internal `list` query (`convex/feedback.ts:24-28`) loads the
 whole table in one read, but nothing calls it. Feedback is read in the Convex
