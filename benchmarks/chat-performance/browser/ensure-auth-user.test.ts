@@ -63,11 +63,14 @@ describe("benchmark identity isolation", () => {
     })
     expect(workosMocks.listUsers).not.toHaveBeenCalled()
     expect(workosMocks.updateUser).not.toHaveBeenCalled()
-    // The job's cleanup step deletes every recorded user once.
-    expect(readFileSync(usersFile, "utf8")).toBe("test-created-user\n")
+    // The job's cleanup step finds each recorded user by email and deletes it.
+    expect(readFileSync(usersFile, "utf8")).toBe(`${first.PERF_AUTH_EMAIL}\n`)
     await first.deleteRecordedCaptureUsers()
+    expect(workosMocks.listUsers).toHaveBeenCalledWith({
+      email: first.PERF_AUTH_EMAIL,
+    })
     expect(workosMocks.deleteUser).toHaveBeenCalledTimes(1)
-    expect(workosMocks.deleteUser).toHaveBeenCalledWith("test-created-user")
+    expect(workosMocks.deleteUser).toHaveBeenCalledWith("existing-user")
     workosMocks.createUser.mockRejectedValueOnce(new Error("creation failed"))
     await expect(second.ensurePerfAuthUser()).rejects.toThrow("creation failed")
     expect(workosMocks.authenticateWithPassword).not.toHaveBeenCalled()

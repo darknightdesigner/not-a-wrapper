@@ -3,8 +3,8 @@
  * email and a known password, using the WORKOS_API_KEY already present in
  * .env.local (bun auto-loads it). CI creates a fresh identity per harness
  * process so previous captures cannot change its sidebar or usage allowance.
- * It records each one in PERF_CAPTURE_USERS_FILE, and the workflow's final
- * always-run step deletes them however the job ends (`--delete-recorded`).
+ * It records each one's email in PERF_CAPTURE_USERS_FILE, and the workflow's
+ * final always-run step deletes them however the job ends (`--delete-recorded`).
  * Local provisioning reuses the configured account and repairs its password.
  *
  * The user lives in the SAME WorkOS environment as the app's dev client id,
@@ -60,15 +60,17 @@ export async function ensurePerfAuthUser(): Promise<void> {
   const workos = new WorkOS(apiKey)
 
   if (isIsolatedCapture) {
+    // Recorded before creation, so cleanup finds the user even when the
+    // create response is lost, and a failed write creates nothing.
+    if (captureUsersFile) appendFileSync(captureUsersFile, `${PERF_AUTH_EMAIL}\n`)
     // Fail on creation errors; reusing an account would invalidate isolation.
-    const user = await workos.userManagement.createUser({
+    await workos.userManagement.createUser({
       email: PERF_AUTH_EMAIL,
       password,
       emailVerified: true,
       firstName: "Perf",
       lastName: "Harness",
     })
-    if (captureUsersFile) appendFileSync(captureUsersFile, `${user.id}\n`)
     console.log("[ensure-auth-user] created isolated capture user")
     return
   }
@@ -113,13 +115,16 @@ export async function ensurePerfAuthUser(): Promise<void> {
  */
 export async function deleteRecordedCaptureUsers(): Promise<void> {
   if (!captureUsersFile || !existsSync(captureUsersFile)) return
-  const ids = new Set(readFileSync(captureUsersFile, "utf8").split("\n"))
-  ids.delete("")
+  const emails = new Set(readFileSync(captureUsersFile, "utf8").split("\n"))
+  emails.delete("")
   const workos = new WorkOS(process.env.WORKOS_API_KEY)
-  for (const id of ids) {
+  for (const email of emails) {
     try {
-      await workos.userManagement.deleteUser(id)
-      console.log("[ensure-auth-user] deleted capture user")
+      const { data } = await workos.userManagement.listUsers({ email })
+      for (const user of data) {
+        await workos.userManagement.deleteUser(user.id)
+        console.log("[ensure-auth-user] deleted capture user")
+      }
     } catch (error) {
       console.warn("[ensure-auth-user] could not delete capture user", error)
     }
