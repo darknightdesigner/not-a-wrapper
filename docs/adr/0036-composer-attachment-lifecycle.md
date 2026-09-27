@@ -17,6 +17,9 @@ files afterward. During admission, Send and another selection could not see them
 - Selected files appear and reserve their identities synchronously. The existing
   indeterminate uploading presentation covers both admission and transfer; no new
   controls, labels, or animated loading treatment are introduced.
+- A staged image stays unbindable until the server stores a copy every model can
+  take (long side at most 2000 px, `convex/attachmentImages.ts`); its upload stays
+  in the uploading state until `files.getStagedAttachmentStatus` reads ready.
 - Pending files block Send immediately. Invalid or over-capacity selections are
   removed with the existing error feedback. The server remains authoritative for
   upload allowance; the client considers earlier pending selections in its check.

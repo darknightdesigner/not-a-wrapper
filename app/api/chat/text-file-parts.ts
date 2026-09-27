@@ -1,3 +1,4 @@
+import { isTextLikeMediaType } from "@/lib/file/policy"
 import type { UIMessage } from "ai"
 
 const MAX_TEXT_FILE_MODEL_INPUT_BYTES = 128 * 1024
@@ -37,32 +38,12 @@ type FetchTextFileOptions = {
   timeoutMs?: number
   overallTimeoutMs?: number
   trustedAttachments?: readonly TrustedTextFileAttachment[]
-  convertOnlyLatestUserMessage?: boolean
 }
 
-type ResolvedFetchTextFileOptions = {
-  fetchImpl: typeof fetch
-  maxBytes: number
-  maxFiles: number
-  maxTotalBytes: number
-  timeoutMs: number
-  overallTimeoutMs: number
-  trustedAttachments: readonly TrustedTextFileAttachment[]
-  convertOnlyLatestUserMessage: boolean
-}
+type ResolvedFetchTextFileOptions = Required<FetchTextFileOptions>
 
-function normalizeMediaType(mediaType: unknown): string {
-  return typeof mediaType === "string"
-    ? (mediaType.split(";")[0]?.trim().toLowerCase() ?? "")
-    : ""
-}
-
-function isPlainTextFilePart(part: MessagePart): boolean {
-  if (part.type !== "file") return false
-  return (
-    normalizeMediaType((part as { mediaType?: unknown }).mediaType) ===
-    "text/plain"
-  )
+function isTextLikeFilePart(part: MessagePart): boolean {
+  return part.type === "file" && isTextLikeMediaType(part.mediaType)
 }
 
 function getFileName(part: MessagePart): string {
@@ -105,11 +86,19 @@ function findTrustedAttachment(
 export function getTextFilePartReferences(
   messages: readonly UIMessage[]
 ): TextFilePartReference[] {
+  return getFilePartReferences(messages, isTextLikeMediaType)
+}
+
+/** Lookup keys for the file parts whose media type `include` selects. */
+export function getFilePartReferences(
+  messages: readonly UIMessage[],
+  include: (mediaType: string) => boolean
+): TextFilePartReference[] {
   const references: TextFilePartReference[] = []
 
   for (const message of messages) {
     for (const part of message.parts) {
-      if (!isPlainTextFilePart(part)) continue
+      if (part.type !== "file" || !include(part.mediaType)) continue
 
       const attachmentId = getAttachmentId(part)
       const url = getFileUrl(part)
@@ -130,15 +119,6 @@ function getLatestUserMessageIndex(messages: readonly UIMessage[]): number {
     if (messages[index]?.role === "user") return index
   }
   return -1
-}
-
-export function getLatestUserMessageTextFilePartReferences(
-  messages: readonly UIMessage[]
-): TextFilePartReference[] {
-  const latestUserMessageIndex = getLatestUserMessageIndex(messages)
-  if (latestUserMessageIndex === -1) return []
-  const latestUserMessage = messages[latestUserMessageIndex]
-  return latestUserMessage ? getTextFilePartReferences([latestUserMessage]) : []
 }
 
 function decodeUtf8WithoutPartialTrailingCharacter(
@@ -266,7 +246,7 @@ async function readPlainTextFile(
 }
 
 function skippedTextFilePartToPromptText(filename: string): string {
-  return `Attached plain text file "${filename}" was provided earlier in the conversation and was not re-read for this turn.`
+  return `Attached text file "${filename}" was provided earlier in the conversation and was not re-read for this turn.`
 }
 
 function textFilePartToPromptText(args: {
@@ -277,16 +257,22 @@ function textFilePartToPromptText(args: {
   maxBytes: number
 }): string {
   if (args.error) {
-    return `Attached plain text file "${args.filename}" could not be read for model input: ${args.error}`
+    return `Attached text file "${args.filename}" could not be read for model input: ${args.error}`
   }
 
   const truncationNote = args.truncated
     ? `\n\n[File content truncated to ${args.maxBytes} bytes for model input.]`
     : ""
 
-  return `Attached plain text file "${args.filename}":\n\n${args.text ?? ""}${truncationNote}`
+  return `Attached text file "${args.filename}":\n\n${args.text ?? ""}${truncationNote}`
 }
 
+/**
+ * Inline every text-like file part as text. The file, byte, and time budgets
+ * are spent newest message first so the current turn's files always fit; an
+ * older file that no longer fits gets a short "not re-read" note instead of
+ * an error. The output keeps the original message order.
+ */
 export async function prepareTextFilePartsForModelInput(
   messages: readonly UIMessage[],
   options: FetchTextFileOptions = {}
@@ -301,7 +287,6 @@ export async function prepareTextFilePartsForModelInput(
     overallTimeoutMs:
       options.overallTimeoutMs ?? TEXT_FILE_CONVERSION_TIMEOUT_MS,
     trustedAttachments: options.trustedAttachments ?? [],
-    convertOnlyLatestUserMessage: options.convertOnlyLatestUserMessage ?? false,
   }
   let convertedCount = 0
   let failedCount = 0
@@ -309,142 +294,96 @@ export async function prepareTextFilePartsForModelInput(
   let skippedCount = 0
   let fetchedFileCount = 0
   let remainingTotalBytes = Math.max(0, resolvedOptions.maxTotalBytes)
-  const latestUserMessageIndex = resolvedOptions.convertOnlyLatestUserMessage
-    ? getLatestUserMessageIndex(messages)
-    : -1
+  const latestUserMessageIndex = getLatestUserMessageIndex(messages)
   const deadlineMs = Date.now() + resolvedOptions.overallTimeoutMs
 
-  const nextMessages: UIMessage[] = []
+  const failed = (filename: string, error: string): string => {
+    failedCount += 1
+    return textFilePartToPromptText({
+      filename,
+      error,
+      maxBytes: resolvedOptions.maxBytes,
+    })
+  }
 
-  for (const [messageIndex, message] of messages.entries()) {
-    const nextParts: MessagePart[] = []
-    let changed = false
+  const convert = async (
+    part: MessagePart,
+    isCurrentTurn: boolean
+  ): Promise<string> => {
+    const filename = getFileName(part)
+    const remainingTimeMs = deadlineMs - Date.now()
+    const exhaustedBudget =
+      fetchedFileCount >= resolvedOptions.maxFiles
+        ? `text attachment limit exceeded (${resolvedOptions.maxFiles} files per request)`
+        : remainingTotalBytes <= 0
+          ? `text attachment byte budget exceeded (${resolvedOptions.maxTotalBytes} bytes per request)`
+          : remainingTimeMs <= 0
+            ? "Text attachment conversion deadline exceeded"
+            : null
 
-    for (const part of message.parts) {
-      if (!isPlainTextFilePart(part)) {
-        nextParts.push(part)
-        continue
-      }
-
-      changed = true
-      const shouldConvert =
-        !resolvedOptions.convertOnlyLatestUserMessage ||
-        messageIndex === latestUserMessageIndex
-      if (!shouldConvert) {
-        skippedCount += 1
-        nextParts.push({
-          type: "text",
-          text: skippedTextFilePartToPromptText(getFileName(part)),
-        } as MessagePart)
-        continue
-      }
-
-      convertedCount += 1
-      const filename = getFileName(part)
-      if (fetchedFileCount >= resolvedOptions.maxFiles) {
-        failedCount += 1
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            error: `text attachment limit exceeded (${resolvedOptions.maxFiles} files per request)`,
-            maxBytes: resolvedOptions.maxBytes,
-          }),
-        } as MessagePart)
-        continue
-      }
-
-      if (remainingTotalBytes <= 0) {
-        failedCount += 1
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            error: `text attachment byte budget exceeded (${resolvedOptions.maxTotalBytes} bytes per request)`,
-            maxBytes: resolvedOptions.maxBytes,
-          }),
-        } as MessagePart)
-        continue
-      }
-
-      const remainingTimeMs = deadlineMs - Date.now()
-      if (remainingTimeMs <= 0) {
-        failedCount += 1
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            error: "Text attachment conversion deadline exceeded",
-            maxBytes: resolvedOptions.maxBytes,
-          }),
-        } as MessagePart)
-        continue
-      }
-
-      const trustedAttachment = findTrustedAttachment(
-        part,
-        resolvedOptions.trustedAttachments
-      )
-
-      if (!trustedAttachment) {
-        failedCount += 1
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            error: "attachment is not available for model input",
-            maxBytes: resolvedOptions.maxBytes,
-          }),
-        } as MessagePart)
-        continue
-      }
-
-      try {
-        fetchedFileCount += 1
-        const maxBytes = Math.min(resolvedOptions.maxBytes, remainingTotalBytes)
-        const { text, truncated, byteLength } = await readPlainTextFile(
-          trustedAttachment.url,
-          {
-            fetchImpl: resolvedOptions.fetchImpl,
-            maxBytes,
-            timeoutMs: Math.min(resolvedOptions.timeoutMs, remainingTimeMs),
-          }
-        )
-        remainingTotalBytes -= byteLength
-        if (truncated) truncatedCount += 1
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            text,
-            truncated,
-            maxBytes,
-          }),
-        } as MessagePart)
-      } catch (error) {
-        failedCount += 1
-        const detail =
-          error instanceof Error && error.message.length > 0
-            ? error.message
-            : "unknown error"
-        nextParts.push({
-          type: "text",
-          text: textFilePartToPromptText({
-            filename,
-            error: detail,
-            maxBytes: resolvedOptions.maxBytes,
-          }),
-        } as MessagePart)
-      }
+    if (exhaustedBudget && !isCurrentTurn) {
+      skippedCount += 1
+      return skippedTextFilePartToPromptText(filename)
     }
 
-    nextMessages.push(
-      changed ? ({ ...message, parts: nextParts } as UIMessage) : message
+    convertedCount += 1
+    if (exhaustedBudget) return failed(filename, exhaustedBudget)
+
+    const trustedAttachment = findTrustedAttachment(
+      part,
+      resolvedOptions.trustedAttachments
     )
+    if (!trustedAttachment) {
+      return failed(filename, "attachment is not available for model input")
+    }
+
+    try {
+      fetchedFileCount += 1
+      const maxBytes = Math.min(resolvedOptions.maxBytes, remainingTotalBytes)
+      const { text, truncated, byteLength } = await readPlainTextFile(
+        trustedAttachment.url,
+        {
+          fetchImpl: resolvedOptions.fetchImpl,
+          maxBytes,
+          timeoutMs: Math.min(resolvedOptions.timeoutMs, remainingTimeMs),
+        }
+      )
+      remainingTotalBytes -= byteLength
+      if (truncated) truncatedCount += 1
+      return textFilePartToPromptText({ filename, text, truncated, maxBytes })
+    } catch (error) {
+      return failed(
+        filename,
+        error instanceof Error && error.message.length > 0
+          ? error.message
+          : "unknown error"
+      )
+    }
+  }
+
+  const replacements = new Map<string, string>()
+  for (const [index, message] of [...messages.entries()].reverse()) {
+    for (const [partIndex, part] of message.parts.entries()) {
+      if (!isTextLikeFilePart(part)) continue
+      replacements.set(
+        `${index}:${partIndex}`,
+        await convert(part, index === latestUserMessageIndex)
+      )
+    }
   }
 
   return {
-    messages: nextMessages,
+    messages: messages.map((message, index) =>
+      message.parts.some(isTextLikeFilePart)
+        ? {
+            ...message,
+            parts: message.parts.map((part, partIndex) => {
+              const text = replacements.get(`${index}:${partIndex}`)
+              return text === undefined ? part : { type: "text" as const, text }
+            }),
+          }
+        : message
+    ),
     convertedCount,
     failedCount,
     truncatedCount,

@@ -261,6 +261,7 @@ export async function POST(req: Request) {
                 workosUserId: authUserId,
                 token: convexToken,
                 messages: generationInput?.messages ?? messages,
+                attachmentSizes: generationInput?.attachmentSizes,
                 requestId,
                 chatId,
                 systemPrompt,

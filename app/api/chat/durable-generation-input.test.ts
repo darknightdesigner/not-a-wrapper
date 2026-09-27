@@ -25,6 +25,13 @@ function canonicalFileMessage(): Doc<"messages"> {
         attachmentId: "attachment-canonical",
         url: "https://stored.example/canonical.txt",
       },
+      {
+        type: "file",
+        filename: "report.pdf",
+        mediaType: "application/pdf",
+        attachmentId: "attachment-pdf",
+        url: "https://stored.example/report.pdf",
+      },
     ],
     status: "completed",
     createdAt: 1,
@@ -46,15 +53,21 @@ describe("preflightDurableGenerationInput", () => {
       if (functionName(ref) === "files:getTrustedTextAttachmentsForChat") {
         expect(args).toMatchObject({
           references: [
-            {
-              url: "https://stored.example/canonical.txt",
-            },
+            { url: "https://stored.example/canonical.txt" },
+            { url: "https://stored.example/report.pdf" },
           ],
         })
         return [
           {
             attachmentId: "attachment-canonical",
             url: "https://stored.example/canonical.txt",
+            mediaType: "text/plain",
+          },
+          {
+            attachmentId: "attachment-pdf",
+            url: "https://stored.example/report.pdf",
+            mediaType: "application/pdf",
+            size: 110_000,
           },
         ]
       }
@@ -102,6 +115,7 @@ describe("preflightDurableGenerationInput", () => {
     expect(result).toMatchObject({
       inputHash: "a".repeat(64),
       pinnedProvider: "openai",
+      attachmentSizes: { "attachment-pdf": 110_000 },
       textFileStats: {
         convertedCount: 1,
         failedCount: 0,
@@ -117,8 +131,9 @@ describe("preflightDurableGenerationInput", () => {
         parts: [
           {
             type: "text",
-            text: 'Attached plain text file "canonical.txt":\n\ntrusted canonical text',
+            text: 'Attached text file "canonical.txt":\n\ntrusted canonical text',
           },
+          { type: "file", mediaType: "application/pdf" },
         ],
       },
     ])

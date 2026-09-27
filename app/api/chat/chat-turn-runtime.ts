@@ -28,6 +28,7 @@ import {
   MCP_MAX_STEP_COUNT,
   SYSTEM_PROMPT_DEFAULT,
 } from "@/lib/config"
+import { isTextLikeMediaType } from "@/lib/file/policy"
 import type { ResolvedModelRoute } from "@/lib/model-route-resolver"
 import { getAllModels } from "@/lib/models"
 import { resolveModelSearchMode } from "@/lib/models/catalog"
@@ -118,6 +119,7 @@ import {
   type TerminalUsageFacts,
   type TitleUsageForSettlement,
 } from "./durable-turn-runtime"
+import { lowerUnsupportedFileParts } from "./file-part-lowering"
 import { createGenerationTimingTracker } from "./generation-timing"
 import { lowerForeignHostedToolParts } from "./hosted-tool-lowering"
 import {
@@ -893,7 +895,9 @@ export function createChatTurnRuntime(args: {
               : []
 
           return await prepareTextFilePartsForModelInput(validatedMessages, {
-            trustedAttachments: trustedTextAttachments,
+            trustedAttachments: trustedTextAttachments.filter((attachment) =>
+              isTextLikeMediaType(attachment.mediaType)
+            ),
           })
         })()
 
@@ -916,6 +920,7 @@ export function createChatTurnRuntime(args: {
       targetModelId: model,
       targetRouteId: route.routeId,
       hasTools: hasAnyTools,
+      vision: modelConfig.vision === true,
       sourceProviderHint: resolvedProvider,
     }
 
@@ -955,9 +960,28 @@ export function createChatTurnRuntime(args: {
       )
     }
 
+    // Files the target route cannot take (an old image after a switch to a
+    // text-only model, a legacy spreadsheet) become a short note.
+    const fileLowering = lowerUnsupportedFileParts(
+      hostedLowering.messages,
+      adaptationContext
+    )
+    if (fileLowering.loweredCount > 0) {
+      console.log(
+        JSON.stringify({
+          _tag: "unsupported_file_history_lowered",
+          chatId,
+          provider: resolvedProvider,
+          model,
+          vision: adaptationContext.vision,
+          loweredCount: fileLowering.loweredCount,
+        })
+      )
+    }
+
     const adaptStartTime = Date.now()
     const adapterResult = await adaptHistoryForProvider(
-      hostedLowering.messages,
+      fileLowering.messages,
       resolvedProvider,
       adaptationContext
     )
@@ -1008,7 +1032,8 @@ export function createChatTurnRuntime(args: {
     // SDK's non-empty structural contract; after projection/adaptation this
     // validation must pass against the current own-property tool registry.
     // Failure is an internal replay invariant breach. Do not silently flatten
-    // files, images, sources, reasoning, or continuation state.
+    // sources, reasoning, or continuation state; the only file downgrade is
+    // the deliberate, logged unsupported-file lowering above.
     const modelBoundValidation = await perf.span("model_bound_validation", () =>
       safeValidateUIMessages({
         messages: adaptedMessagesWithTail,

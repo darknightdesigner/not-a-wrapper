@@ -22,9 +22,11 @@ complete second adapter.
 
 History adaptation has one seam: `adaptHistoryForProvider` selects one
 target-provider adapter from the registry. Before that seam, the Chat turn
-runtime separates approval continuations and lowers historical
-provider-executed activity to provider-neutral text. After it, model-bound
-validation fails closed before conversion and provider execution.
+runtime separates approval continuations, lowers historical
+provider-executed activity to provider-neutral text, and replaces file parts
+the target route cannot take (images and PDFs without `vision`, any other
+non-text file) with a short note (`file-part-lowering.ts`). After it,
+model-bound validation fails closed before conversion and provider execution.
 
 Delete the compiler flag, compiler implementation, fallback telemetry, and
 compiler-only tests. Keep the final provider-request matrix as the end-to-end

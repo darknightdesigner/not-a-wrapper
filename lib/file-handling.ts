@@ -1,6 +1,11 @@
+import { isImageMediaType } from "@/lib/file/policy"
 import type { ConvexReactClient } from "convex/react"
 
 export { ACCEPTED_FILE_PICKER_TYPES, validateFile } from "@/lib/file/validation"
+
+/** A staged image that never commits fails its upload instead of blocking Send. */
+const STAGED_IMAGE_READY_TIMEOUT_MS = 60_000
+const UPLOAD_FAILED_MESSAGE = "Upload failed. Please try again."
 
 export type Attachment = {
   name: string
@@ -102,12 +107,65 @@ export async function uploadStagedFile(
   if (!attachmentId) {
     throw new FileUploadLimitError("Daily file upload limit reached.")
   }
+  // The server resizes staged images before they can be bound to a turn.
+  if (isImageMediaType(file.type)) {
+    try {
+      await waitForStagedAttachment(convex, attachmentId, options.signal)
+    } catch (error) {
+      // Cancelled or failed: release the row and its daily upload slot.
+      void deleteUploadedAttachment(convex, attachmentId).catch(() => {})
+      throw error
+    }
+  }
 
   // Preview through a same-origin owner-checked route. The canonical storage
   // URL is returned only after the staged set is bound to a chat at Send.
   const fileUrl = `/api/files/${attachmentId}/preview`
 
   return { fileUrl, attachmentId }
+}
+
+async function waitForStagedAttachment(
+  convex: ConvexReactClient,
+  attachmentId: string,
+  signal?: AbortSignal
+): Promise<void> {
+  const { api } = await import("@/convex/_generated/api")
+  const watch = convex.watchQuery(api.files.getStagedAttachmentStatus, {
+    attachmentId:
+      attachmentId as unknown as typeof api.files.getStagedAttachmentStatus._args.attachmentId,
+  })
+
+  await new Promise<void>((resolve, reject) => {
+    let unsubscribe: (() => void) | undefined
+    const settle = (error?: Error) => {
+      unsubscribe?.()
+      clearTimeout(timeout)
+      signal?.removeEventListener("abort", onAbort)
+      if (error) reject(error)
+      else resolve()
+    }
+    const onAbort = () =>
+      settle(new DOMException("Upload cancelled", "AbortError"))
+    const timeout = setTimeout(
+      () => settle(new Error(UPLOAD_FAILED_MESSAGE)),
+      STAGED_IMAGE_READY_TIMEOUT_MS
+    )
+    const check = () => {
+      try {
+        const status = watch.localQueryResult()
+        if (status === "ready") settle()
+        else if (status === null) settle(new Error(UPLOAD_FAILED_MESSAGE))
+      } catch {
+        settle(new Error(UPLOAD_FAILED_MESSAGE))
+      }
+    }
+
+    if (signal?.aborted) return onAbort()
+    signal?.addEventListener("abort", onAbort, { once: true })
+    unsubscribe = watch.onUpdate(check)
+    check()
+  })
 }
 
 export async function attachStagedFilesToChat(

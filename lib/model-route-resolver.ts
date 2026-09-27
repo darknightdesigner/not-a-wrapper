@@ -10,7 +10,10 @@ import { resolveGenerationBudget } from "@/lib/openproviders/output-budget"
 import { getProviderStrategy } from "@/lib/openproviders/provider-strategy"
 import type { Provider } from "@/lib/provider-identity"
 import { buildPricingSnapshot } from "@/lib/usage/billable-pricing"
-import { estimatePlatformUsage } from "@/lib/usage/platform-usage-estimate"
+import {
+  estimatePlatformUsage,
+  type AttachmentSizes,
+} from "@/lib/usage/platform-usage-estimate"
 import { getUserKeyFromConvex } from "@/lib/user-keys"
 import type { UIMessage } from "ai"
 import { fetchMutation, fetchQuery } from "convex/nextjs"
@@ -129,6 +132,8 @@ export type PlatformFundingContext = {
   chatId: string
   /** The turn's wire messages + prompt — estimation inputs only. */
   messages: UIMessage[]
+  /** Stored PDF sizes by attachment id — estimation input only. */
+  attachmentSizes?: AttachmentSizes
   systemPrompt?: string
   /** Tools may run this turn (search enabled); widens the input estimate. */
   toolsLikely: boolean
@@ -453,6 +458,8 @@ async function resolveModelRouteOnce(
         toolsLikely: funding.toolsLikely,
         pricingSnapshot,
         outputTokenBudget,
+        attachmentSizes: funding.attachmentSizes,
+        contextWindow: candidate.route.config.contextWindow,
       })
       const reserved = await deps.reservePlatformUsage({
         token: args.token,

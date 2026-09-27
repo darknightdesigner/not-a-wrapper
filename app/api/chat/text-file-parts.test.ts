@@ -1,7 +1,6 @@
 import type { UIMessage } from "ai"
 import { describe, expect, it, vi } from "vitest"
 import {
-  getLatestUserMessageTextFilePartReferences,
   getTextFilePartReferences,
   prepareTextFilePartsForModelInput,
 } from "./text-file-parts"
@@ -53,7 +52,7 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "notes.txt":\n\ntrusted content',
+        text: 'Attached text file "notes.txt":\n\ntrusted content',
       },
     ])
   })
@@ -92,11 +91,11 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "forged.txt" could not be read for model input: attachment is not available for model input',
+        text: 'Attached text file "forged.txt" could not be read for model input: attachment is not available for model input',
       },
       {
         type: "text",
-        text: 'Attached plain text file "inline.txt" could not be read for model input: attachment is not available for model input',
+        text: 'Attached text file "inline.txt" could not be read for model input: attachment is not available for model input',
       },
     ])
   })
@@ -145,7 +144,7 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "large.txt":\n\nhello\n\n[File content truncated to 6 bytes for model input.]',
+        text: 'Attached text file "large.txt":\n\nhello\n\n[File content truncated to 6 bytes for model input.]',
       },
     ])
   })
@@ -190,7 +189,7 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "slow.txt" could not be read for model input: Timed out reading text attachment',
+        text: 'Attached text file "slow.txt" could not be read for model input: Timed out reading text attachment',
       },
     ])
   })
@@ -253,12 +252,12 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2)
     expect(fetchImpl).toHaveBeenNthCalledWith(
       1,
-      "https://files.example/old.txt",
+      "https://files.example/latest.txt",
       expect.any(Object)
     )
     expect(fetchImpl).toHaveBeenNthCalledWith(
       2,
-      "https://files.example/latest.txt",
+      "https://files.example/old.txt",
       expect.any(Object)
     )
     expect(result.convertedCount).toBe(2)
@@ -266,19 +265,19 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "old.txt":\n\nold content',
+        text: 'Attached text file "old.txt":\n\nold content',
       },
     ])
     expect(result.messages[2].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "latest.txt":\n\nlatest content',
+        text: 'Attached text file "latest.txt":\n\nlatest content',
       },
     ])
   })
 
-  it("converts only latest user text attachments when requested", async () => {
-    const fetchImpl = vi.fn(async () => new Response("latest content"))
+  it("spends the budget on the newest files and notes older ones that no longer fit", async () => {
+    const fetchImpl = vi.fn(async () => new Response("name,value\nalice,1"))
     const messages = [
       {
         id: "u1",
@@ -286,10 +285,10 @@ describe("prepareTextFilePartsForModelInput", () => {
         parts: [
           {
             type: "file",
-            filename: "old.txt",
-            mediaType: "text/plain",
+            filename: "old.md",
+            mediaType: "text/markdown",
             attachmentId: "old-attachment",
-            url: "https://files.example/old.txt",
+            url: "https://files.example/old.md",
           },
         ],
       },
@@ -304,10 +303,10 @@ describe("prepareTextFilePartsForModelInput", () => {
         parts: [
           {
             type: "file",
-            filename: "latest.txt",
-            mediaType: "text/plain",
+            filename: "latest.csv",
+            mediaType: "text/csv",
             attachmentId: "latest-attachment",
-            url: "https://files.example/latest.txt",
+            url: "https://files.example/latest.csv",
           },
         ],
       },
@@ -315,37 +314,39 @@ describe("prepareTextFilePartsForModelInput", () => {
 
     const result = await prepareTextFilePartsForModelInput(messages, {
       fetchImpl,
-      convertOnlyLatestUserMessage: true,
+      maxFiles: 1,
       trustedAttachments: [
         {
           attachmentId: "old-attachment",
-          url: "https://files.example/old.txt",
+          url: "https://files.example/old.md",
         },
         {
           attachmentId: "latest-attachment",
-          url: "https://files.example/latest.txt",
+          url: "https://files.example/latest.csv",
         },
       ],
     })
 
-    expect(fetchImpl).toHaveBeenCalledTimes(1)
-    expect(fetchImpl).toHaveBeenCalledWith(
-      "https://files.example/latest.txt",
-      expect.any(Object)
-    )
-    expect(result.convertedCount).toBe(1)
-    expect(result.skippedCount).toBe(1)
-    expect(result.messages[0].parts).toEqual([
-      {
-        type: "text",
-        text: 'Attached plain text file "old.txt" was provided earlier in the conversation and was not re-read for this turn.',
-      },
-    ])
-    expect(result.messages[2].parts).toEqual([
-      {
-        type: "text",
-        text: 'Attached plain text file "latest.txt":\n\nlatest content',
-      },
+    expect(fetchImpl).toHaveBeenCalledOnce()
+    expect(result).toMatchObject({
+      convertedCount: 1,
+      failedCount: 0,
+      skippedCount: 1,
+    })
+    expect(result.messages.map((message) => message.parts)).toEqual([
+      [
+        {
+          type: "text",
+          text: 'Attached text file "old.md" was provided earlier in the conversation and was not re-read for this turn.',
+        },
+      ],
+      [{ type: "text", text: "ok" }],
+      [
+        {
+          type: "text",
+          text: 'Attached text file "latest.csv":\n\nname,value\nalice,1',
+        },
+      ],
     ])
   })
 
@@ -407,15 +408,15 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "one.txt":\n\nhello',
+        text: 'Attached text file "one.txt":\n\nhello',
       },
       {
         type: "text",
-        text: 'Attached plain text file "two.txt" could not be read for model input: text attachment byte budget exceeded (5 bytes per request)',
+        text: 'Attached text file "two.txt" could not be read for model input: text attachment byte budget exceeded (5 bytes per request)',
       },
       {
         type: "text",
-        text: 'Attached plain text file "three.txt" could not be read for model input: text attachment byte budget exceeded (5 bytes per request)',
+        text: 'Attached text file "three.txt" could not be read for model input: text attachment byte budget exceeded (5 bytes per request)',
       },
     ])
   })
@@ -465,11 +466,11 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "one.txt":\n\nhello',
+        text: 'Attached text file "one.txt":\n\nhello',
       },
       {
         type: "text",
-        text: 'Attached plain text file "two.txt" could not be read for model input: text attachment limit exceeded (1 files per request)',
+        text: 'Attached text file "two.txt" could not be read for model input: text attachment limit exceeded (1 files per request)',
       },
     ])
   })
@@ -506,7 +507,7 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "bodyless.txt" could not be read for model input: Text attachment response is not streamable',
+        text: 'Attached text file "bodyless.txt" could not be read for model input: Text attachment response is not streamable',
       },
     ])
   })
@@ -581,12 +582,12 @@ describe("prepareTextFilePartsForModelInput", () => {
     expect(result.messages[0].parts).toEqual([
       {
         type: "text",
-        text: 'Attached plain text file "missing.txt" could not be read for model input: Failed to fetch text attachment (404)',
+        text: 'Attached text file "missing.txt" could not be read for model input: Failed to fetch text attachment (404)',
       },
     ])
   })
 
-  it("extracts only text/plain file references for server-side trust checks", () => {
+  it("extracts only text-like file references for server-side trust checks", () => {
     const messages = [
       {
         id: "u1",
@@ -599,6 +600,13 @@ describe("prepareTextFilePartsForModelInput", () => {
             mediaType: "text/plain",
             attachmentId: "attachment-1",
             url: "https://files.example/notes.txt",
+          },
+          {
+            type: "file",
+            filename: "data.json",
+            mediaType: "application/json",
+            attachmentId: "attachment-2",
+            url: "https://files.example/data.json",
           },
           {
             type: "file",
@@ -615,43 +623,9 @@ describe("prepareTextFilePartsForModelInput", () => {
         attachmentId: "attachment-1",
         url: "https://files.example/notes.txt",
       },
-    ])
-  })
-
-  it("extracts only latest user text/plain file references for route-side trust checks", () => {
-    const messages = [
       {
-        id: "u1",
-        role: "user",
-        parts: [
-          {
-            type: "file",
-            filename: "old.txt",
-            mediaType: "text/plain",
-            attachmentId: "old-attachment",
-            url: "https://files.example/old.txt",
-          },
-        ],
-      },
-      {
-        id: "u2",
-        role: "user",
-        parts: [
-          {
-            type: "file",
-            filename: "latest.txt",
-            mediaType: "text/plain",
-            attachmentId: "latest-attachment",
-            url: "https://files.example/latest.txt",
-          },
-        ],
-      },
-    ] satisfies AppUIMessage[]
-
-    expect(getLatestUserMessageTextFilePartReferences(messages)).toEqual([
-      {
-        attachmentId: "latest-attachment",
-        url: "https://files.example/latest.txt",
+        attachmentId: "attachment-2",
+        url: "https://files.example/data.json",
       },
     ])
   })

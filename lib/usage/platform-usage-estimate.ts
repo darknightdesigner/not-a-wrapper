@@ -3,6 +3,7 @@ import {
   type PricingSnapshot,
 } from "@/convex/domain/usage_accounting"
 import { CHAT_TITLE_MAX_OUTPUT_TOKENS } from "@/lib/chat-title-prompt"
+import { isImageMediaType, isPdfMediaType } from "@/lib/file/policy"
 import {
   CHARS_PER_TOKEN,
   estimateTitleInputTokens,
@@ -17,9 +18,10 @@ import type { UIMessage } from "ai"
  *
  * Documented heuristics:
  *  - Input tokens ≈ ceil(chars / 4) over system prompt + history text, plus a
- *    per-message structural overhead, a flat per-image allowance, and a flat
- *    tool allowance when search/tools are active (tool definitions plus
- *    expected tool-step re-sends).
+ *    per-message structural overhead, a flat per-image allowance, a per-PDF
+ *    page estimate from its stored size, and a flat tool allowance when
+ *    search/tools are active (tool definitions plus expected tool-step
+ *    re-sends).
  *  - Output tokens: the route-aware funding reservation resolved in
  *    `lib/openproviders/output-budget.ts`. It can differ from the AI SDK's
  *    `maxOutputTokens` value when a provider adapter adds fixed reasoning
@@ -35,6 +37,11 @@ import type { UIMessage } from "ai"
 // Character/token vocabulary shared with the terminal-usage estimators —
 // declared once in lib/usage/terminal-usage-estimate.ts.
 const IMAGE_ATTACHMENT_TOKENS = 1_100
+// LibreChat's PDF heuristic: ~55 KB of file (75 KB of base64) and ~1,500
+// tokens per page, and a flat allowance when the size is unknown.
+const PDF_BYTES_PER_PAGE = 55 * 1024
+const PDF_TOKENS_PER_PAGE = 1_500
+const PDF_UNKNOWN_SIZE_TOKENS = 2_000
 const TOOL_ALLOWANCE_TOKENS = 2_000
 const TITLE_INPUT_TOKENS_MAX = 1_000 // 4000-char title input cap / 4
 const TITLE_OUTPUT_TOKENS = CHAT_TITLE_MAX_OUTPUT_TOKENS
@@ -55,21 +62,48 @@ export type PlatformUsageEstimate = {
   estimatedCredits: number
 }
 
-function estimateMessageTokens(message: UIMessage): number {
+/** Stored byte size by attachment id, for file parts sized by bytes (PDFs). */
+export type AttachmentSizes = Readonly<Record<string, number>>
+
+type FileEstimateContext = {
+  attachmentSizes?: AttachmentSizes
+  /** The route's context window; one PDF cannot cost more than this. */
+  contextWindow?: number
+}
+
+function estimatePdfTokens(
+  part: Extract<UIMessage["parts"][number], { type: "file" }>,
+  context: FileEstimateContext
+): number {
+  const attachmentId = (part as { attachmentId?: unknown }).attachmentId
+  const size =
+    typeof attachmentId === "string"
+      ? context.attachmentSizes?.[attachmentId]
+      : undefined
+  if (size === undefined) return PDF_UNKNOWN_SIZE_TOKENS
+  const tokens =
+    Math.max(1, Math.ceil(size / PDF_BYTES_PER_PAGE)) * PDF_TOKENS_PER_PAGE
+  return context.contextWindow
+    ? Math.min(tokens, context.contextWindow)
+    : tokens
+}
+
+function estimateMessageTokens(
+  message: UIMessage,
+  context: FileEstimateContext
+): number {
   let chars = 0
-  let imageParts = 0
+  let fileTokens = 0
   for (const part of message.parts ?? []) {
     if (part.type === "text" || part.type === "reasoning") {
       chars += typeof part.text === "string" ? part.text.length : 0
     } else if (part.type === "file") {
-      const mediaType = (part as { mediaType?: unknown }).mediaType
-      if (typeof mediaType === "string" && mediaType.startsWith("image/")) {
-        imageParts += 1
-      } else {
-        // Non-image files reach the model as inlined text; approximate from
-        // the part's url/text payload size when present.
-        const inline = (part as { url?: unknown }).url
-        chars += typeof inline === "string" ? inline.length : 0
+      // Text-like files arrive here already inlined as text parts; any other
+      // file reaches the model natively or as a short omission note.
+      if (isImageMediaType(part.mediaType)) {
+        fileTokens += IMAGE_ATTACHMENT_TOKENS
+      } else if (isPdfMediaType(part.mediaType)) {
+        fileTokens += estimatePdfTokens(part, context)
       }
     } else {
       // Tool parts, sources, and other structured history re-enter the
@@ -84,7 +118,7 @@ function estimateMessageTokens(message: UIMessage): number {
   return (
     Math.ceil(chars / CHARS_PER_TOKEN) +
     PER_MESSAGE_OVERHEAD_TOKENS +
-    imageParts * IMAGE_ATTACHMENT_TOKENS
+    fileTokens
   )
 }
 
@@ -96,12 +130,12 @@ export function estimatePlatformUsage(args: {
   pricingSnapshot: PricingSnapshot
   /** Route-specific worst-case billable output reservation. */
   outputTokenBudget: number
-}): PlatformUsageEstimate {
+} & FileEstimateContext): PlatformUsageEstimate {
   let inputTokens = Math.ceil(
     (args.systemPrompt?.length ?? 0) / CHARS_PER_TOKEN
   )
   for (const message of args.messages) {
-    inputTokens += estimateMessageTokens(message)
+    inputTokens += estimateMessageTokens(message, args)
   }
   if (args.toolsLikely) {
     inputTokens += TOOL_ALLOWANCE_TOKENS

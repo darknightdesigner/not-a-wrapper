@@ -223,6 +223,34 @@ describe("normalizeChatError", () => {
     })
   })
 
+  it("names an oversized stored image instead of offering a retry", () => {
+    const error = {
+      statusCode: 400,
+      responseBody: JSON.stringify({
+        type: "error",
+        error: {
+          type: "invalid_request_error",
+          message:
+            "messages.0.content.1.image.source.base64: image dimensions exceed max allowed size: 8000 pixels",
+        },
+      }),
+    }
+
+    expect(
+      normalizeChatError(error, {
+        provider: "anthropic",
+        credentialSource: "byok",
+      })
+    ).toEqual({
+      code: "PROVIDER_ERROR",
+      message:
+        "An image in this chat is too large for Anthropic. Try a different model or start a new chat.",
+      retryable: false,
+      provider: "anthropic",
+      credentialSource: "byok",
+    })
+  })
+
   it("omits provider attribution when the runtime has not resolved one", () => {
     expect(normalizeChatError(new Error("402 payment required"))).toEqual({
       code: "PAYMENT_REQUIRED",

@@ -4,6 +4,8 @@ import type {
   ChatTurnEditRequest,
   ChatTurnRegenerationRequest,
 } from "@/lib/chat-messages/chat-turn-contract"
+import { isPdfMediaType, isTextLikeMediaType } from "@/lib/file/policy"
+import type { AttachmentSizes } from "@/lib/usage/platform-usage-estimate"
 import type { UIMessage } from "ai"
 import { validateUIMessages } from "ai"
 import { fetchQuery as defaultFetchQuery } from "convex/nextjs"
@@ -12,7 +14,7 @@ import {
   toDurableUiMessages,
 } from "./durable-turn-runtime"
 import {
-  getTextFilePartReferences,
+  getFilePartReferences,
   prepareTextFilePartsForModelInput,
 } from "./text-file-parts"
 import {
@@ -25,6 +27,8 @@ export type DurableGenerationInputPlan = {
   /** Canonical, system-filtered, attachment-expanded provider input. */
   messages: UIMessage[]
   pinnedProvider?: string
+  /** Stored PDF sizes for the platform usage estimate. */
+  attachmentSizes?: AttachmentSizes
   textFileStats: {
     convertedCount: number
     failedCount: number
@@ -95,14 +99,18 @@ export async function preflightDurableGenerationInput(
   const validatedMessages = await validateUIMessages({
     messages: systemFiltered,
   })
-  const textFileReferences = getTextFilePartReferences(validatedMessages)
+  // Text-like files are read and inlined; PDFs are only sized.
+  const attachmentReferences = getFilePartReferences(
+    validatedMessages,
+    (mediaType) => isTextLikeMediaType(mediaType) || isPdfMediaType(mediaType)
+  )
   const trustedAttachments =
-    textFileReferences.length > 0
+    attachmentReferences.length > 0
       ? await deps.fetchQuery(
           api.files.getTrustedTextAttachmentsForChat,
           {
             chatId: args.chatId,
-            references: textFileReferences,
+            references: attachmentReferences,
           },
           { token: args.token }
         )
@@ -110,15 +118,24 @@ export async function preflightDurableGenerationInput(
   const textFileInput = await prepareTextFilePartsForModelInput(
     validatedMessages,
     {
-      trustedAttachments,
+      trustedAttachments: trustedAttachments.filter((attachment) =>
+        isTextLikeMediaType(attachment.mediaType)
+      ),
       ...(deps.fetchImpl ? { fetchImpl: deps.fetchImpl } : {}),
     }
   )
+  const attachmentSizes: Record<string, number> = {}
+  for (const attachment of trustedAttachments) {
+    if (isPdfMediaType(attachment.mediaType) && attachment.size !== undefined) {
+      attachmentSizes[attachment.attachmentId] = attachment.size
+    }
+  }
 
   return {
     inputHash: plan.inputHash,
     messages: textFileInput.messages,
     ...(plan.pinnedProvider ? { pinnedProvider: plan.pinnedProvider } : {}),
+    attachmentSizes,
     textFileStats: {
       convertedCount: textFileInput.convertedCount,
       failedCount: textFileInput.failedCount,

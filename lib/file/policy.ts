@@ -10,8 +10,6 @@ export const ALLOWED_FILE_TYPES = [
   "text/markdown",
   "application/json",
   "text/csv",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ] as const
 
 export const ALLOWED_PROFILE_IMAGE_TYPES = [
@@ -29,6 +27,33 @@ export function isAllowedFileMimeType(mimeType: string | null | undefined) {
   return (ALLOWED_FILE_TYPES as readonly string[]).includes(
     normalizeFileMimeType(mimeType)
   )
+}
+
+const TEXTUAL_APPLICATION_MEDIA_TYPES: ReadonlySet<string> = new Set([
+  "application/json",
+  "application/xml",
+  "application/csv",
+])
+
+/**
+ * Types whose bytes are already text. The server inlines these into the
+ * prompt instead of sending a file part, which most provider SDKs reject
+ * (LibreChat `isNativelyReadableText`, HuggingChat `TEXT_MIME_ALLOWLIST`).
+ */
+export function isTextLikeMediaType(mediaType: string | null | undefined) {
+  const normalized = normalizeFileMimeType(mediaType)
+  return (
+    normalized.startsWith("text/") ||
+    TEXTUAL_APPLICATION_MEDIA_TYPES.has(normalized)
+  )
+}
+
+export function isImageMediaType(mediaType: string | null | undefined) {
+  return normalizeFileMimeType(mediaType).startsWith("image/")
+}
+
+export function isPdfMediaType(mediaType: string | null | undefined) {
+  return normalizeFileMimeType(mediaType) === "application/pdf"
 }
 
 export function isAllowedProfileImageMimeType(

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as attachmentImages from "../attachmentImages.js";
 import type * as chatRuntime from "../chatRuntime.js";
 import type * as chatRuntimeWorker from "../chatRuntimeWorker.js";
 import type * as chats from "../chats.js";
@@ -63,6 +64,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  attachmentImages: typeof attachmentImages;
   chatRuntime: typeof chatRuntime;
   chatRuntimeWorker: typeof chatRuntimeWorker;
   chats: typeof chats;

@@ -2,23 +2,20 @@ import * as fileType from "file-type"
 import {
   ALLOWED_FILE_TYPES,
   isAllowedFileMimeType,
+  isTextLikeMediaType,
   MAX_FILE_SIZE,
-  normalizeFileMimeType,
 } from "./policy"
 
 export { ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from "./policy"
 
-const TEXT_FILE_TYPES = new Set([
-  "text/plain",
-  "text/markdown",
-  "application/json",
-  "text/csv",
-])
-
 /**
  * Browsers need MIME types and extensions for reliable picker filtering.
+ * Keyed by the allowed types, so the two lists cannot drift.
  */
-export const MIME_TO_EXTENSIONS: Record<string, string[]> = {
+export const MIME_TO_EXTENSIONS: Record<
+  (typeof ALLOWED_FILE_TYPES)[number],
+  readonly string[]
+> = {
   "image/jpeg": [".jpg", ".jpeg"],
   "image/png": [".png"],
   "image/gif": [".gif"],
@@ -28,16 +25,12 @@ export const MIME_TO_EXTENSIONS: Record<string, string[]> = {
   "text/markdown": [".md"],
   "application/json": [".json"],
   "text/csv": [".csv"],
-  "application/vnd.ms-excel": [".xls"],
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
-    ".xlsx",
-  ],
 }
 
 /** Derived from validation policy so picker filtering cannot drift. */
 export const ACCEPTED_FILE_PICKER_TYPES = ALLOWED_FILE_TYPES.flatMap((mime) => [
   mime,
-  ...(MIME_TO_EXTENSIONS[mime] ?? []),
+  ...MIME_TO_EXTENSIONS[mime],
 ]).join(",")
 
 export type FileValidationResult = {
@@ -66,9 +59,11 @@ export async function validateFile(file: File): Promise<FileValidationResult> {
     return { isValid: true }
   }
 
-  const declaredMimeType = normalizeFileMimeType(file.type)
   const canUseTextFallback =
-    !type && TEXT_FILE_TYPES.has(declaredMimeType) && isLikelyText(header)
+    !type &&
+    isAllowedFileMimeType(file.type) &&
+    isTextLikeMediaType(file.type) &&
+    isLikelyText(header)
 
   if (!canUseTextFallback) {
     return {

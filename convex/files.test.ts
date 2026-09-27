@@ -9,7 +9,7 @@ import {
   isFileUploadLimitExceeded,
   isStoredFileMetadataValid,
   saveStagedAttachmentHandler,
-  selectTrustedTextAttachmentsForModelInput,
+  selectTrustedModelInputAttachments,
 } from "./files"
 
 const userId = "user-1" as Id<"users">
@@ -19,7 +19,7 @@ const otherChatId = "chat-2" as Id<"chats">
 const storageId = "storage-1" as Id<"_storage">
 const attachmentId = "attachment-1" as Id<"chatAttachments">
 type TrustedAttachmentCandidate = Parameters<
-  typeof selectTrustedTextAttachmentsForModelInput
+  typeof selectTrustedModelInputAttachments
 >[0]["attachments"][number]
 
 function attachment(
@@ -201,10 +201,14 @@ describe("attachment reads", () => {
   })
 })
 
-describe("trusted text attachments for model input", () => {
-  it("trusts only same-user same-chat Convex storage text/plain attachments", () => {
+describe("trusted attachments for model input", () => {
+  it("trusts only same-user same-chat Convex storage text-like and PDF attachments", () => {
     const trusted = attachment()
-    const selected = selectTrustedTextAttachmentsForModelInput({
+    const pdf = attachment({
+      _id: "pdf-attachment" as Id<"chatAttachments">,
+      fileType: "application/pdf",
+    })
+    const selected = selectTrustedModelInputAttachments({
       chatId,
       userId,
       references: [
@@ -212,9 +216,12 @@ describe("trusted text attachments for model input", () => {
           attachmentId,
           url: "http://169.254.169.254/latest/meta-data",
         },
+        { attachmentId: pdf._id },
+        { attachmentId: "image-attachment" },
       ],
       attachments: [
         trusted,
+        pdf,
         attachment({
           _id: "other-user-attachment" as Id<"chatAttachments">,
           userId: otherUserId,
@@ -234,12 +241,12 @@ describe("trusted text attachments for model input", () => {
       ],
     })
 
-    expect(selected).toEqual([trusted])
+    expect(selected).toEqual([trusted, pdf])
   })
 
   it("does not trust forged URL-only references", () => {
     expect(
-      selectTrustedTextAttachmentsForModelInput({
+      selectTrustedModelInputAttachments({
         chatId,
         userId,
         references: [
@@ -258,7 +265,7 @@ describe("trusted text attachments for model input", () => {
     })
 
     expect(
-      selectTrustedTextAttachmentsForModelInput({
+      selectTrustedModelInputAttachments({
         chatId,
         userId,
         references: [{ url: "https://convex.cloud/storage/notes.txt" }],
