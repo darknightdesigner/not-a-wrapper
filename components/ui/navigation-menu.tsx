@@ -9,15 +9,11 @@ import * as React from "react"
 function NavigationMenu({
   className,
   children,
-  viewport = true,
   ...props
-}: React.ComponentProps<typeof NavigationMenuPrimitive.Root> & {
-  viewport?: boolean
-}) {
+}: React.ComponentProps<typeof NavigationMenuPrimitive.Root>) {
   return (
     <NavigationMenuPrimitive.Root
       data-slot="navigation-menu"
-      data-viewport={viewport}
       className={cn(
         "group/navigation-menu relative flex max-w-max flex-1 items-center justify-center",
         className
@@ -25,7 +21,8 @@ function NavigationMenu({
       {...props}
     >
       {children}
-      {viewport && <NavigationMenuViewport />}
+      {/* Base UI portals every Content into this viewport; without it no panel renders. */}
+      <NavigationMenuViewport />
     </NavigationMenuPrimitive.Root>
   )
 }
@@ -92,7 +89,7 @@ function NavigationMenuContent({
       data-slot="navigation-menu-content"
       className={cn(
         "top-0 left-0 w-full p-2 pr-2.5 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:absolute md:w-auto",
-        "group-data-[viewport=false]/navigation-menu:bg-floating-surface group-data-[viewport=false]/navigation-menu:text-floating-surface-foreground group-data-[viewport=false]/navigation-menu:shadow-floating-surface group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden group-data-[viewport=false]/navigation-menu:rounded-md group-data-[viewport=false]/navigation-menu:data-[ending-style]:opacity-0 **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none group-data-[viewport=false]/navigation-menu:data-[starting-style]:opacity-0",
+        "**:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none",
         className
       )}
       style={{ transition: "opacity 200ms ease-out", ...style }}
