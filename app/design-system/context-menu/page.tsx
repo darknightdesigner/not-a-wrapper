@@ -7,77 +7,8 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuRadioGroup,
-  ContextMenuRadioItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import type { Metadata } from "next"
-
-const defaultCode = `import {
-  ContextMenu,
-  ContextMenuCheckboxItem,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuRadioGroup,
-  ContextMenuRadioItem,
-  ContextMenuSeparator,
-  ContextMenuShortcut,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
-
-export function ContextMenuDefault() {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger className="text-muted-foreground flex h-36 w-64 items-center justify-center rounded-xl border border-dashed text-sm">
-        Right-click here
-      </ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuItem>
-          Back
-          <ContextMenuShortcut>⌘[</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuItem>
-          Reload
-          <ContextMenuShortcut>⌘R</ContextMenuShortcut>
-        </ContextMenuItem>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>More tools</ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            <ContextMenuItem>Save page…</ContextMenuItem>
-            <ContextMenuItem>Create shortcut…</ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuCheckboxItem defaultChecked>
-          Show bookmarks
-        </ContextMenuCheckboxItem>
-        <ContextMenuSeparator />
-        <ContextMenuLabel>People</ContextMenuLabel>
-        <ContextMenuRadioGroup defaultValue="andres">
-          <ContextMenuRadioItem value="andres">Andres</ContextMenuRadioItem>
-          <ContextMenuRadioItem value="alex">Alex</ContextMenuRadioItem>
-        </ContextMenuRadioGroup>
-        <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive">Delete</ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  )
-}`
+import { ContextMenuDefaultDemo } from "./demos/context-menu-default-demo"
 
 const apiRows = [
   {
@@ -140,6 +71,9 @@ export default function ContextMenuPage() {
   const contextMenuSource = readComponentSource(
     "components/ui/context-menu.tsx"
   )
+  const defaultCode = readComponentSource(
+    "app/design-system/context-menu/demos/context-menu-default-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -155,42 +89,7 @@ export default function ContextMenuPage() {
         description="Right-click the dashed area. The menu opens at the pointer and supports the full menu vocabulary: shortcuts, a submenu, checkbox and radio items, and a destructive item."
       >
         <ComponentPreview code={defaultCode} sourceCode={contextMenuSource}>
-          <ContextMenu>
-            <ContextMenuTrigger className="text-muted-foreground flex h-36 w-64 items-center justify-center rounded-xl border border-dashed text-sm">
-              Right-click here
-            </ContextMenuTrigger>
-            <ContextMenuContent className="w-52">
-              <ContextMenuItem>
-                Back
-                <ContextMenuShortcut>⌘[</ContextMenuShortcut>
-              </ContextMenuItem>
-              <ContextMenuItem>
-                Reload
-                <ContextMenuShortcut>⌘R</ContextMenuShortcut>
-              </ContextMenuItem>
-              <ContextMenuSub>
-                <ContextMenuSubTrigger>More tools</ContextMenuSubTrigger>
-                <ContextMenuSubContent>
-                  <ContextMenuItem>Save page…</ContextMenuItem>
-                  <ContextMenuItem>Create shortcut…</ContextMenuItem>
-                </ContextMenuSubContent>
-              </ContextMenuSub>
-              <ContextMenuSeparator />
-              <ContextMenuCheckboxItem defaultChecked>
-                Show bookmarks
-              </ContextMenuCheckboxItem>
-              <ContextMenuSeparator />
-              <ContextMenuLabel>People</ContextMenuLabel>
-              <ContextMenuRadioGroup defaultValue="andres">
-                <ContextMenuRadioItem value="andres">
-                  Andres
-                </ContextMenuRadioItem>
-                <ContextMenuRadioItem value="alex">Alex</ContextMenuRadioItem>
-              </ContextMenuRadioGroup>
-              <ContextMenuSeparator />
-              <ContextMenuItem variant="destructive">Delete</ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
+          <ContextMenuDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -198,8 +97,8 @@ export default function ContextMenuPage() {
         <DsApiTable columnWidths={[26, 26, 12, 36]} rows={apiRows} />
         <DsParagraph className="mt-3">
           Remaining Base UI Context Menu props are forwarded from each wrapper.
-          Unlike the dropdown menu, content width does not track an anchor —
-          the popup sizes to its content with a min-width.
+          Unlike the dropdown menu, content width does not track an anchor — the
+          popup sizes to its content with a min-width.
         </DsParagraph>
       </DsSection>
     </DsPage>

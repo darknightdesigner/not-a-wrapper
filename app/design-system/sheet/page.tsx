@@ -7,90 +7,9 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-
-export function SheetDefault() {
-  return (
-    <Sheet>
-      <SheetTrigger render={<Button variant="outline" />}>
-        Open sheet
-      </SheetTrigger>
-      <SheetContent>
-        <SheetHeader>
-          <SheetTitle>Edit profile</SheetTitle>
-          <SheetDescription>
-            Make changes to your profile here. Click save when you are done.
-          </SheetDescription>
-        </SheetHeader>
-        <SheetFooter>
-          <SheetClose render={<Button />}>Save changes</SheetClose>
-          <SheetClose render={<Button variant="outline" />}>
-            Cancel
-          </SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  )
-}`
-
-const sidesCode = `import { Button } from "@/components/ui/button"
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet"
-
-const sides = ["top", "right", "bottom", "left"] as const
-
-export function SheetSides() {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      {sides.map((side) => (
-        <Sheet key={side}>
-          <SheetTrigger render={<Button variant="outline" />}>
-            {side}
-          </SheetTrigger>
-          <SheetContent side={side}>
-            <SheetHeader>
-              <SheetTitle>Sheet from {side}</SheetTitle>
-              <SheetDescription>
-                This sheet slides in from the {side} edge.
-              </SheetDescription>
-            </SheetHeader>
-          </SheetContent>
-        </Sheet>
-      ))}
-    </div>
-  )
-}`
-
-const sides = ["top", "right", "bottom", "left"] as const
+import { SheetDefaultDemo } from "./demos/sheet-default-demo"
+import { SheetSidesDemo } from "./demos/sheet-sides-demo"
 
 const apiRows = [
   {
@@ -133,6 +52,12 @@ export const metadata: Metadata = {
 
 export default function SheetPage() {
   const sheetSource = readComponentSource("components/ui/sheet.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/sheet/demos/sheet-default-demo.tsx"
+  )
+  const sidesCode = readComponentSource(
+    "app/design-system/sheet/demos/sheet-sides-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -148,26 +73,7 @@ export default function SheetPage() {
         description="Slides in from the right. Header and footer pad their own content; the top-right close button ships by default."
       >
         <ComponentPreview code={defaultCode} sourceCode={sheetSource}>
-          <Sheet>
-            <SheetTrigger render={<Button variant="outline" />}>
-              Open sheet
-            </SheetTrigger>
-            <SheetContent>
-              <SheetHeader>
-                <SheetTitle>Edit profile</SheetTitle>
-                <SheetDescription>
-                  Make changes to your profile here. Click save when you are
-                  done.
-                </SheetDescription>
-              </SheetHeader>
-              <SheetFooter>
-                <SheetClose render={<Button />}>Save changes</SheetClose>
-                <SheetClose render={<Button variant="outline" />}>
-                  Cancel
-                </SheetClose>
-              </SheetFooter>
-            </SheetContent>
-          </Sheet>
+          <SheetDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -177,23 +83,7 @@ export default function SheetPage() {
         description="The side prop anchors the sheet to any viewport edge. Left and right sheets are full-height; top and bottom size to their content."
       >
         <ComponentPreview code={sidesCode} sourceCode={sheetSource}>
-          <div className="grid grid-cols-2 gap-2">
-            {sides.map((side) => (
-              <Sheet key={side}>
-                <SheetTrigger render={<Button variant="outline" />}>
-                  {side}
-                </SheetTrigger>
-                <SheetContent side={side}>
-                  <SheetHeader>
-                    <SheetTitle>Sheet from {side}</SheetTitle>
-                    <SheetDescription>
-                      This sheet slides in from the {side} edge.
-                    </SheetDescription>
-                  </SheetHeader>
-                </SheetContent>
-              </Sheet>
-            ))}
-          </div>
+          <SheetSidesDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -201,8 +91,8 @@ export default function SheetPage() {
         <DsApiTable columnWidths={[26, 26, 12, 36]} rows={apiRows} />
         <DsParagraph className="mt-3">
           Remaining Base UI Dialog props are forwarded from each wrapper.
-          SheetContent renders its own portal and overlay, so pages only
-          compose the root, trigger, and content.
+          SheetContent renders its own portal and overlay, so pages only compose
+          the root, trigger, and content.
         </DsParagraph>
       </DsSection>
     </DsPage>

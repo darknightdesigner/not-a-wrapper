@@ -7,83 +7,10 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/ui/kbd"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipMultiline,
-  TooltipShortcut,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-
-export function TooltipDefault() {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<Button variant="outline" />}>
-        Hover me
-      </TooltipTrigger>
-      <TooltipContent>Add to library</TooltipContent>
-    </Tooltip>
-  )
-}`
-
-const multilineCode = `import { Button } from "@/components/ui/button"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipMultiline,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-
-export function TooltipWithMultipleLines() {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<Button variant="outline" />}>
-        Retry
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <TooltipMultiline>
-          <span>Try again...</span>
-          <span className="text-[var(--text-tertiary)]">Using GPT-5.5</span>
-        </TooltipMultiline>
-      </TooltipContent>
-    </Tooltip>
-  )
-}`
-
-const shortcutCode = `import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/ui/kbd"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipShortcut,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-
-export function TooltipWithShortcut() {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<Button variant="outline" />}>
-        Search
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        <TooltipShortcut label="Search chats">
-          <Kbd label="Command">⌘</Kbd>
-          <Kbd>K</Kbd>
-        </TooltipShortcut>
-      </TooltipContent>
-    </Tooltip>
-  )
-}`
+import { TooltipDefaultDemo } from "./demos/tooltip-default-demo"
+import { TooltipMultilineDemo } from "./demos/tooltip-multiline-demo"
+import { TooltipShortcutDemo } from "./demos/tooltip-shortcut-demo"
 
 const apiRows = [
   {
@@ -149,6 +76,15 @@ export const metadata: Metadata = {
 
 export default function TooltipPage() {
   const tooltipSource = readComponentSource("components/ui/tooltip.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/tooltip/demos/tooltip-default-demo.tsx"
+  )
+  const multilineCode = readComponentSource(
+    "app/design-system/tooltip/demos/tooltip-multiline-demo.tsx"
+  )
+  const shortcutCode = readComponentSource(
+    "app/design-system/tooltip/demos/tooltip-shortcut-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -164,12 +100,7 @@ export default function TooltipPage() {
         description="Opens immediately from pointer hover or keyboard focus. Use it only for supplementary hints; the UI must work without ever reading a tooltip."
       >
         <ComponentPreview code={defaultCode} sourceCode={tooltipSource}>
-          <Tooltip>
-            <TooltipTrigger render={<Button variant="outline" />}>
-              Hover me
-            </TooltipTrigger>
-            <TooltipContent>Add to library</TooltipContent>
-          </Tooltip>
+          <TooltipDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -179,19 +110,7 @@ export default function TooltipPage() {
         description="TooltipMultiline stacks related details and switches the surface from the single-line pill to a smaller corner radius."
       >
         <ComponentPreview code={multilineCode} sourceCode={tooltipSource}>
-          <Tooltip>
-            <TooltipTrigger render={<Button variant="outline" />}>
-              Retry
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <TooltipMultiline>
-                <span>Try again...</span>
-                <span className="text-[var(--text-tertiary)]">
-                  Using GPT-5.5
-                </span>
-              </TooltipMultiline>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipMultilineDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -201,17 +120,7 @@ export default function TooltipPage() {
         description="TooltipShortcut announces the action and keys as one phrase, then renders the keys in the shared 18px shortcut capsule. Keys hide automatically on touch devices."
       >
         <ComponentPreview code={shortcutCode} sourceCode={tooltipSource}>
-          <Tooltip>
-            <TooltipTrigger render={<Button variant="outline" />}>
-              Search
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <TooltipShortcut label="Search chats">
-                <Kbd label="Command">⌘</Kbd>
-                <Kbd>K</Kbd>
-              </TooltipShortcut>
-            </TooltipContent>
-          </Tooltip>
+          <TooltipShortcutDemo />
         </ComponentPreview>
       </DsSection>
 

@@ -91,7 +91,8 @@ function NavigationMenuContent({
     <NavigationMenuPrimitive.Content
       data-slot="navigation-menu-content"
       className={cn(
-        "top-0 left-0 w-full p-2 pr-2.5 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 md:absolute md:w-auto",
+        // In flow: the popup sizes to the active panel; Base UI positions the exiting panel.
+        "w-max p-2 pr-2.5 data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
         "group-data-[viewport=false]/navigation-menu:bg-floating-surface group-data-[viewport=false]/navigation-menu:text-floating-surface-foreground group-data-[viewport=false]/navigation-menu:shadow-floating-surface group-data-[viewport=false]/navigation-menu:top-full group-data-[viewport=false]/navigation-menu:mt-1.5 group-data-[viewport=false]/navigation-menu:overflow-hidden group-data-[viewport=false]/navigation-menu:rounded-md group-data-[viewport=false]/navigation-menu:data-[ending-style]:opacity-0 **:data-[slot=navigation-menu-link]:focus:ring-0 **:data-[slot=navigation-menu-link]:focus:outline-none group-data-[viewport=false]/navigation-menu:data-[starting-style]:opacity-0",
         className
       )}
@@ -106,25 +107,27 @@ function NavigationMenuViewport({
   ...props
 }: React.ComponentProps<typeof NavigationMenuPrimitive.Viewport>) {
   return (
-    <NavigationMenuPrimitive.Positioner
-      side="bottom"
-      sideOffset={6}
-      className="isolate z-50"
-    >
-      <NavigationMenuPrimitive.Popup
-        data-slot="navigation-menu-viewport"
-        className={cn(
-          floatingSurfaceClassName,
-          "origin-top-center relative h-(--popup-height) w-full overflow-hidden rounded-md data-[ending-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[starting-style]:opacity-0 md:w-(--popup-width)",
-          className
-        )}
-        style={{
-          transition: "opacity 200ms ease-out, transform 200ms ease-out",
-        }}
+    <NavigationMenuPrimitive.Portal>
+      <NavigationMenuPrimitive.Positioner
+        side="bottom"
+        sideOffset={6}
+        className="isolate z-50"
       >
-        <NavigationMenuPrimitive.Viewport {...props} />
-      </NavigationMenuPrimitive.Popup>
-    </NavigationMenuPrimitive.Positioner>
+        <NavigationMenuPrimitive.Popup
+          data-slot="navigation-menu-viewport"
+          className={cn(
+            floatingSurfaceClassName,
+            "origin-top-center relative h-(--popup-height) w-full overflow-hidden rounded-md data-[ending-style]:[transform:scale(0.95)] data-[ending-style]:opacity-0 data-[starting-style]:[transform:scale(0.95)] data-[starting-style]:opacity-0 md:w-(--popup-width)",
+            className
+          )}
+          style={{
+            transition: "opacity 200ms ease-out, transform 200ms ease-out",
+          }}
+        >
+          <NavigationMenuPrimitive.Viewport {...props} />
+        </NavigationMenuPrimitive.Popup>
+      </NavigationMenuPrimitive.Positioner>
+    </NavigationMenuPrimitive.Portal>
   )
 }
 
