@@ -7,50 +7,8 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-
-export function DialogDefault() {
-  return (
-    <Dialog>
-      <DialogTrigger render={<Button variant="outline" />}>
-        Edit profile
-      </DialogTrigger>
-      <DialogContent showCloseButton={false}>
-        <DialogHeader
-          title="Edit profile"
-          description="Make changes to your profile here. Click save when you are done."
-        />
-        <DialogFooter
-          secondaryButton={
-            <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          }
-          primaryButton={
-            <DialogClose render={<Button />}>Save changes</DialogClose>
-          }
-        />
-      </DialogContent>
-    </Dialog>
-  )
-}`
+import { DialogDefaultDemo } from "./demos/dialog-default-demo"
 
 const apiRows = [
   {
@@ -130,6 +88,9 @@ export const metadata: Metadata = {
 
 export default function DialogPage() {
   const dialogSource = readComponentSource("components/ui/dialog.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/dialog/demos/dialog-default-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -145,27 +106,7 @@ export default function DialogPage() {
         description="Trigger, content with header and description, and a footer whose buttons close via DialogClose. The top-right close button ships by default."
       >
         <ComponentPreview code={defaultCode} sourceCode={dialogSource}>
-          <Dialog>
-            <DialogTrigger render={<Button variant="outline" />}>
-              Edit profile
-            </DialogTrigger>
-            <DialogContent showCloseButton={false}>
-              <DialogHeader
-                title="Edit profile"
-                description="Make changes to your profile here. Click save when you are done."
-              />
-              <DialogFooter
-                secondaryButton={
-                  <DialogClose render={<Button variant="outline" />}>
-                    Cancel
-                  </DialogClose>
-                }
-                primaryButton={
-                  <DialogClose render={<Button />}>Save changes</DialogClose>
-                }
-              />
-            </DialogContent>
-          </Dialog>
+          <DialogDefaultDemo />
         </ComponentPreview>
       </DsSection>
 

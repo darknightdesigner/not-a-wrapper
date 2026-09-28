@@ -7,83 +7,9 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-
-export function DrawerDefault() {
-  return (
-    <Drawer>
-      <DrawerTrigger render={<Button variant="outline" />}>
-        Open drawer
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Move goal</DrawerTitle>
-          <DrawerDescription>
-            Set your daily activity goal.
-          </DrawerDescription>
-        </DrawerHeader>
-        <DrawerFooter>
-          <DrawerClose render={<Button />}>Submit</DrawerClose>
-          <DrawerClose render={<Button variant="outline" />}>
-            Cancel
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
-  )
-}`
-
-const directionCode = `import { Button } from "@/components/ui/button"
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/ui/drawer"
-
-export function DrawerRight() {
-  return (
-    <Drawer direction="right">
-      <DrawerTrigger render={<Button variant="outline" />}>
-        Open from right
-      </DrawerTrigger>
-      <DrawerContent>
-        <DrawerHeader>
-          <DrawerTitle>Right drawer</DrawerTitle>
-          <DrawerDescription>
-            Side drawers skip the drag handle and behave like a sheet with
-            drag-to-dismiss.
-          </DrawerDescription>
-        </DrawerHeader>
-      </DrawerContent>
-    </Drawer>
-  )
-}`
+import { DrawerDefaultDemo } from "./demos/drawer-default-demo"
+import { DrawerDirectionDemo } from "./demos/drawer-direction-demo"
 
 const apiRows = [
   {
@@ -129,6 +55,12 @@ export const metadata: Metadata = {
 
 export default function DrawerPage() {
   const drawerSource = readComponentSource("components/ui/drawer.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/drawer/demos/drawer-default-demo.tsx"
+  )
+  const directionCode = readComponentSource(
+    "app/design-system/drawer/demos/drawer-direction-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -144,25 +76,7 @@ export default function DrawerPage() {
         description="Slides up from the bottom with a drag handle. Drag down or click the backdrop to dismiss."
       >
         <ComponentPreview code={defaultCode} sourceCode={drawerSource}>
-          <Drawer>
-            <DrawerTrigger render={<Button variant="outline" />}>
-              Open drawer
-            </DrawerTrigger>
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Move goal</DrawerTitle>
-                <DrawerDescription>
-                  Set your daily activity goal.
-                </DrawerDescription>
-              </DrawerHeader>
-              <DrawerFooter>
-                <DrawerClose render={<Button />}>Submit</DrawerClose>
-                <DrawerClose render={<Button variant="outline" />}>
-                  Cancel
-                </DrawerClose>
-              </DrawerFooter>
-            </DrawerContent>
-          </Drawer>
+          <DrawerDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -172,20 +86,7 @@ export default function DrawerPage() {
         description="The direction prop on the root anchors the drawer to any viewport edge. The drag handle only renders for bottom drawers."
       >
         <ComponentPreview code={directionCode} sourceCode={drawerSource}>
-          <Drawer direction="right">
-            <DrawerTrigger render={<Button variant="outline" />}>
-              Open from right
-            </DrawerTrigger>
-            <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle>Right drawer</DrawerTitle>
-                <DrawerDescription>
-                  Side drawers skip the drag handle and behave like a sheet
-                  with drag-to-dismiss.
-                </DrawerDescription>
-              </DrawerHeader>
-            </DrawerContent>
-          </Drawer>
+          <DrawerDirectionDemo />
         </ComponentPreview>
       </DsSection>
 

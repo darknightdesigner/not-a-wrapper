@@ -7,44 +7,8 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-} from "@/components/ui/popover"
-
-export function PopoverDefault() {
-  return (
-    <Popover>
-      <PopoverTrigger render={<Button variant="outline" />}>
-        Open popover
-      </PopoverTrigger>
-      <PopoverContent className="p-4">
-        <PopoverHeader>
-          <PopoverTitle>Dimensions</PopoverTitle>
-          <PopoverDescription>
-            Set the dimensions for the layer.
-          </PopoverDescription>
-        </PopoverHeader>
-      </PopoverContent>
-    </Popover>
-  )
-}`
+import { PopoverDefaultDemo } from "./demos/popover-default-demo"
 
 const apiRows = [
   {
@@ -94,6 +58,9 @@ export const metadata: Metadata = {
 
 export default function PopoverPage() {
   const popoverSource = readComponentSource("components/ui/popover.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/popover/demos/popover-default-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -109,19 +76,7 @@ export default function PopoverPage() {
         description="The content defaults to menu-tight p-1.5; pad up (p-4 here) for prose. The surface outline comes from shadow-border, so do not add border classes."
       >
         <ComponentPreview code={defaultCode} sourceCode={popoverSource}>
-          <Popover>
-            <PopoverTrigger render={<Button variant="outline" />}>
-              Open popover
-            </PopoverTrigger>
-            <PopoverContent className="p-4">
-              <PopoverHeader>
-                <PopoverTitle>Dimensions</PopoverTitle>
-                <PopoverDescription>
-                  Set the dimensions for the layer.
-                </PopoverDescription>
-              </PopoverHeader>
-            </PopoverContent>
-          </Popover>
+          <PopoverDefaultDemo />
         </ComponentPreview>
       </DsSection>
 

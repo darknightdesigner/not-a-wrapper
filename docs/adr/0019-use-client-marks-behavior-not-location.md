@@ -63,6 +63,12 @@ tree client-side.
   build.)
 - The invariant fails safe: adding a hook to a directive-free file breaks the
   build loudly with an actionable error, which is the enforcement working.
+- Shared wrappers render wherever their caller does. A Server Component that
+  writes `<DialogTrigger render={<Button />}>Edit</DialogTrigger>` renders
+  `Button` on the server before Base UI clones it, so the output's empty
+  `children` and `data-slot` overwrite the trigger's and the label vanishes
+  silently. Compose `render` props in client modules; design-system demos live
+  in `demos/*.tsx` with `"use client"` for this reason (fixed 2026-09-27).
 - Known kept directives with reasons: `input-group.tsx` (in-file `onClick`),
   `breadcrumb.tsx` (Base UI `useRender` hook chain), `markdown.tsx` (streaming
   renderer hooks — a deliberate divergence from prompt-kit's directive-free

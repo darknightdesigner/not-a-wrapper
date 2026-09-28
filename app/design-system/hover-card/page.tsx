@@ -7,38 +7,8 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-} from "@/components/ui/hover-card"
-
-export function HoverCardDefault() {
-  return (
-    <HoverCard>
-      <HoverCardTrigger render={<Button variant="link" />}>
-        @notawrapper
-      </HoverCardTrigger>
-      <HoverCardContent>
-        <div className="flex flex-col gap-1">
-          <p className="text-sm font-medium">Not A Wrapper</p>
-          <p className="text-muted-foreground text-sm">
-            An AI chat app that is definitely not just a wrapper.
-          </p>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
-  )
-}`
+import { HoverCardDefaultDemo } from "./demos/hover-card-default-demo"
 
 const apiRows = [
   {
@@ -95,6 +65,9 @@ export const metadata: Metadata = {
 
 export default function HoverCardPage() {
   const hoverCardSource = readComponentSource("components/ui/hover-card.tsx")
+  const defaultCode = readComponentSource(
+    "app/design-system/hover-card/demos/hover-card-default-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -110,19 +83,7 @@ export default function HoverCardPage() {
         description="Hover or focus the trigger to open the preview after a short delay. The card stays open while the pointer is over it."
       >
         <ComponentPreview code={defaultCode} sourceCode={hoverCardSource}>
-          <HoverCard>
-            <HoverCardTrigger render={<Button variant="link" />}>
-              @notawrapper
-            </HoverCardTrigger>
-            <HoverCardContent>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">Not A Wrapper</p>
-                <p className="text-muted-foreground text-sm">
-                  An AI chat app that is definitely not just a wrapper.
-                </p>
-              </div>
-            </HoverCardContent>
-          </HoverCard>
+          <HoverCardDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
