@@ -7,116 +7,9 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  RiDeleteBinLine,
-  RiSettings3Line,
-  RiUserLine,
-} from "@remixicon/react"
 import type { Metadata } from "next"
-
-const defaultCode = `import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { RiDeleteBinLine, RiSettings3Line, RiUserLine } from "@remixicon/react"
-
-export function DropdownMenuDefault() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline">Open menu</Button>} />
-      <DropdownMenuContent className="w-56">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
-        <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <RiUserLine />
-            Profile
-            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <RiSettings3Line />
-            Settings
-            <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Invite users</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            <DropdownMenuItem>Email</DropdownMenuItem>
-            <DropdownMenuItem>Message</DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive">
-          <RiDeleteBinLine />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}`
-
-const selectionCode = `import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-
-export function DropdownMenuSelection() {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="outline">View options</Button>} />
-      <DropdownMenuContent className="w-56">
-        <DropdownMenuLabel>Appearance</DropdownMenuLabel>
-        <DropdownMenuCheckboxItem defaultChecked>
-          Status bar
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem>Activity panel</DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel>Density</DropdownMenuLabel>
-        <DropdownMenuRadioGroup defaultValue="comfortable">
-          <DropdownMenuRadioItem value="comfortable">
-            Comfortable
-          </DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="compact">Compact</DropdownMenuRadioItem>
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}`
+import { DropdownMenuDefaultDemo } from "./demos/dropdown-menu-default-demo"
+import { DropdownMenuSelectionDemo } from "./demos/dropdown-menu-selection-demo"
 
 const apiRows = [
   {
@@ -185,6 +78,12 @@ export default function DropdownMenuPage() {
   const dropdownMenuSource = readComponentSource(
     "components/ui/dropdown-menu.tsx"
   )
+  const defaultCode = readComponentSource(
+    "app/design-system/dropdown-menu/demos/dropdown-menu-default-demo.tsx"
+  )
+  const selectionCode = readComponentSource(
+    "app/design-system/dropdown-menu/demos/dropdown-menu-selection-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -200,39 +99,7 @@ export default function DropdownMenuPage() {
         description="A trigger button opening a menu of actions: grouped items with icons and shortcuts, a submenu, and a destructive item."
       >
         <ComponentPreview code={defaultCode} sourceCode={dropdownMenuSource}>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline">Open menu</Button>}
-            />
-            <DropdownMenuContent className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuGroup>
-                <DropdownMenuItem>
-                  <RiUserLine />
-                  Profile
-                  <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <RiSettings3Line />
-                  Settings
-                  <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>Invite users</DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                  <DropdownMenuItem>Email</DropdownMenuItem>
-                  <DropdownMenuItem>Message</DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem variant="destructive">
-                <RiDeleteBinLine />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DropdownMenuDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -242,28 +109,7 @@ export default function DropdownMenuPage() {
         description="Menus can carry persistent selection: checkbox items toggle independently, radio items pick one value per group."
       >
         <ComponentPreview code={selectionCode} sourceCode={dropdownMenuSource}>
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={<Button variant="outline">View options</Button>}
-            />
-            <DropdownMenuContent className="w-56">
-              <DropdownMenuLabel>Appearance</DropdownMenuLabel>
-              <DropdownMenuCheckboxItem defaultChecked>
-                Status bar
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Activity panel</DropdownMenuCheckboxItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel>Density</DropdownMenuLabel>
-              <DropdownMenuRadioGroup defaultValue="comfortable">
-                <DropdownMenuRadioItem value="comfortable">
-                  Comfortable
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="compact">
-                  Compact
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DropdownMenuSelectionDemo />
         </ComponentPreview>
       </DsSection>
 

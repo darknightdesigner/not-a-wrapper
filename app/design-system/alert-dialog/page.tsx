@@ -7,55 +7,8 @@ import {
   DsSection,
 } from "@/app/design-system/_components/ds-page"
 import { readComponentSource } from "@/app/design-system/_lib/component-source"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
 import type { Metadata } from "next"
-
-const defaultCode = `import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
-
-export function AlertDialogDefault() {
-  return (
-    <AlertDialog>
-      <AlertDialogTrigger render={<Button variant="outline" />}>
-        Delete chat
-      </AlertDialogTrigger>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-          <AlertDialogDescription>
-            This action cannot be undone. The chat and all of its messages
-            will be permanently deleted.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction>Delete</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  )
-}`
+import { AlertDialogDefaultDemo } from "./demos/alert-dialog-default-demo"
 
 const apiRows = [
   {
@@ -102,6 +55,9 @@ export default function AlertDialogPage() {
   const alertDialogSource = readComponentSource(
     "components/ui/alert-dialog.tsx"
   )
+  const defaultCode = readComponentSource(
+    "app/design-system/alert-dialog/demos/alert-dialog-default-demo.tsx"
+  )
 
   return (
     <DsPage>
@@ -117,24 +73,7 @@ export default function AlertDialogPage() {
         description="Unlike Dialog, there is no corner close button and clicking the backdrop does not dismiss — the user must pick Cancel or the action."
       >
         <ComponentPreview code={defaultCode} sourceCode={alertDialogSource}>
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="outline" />}>
-              Delete chat
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete this chat?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. The chat and all of its
-                  messages will be permanently deleted.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <AlertDialogDefaultDemo />
         </ComponentPreview>
       </DsSection>
 
@@ -143,8 +82,8 @@ export default function AlertDialogPage() {
         <DsParagraph className="mt-3">
           Remaining Base UI Alert Dialog props are forwarded from each wrapper.
           AlertDialogAction and AlertDialogCancel are Close primitives styled
-          with buttonVariants, so they accept className to restyle (for
-          example a destructive action).
+          with buttonVariants, so they accept className to restyle (for example
+          a destructive action).
         </DsParagraph>
       </DsSection>
     </DsPage>
