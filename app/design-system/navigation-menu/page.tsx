@@ -80,13 +80,6 @@ export function NavigationMenuDefault() {
 
 const apiRows = [
   {
-    prop: "NavigationMenu viewport",
-    type: "boolean",
-    defaultValue: "true",
-    description:
-      "Renders panels in one shared popup that resizes between items; false gives each item its own popup under its trigger.",
-  },
-  {
     prop: "NavigationMenu value / onValueChange",
     type: "any / (value, eventDetails) => void",
     defaultValue: "—",
