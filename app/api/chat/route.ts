@@ -30,6 +30,7 @@ import {
 } from "./chat-turn-runtime"
 import { preflightDurableGenerationInput } from "./durable-generation-input"
 import { isDurableConvexChat } from "./durable-turn-runtime"
+import { isPublicChatHttpError } from "./public-http-error"
 import { createErrorResponse } from "./utils"
 
 // Top-line chat-turn budget. Next.js statically analyzes segment config, so
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
     // Validate against the Chat turn wire contract — the one statement of the
     // request shape, shared with the client builder
     // (lib/chat-messages/chat-turn-contract.ts). Identity stays session-derived.
-    const parsed = parseChatTurnRequest(jsonBody)
+    const parsed = await parseChatTurnRequest(jsonBody)
     // Body parse + wire-contract validation together; rejected requests
     // return above/below without a span (they never stream, so their absence
     // cannot skew a turn timeline).
@@ -408,7 +409,7 @@ export async function POST(req: Request) {
           },
         })
       }
-    } else {
+    } else if (!isPublicChatHttpError(err)) {
       // Pre-runtime error (parse / validation / usage admission). No durable
       // failure write is needed here precisely because durable state (the
       // generationRuns row) is created only inside the runtime — after `turn`
