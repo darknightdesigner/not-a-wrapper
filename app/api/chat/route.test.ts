@@ -327,6 +327,49 @@ describe("/api/chat route", () => {
     expect(validateAndResolveChatCredential).not.toHaveBeenCalled()
     expect(admitServerSideUsage).toHaveBeenCalledOnce()
     expect(createChatTurnRuntime).not.toHaveBeenCalled()
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+
+  it("returns malformed message envelopes as a quiet 400 before admission", async () => {
+    const response = await POST(
+      new Request("http://test.local/api/chat", {
+        method: "POST",
+        body: JSON.stringify({
+          messages: [{ id: "u1", role: "user" }],
+          chatId: "3f2c6c1e-8b0d-4a3f-9a6e-1c2b3d4e5f60",
+          model: "test-model",
+        }),
+      })
+    )
+
+    await expect(response.json()).resolves.toEqual({
+      error: "Messages are invalid",
+      code: "INVALID_REQUEST",
+    })
+    expect(response.status).toBe(400)
+    expect(admitServerSideUsage).not.toHaveBeenCalled()
+    expect(validateAndResolveChatCredential).not.toHaveBeenCalled()
+    expect(createChatTurnRuntime).not.toHaveBeenCalled()
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+  })
+
+  it("returns expected admission refusals without capturing them", async () => {
+    vi.mocked(validateAndResolveChatCredential).mockRejectedValueOnce(
+      new PublicChatHttpError({
+        message: "This model requires authentication.",
+        statusCode: 401,
+        code: "AUTH_REQUIRED",
+      })
+    )
+
+    const response = await POST(makeRequest())
+
+    await expect(response.json()).resolves.toEqual({
+      error: "This model requires authentication.",
+      code: "AUTH_REQUIRED",
+    })
+    expect(response.status).toBe(401)
+    expect(Sentry.captureException).not.toHaveBeenCalled()
   })
 
   describe("guest turns (ADR-0045)", () => {

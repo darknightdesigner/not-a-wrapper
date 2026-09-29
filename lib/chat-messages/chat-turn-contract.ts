@@ -2,7 +2,7 @@ import { isChatPublicId } from "@/lib/chat-store/identity"
 import type { ModelReasoningEffort } from "@/lib/models/types"
 import { isModelReasoningEffort } from "@/lib/models/types"
 import { isGenerationBudget } from "@/lib/openproviders/output-budget"
-import type { UIMessage } from "ai"
+import { safeValidateUIMessages, type UIMessage } from "ai"
 
 // Chat turn wire contract (CONTEXT.md): the single statement of the
 // POST /api/chat request shape. The Chat turn controller's plan builders
@@ -119,9 +119,9 @@ function isNonEmptyString(value: unknown): value is string {
  * Unknown keys are ignored, not rejected — the contract is closed at the type
  * level, tolerant at the wire level.
  */
-export function parseChatTurnRequest(
+export async function parseChatTurnRequest(
   body: unknown
-): ChatTurnRequestParseResult {
+): Promise<ChatTurnRequestParseResult> {
   const record: Record<string, unknown> = isRecord(body) ? body : {}
   const { messages, chatId, model } = record
 
@@ -145,6 +145,19 @@ export function parseChatTurnRequest(
       },
     }
   }
+
+  // `messages` crosses an untrusted HTTP boundary. Validate its AI SDK
+  // envelope before admission code reads `parts` or other typed fields.
+  const validatedMessages = await safeValidateUIMessages({ messages })
+  if (!validatedMessages.success) {
+    return {
+      ok: false,
+      status: 400,
+      code: "INVALID_REQUEST",
+      error: "Messages are invalid",
+    }
+  }
+  record.messages = validatedMessages.data
 
   if (record.edit && record.regeneration) {
     // Edit and regeneration are mutually exclusive by client construction, so
