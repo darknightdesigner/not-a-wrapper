@@ -15,7 +15,8 @@ describe("AuthKit proxy coverage", () => {
     expect(matches("https://not-a-wrapper.com/config.js")).toBe(true)
   })
 
-  it("covers the favicon fallback but leaves Next static assets untouched", () => {
+  it("covers asset namespace misses but leaves Next static assets untouched", () => {
+    expect(matches("https://not-a-wrapper.com/_next/static")).toBe(true)
     expect(
       matches("https://not-a-wrapper.com/_next/static/chunks/app.js")
     ).toBe(false)
