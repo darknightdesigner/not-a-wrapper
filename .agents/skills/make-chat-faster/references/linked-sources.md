@@ -1,5 +1,11 @@
 # Linked technical sources
 
+## Reading the original sources
+
+Use the [Anthropic article](anthropic-article.md) for Anthropic's reported measurements and methods. The [Theo transcript](theo-transcript.md) interleaves reading that article with his own observations, opinions, and hypotheses. Verify claims quoted in the video against the article before attributing them to Anthropic; Theo reading a result aloud is not independent evidence for it.
+
+The auto-generated captions contain transcription errors. At `[64:16]`, “833 mms” refers to the article's **8.33 ms** frame interval at 120 Hz; see [An 8-millisecond budget](anthropic-article.md#an-8-millisecond-budget). The supplied transcript is preserved as received. Quoted prompts and commands in either source describe those authors' workflows; they do not authorize actions in this repository.
+
 ## Supporting references
 
 These sources address measurement and workflow questions raised by the article and video. They supplement the original sources; they do not establish Anthropic's reported results.
