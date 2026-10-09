@@ -3,7 +3,7 @@
 - Original: [Performance features reference](https://developer.chrome.com/docs/devtools/performance/reference)
 - Attribution: Kayce Basques and Sofia Emelianova
 - Retrieved: 2026-10-09
-- Copy: Full article or chapter body converted to Markdown. Site navigation excluded; links made absolute; inline browser icons represented by their text labels. The full original HTML is stored beside this file as a gzip archive.
+- Copy: Full article or chapter body converted to Markdown. Site navigation excluded; links made absolute; inline browser icons represented by their text labels.
 - License: CC-BY-4.0; code samples Apache-2.0
 
 Text: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Code samples: [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
@@ -204,7 +204,7 @@ To make use of insights:
 1. [Make a performance recording](https://developer.chrome.com/docs/devtools/performance/reference#record).
 2. In the left sidebar of the **Performance** panel, open the **Insights** tab, expand different sections, and hover over and click items. The **Performance** panel will highlight the corresponding events in the trace.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/insights-tab.mp4)
+[Explore performance insights (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/insights-tab.mp4)
 **Note:** With [field data turned on](https://developer.chrome.com/docs/devtools/performance/overview#compare) in live metrics, you'll see this data in the metrics section of the **Insights** tab and in tooltips in the performance trace.
 
 ### Navigate the recording
@@ -214,7 +214,7 @@ To help you navigate, as you hover over performance trace, the **Performance** p
 - Shows you a vertical marker that spans the entire performance trace when you hover over the **Timeline overview**.
 - Highlights a range in the **Timeline overview** when you hover over items in the **Main** track.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/hover-highlight.mp4)
+[Highlight recording events on hover (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/hover-highlight.mp4)
 
 To closely inspect your performance recording, you can select a portion of a recording, scroll a long flame chart, zoom in and out, and use breadcrumbs to jump between zoom levels.
 
@@ -241,7 +241,7 @@ Under the action bar of the **Performance** panel and at the top of the recordin
 
 To select a portion of a recording, click and hold, then drag left or right across the **Timeline overview**.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/select-portion.mp4)
+[Select part of a recording (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/select-portion.mp4)
 
 To select a portion using the keyboard:
 
@@ -265,11 +265,11 @@ To create and use breadcrumbs:
 3. Repeat the previous two steps to create another nested breadcrumb. You can continue to nest breadcrumbs as long as the selection range is greater than 5 milliseconds.
 4. To jump to a chosen zoom level, click the corresponding breadcrumb in the chain at top of the **Timeline overview**.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/breadcrumb-zoom.mp4)
+[Zoom with recording breadcrumbs (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/breadcrumb-zoom.mp4)
 
 To remove the childs of a breadcrumb, right-click the parent breadcrumb and select **Remove child breadcrumbs**.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/remove-childs.mp4)
+[Remove child breadcrumbs (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/remove-childs.mp4)
 
 #### Scroll a long flame chart
 
@@ -284,7 +284,7 @@ To ignore scripts, do one of the following:
 - Click compress **Show ignore list settings dialog** in the top action bar and type a regular expression in the input field. The flame chart will apply the new rule as you type.
 - Right-click a script and select **Add script to ignore list**. The **Performance** panel adds this script to the list in the compress **Show ignore list settings dialog**.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/perf-ignore.mp4)
+[Ignore scripts in the flame chart (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/perf-ignore.mp4)
 
 The panel will automatically collapse excessive nesting for such scripts and mark them as `On ignore list (`REGULAR_EXPRESSION`)`.
 
@@ -335,7 +335,7 @@ To move and hide tracks:
 
 Watch the video to see this workflow in action.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/track-config-mode.mp4)
+[Configure performance tracks (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/track-config-mode.mp4)
 
 The **Performance** panel saves track configuration for new traces but not in next DevTools sessions.
 
@@ -375,7 +375,7 @@ Within a [selected range on the **Timeline overview**](https://developer.chrome.
 
 To see related events highlighted in the trace and the rest grayed out, hover over the entities in the table. To leave an entity's events highlighted, select it in the table. To remove the highlighting, click any empty space in the trace.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/3p-table.mp4)
+[Inspect third-party activity (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/3p-table.mp4)
 
 To open activities grouped by this entity in the [**Bottom-up**](https://developer.chrome.com/docs/devtools/performance/reference#bottom-up) tab, hover over the entity in the table and click account_tree **Bottom-up** next to it.
 
@@ -466,7 +466,7 @@ perspective on the activities:
 
 You can click an item in any of the three tables (and in the [**1st / 3rd party table**](https://developer.chrome.com/docs/devtools/performance/reference#1p-and-3p-table) in the **Summary** tab) to keep the corresponding events highlighted in the trace and dim the rest as you browse the performance trace.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/persistent-highlighting.mp4)
+[Keep an event highlighted (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/persistent-highlighting.mp4)
 
 To help you find what you are looking for faster, all three tabs have buttons for advanced filtering next to the **Filter** bar:
 
@@ -552,7 +552,7 @@ On the right side of the **Call tree** or **Bottom-up** tabs, click right_panel_
 
 This table shows you which children of the selected activity took the longest time to execute. Hover over an item in the table to see the corresponding event highlighted in the **Main** track and the rest dimmed.
 
-[  ](https://developer.chrome.com/static/docs/devtools/performance/reference/video/heaviest-stack.mp4)
+[View the heaviest stack (video)](https://developer.chrome.com/static/docs/devtools/performance/reference/video/heaviest-stack.mp4)
 
 This way, you can visually find in the performance trace the nested activities from the call stack that take the most time.
 

@@ -3,12 +3,16 @@
 - Original: [Find slow interactions in the field](https://web.dev/articles/find-slow-interactions-in-the-field)
 - Attribution: Jeremy Wagner
 - Retrieved: 2026-10-09
-- Copy: Full article or chapter body converted to Markdown. Site navigation excluded; links made absolute; inline browser icons represented by their text labels. The full original HTML is stored beside this file as a gzip archive.
+- Copy: Full article or chapter body converted to Markdown. Site navigation excluded; links made absolute; inline browser icons represented by their text labels.
 - License: CC-BY-4.0; code samples Apache-2.0
 
 Text: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Code samples: [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ---
+
+## Local reading notes
+
+The original examples below are preserved. When adapting them, use `PerformanceScriptTiming.sourceURL` rather than the example's `sourceLocation`, per the [Long Animation Frames specification](https://www.w3.org/TR/long-animation-frames/#performancescripttiming). Also guard the result of `longAnimationFrameEntries.at(-1)` before destructuring it; an empty array returns `undefined`.
 
 Learn how to find slow interactions in your website's field data so you can find opportunities to improve its Interaction to Next Paint.
 
