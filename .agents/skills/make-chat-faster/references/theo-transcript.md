@@ -1,5 +1,3 @@
-# Anthropic Made Claude Even Better
-
 - Creator: Theo - t3.gg
 - Original: https://www.youtube.com/watch?v=FsDUOUV9Vs8
 - Video ID: FsDUOUV9Vs8

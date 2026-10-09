@@ -1,5 +1,3 @@
-# How we made claude.ai 3x faster in two weeks
-
 - Publisher: Anthropic / claude.dev
 - Authors: Raymond Wang, Sam Attard, and Issac G.
 - Published: September 23, 2026
