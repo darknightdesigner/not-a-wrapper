@@ -460,12 +460,14 @@ export function ButtonPlusMenu({
           disabled={isTriggerMenuOpen || tooltipDisabled}
         >
           <TooltipTrigger render={<span className="inline-flex" />}>
+            {/* The id goes on the Trigger: Base UI matches the open trigger by
+                its DOM id, so an id on the render element hides the open state. */}
             <PopoverTrigger
+              id="composer-plus-btn"
               render={
                 <ComposerIconButton
                   ref={setTriggerNode}
                   type="button"
-                  id="composer-plus-btn"
                   data-testid="composer-plus-btn"
                   aria-label="Add files and more"
                 />
@@ -592,12 +594,13 @@ export function ButtonPlusMenu({
             disabled={isMenuOpen || tooltipDisabled}
           >
             <TooltipTrigger render={<span className="inline-flex" />}>
+              {/* id on the Trigger, not the render element (see above). */}
               <DropdownMenuTrigger
+                id="composer-plus-btn"
                 render={
                   <ComposerIconButton
                     ref={setTriggerNode}
                     type="button"
-                    id="composer-plus-btn"
                     data-testid="composer-plus-btn"
                     aria-label="Add files and more"
                     aria-expanded={isTriggerMenuOpen}
