@@ -1,0 +1,4 @@
+interface:
+  display_name: "Make Chat Faster"
+  short_description: "Source references for faster chat interfaces"
+  default_prompt: "Use $make-chat-faster to investigate a chat performance issue using the linked source references."
