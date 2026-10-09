@@ -818,6 +818,8 @@ To move the diagram:
 
 See layer analysis in action:
 
+[Layer analysis demo (video)](https://www.youtube.com/watch?v=6je49J67TQk)
+
 ### View paint profiler
 
 To view advanced information about a paint event:

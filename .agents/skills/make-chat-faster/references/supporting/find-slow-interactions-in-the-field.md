@@ -55,13 +55,9 @@ The [`web-vitals` JavaScript library](https://github.com/GoogleChrome/web-vitals
 Browser Support
 
 - Chrome: 96.
-  96
 - Edge: 96.
-  96
 - Firefox: 144.
-  144
 - Safari: 26.2.
-  26.2
 
 [Source](https://developer.mozilla.org/docs/Web/API/PerformanceEventTiming/interactionId)
 
@@ -142,9 +138,7 @@ Beginning with version 4 of the web-vitals library, you can get even deeper insi
 Browser Support
 
 - Chrome: 123.
-  123
 - Edge: 123.
-  123
 - Firefox: not supported.
   x
 - Safari: not supported.
