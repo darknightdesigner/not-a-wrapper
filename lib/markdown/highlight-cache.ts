@@ -5,8 +5,9 @@
  *
  * Keyed by the code string so lookups reuse V8's cached string hash instead
  * of hashing a fresh composite key per render; theme + fenced language select
- * the variant. Least recently used codes are evicted first, bounded by
- * variant count and total characters.
+ * the variant. Least recently used codes are evicted first, then the current
+ * code's least recently used variants, so variant count and total characters
+ * stay bounded even when one code is stored under many fence labels.
  */
 import type { ShikiClientTheme } from "./shiki-client"
 
@@ -28,13 +29,23 @@ let charCount = 0
 const variantKey = ({ theme, language }: HighlightTuple) =>
   `${theme}:${language ?? ""}`
 
+const withinLimits = () =>
+  entryCount <= CACHE_MAX_ENTRIES && charCount <= CACHE_MAX_CHARS
+
+/** Moves a key to the most recently used end of a Map. */
+function touch<K, V>(map: Map<K, V>, key: K, value: V): void {
+  map.delete(key)
+  map.set(key, value)
+}
+
 /** Exact-tuple read; never runs Shiki. Refreshes the entry's LRU position. */
 export function readCachedHighlight(tuple: HighlightTuple): string | null {
   const record = records.get(tuple.code)
-  const html = record?.variants.get(variantKey(tuple))
+  const variant = variantKey(tuple)
+  const html = record?.variants.get(variant)
   if (record === undefined || html === undefined) return null
-  records.delete(record.code)
-  records.set(record.code, record)
+  touch(records, record.code, record)
+  touch(record.variants, variant, html)
   return html
 }
 
@@ -45,9 +56,7 @@ export function readCachedHighlight(tuple: HighlightTuple): string | null {
 export function storeHighlight(tuple: HighlightTuple, html: string): void {
   if (tuple.code.length + html.length > CACHE_MAX_CHARS) return
   let record = records.get(tuple.code)
-  if (record) {
-    records.delete(record.code)
-  } else {
+  if (!record) {
     record = { code: tuple.code, variants: new Map() }
     charCount += record.code.length
   }
@@ -57,18 +66,26 @@ export function storeHighlight(tuple: HighlightTuple, html: string): void {
     entryCount -= 1
     charCount -= previous.length
   }
-  record.variants.set(variant, html)
+  touch(records, record.code, record)
+  touch(record.variants, variant, html)
   entryCount += 1
   charCount += html.length
-  records.set(record.code, record)
 
   for (const oldest of records.values()) {
-    if (entryCount <= CACHE_MAX_ENTRIES && charCount <= CACHE_MAX_CHARS) break
+    if (withinLimits()) return
     if (oldest === record) break
     records.delete(oldest.code)
     entryCount -= oldest.variants.size
     charCount -= oldest.code.length
     for (const oldHtml of oldest.variants.values()) charCount -= oldHtml.length
+  }
+  // Only this code is left. The new variant alone fits (checked above), so
+  // dropping older variants always restores both bounds.
+  for (const [key, oldHtml] of record.variants) {
+    if (withinLimits() || key === variant) return
+    record.variants.delete(key)
+    entryCount -= 1
+    charCount -= oldHtml.length
   }
 }
 
