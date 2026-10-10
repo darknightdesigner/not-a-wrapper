@@ -97,11 +97,19 @@ describe("compareCounts", () => {
     expect(compareCounts(capture(), head).ok).toBe(true)
   })
 
-  it("fails a gated increase, an unstable gated count, and a missing capture", () => {
-    expect(compareCounts(capture(), capture(Array(5).fill({ hookRenders: 65071 }))).ok).toBe(false)
-    const unstable = capture([{}, {}, {}, {}, { reactCommits: 28 }])
-    expect(compareCounts(capture(), unstable).lines).toContainEqual(expect.stringContaining("unstable capture"))
-    const missing = { ...capture(), interactions: capture().interactions.slice(1) }
-    expect(compareCounts(missing, capture()).lines).toContainEqual(expect.stringContaining("NOT EVALUATED"))
+  it("fails a gated increase, unstable or malformed counts, and a missing capture", () => {
+    const cases: Array<[CountsResultFile, CountsResultFile, string]> = [
+      [capture(), capture(Array(5).fill({ hookRenders: 65071 })), "regression"],
+      [capture(), capture([{}, {}, {}, {}, { reactCommits: 28 }]), "unstable capture"],
+      // Uniformly missing or NaN values once compared as stable.
+      [capture(), capture(Array(5).fill({ layoutCount: undefined })), "head capture invalid"],
+      [capture(Array(5).fill({ domMutations: Number.NaN })), capture(), "base capture invalid"],
+      [{ ...capture(), interactions: capture().interactions.slice(1) }, capture(), "NOT EVALUATED"],
+    ]
+    for (const [base, head, reason] of cases)
+      expect(compareCounts(base, head)).toMatchObject({
+        ok: false,
+        lines: expect.arrayContaining([expect.stringContaining(reason)]),
+      })
   })
 })

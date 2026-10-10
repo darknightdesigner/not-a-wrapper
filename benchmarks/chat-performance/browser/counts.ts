@@ -13,7 +13,7 @@
  * Env: RUNS (default 5), WARMUPS (default 1), PERF_PORT (default 3122),
  *      COUNTS_OUT (capture path), PW_CHANNEL.
  */
-import { execFileSync, spawn, type ChildProcess } from "node:child_process"
+import { execFileSync, spawn } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { chromium, type Browser, type CDPSession, type Page } from "playwright"
@@ -57,20 +57,40 @@ function log(message: string) {
   console.log(`[bench:counts] ${message}`)
 }
 
-let serverProcess: ChildProcess | null = null
+/** Process group of the spawned server: bunx plus the `next start` behind it. */
+let serverGroup: number | null = null
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+const serving = (baseUrl: string) => fetch(baseUrl, { redirect: "manual" }).then(() => true, () => false)
+
+/** Signals every server process; false once none is left. Signal 0 only probes. */
+function signalServer(signal: NodeJS.Signals | 0) {
+  if (serverGroup === null) return false
+  try {
+    process.kill(-serverGroup, signal)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// The detached group never sees the terminal's Ctrl+C: it must not outlive us.
+process.once("exit", () => signalServer("SIGKILL"))
+for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => process.exit(1))
 
 async function startServer(baseUrl: string) {
   if (!existsSync(path.join(REPO_ROOT, DIST_DIR, "BUILD_ID")))
     throw new Error(`no production build at ${DIST_DIR}; see the usage header`)
   // Base and head captures reuse one port: a leftover server would silently
   // serve the other build.
-  const leftover = await fetch(baseUrl, { redirect: "manual" }).then(() => true, () => false)
-  if (leftover) throw new Error(`${baseUrl} is already serving; stop it first`)
-  serverProcess = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
+  if (await serving(baseUrl)) throw new Error(`${baseUrl} is already serving; stop it first`)
+  // Own process group so stopServer() reaches `next start`, not just bunx.
+  serverGroup = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
     cwd: REPO_ROOT,
     env: { ...process.env, NEXT_DIST_DIR: DIST_DIR, CHAT_PERF_DETERMINISTIC_PROVIDER: "1" },
     stdio: ["ignore", "ignore", "inherit"],
-  })
+    detached: true,
+  }).pid ?? null
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     try {
@@ -78,9 +98,30 @@ async function startServer(baseUrl: string) {
     } catch {
       // Not up yet.
     }
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    await sleep(300)
   }
   throw new Error(`server at ${baseUrl} did not become ready`)
+}
+
+/**
+ * SIGTERM the server group, then SIGKILL, each with a bounded wait until every
+ * member has exited and the port refuses connections, so the next capture on
+ * this port can never measure a stale build.
+ */
+async function stopServer(baseUrl: string) {
+  if (serverGroup === null) return
+  for (const [signal, waitMs] of [["SIGTERM", 10_000], ["SIGKILL", 5_000]] as const) {
+    signalServer(signal)
+    const deadline = Date.now() + waitMs
+    while (Date.now() < deadline) {
+      if (!signalServer(0) && !(await serving(baseUrl))) {
+        serverGroup = null
+        return
+      }
+      await sleep(200)
+    }
+  }
+  throw new Error(`server group ${serverGroup} or ${baseUrl} still alive after SIGKILL`)
 }
 
 /** Resolves once no commit or DOM mutation has happened for `quietMs`. */
@@ -226,13 +267,14 @@ function gitCommit() {
 async function capture(output: string) {
   if (!Number.isInteger(RUNS) || RUNS < 1 || !Number.isInteger(WARMUPS) || WARMUPS < 0)
     throw new Error("RUNS must be positive and WARMUPS nonnegative integers")
-  if (!Number.isInteger(PERF_PORT) || PERF_PORT === 3000)
-    throw new Error("PERF_PORT must be an owned port other than the developer server's 3000")
+  if (!Number.isInteger(PERF_PORT) || PERF_PORT < 1 || PERF_PORT > 65_535 || PERF_PORT === 3000)
+    throw new Error("PERF_PORT must be an integer port in 1-65535 other than the developer server's 3000")
   if (process.env.BASE_URL) throw new Error("BASE_URL is unsupported: counts need an owned production server")
   const baseUrl = `http://localhost:${PERF_PORT}`
-  await startServer(baseUrl)
-  const browser = await chromium.launch({ channel: process.env.PW_CHANNEL })
+  let browser: Browser | undefined
   try {
+    await startServer(baseUrl)
+    browser = await chromium.launch({ channel: process.env.PW_CHANNEL })
     const interactions: InteractionCounts[] = []
     for (const cpuThrottle of COUNT_THROTTLES) {
       const entries = new Map<InteractionId, InteractionCounts>()
@@ -268,8 +310,8 @@ async function capture(output: string) {
     }
     log(`wrote ${output}`)
   } finally {
-    await browser.close()
-    serverProcess?.kill()
+    await browser?.close()
+    await stopServer(baseUrl)
   }
 }
 
@@ -278,7 +320,8 @@ async function main() {
   if (args[0] === "--compare") {
     const [basePath, headPath] = args.slice(1)
     if (!basePath || !headPath) throw new Error("usage: --compare <base.json> <head.json>")
-    const read = (file: string) => JSON.parse(readFileSync(file, "utf8")) as CountsResultFile
+    // compareCounts validates the contract; the parsed JSON stays untrusted until then.
+    const read = (file: string): unknown => JSON.parse(readFileSync(file, "utf8"))
     const { ok, lines } = compareCounts(read(basePath), read(headPath))
     for (const line of lines) console.log(line)
     if (!ok) process.exitCode = 1
@@ -292,6 +335,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error)
-  serverProcess?.kill()
   process.exitCode = 1
 })

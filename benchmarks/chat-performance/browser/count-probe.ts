@@ -4,61 +4,73 @@
  * so a regression shows up as the same number on every run instead of a noisy
  * millisecond distribution.
  */
+import { z } from "zod"
+
+const count = z.number().int().nonnegative()
+const delta = z.number().int()
+const duration = z.number().nonnegative()
 
 /** One measured interaction window. Chrome metrics come from CDP deltas. */
-export type CountSample = {
+const countSample = z.object({
   /** `onCommitFiberRoot` calls (React commits). */
-  reactCommits: number
+  reactCommits: count,
   /** Function/class component fibers that performed work. */
-  componentRenders: number
+  componentRenders: count,
   /** Hooks on those renders (memoizedState chain length): the hook census. */
-  hookRenders: number
+  hookRenders: count,
   /** `useSyncExternalStore` hooks among those renders: store subscriptions. */
-  storeSubscriptionRenders: number
+  storeSubscriptionRenders: count,
   /** Context dependencies among those renders. */
-  contextReadRenders: number
-  domMutations: number
-  recalcStyleCount: number
-  layoutCount: number
-  nodesDelta: number
-  jsEventListenersDelta: number
+  contextReadRenders: count,
+  domMutations: count,
+  recalcStyleCount: count,
+  layoutCount: count,
+  nodesDelta: delta,
+  jsEventListenersDelta: delta,
   /** Wall-clock CDP durations: report-only context, never gated. */
-  scriptDurationMs: number
-  recalcStyleDurationMs: number
-  layoutDurationMs: number
-  taskDurationMs: number
-}
+  scriptDurationMs: duration,
+  recalcStyleDurationMs: duration,
+  layoutDurationMs: duration,
+  taskDurationMs: duration,
+})
 
-export type ComponentCensus = {
-  label: string
-  renders: number
+const componentCensus = z.object({
+  label: z.string(),
+  renders: count,
   /** Hooks summed over those renders. */
-  hookRenders: number
-}
+  hookRenders: count,
+})
+
+const interactionId = z.enum(["composer-typing", "composer-menu-open"])
+
+/** Capture file contract; `compareCounts` parses both arms so bad evidence fails closed. */
+const countsResultFile = z.object({
+  schema: z.literal("interaction-counts-v1"),
+  commit: z.string(),
+  buildId: z.string(),
+  browser: z.string(),
+  typedCharacters: count,
+  interactions: z.array(
+    z.object({
+      id: interactionId,
+      cpuThrottle: z.number().positive(),
+      samples: z.array(countSample),
+      /** Top component types by hook renders in the first sample (minified names carry a DOM hint). */
+      topComponents: z.array(componentCensus),
+    })
+  ),
+})
+
+export type CountSample = z.infer<typeof countSample>
+export type ComponentCensus = z.infer<typeof componentCensus>
+export type InteractionId = z.infer<typeof interactionId>
+export type CountsResultFile = z.infer<typeof countsResultFile>
+export type InteractionCounts = CountsResultFile["interactions"][number]
 
 export type CountMetric = Exclude<
   keyof CountSample,
   "scriptDurationMs" | "recalcStyleDurationMs" | "layoutDurationMs" | "taskDurationMs"
 >
-
-export type InteractionId = "composer-typing" | "composer-menu-open"
-
-export type InteractionCounts = {
-  id: InteractionId
-  cpuThrottle: number
-  samples: CountSample[]
-  /** Top component types by hook renders in the first sample (minified names carry a DOM hint). */
-  topComponents: ComponentCensus[]
-}
-
-export type CountsResultFile = {
-  schema: "interaction-counts-v1"
-  commit: string
-  buildId: string
-  browser: string
-  typedCharacters: number
-  interactions: InteractionCounts[]
-}
 
 /**
  * Gated counts, chosen by the stability proof in ADR-0049: identical across
@@ -107,24 +119,34 @@ const median = (values: number[]) => {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2
 }
 
+/** FAIL lines for every contract violation in one capture arm. */
+const contractFailures = (side: "base" | "head", result: z.ZodSafeParseResult<CountsResultFile>) =>
+  result.error?.issues.map((issue) => `FAIL ${side} capture invalid at ${issue.path.map(String).join(".")}: ${issue.message}`) ?? []
+
 /**
- * Compare a base and candidate capture from the same runner. A gated count
- * fails when it varies between runs (invalid evidence) or when the candidate
- * exceeds the base, so the ceiling ratchets down with main automatically.
+ * Compare a base and candidate capture from the same runner. Both arms are
+ * parsed first: a missing or non-finite count would otherwise compare as
+ * stable. A gated count fails when it varies between runs (invalid evidence)
+ * or when the candidate exceeds the base, so the ceiling ratchets down with
+ * main automatically.
  */
 export function compareCounts(
-  base: CountsResultFile,
-  head: CountsResultFile,
+  baseCapture: unknown,
+  headCapture: unknown,
   minimumSamples = 5
 ): { ok: boolean; lines: string[] } {
+  const baseResult = countsResultFile.safeParse(baseCapture)
+  const headResult = countsResultFile.safeParse(headCapture)
+  if (!baseResult.success || !headResult.success)
+    return { ok: false, lines: [...contractFailures("base", baseResult), ...contractFailures("head", headResult)] }
+  const base = baseResult.data
+  const head = headResult.data
   const lines: string[] = []
   let ok = true
   const failure = (line: string) => {
     ok = false
     lines.push(`FAIL ${line}`)
   }
-  if (base.schema !== "interaction-counts-v1" || head.schema !== base.schema)
-    return { ok: false, lines: ["FAIL incompatible count schemas"] }
   if (base.typedCharacters !== head.typedCharacters)
     return { ok: false, lines: ["FAIL captures typed different inputs"] }
   for (const id of Object.keys(GATED_COUNTS) as InteractionId[]) {
