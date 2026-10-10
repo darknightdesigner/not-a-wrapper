@@ -32,12 +32,13 @@ import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import os from "node:os"
+import { fileURLToPath } from "node:url"
 import { chromium, type Browser, type Page } from "playwright"
 import { startPerfServer, waitForServer, type PerfServer } from "./perf-server"
 import { BENCHMARK_TYPING_DELAY_MS } from "./scenarios"
 
 const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../.."
 )
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
@@ -46,7 +47,7 @@ const STREAMING_PRESENTATION = process.env.STREAMING_PRESENTATION
 const PERF_PORT = Number(process.env.PERF_PORT ?? 3111)
 const OUT_DIR =
   process.env.OUT_DIR ??
-  path.join(path.dirname(new URL(import.meta.url).pathname), "results", "traces")
+  path.join(path.dirname(fileURLToPath(import.meta.url)), "results", "traces")
 
 type TraceCase = {
   id: string

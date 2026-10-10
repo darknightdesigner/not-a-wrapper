@@ -33,13 +33,17 @@ describe.skipIf(process.platform === "win32")("startServerGroup", () => {
     const server = await startServerGroup([process.execPath, "-e", LEADER, String(port)], baseUrl, {
       readyTimeoutMs: 5_000,
     })
-    const grandchild = Number(await (await fetch(baseUrl)).text())
-    expect(grandchild).not.toBe(server.child.pid)
-    await expect(startServerGroup([process.execPath, "-e", LEADER, String(port)], baseUrl)).rejects.toThrow(
-      "already serving"
-    )
-
-    await server.stop()
+    let grandchild: number
+    try {
+      grandchild = Number(await (await fetch(baseUrl)).text())
+      expect(grandchild).not.toBe(server.child.pid)
+      await expect(startServerGroup([process.execPath, "-e", LEADER, String(port)], baseUrl)).rejects.toThrow(
+        "already serving"
+      )
+    } finally {
+      // A failed assertion must not leave the detached group serving the port.
+      await server.stop()
+    }
     expect(alive(grandchild)).toBe(false)
     await expect(fetch(baseUrl)).rejects.toThrow()
   })

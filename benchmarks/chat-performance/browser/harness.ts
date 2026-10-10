@@ -23,6 +23,7 @@ import { execSync, type ChildProcess } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   buildDeterministicPartScript,
   deterministicScenarioText,
@@ -87,7 +88,7 @@ const SUITE_NAME = process.env.SUITE ?? "standard"
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const PROFILE_LATE_MENU = process.env.PERF_PROFILE_LATE_MENU === "true"
 const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../.."
 )
 
@@ -1722,7 +1723,7 @@ async function main() {
   }
 
   const resultsDir = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(fileURLToPath(import.meta.url)),
     "results"
   )
   mkdirSync(resultsDir, { recursive: true })

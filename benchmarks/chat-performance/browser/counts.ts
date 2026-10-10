@@ -16,6 +16,7 @@
 import { execFileSync } from "node:child_process"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { chromium, type Browser, type CDPSession, type Page } from "playwright"
 import {
   compareCounts,
@@ -29,7 +30,7 @@ import {
 } from "./count-probe"
 import { startPerfServer, type PerfServer } from "./perf-server"
 
-const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..")
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..")
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const PERF_PORT = Number(process.env.PERF_PORT ?? 3122)
 const RUNS = Number(process.env.RUNS ?? 5)
