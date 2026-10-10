@@ -223,8 +223,9 @@ captures under the selected policy. Results upload even on failure.
 Both arms run against the one Convex deployment in `PERF_ENV_FILE`, and the
 workflow deploys no functions, so it runs whatever was last pushed there
 (normally main). When a PR changes `convex/`, the workflow warns: the signed-in
-pair is valid only after the owner deploys the branch's `convex/` to that
-deployment (agents must not), and main's functions go back afterwards. The new
+pair is valid only after the branch's `convex/` is pushed to that deployment
+(`convex dev --once` from a clean checkout of the branch), and main's functions
+go back afterwards if the PR does not merge. The new
 backend must still serve the merge-base client, so change public functions
 additively: a new function, or an opt-in argument (ADR-0027's `splitLiveTail`).
 
