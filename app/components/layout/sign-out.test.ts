@@ -1,10 +1,15 @@
 import { toast } from "@/components/ui/toast"
+import { clearPersistedWindow } from "@/lib/chat-store/chats/persisted-window"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { isNextRedirectError, signOutAndClearLocalState } from "./sign-out"
 
 vi.mock("@/components/ui/toast", () => ({
   toast: vi.fn(),
+}))
+
+vi.mock("@/lib/chat-store/chats/persisted-window", () => ({
+  clearPersistedWindow: vi.fn(),
 }))
 
 vi.mock("@/lib/chat-store/persist", () => ({
@@ -70,6 +75,7 @@ describe("signOutAndClearLocalState", () => {
 
     expect(options.resetChats).toHaveBeenCalledOnce()
     expect(clearAllIndexedDBStores).toHaveBeenCalledOnce()
+    expect(clearPersistedWindow).toHaveBeenCalledOnce()
     expect(options.signOut).toHaveBeenCalledWith({ returnTo: "/" })
     expect(toast).not.toHaveBeenCalled()
   })

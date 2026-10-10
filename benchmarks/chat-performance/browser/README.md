@@ -220,8 +220,15 @@ captures under the selected policy. Results upload even on failure.
 ## Diagnostics outside the core gate
 
 `composer-shell.ts` remains the specialized saved-label/CLS/TTFB check.
-`trace-attribution.ts` remains the detailed main-thread attribution tool. Neither
-is a substitute for ready-to-type/ready-to-send measurements. Production Sentry
+`composer-handoff.ts` (ADR-0047) checks the pre-hydration composer on the guest
+path: time to typeable versus editor editable, and that typing across the
+fallback-to-editor handoff loses no keys and shifts nothing. Run it against a
+running server (`BASE_URL=http://localhost:3000 bun run
+benchmarks/chat-performance/browser/composer-handoff.ts`) or a production build
+(`NEXT_DIST_DIR`/`PERF_PORT`, as for `composer-shell.ts`). It exits 1 on a
+failed guardrail.
+`trace-attribution.ts` remains the detailed main-thread attribution tool. None of
+these is a substitute for ready-to-type/ready-to-send measurements. Production Sentry
 collection is opt-in (`NEXT_PUBLIC_CHAT_UI_SAMPLE_RATE`, default 0) until overhead
 is measured; see the runbook for the A/B and actual event-arrival verification.
 Real-provider first-output/token-rate analysis stays separate, grouped by the real
@@ -235,7 +242,9 @@ authenticated scenario. Each paired comparison still runs sequentially on one
 isolated CI machine; authenticated suites remain serialized. This avoids blocking
 an authenticated PR comparison behind an unrelated guest rendering capture.
 Guest usage admission still reaches the shared deployment under a fresh anonymous
-identity; these lanes isolate browser CPU, not backend capacity.
+identity; these lanes isolate browser CPU, not backend capacity. Fresh guests do
+not reset the per-network guest cap (ADR-0045): locally, five guest sends a day
+from one network exhaust it for every guest-send harness and trace.
 The legacy overlay also accepts descendants of its original reference only when
 their existing measurement modules and hook files remain byte-identical to that
 reference. After checking and applying the hook patch, the runner copies the
@@ -246,3 +255,11 @@ Late interactions retain the 80% content checkpoint and run typing, native wheel
 then menu opening. The active-stream check follows the measured menu frame;
 unmeasured dismissal follows. `late-typing-native-wheel-menu-v2` rejects both
 earlier probe ordering and the previous DOM/frame wheel measurement.
+
+## Interaction counts
+
+`bun run bench:counts` (ADR-0049) counts React commits, component renders,
+hooks, DOM mutations, and style/layout work for composer typing and the plus
+popover, with reduced motion and per-keystroke frame draining so the numbers
+repeat exactly at 1x and 4x CPU. It needs no credentials. The responsiveness
+pair gates the stable counts against the merge base; see the runbook.

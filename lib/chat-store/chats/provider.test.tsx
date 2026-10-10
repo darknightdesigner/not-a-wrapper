@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import type { Doc } from "@/convex/_generated/dataModel"
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import {
@@ -14,6 +15,10 @@ import {
 import { resetCachedMessagesSnapshot } from "../messages/api"
 import type { Chats } from "../types"
 import { resetCachedChatsSnapshot } from "./api"
+import {
+  PERSISTED_WINDOW_STORAGE_KEY,
+  serializePersistedWindow,
+} from "./persisted-window"
 import {
   ChatsProvider,
   useChatActions,
@@ -65,9 +70,11 @@ const convexMocks = vi.hoisted(() => ({
   paginationStatus: "Exhausted" as
     "LoadingFirstPage" | "CanLoadMore" | "LoadingMore" | "Exhausted",
   queryValue: undefined as unknown,
+  paginationResults: [] as unknown[],
   mutationFn: vi.fn(),
   toast: vi.fn(),
   useQuery: vi.fn(),
+  authUserId: undefined as string | undefined,
 }))
 
 vi.mock("../persist", () => ({
@@ -94,10 +101,16 @@ vi.mock("convex/react", () => ({
   // unsubscribed, but the provider still calls the paginated hook, so it must
   // exist.
   usePaginatedQuery: () => ({
-    results: [],
+    results: convexMocks.paginationResults,
     status: convexMocks.paginationStatus,
     isLoading: false,
     loadMore: () => {},
+  }),
+}))
+
+vi.mock("@workos-inc/authkit-nextjs/components", () => ({
+  useAuth: () => ({
+    user: convexMocks.authUserId ? { id: convexMocks.authUserId } : null,
   }),
 }))
 
@@ -169,6 +182,17 @@ describe("ChatsProvider guest local chats", () => {
     ;(
       globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true
+    // Map-backed storage, as in chat-organization.test.ts.
+    const values = new Map<string, string>()
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: {
+        clear: () => values.clear(),
+        getItem: (key: string) => values.get(key) ?? null,
+        removeItem: (key: string) => values.delete(key),
+        setItem: (key: string, value: string) => values.set(key, value),
+      },
+    })
   })
 
   beforeEach(() => {
@@ -182,6 +206,9 @@ describe("ChatsProvider guest local chats", () => {
     convexMocks.isLoading = false
     convexMocks.paginationStatus = "Exhausted"
     convexMocks.queryValue = undefined
+    convexMocks.paginationResults = []
+    convexMocks.authUserId = undefined
+    localStorage.clear()
     convexMocks.mutationFn.mockReset()
     convexMocks.toast.mockReset()
     convexMocks.useQuery.mockClear()
@@ -778,6 +805,111 @@ describe("ChatsProvider guest local chats", () => {
     expect(convexMocks.toast).toHaveBeenCalledWith({
       title: "Failed to create chat",
       status: "error",
+    })
+  })
+
+  describe("persisted sidebar window (ADR-0048)", () => {
+    const project = {
+      _id: "project-1",
+      _creationTime: 1,
+      userId: "user-row",
+      name: "Cached project",
+      pinned: false,
+      updatedAt: 1,
+    } as Doc<"projects">
+
+    function persistWindow(owner: string, ids: string[]) {
+      localStorage.setItem(
+        PERSISTED_WINDOW_STORAGE_KEY,
+        serializePersistedWindow(
+          owner,
+          ids.map((id) => localChat({ id, user_id: "user-row" })),
+          [project]
+        )
+      )
+    }
+
+    function deliverLiveWindow() {
+      convexMocks.isLoading = false
+      convexMocks.isAuthenticated = true
+      convexMocks.paginationResults = [{ ...durableChat(), pinned: false }]
+      // Pinned and project reads share the mocked query value.
+      convexMocks.queryValue = []
+    }
+
+    it("paints the owner's persisted rows while live data is pending", async () => {
+      persistWindow("user-1", ["cached-a", "cached-b"])
+      convexMocks.isLoading = true
+      const capture: { current: ReturnType<typeof useChats> | null } = {
+        current: null,
+      }
+
+      renderProvider(capture, "user-1")
+      await flushPromises()
+
+      expect(capture.current?.isLoading).toBe(false)
+      expect(capture.current?.chats.map((chat) => chat.id)).toEqual([
+        "cached-a",
+        "cached-b",
+      ])
+      expect(capture.current?.persistedProjects).toEqual([project])
+      // Persisted rows are display-only; chat surfaces use their own read.
+      expect(capture.current?.getChatById("cached-a")).toBeUndefined()
+    })
+
+    it("replaces the persisted rows with the live window and persists it", async () => {
+      vi.useFakeTimers()
+      persistWindow("user-1", ["deleted-elsewhere"])
+      convexMocks.isLoading = true
+      convexMocks.authUserId = "user-1"
+      const capture: { current: ReturnType<typeof useChats> | null } = {
+        current: null,
+      }
+      renderProvider(capture, "user-1")
+
+      deliverLiveWindow()
+      rerenderProvider(capture, "user-1")
+      act(() => vi.runAllTimers())
+
+      expect(capture.current?.chats.map((chat) => chat.id)).toEqual([
+        "chat-server",
+      ])
+      expect(capture.current?.persistedProjects).toBeNull()
+      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).toContain(
+        '"id":"chat-server"'
+      )
+      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).not.toContain(
+        "deleted-elsewhere"
+      )
+    })
+
+    it("writes nothing when the live AuthKit user is not the owner", async () => {
+      vi.useFakeTimers()
+      convexMocks.authUserId = "user-2"
+      deliverLiveWindow()
+      const capture: { current: ReturnType<typeof useChats> | null } = {
+        current: null,
+      }
+
+      renderProvider(capture, "user-1")
+      act(() => vi.runAllTimers())
+
+      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).toBeNull()
+    })
+
+    it("ignores and removes another owner's window", async () => {
+      persistWindow("user-2", ["other-user-chat"])
+      convexMocks.isLoading = true
+      const capture: { current: ReturnType<typeof useChats> | null } = {
+        current: null,
+      }
+
+      renderProvider(capture, "user-1")
+      await flushPromises()
+
+      expect(capture.current?.isLoading).toBe(true)
+      expect(capture.current?.chats).toEqual([])
+      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).toBeNull()
     })
   })
 })

@@ -10,6 +10,25 @@ function parseObject(text: string) {
   return record.parse(parsed.config)
 }
 
+/**
+ * Package scripts the paired protocol executes: lifecycle hooks of
+ * `bun install --frozen-lockfile` and `bun run build:next`.
+ */
+const PAIRED_SCRIPTS = [
+  "preinstall", "install", "postinstall", "prepare",
+  "prebuild:next", "build:next", "postbuild:next",
+] as const
+
+/**
+ * The manifest as the paired builds see it: scripts they never run are
+ * dropped, so adding a tooling script does not require an overlay.
+ */
+export function pairedBuildManifest(text: string): Record<string, unknown> {
+  const { scripts, ...manifest } = parseObject(text)
+  const all = record.parse(scripts ?? {})
+  return { ...manifest, pairedScripts: Object.fromEntries(PAIRED_SCRIPTS.map((name) => [name, all[name]])) }
+}
+
 function assertUnchanged(base: unknown, head: unknown, label: string) {
   if (!isDeepStrictEqual(base, head))
     throw new Error(`${label} changed; dependency overlay only permits dependency additions and version changes`)
@@ -45,8 +64,8 @@ function directDelta(base: unknown, head: unknown, label: string) {
  * run in absolute terms). Additions and version changes of direct
  * dependencies, and the locked package resolutions that follow from them, are
  * permitted and recorded. Removing a direct dependency, and any change outside
- * the dependency sets (scripts, lockfile settings, other workspaces), fails
- * closed.
+ * the dependency sets (the build script, lockfile settings, other workspaces),
+ * fails closed.
  */
 export function validateDependencyOverlay(input: {
   baseManifest: string
@@ -54,8 +73,8 @@ export function validateDependencyOverlay(input: {
   baseLock: string
   headLock: string
 }) {
-  const { dependencies: baseDeps, devDependencies: baseDevDeps, ...baseManifest } = parseObject(input.baseManifest)
-  const { dependencies: headDeps, devDependencies: headDevDeps, ...headManifest } = parseObject(input.headManifest)
+  const { dependencies: baseDeps, devDependencies: baseDevDeps, ...baseManifest } = pairedBuildManifest(input.baseManifest)
+  const { dependencies: headDeps, devDependencies: headDevDeps, ...headManifest } = pairedBuildManifest(input.headManifest)
   assertUnchanged(baseManifest, headManifest, "Package manifest outside dependencies")
   const dependencies = directDelta(baseDeps, headDeps, "Dependency")
   const devDependencies = directDelta(baseDevDeps, headDevDeps, "Dev dependency")

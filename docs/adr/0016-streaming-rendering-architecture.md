@@ -106,6 +106,76 @@ The shared service skips stale work while loading, and current plain text never
 waits for highlighting. Measurement limitations and validation are in the
 [shared streaming audit](../performance/2026-09-07-shared-streaming-audit.md).
 
+**One-byte input, HTML cache, yielding queue (2026-10-09).** From Anthropic's
+"How we made claude.ai 3x faster" (em dash finding). V8 stores a string as
+two-byte UTF-16 when any character is outside Latin-1, and slices inherit that
+width. One em dash or curly quote in a reply's prose makes the fence value our
+remark pipeline passes to `CodeBlockCode` two-byte (verified through the real
+`Markdown` component), and the JS regex engine then runs every grammar regex on
+V8's slower path. The service now:
+
+- Tokenizes `toOneByteString(code)`: a JSON round trip that V8 allocates as a
+  flat one-byte copy whenever every code unit fits (~45 us per 20 KB; fastest
+  correct copy measured vs split/join, chunked `fromCharCode`, concat loop).
+  Code containing non-Latin-1 characters stays two-byte.
+- Keeps finished HTML in a Shiki-free module LRU
+  (`lib/markdown/highlight-cache.ts`) keyed by the exact (code, fenced
+  language, theme) tuple, capped at 200 variants and 2M characters. Records
+  hold their own flat key copy so a cached block never retains the message it
+  was sliced from. A degraded `text` render after a failed grammar load is not
+  cached. `CodeBlockCode` reads the cache synchronously during render, gated by
+  a `useSyncExternalStore` server snapshot so hydration always matches the
+  plain server HTML; the async completion pins the HTML in state so eviction
+  cannot revert a mounted block.
+- Serializes tokenization through a queue that yields two plain
+  `MessageChannel` macrotasks before each block. Not `scheduler.yield()`:
+  Chrome runs its continuations ahead of ordinary tasks, so React's Scheduler
+  (a `MessageChannel` task) and timers starved until the queue drained and all
+  blocks committed at once. The second hop queues behind the render task the
+  previous block's `setState` posted, so each block commits before the next
+  tokenizes. Aborted entries skip tokenization.
+- Emits the `shiki_highlight` mark from the service for real Shiki runs only
+  (lazy loads + tokenization, queue wait excluded); cache hits emit nothing.
+
+Measured in Node 25 / vitest jsdom: the 400-line fixture block sliced from
+an em-dash reply highlights in 42.6 ms vs 17.4 ms after the copy
+(`render-stream.bench.tsx`); a 16 KB TS block 68-72 ms vs 29-31 ms (ASCII
+reply: 29-32 ms).
+
+Measured in headless Chromium (Playwright) with the real `CodeBlockCode`,
+service, and React 19 production build:
+
+- Twelve blocks settling together: the longest main-thread gap (setTimeout
+  heartbeat) is 16-18 ms for 7.6 KB blocks and 30-32 ms for 16 KB blocks,
+  with one React commit per block. With `scheduler.yield()` it was 103-129 ms
+  and 218-247 ms, with a single commit of all twelve. Total time is unchanged
+  (~180 ms / ~320 ms).
+- Remount of eight highlighted 16 KB blocks (1.24M characters of HTML): the
+  cached first commit plus layout takes 37-40 ms and is final; the plain
+  first commit takes 11.5-12.5 ms and reaches fully highlighted after
+  213-243 ms of re-highlighting. Cached HTML therefore adds ~3 ms per 16 KB
+  block to the navigation commit while removing the re-highlight. Typical
+  blocks are a few KB, so the synchronous read stays unbudgeted; revisit with
+  a per-commit character budget if `nav_to_thread_painted` regresses on
+  code-heavy threads.
+
+Dual themes (`themes: { light, dark }`) were evaluated and rejected. Visual
+parity is reachable (zero visible per-character differences across 131,573
+characters in 34 grammars, with `mergeWhitespaces: false` plus four CSS
+variable rules), but Shiki tokenizes once per theme: a 24.5 KB TS block took
+124 ms vs 63 ms and produced 1.7x the HTML. Doubling every highlight to avoid
+re-highlighting on a rare theme toggle is a net loss; theme stays in the cache
+key, so toggling back is a cache hit.
+
+A Web Worker was evaluated and deferred. After the copy, the remaining cost is
+one main-thread task per block (17 ms for the 400-line fixture, ~30 ms per
+16 KB of TS), and transferring 123 KB of HTML costs ~0.01 ms. Moving Shiki into
+a worker would need a second core and grammar set inside the worker, a
+request-id and abort protocol, a main-thread fallback for jsdom and failed
+worker construction, and Turbopack bundling of the grammar `import()` calls
+from a worker entry (unverified without a production build). Revisit when
+Chrome traces show single-block highlight tasks above 50 ms on typical replies.
+
 ### Notification cadence
 
 The accepted target is one frame-aligned message publication, implemented by

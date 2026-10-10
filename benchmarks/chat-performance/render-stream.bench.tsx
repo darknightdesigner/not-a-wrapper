@@ -16,8 +16,13 @@
  * Run with: bun run bench:chat
  */
 import { parseMarkdownIntoBlocks, Markdown } from "@/components/ui/markdown"
+import { toOneByteString } from "@/lib/markdown/shiki-client"
+import typescriptGrammar from "@shikijs/langs/typescript"
+import githubDark from "@shikijs/themes/github-dark"
 import { renderToString } from "react-dom/server"
 import { createHighlighter } from "shiki"
+import { createHighlighterCore } from "shiki/core"
+import { createJavaScriptRegexEngine } from "shiki/engine/javascript"
 import { bench, describe } from "vitest"
 import {
   buildCodePayload,
@@ -227,5 +232,47 @@ describe("shiki full-block highlight (components/ui/code-block.tsx)", () => {
       }
     },
     { warmupIterations: 1, iterations: 3, time: 0, warmupTime: 0 }
+  )
+})
+
+// Production engine (shiki/core + JS regex engine, lib/markdown/shiki-client.ts).
+// One em dash anywhere in a reply makes the sliced fence value a two-byte V8
+// string, putting every grammar regex on the slower two-byte path; the
+// service tokenizes a one-byte copy instead.
+const productionHighlighter = await createHighlighterCore({
+  themes: [githubDark],
+  langs: [typescriptGrammar],
+  engine: createJavaScriptRegexEngine({ forgiving: true }),
+})
+const emDashReply = `Here is the module \u2014 \u201cas promised\u201d:\n\n\`\`\`ts\n${settledCode}\n\`\`\`\n`
+const emDashCode = emDashReply.slice(
+  emDashReply.indexOf("```ts\n") + 6,
+  emDashReply.lastIndexOf("\n```")
+)
+if (emDashCode !== settledCode) {
+  throw new Error("em-dash reply did not reproduce the code payload")
+}
+
+describe("shiki em-dash reply (production JS regex engine)", () => {
+  const highlight = (code: string) =>
+    productionHighlighter.codeToHtml(code, {
+      lang: "typescript",
+      theme: "github-dark",
+    })
+
+  bench(
+    "highlight 400-line block sliced from an em-dash reply (two-byte)",
+    () => {
+      highlight(emDashCode)
+    },
+    { warmupIterations: 3, iterations: 15, time: 0, warmupTime: 0 }
+  )
+
+  bench(
+    "highlight the same block after toOneByteString (production path)",
+    () => {
+      highlight(toOneByteString(emDashCode))
+    },
+    { warmupIterations: 3, iterations: 15, time: 0, warmupTime: 0 }
   )
 })

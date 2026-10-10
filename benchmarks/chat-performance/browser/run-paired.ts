@@ -4,7 +4,8 @@ import { createHash } from "node:crypto"
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { validateDependencyOverlay } from "./dependency-overlay"
+import { isDeepStrictEqual } from "node:util"
+import { pairedBuildManifest, validateDependencyOverlay } from "./dependency-overlay"
 import { validateDirectiveOverlay } from "./directive-overlay"
 import { applySseCharsetOverlay } from "./sse-charset-overlay"
 import { LEGACY_MEASUREMENT_BASE, MEASUREMENT_FILES, MEASUREMENT_HOOK_FILES, measurementBootstrap } from "./measurement-overlay"
@@ -13,10 +14,10 @@ const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../.
 const harnessDirectory = "benchmarks/chat-performance/browser"
 const resultsDirectory = `${harnessDirectory}/results`
 
-function command(cwd: string, program: string, args: string[], capture = false) {
+function command(cwd: string, program: string, args: string[], capture = false, env: Record<string, string> = {}) {
   const result = spawnSync(program, args, {
     cwd,
-    env: process.env,
+    env: { ...process.env, ...env },
     encoding: "utf8",
     stdio: capture ? "pipe" : "inherit",
     maxBuffer: 32 * 1024 * 1024,
@@ -115,7 +116,8 @@ function main() {
   const originalBaseDependencySha256 = digest(path.join(baselineRoot, "bun.lock"))
   let dependencyOverlay: ReturnType<typeof validateDependencyOverlay> | null = null
   if (originalBaseDependencySha256 !== digest(path.join(root, "bun.lock")) ||
-      digest(path.join(baselineRoot, "package.json")) !== digest(path.join(root, "package.json"))) {
+      !isDeepStrictEqual(pairedBuildManifest(readFileSync(path.join(baselineRoot, "package.json"), "utf8")),
+        pairedBuildManifest(readFileSync(path.join(root, "package.json"), "utf8")))) {
     dependencyOverlay = validateDependencyOverlay({
       baseManifest: readFileSync(path.join(baselineRoot, "package.json"), "utf8"),
       headManifest: readFileSync(path.join(root, "package.json"), "utf8"),
@@ -175,21 +177,41 @@ function main() {
   process.env.NEXT_DIST_DIR = ".next-perf"
   command(baselineRoot, "bun", ["run", "build:next"])
   capture(baselineRoot, path.join(output, "base.json"))
+  // Deterministic interaction counts (ADR-0049) gate the same pair of builds.
+  const counts = suite === "responsiveness"
+  const captureCounts = (cwd: string, side: "base" | "head") =>
+    command(cwd, "bun", ["run", `${harnessDirectory}/counts.ts`], false,
+      { COUNTS_OUT: path.join(output, `counts-${side}.json`) })
+  if (counts) captureCounts(baselineRoot, "base")
   command(root, "bun", ["run", `${harnessDirectory}/compare-results.ts`, "--regression-only",
     "--collect-baseline", path.join(output, "base.json")])
   command(root, "bun", ["run", "build:next"])
   capture(root, path.join(output, "head.json"))
+  if (counts) captureCounts(root, "head")
   const comparison = spawnSync("bun", ["run", `${harnessDirectory}/compare-results.ts`, "--regression-only",
     path.join(output, "base.json"), path.join(output, "head.json")], { cwd: root, encoding: "utf8" })
   const report = `${comparison.stdout ?? ""}${comparison.stderr ?? ""}`
   process.stdout.write(report)
   writeFileSync(path.join(output, "comparison.txt"), report)
+  const countComparison = counts
+    ? spawnSync("bun", ["run", `${harnessDirectory}/counts.ts`, "--compare",
+      path.join(output, "counts-base.json"), path.join(output, "counts-head.json")], { cwd: root, encoding: "utf8" })
+    : null
+  const countReport = countComparison ? `${countComparison.stdout ?? ""}${countComparison.stderr ?? ""}` : ""
+  if (countComparison) {
+    process.stdout.write(countReport)
+    writeFileSync(path.join(output, "counts-comparison.txt"), countReport)
+  }
   if (process.env.GITHUB_STEP_SUMMARY) {
-    const summary = `### ${suite}: same-runner comparison\n\nProduct base: \`${base}\`\n\nProduct head: \`${head}\`\n\nMeasurements: \`${head}\`${legacy ? " with audited measurement-only hooks on the original base" : ""}. Both captures use five or more runs; no profiled samples.\n\n\`\`\`text\n${report}\n\`\`\`\n`
+    const countSummary = countComparison ? `\n#### Interaction counts (ADR-0049)\n\n\`\`\`text\n${countReport}\n\`\`\`\n` : ""
+    const summary = `### ${suite}: same-runner comparison\n\nProduct base: \`${base}\`\n\nProduct head: \`${head}\`\n\nMeasurements: \`${head}\`${legacy ? " with audited measurement-only hooks on the original base" : ""}. Both captures use five or more runs; no profiled samples.\n\n\`\`\`text\n${report}\n\`\`\`\n${countSummary}`
     writeFileSync(process.env.GITHUB_STEP_SUMMARY, summary, { flag: "a" })
   }
   if (comparison.error) throw comparison.error
   if (comparison.status !== 0) throw new Error(`Paired comparison failed (${comparison.status}); see comparison.txt`)
+  if (countComparison?.error) throw countComparison.error
+  if (countComparison && countComparison.status !== 0)
+    throw new Error(`Interaction counts regressed or were invalid (${countComparison.status}); see counts-comparison.txt`)
 }
 
 try {

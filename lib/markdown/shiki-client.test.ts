@@ -9,6 +9,7 @@ import {
   highlightCode,
   resetShikiClientForTests,
   resolveShikiLanguage,
+  toOneByteString,
 } from "./shiki-client"
 
 afterEach(() => {
@@ -114,5 +115,35 @@ describe("highlightCode (real modules)", () => {
     ])
     expect(a).toBe(b)
     expect(c).toContain("SELECT")
+  })
+
+  it("renders the same HTML as Shiki on the raw two-byte slice", async () => {
+    const code = "const label = 'caf\u00e9' // Latin-1 stays one-byte\n"
+    const message = `Reply \u2014 with \u201ccurly\u201d quotes:\n${code}`
+    const sliced = message.slice(message.indexOf(code))
+    expect(toOneByteString(sliced)).toBe(sliced)
+    expect(toOneByteString("a \u2014 b")).toBe("a \u2014 b")
+
+    // Pre-copy path: an independent highlighter tokenizes the two-byte slice.
+    const [{ createHighlighterCore }, engine, theme, ts] = await Promise.all([
+      import("shiki/core"),
+      import("shiki/engine/javascript"),
+      import("@shikijs/themes/github-dark"),
+      import("@shikijs/langs/typescript"),
+    ])
+    const reference = await createHighlighterCore({
+      themes: [theme.default],
+      langs: [ts.default],
+      engine: engine.createJavaScriptRegexEngine({ forgiving: true }),
+    })
+    const twoByteHtml = reference.codeToHtml(sliced, {
+      lang: "typescript",
+      theme: "github-dark",
+    })
+    reference.dispose()
+
+    expect(
+      await highlightCode({ code: sliced, language: "ts", theme: "github-dark" })
+    ).toBe(twoByteHtml)
   })
 })

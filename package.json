@@ -33,7 +33,8 @@
     "test": "vitest run",
     "bench": "vitest bench --run",
     "bench:chat": "vitest bench --run benchmarks/chat-performance",
-    "bench:browser": "bun run benchmarks/chat-performance/browser/harness.ts"
+    "bench:browser": "bun run benchmarks/chat-performance/browser/harness.ts",
+    "bench:counts": "bun run benchmarks/chat-performance/browser/counts.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",

@@ -1,5 +1,6 @@
 "use client"
 
+import { useHydrated } from "@/hooks/use-hydrated"
 import { cn } from "@/lib/utils"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
@@ -8,20 +9,11 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react"
 import { createPortal } from "react-dom"
-
-// Hydration-safe hook using useSyncExternalStore (React 19 pattern)
-const subscribe = () => () => {}
-const getSnapshot = () => true
-const getServerSnapshot = () => false
-
-function useHydrated() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-}
 
 type FileUploadContextValue = {
   isDragging: boolean
@@ -126,10 +118,22 @@ function FileUpload({
     [disabled, multiple, onFilesAdded]
   )
 
+  // Stable identity, so memoized consumers (the composer + menu) skip the
+  // re-renders each composer keystroke gives this provider.
+  const contextValue = useMemo(
+    () => ({
+      isDragging,
+      inputRef,
+      openFilePicker,
+      addFiles,
+      multiple,
+      disabled,
+    }),
+    [isDragging, openFilePicker, addFiles, multiple, disabled]
+  )
+
   return (
-    <FileUploadContext.Provider
-      value={{ isDragging, inputRef, openFilePicker, addFiles, multiple, disabled }}
-    >
+    <FileUploadContext.Provider value={contextValue}>
       <input
         type="file"
         ref={inputRef}

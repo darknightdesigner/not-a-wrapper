@@ -63,5 +63,5 @@ not deliver anything, so that guarantee is unaffected.
   query once per parked tab, for up to the TTL. Bounded by the cap and the
   TTL; revisit if the Convex functions dashboard shows the parked window
   dominating `getSelectedPath` executions.
-- In-memory only. Reload still cold-loads (persisting the thread list is the
-  remaining T3 replication item in TODO.md).
+- In-memory only. Reload cold-loads these queries; the sidebar thread list
+  is persisted separately (ADR-0048).

@@ -55,7 +55,7 @@ import {
   RiLockLine,
   RiSearchLine,
 } from "@remixicon/react"
-import { useEffect, useRef, useState } from "react"
+import { memo, useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { ProModelDialog } from "./pro-dialog"
 
@@ -667,7 +667,8 @@ function ModelSelectorList({
   )
 }
 
-export function ModelSelector({
+// Memoized: the Composer re-renders on every keystroke; the picker does not.
+export const ModelSelector = memo(function ModelSelector({
   className,
   isUserAuthenticated = true,
   selectedModelId,
@@ -1133,4 +1134,4 @@ export function ModelSelector({
       </DropdownMenu>
     </div>
   )
-}
+})

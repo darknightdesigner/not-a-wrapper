@@ -38,7 +38,7 @@ import {
   RiImageLine,
   RiPlugLine,
 } from "@remixicon/react"
-import { useCallback, useMemo, useRef } from "react"
+import { memo, useCallback, useMemo, useRef } from "react"
 import { type ComposerActionId } from "./composer-action-registry"
 import {
   type ComposerActionAvailability,
@@ -344,7 +344,8 @@ function ComposerActionMenuRow({
   )
 }
 
-export function ButtonPlusMenu({
+// Memoized: the Composer re-renders on every keystroke; this menu does not.
+export const ButtonPlusMenu = memo(function ButtonPlusMenu({
   isUserAuthenticated,
   acceptsImages,
   enableSearch,
@@ -703,4 +704,4 @@ export function ButtonPlusMenu({
       {editorOwnedContent}
     </Popover>
   )
-}
+})

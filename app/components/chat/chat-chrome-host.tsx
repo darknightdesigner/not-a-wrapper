@@ -1,6 +1,7 @@
 "use client"
 
 import { Header } from "@/app/components/layout/header"
+import { ScrollRootFixedHeaderProvider } from "@/components/ui/scroll-root"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import {
   createContext,
@@ -23,9 +24,11 @@ type ChatChromeState = Pick<ChatChrome, "appHeader" | "fixedHeader">
  * keeps its implicit banner role; nesting it inside main forfeits both.
  *
  * Chat publishes the resolved header facts pre-paint, and the shell's header
- * slot renders them. The initial values mirror the route group's SSR-known
- * first surface so server HTML and hydration agree; Chat publishes the exact
- * thread mode before paint once the client surface resolves.
+ * slot renders them. The scroll root receives the same fixed mode from this
+ * state, so its sticky inset can never disagree with the rendered header. The
+ * initial values mirror the route group's SSR-known first surface so server
+ * HTML and hydration agree; Chat publishes the exact thread mode before paint
+ * once the client surface resolves.
  */
 const ChatChromeContext = createContext<{
   chrome: ChatChromeState
@@ -56,7 +59,11 @@ export function ChatChromeProvider({
   const value = useMemo(() => ({ chrome, setChrome }), [chrome, setChrome])
   return (
     <ChatChromeContext.Provider value={value}>
-      {children}
+      <ScrollRootFixedHeaderProvider
+        value={chrome.appHeader ? chrome.fixedHeader : undefined}
+      >
+        {children}
+      </ScrollRootFixedHeaderProvider>
     </ChatChromeContext.Provider>
   )
 }

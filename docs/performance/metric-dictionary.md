@@ -62,6 +62,7 @@ stats** on the assistant message.
 | `input_to_settled_paint`     | keystroke → second frame (`composer.keystroke_to_settled_paint`)                                                                                              | browser                 | yes                                 | existing                                                                                                                                        |
 | `stop_to_ui_feedback`        | `stop_intent` → stopped-state render                                                                                                                          | browser                 | yes                                 | partial (`stop_intent` mark exists; the feedback endpoint is harness-measured — `stream_terminal` with `outcome: "abort"` bounds it from above) |
 | `nav_to_thread_painted`      | `chat_navigation_intent` (sidebar row click) → `nav_to_thread_painted` (two rAFs after the commit that first rendered a message row for the destination chat) | browser                 | yes (harness `SUITE=thread-switch`) | existing (2026-09-02)                                                                                                                           |
+| `time_to_typeable`           | navigation start → first frame the composer accepts input (server fallback textarea visible and enabled, or the ProseMirror editor editable)                  | browser                 | no (`composer-handoff.ts`, guest)   | ADR-0047 (2026-10-09); compare to editor editable (the pre-ADR-0047 typeable point); the script's handoff cases are pass/fail                   |
 
 Interpretation and limitations:
 
@@ -143,7 +144,7 @@ thinking phase is inside this figure.
 | `raf_gap_p95_ms`                                                 | derived from `raf_gap` marks (rAF-interval sampler while streaming, >40 ms gaps)                                                      | yes (harness)                           | existing (marks; aggregates harness-derived)                     |
 | `markdown_projection_ms`                                         | `markdown_projection_advance` mark per committed advance                                                                              | yes                                     | existing (Phase 2)                                               |
 | `markdown_projection_anomalies`                                  | count of `markdown_projection_reset` / `_fallback` / `_settle_mismatch` by `reason`                                                   | yes (zero-tolerance on settle_mismatch) | existing                                                         |
-| `shiki_highlight_ms` / `shiki_invocations`                       | `shiki_highlight` mark per highlight run (duration includes any lazy grammar/theme load; count = mark count)                          | yes                                     | existing (Phase 2; a separate grammar-load split stays proposed) |
+| `shiki_highlight_ms` / `shiki_invocations`                       | `shiki_highlight` mark per real Shiki run (duration = lazy grammar/theme load + tokenization, excluding highlight-queue wait; cache hits emit no mark; count = mark count) | yes                                     | existing (Phase 2; cache/queue semantics 2026-10-09; a separate grammar-load split stays proposed) |
 | `dom_node_count_start` / `_end`                                  | scenario boundaries                                                                                                                   | yes (harness)                           | proposed                                                         |
 | `heap_growth_bytes`                                              | CDP, harness-only                                                                                                                     | no (advisory)                           | proposed                                                         |
 
@@ -159,7 +160,7 @@ classify work by the later User Timing mark timestamp.
 | `stream_chunks_received`                    | SSE frames observed by the client tap                                   | yes                     | proposed                                                                                                            |
 | `ui_publications`                           | rAF-coalescer publications per streaming session                        | yes                     | existing (Phase 2: `stream_publication_summary` mark — one per session, emitted when the stream leaves `streaming`) |
 | `coalesced_deltas`                          | SDK message callbacks absorbed without a publication                    | yes                     | existing (Phase 2, same summary; "deltas" = SDK message callbacks, not SSE frames)                                  |
-| `react_commits`                             | React commit count — **profiling builds only**, never normal production | yes (profiling harness) | proposed                                                                                                            |
+| `react_commits`                             | React commit count — **benchmark DevTools-hook stub only**, never normal production | yes (`bench:counts`)    | existing for composer typing and popover open (group 15, ADR-0049); streaming not yet counted                        |
 | `stream_bytes_total` / `stream_chars_total` | bucketed totals per turn                                                | yes                     | proposed                                                                                                            |
 
 Invariant (plan target): `ui_publications` ≤ one per animation frame during streaming;
@@ -193,6 +194,7 @@ status/error publications are exempt (they bypass the coalescer by design).
 | `selected_conversation_client` (`selectedCount`, `mappingDurationMs`)   | client-side mapping cost + row count per subscription update                           | browser | existing (note: re-runs mapping to time it; flag-gated)                                                                                                                 |
 | `subscription_updates_per_turn`                                         | count of `getSelectedPath` and `getSelectedRunState` results delivered during one turn | browser | proposed                                                                                                                                                                |
 | `reactive_result_bytes_bucket`                                          | serialized result size bucket per update                                               | browser | proposed                                                                                                                                                                |
+| `payload_bytes.*`                                                       | exact JSON bytes per subscribed read over the fixed seam fixture                       | convex  | existing (group 15, ADR-0049; gates every PR through `bun run test`)                                                                                                     |
 | `messages_read_bucket` / `selected_count_bucket` / `parts_bytes_bucket` | per-invocation read cost, sampled, Convex side                                         | convex  | existing (Phase 2: `_tag:"chat_perf_convex"` `selected_conversation_read`, gated by `CHAT_PERF_CONVEX_SAMPLE_RATE`; line frequency doubles as the re-execution counter) |
 | `query_reexecutions` / `documents_read` / `db_bandwidth`                | deployment metrics via Convex dashboard/MCP, recorded per benchmark run                | convex  | proposed (result-file only, not app logs)                                                                                                                               |
 
@@ -383,3 +385,29 @@ Cold means HTTP cache disabled (CI also creates a fresh context with the benchma
 session); authenticated Chrome preserves the person's storage and cookies. Warm
 uses cached assets in fresh documents; the visited thread-switch pass separately
 measures navigation within a live document.
+
+## 15. Deterministic interaction counts and payload budgets (ADR-0049)
+
+Counts of work per interaction, not durations. `bench:counts` drives a fresh guest
+on an owned production server with reduced motion emulated, drains frames after
+every keystroke, and repeats at 1x and 4x CPU. A gated count must be identical in
+every run; the paired PR gate fails when the candidate exceeds the merge base.
+
+| Metric                      | Definition                                                                       | Gate?                                  | Status   |
+| --------------------------- | -------------------------------------------------------------------------------- | -------------------------------------- | -------- |
+| `react_commits`             | `onCommitFiberRoot` calls during the interaction                                 | yes                                    | existing |
+| `component_renders`         | function/class fibers with `PerformedWork` in a changed subtree                  | yes                                    | existing |
+| `hook_renders`              | hooks on those renders (`memoizedState` chain length): the hook census           | yes                                    | existing |
+| `store_subscription_renders`| `useSyncExternalStore` hooks among those renders                                 | yes                                    | existing |
+| `context_read_renders`      | context dependencies among those renders                                         | yes                                    | existing |
+| `dom_mutations`             | MutationObserver records, whole document                                         | yes                                    | existing |
+| `layout_count`              | CDP `LayoutCount` delta                                                          | yes                                    | existing |
+| `recalc_style_count`        | CDP `RecalcStyleCount` delta                                                     | popover open only (typing varies ±2)   | existing |
+| `nodes_delta` / `js_event_listeners_delta` | CDP `Nodes` / `JSEventListeners` delta                            | no (garbage-collection timing)         | existing |
+| `*_duration_ms`             | CDP script/style/layout/task duration deltas                                     | no (wall-clock context)                | existing |
+| `payload_bytes.*`           | JSON bytes of `getSelectedPath`, `getSelectedRunState` (live, settled), recent window first page, pinned, over the 120-turn seam fixture | yes: any growth fails, -1% asks to lower the budget | existing |
+
+Interactions: `composer-typing` (26 characters into the idle home composer) and
+`composer-menu-open` (guest plus popover, after its hover tooltip settles). Counts
+are per interaction, never per second. The hook stub runs only in the benchmark
+browser; production builds never install it.

@@ -31,6 +31,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useHydrated } from "@/hooks/use-hydrated"
 import {
   createComposerPaintController,
   type ComposerPaintController,
@@ -42,7 +43,13 @@ import { RiCollapseDiagonalLine, RiExpandDiagonalLine } from "@remixicon/react"
 import { motion, MotionConfig, type HTMLMotionProps } from "motion/react"
 import { EditorState } from "prosemirror-state"
 import { EditorView } from "prosemirror-view"
-import React, { createContext, useContext, useRef, useState } from "react"
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 export type PromptInputEditorHandle = {
   focus: (options?: FocusOptions) => void
@@ -80,10 +87,29 @@ const PromptInputContext = createContext<PromptInputContextType | undefined>(
   undefined
 )
 
+/** The slice toolbar parts read. It omits the value, so typing re-renders
+ * only the editor, never the actions around it. */
+type PromptInputLayoutContextType = Pick<
+  PromptInputContextType,
+  "layoutDependency" | "disabled"
+>
+
+const PromptInputLayoutContext = createContext<
+  PromptInputLayoutContextType | undefined
+>(undefined)
+
 function usePromptInput() {
   const context = useContext(PromptInputContext)
   if (!context) {
     throw new Error("usePromptInput must be used within a PromptInput")
+  }
+  return context
+}
+
+function usePromptInputLayout() {
+  const context = useContext(PromptInputLayoutContext)
+  if (!context) {
+    throw new Error("usePromptInputLayout must be used within a PromptInput")
   }
   return context
 }
@@ -164,148 +190,184 @@ function PromptInput({
     [isExpandedComposer, scrollRoot]
   )
 
-  const handleChange = (newValue: string) => {
-    setInternalValue(newValue)
-    onValueChange?.(newValue)
-  }
+  const handleChange = React.useCallback(
+    (newValue: string) => {
+      setInternalValue(newValue)
+      onValueChange?.(newValue)
+    },
+    [onValueChange]
+  )
 
-  const handleEntitiesChange = (nextEntities: readonly PromptInputEntity[]) => {
-    setInternalEntities(nextEntities)
-    onEntitiesChange?.(nextEntities)
-  }
+  const handleEntitiesChange = React.useCallback(
+    (nextEntities: readonly PromptInputEntity[]) => {
+      setInternalEntities(nextEntities)
+      onEntitiesChange?.(nextEntities)
+    },
+    [onEntitiesChange]
+  )
+
+  // Stable across parent re-renders that change none of these, so the
+  // memoized editor skips them (an overlay opening in the toolbar).
+  const resolvedValue = value ?? internalValue
+  const resolvedEntities = entities ?? internalEntities
+  const context = useMemo<PromptInputContextType>(
+    () => ({
+      isLoading,
+      value: resolvedValue,
+      setValue: onValueChange ?? handleChange,
+      entities: resolvedEntities,
+      setEntities: onEntitiesChange ?? handleEntitiesChange,
+      setTextareaExpanded,
+      setCanExpandComposer,
+      layoutDependency,
+      draftKey,
+      maxHeight,
+      onSubmit,
+      disabled,
+      editorRef,
+    }),
+    [
+      isLoading,
+      resolvedValue,
+      onValueChange,
+      handleChange,
+      resolvedEntities,
+      onEntitiesChange,
+      handleEntitiesChange,
+      layoutDependency,
+      draftKey,
+      maxHeight,
+      onSubmit,
+      disabled,
+    ]
+  )
+  const layoutContext = useMemo(
+    () => ({ layoutDependency, disabled }),
+    [layoutDependency, disabled]
+  )
 
   return (
-    <PromptInputContext.Provider
-      value={{
-        isLoading,
-        value: value ?? internalValue,
-        setValue: onValueChange ?? handleChange,
-        entities: entities ?? internalEntities,
-        setEntities: onEntitiesChange ?? handleEntitiesChange,
-        setTextareaExpanded,
-        setCanExpandComposer,
-        layoutDependency,
-        draftKey,
-        maxHeight,
-        onSubmit,
-        disabled,
-        editorRef,
-      }}
-    >
-      <MotionConfig
-        reducedMotion="user"
-        transition={{
-          layout: isPasting
-            ? { duration: 0 }
-            : { type: "spring", bounce: 0.1, duration: 0.3 },
-        }}
-      >
-        <form
-          ref={formRef}
-          autoComplete="off"
-          className={cn("group/composer relative z-1 w-full", className)}
-          style={
-            {
-              "--composer-border-radius": "28px",
-              viewTransitionName: "var(--vt-composer)",
-            } as React.CSSProperties
-          }
-          data-expanded={isExpanded ? "" : undefined}
-          data-expanded-composer={isExpandedComposer ? "" : undefined}
-          data-expanded-composer-mode-button={
-            canExpandComposer ? "" : undefined
-          }
-          data-type="unified-composer"
-          onPaste={() => {
-            setIsPasting(true)
-            if (pasteTimeout.current !== null)
-              clearTimeout(pasteTimeout.current)
-            pasteTimeout.current = setTimeout(() => setIsPasting(false), 250)
-          }}
-          onSubmit={(event) => {
-            event.preventDefault()
-            if (!disabled) onSubmit?.()
+    <PromptInputContext.Provider value={context}>
+      <PromptInputLayoutContext.Provider value={layoutContext}>
+        <MotionConfig
+          reducedMotion="user"
+          transition={{
+            layout: isPasting
+              ? { duration: 0 }
+              : { type: "spring", bounce: 0.1, duration: 0.3 },
           }}
         >
-          {formControls}
-          <div className="relative">
-            <motion.div
-              layout
-              layoutDependency={layoutDependency}
-              style={{ borderRadius: 28 }}
-              data-composer-surface="true"
-              data-expanded-composer={isExpandedComposer ? "" : undefined}
-              data-slot="prompt-input-surface"
-              className={cn(
-                "shadow-short-composer border-border-subtle relative grid cursor-text grid-cols-[minmax(0,1fr)] grid-rows-[max-content_0_auto] flex-col overflow-clip border-0 bg-[var(--composer-surface-primary)] bg-clip-padding contain-inline-size [corner-shape:superellipse(1.1)] [grid-template-areas:'eyebrow'_'controls'_'body'] group-not-data-expanded/composer:min-h-[52px] motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-in-out max-sm:not-dark:shadow-[0_0_0_1px_rgba(0,_0,_0,_0.04),0_2px_8px_0_rgba(0,_0,_0,_0.04),0px_4px_40px_8px_rgba(0,_0,_0,_0.025)]",
-                isExpandedComposer &&
-                  "my-4 h-[min(calc(100svh-var(--header-height)-8rem),48rem)] max-h-[calc(100svh-var(--header-height)-8rem)]"
-              )}
-              onClick={() => {
-                editorRef.current?.focus()
-              }}
-            >
-              <div
-                className="relative col-start-1 col-end-2 row-start-2 row-end-3 h-0 shrink-0"
-                data-composer-controls-anchor=""
-              >
-                {canExpandComposer && (
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <ComposerIconButton
-                          aria-label={
-                            isExpandedComposer ? "Collapse" : "Expand"
-                          }
-                          aria-pressed={isExpandedComposer}
-                          className="absolute end-2.5 top-2.5 z-10"
-                          type="button"
-                          pressMotion="none"
-                          onPointerDown={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                          }}
-                          onClick={(event) => {
-                            event.preventDefault()
-                            event.stopPropagation()
-                            setExpandedComposer((current) => !current)
-                            editorRef.current?.focus({ preventScroll: true })
-                          }}
-                        >
-                          <Icon
-                            className="text-[var(--text-secondary)]"
-                            icon={
-                              isExpandedComposer
-                                ? RiCollapseDiagonalLine
-                                : RiExpandDiagonalLine
-                            }
-                            slotSize={20}
-                          />
-                        </ComposerIconButton>
-                      }
-                    />
-                    <TooltipContent side="bottom">
-                      {isExpandedComposer ? "Collapse" : "Expand"}
-                    </TooltipContent>
-                  </Tooltip>
+          {/* method="dialog" outside a <dialog> makes native submission a no-op,
+            so the send button cannot navigate (and serialize the typed
+            prompt into the URL) before hydration (ADR-0047). */}
+          <form
+            ref={formRef}
+            method="dialog"
+            autoComplete="off"
+            className={cn("group/composer relative z-1 w-full", className)}
+            style={
+              {
+                "--composer-border-radius": "28px",
+                viewTransitionName: "var(--vt-composer)",
+              } as React.CSSProperties
+            }
+            data-expanded={isExpanded ? "" : undefined}
+            data-expanded-composer={isExpandedComposer ? "" : undefined}
+            data-expanded-composer-mode-button={
+              canExpandComposer ? "" : undefined
+            }
+            data-type="unified-composer"
+            onPaste={() => {
+              setIsPasting(true)
+              if (pasteTimeout.current !== null)
+                clearTimeout(pasteTimeout.current)
+              pasteTimeout.current = setTimeout(() => setIsPasting(false), 250)
+            }}
+            onSubmit={(event) => {
+              event.preventDefault()
+              if (!disabled) onSubmit?.()
+            }}
+          >
+            {formControls}
+            <div className="relative">
+              <motion.div
+                layout
+                layoutDependency={layoutDependency}
+                style={{ borderRadius: 28 }}
+                data-composer-surface="true"
+                data-expanded-composer={isExpandedComposer ? "" : undefined}
+                data-slot="prompt-input-surface"
+                className={cn(
+                  "shadow-short-composer border-border-subtle relative grid cursor-text grid-cols-[minmax(0,1fr)] grid-rows-[max-content_0_auto] flex-col overflow-clip border-0 bg-[var(--composer-surface-primary)] bg-clip-padding contain-inline-size [corner-shape:superellipse(1.1)] [grid-template-areas:'eyebrow'_'controls'_'body'] group-not-data-expanded/composer:min-h-[52px] motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-in-out max-sm:not-dark:shadow-[0_0_0_1px_rgba(0,_0,_0,_0.04),0_2px_8px_0_rgba(0,_0,_0,_0.04),0px_4px_40px_8px_rgba(0,_0,_0,_0.025)]",
+                  isExpandedComposer &&
+                    "my-4 h-[min(calc(100svh-var(--header-height)-8rem),48rem)] max-h-[calc(100svh-var(--header-height)-8rem)]"
                 )}
-              </div>
-              <div
-                data-composer-body=""
-                data-composer-grid=""
-                data-composer-layout="true"
-                className="col-start-1 col-end-2 row-start-3 row-end-4 grid min-h-0 min-w-0 flex-1 grid-cols-[auto_1fr_auto] px-2 py-[9px] [--composer-compact-editor-padding-end:6px] [--composer-compact-editor-padding-start:7px] [grid-template-areas:'header_header_header'_'leading_primary_trailing'_'._footer_.'] group-not-data-expanded/composer:py-[5px] group-data-expanded/composer:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] group-data-expanded-composer/composer:grid-rows-[auto_minmax(0,1fr)_auto] max-sm:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] max-sm:group-not-data-expanded/composer:pb-2 @max-[520px]/main:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing']"
+                onClick={() => {
+                  editorRef.current?.focus()
+                }}
               >
-                {children}
-              </div>
-            </motion.div>
-            <div
-              data-composer-overlay-host=""
-              className="pointer-events-none absolute inset-0 z-50 *:pointer-events-auto"
-            />
-          </div>
-        </form>
-      </MotionConfig>
+                <div
+                  className="relative col-start-1 col-end-2 row-start-2 row-end-3 h-0 shrink-0"
+                  data-composer-controls-anchor=""
+                >
+                  {canExpandComposer && (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <ComposerIconButton
+                            aria-label={
+                              isExpandedComposer ? "Collapse" : "Expand"
+                            }
+                            aria-pressed={isExpandedComposer}
+                            className="absolute end-2.5 top-2.5 z-10"
+                            type="button"
+                            pressMotion="none"
+                            onPointerDown={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              event.stopPropagation()
+                              setExpandedComposer((current) => !current)
+                              editorRef.current?.focus({ preventScroll: true })
+                            }}
+                          >
+                            <Icon
+                              className="text-[var(--text-secondary)]"
+                              icon={
+                                isExpandedComposer
+                                  ? RiCollapseDiagonalLine
+                                  : RiExpandDiagonalLine
+                              }
+                              slotSize={20}
+                            />
+                          </ComposerIconButton>
+                        }
+                      />
+                      <TooltipContent side="bottom">
+                        {isExpandedComposer ? "Collapse" : "Expand"}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+                <div
+                  data-composer-body=""
+                  data-composer-grid=""
+                  data-composer-layout="true"
+                  className="col-start-1 col-end-2 row-start-3 row-end-4 grid min-h-0 min-w-0 flex-1 grid-cols-[auto_1fr_auto] px-2 py-[9px] [--composer-compact-editor-padding-end:6px] [--composer-compact-editor-padding-start:7px] [grid-template-areas:'header_header_header'_'leading_primary_trailing'_'._footer_.'] group-not-data-expanded/composer:py-[5px] group-data-expanded/composer:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] group-data-expanded-composer/composer:grid-rows-[auto_minmax(0,1fr)_auto] max-sm:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] max-sm:group-not-data-expanded/composer:pb-2 @max-[520px]/main:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing']"
+                >
+                  {children}
+                </div>
+              </motion.div>
+              <div
+                data-composer-overlay-host=""
+                className="pointer-events-none absolute inset-0 z-50 *:pointer-events-auto"
+              />
+            </div>
+          </form>
+        </MotionConfig>
+      </PromptInputLayoutContext.Provider>
     </PromptInputContext.Provider>
   )
 }
@@ -355,7 +417,13 @@ function getEditorWidths(textarea: HTMLTextAreaElement) {
       layoutStyle.getPropertyValue("--composer-compact-editor-padding-end")
     )
 
-  if (window.matchMedia("(max-width: 639px)").matches) {
+  // The grid stacks the editor above its actions at `max-sm` and in a `/main`
+  // container under 520px (`@max-[520px]/main`); measure that layout alike.
+  const main = layout.closest<HTMLElement>("#main")
+  if (
+    window.matchMedia("(max-width: 639px)").matches ||
+    (main !== null && main.getBoundingClientRect().width < 520)
+  ) {
     return { compact: Math.max(0, contentWidth - editorPadding), full }
   }
 
@@ -453,6 +521,7 @@ function measureTextareaScrollHeight(
   clone.removeAttribute("id")
   clone.removeAttribute("name")
   clone.tabIndex = -1
+  clone.hidden = false
   clone.value = value || " "
   clone.rows = 1
   clone.style.position = "absolute"
@@ -476,6 +545,10 @@ function measureTextareaScrollHeight(
 
 const COLLAPSED_EDITOR_HEIGHT = 42
 
+/** Shared by the editor and its pre-hydration fallback so both lay out alike. */
+const EDITOR_CLASS_NAME =
+  "composer-prosemirror text-foreground block whitespace-break-spaces text-base leading-[26px] outline-none"
+
 function getEditorAttributes({
   id,
   ariaLabel,
@@ -494,10 +567,7 @@ function getEditorAttributes({
     autocapitalize: "sentences",
     autocomplete: "off",
     autocorrect: "on",
-    class: cn(
-      "composer-prosemirror text-foreground block whitespace-break-spaces text-base leading-[26px] outline-none",
-      className
-    ),
+    class: cn(EDITOR_CLASS_NAME, className),
     "data-virtualkeyboard": "true",
     id,
     inputmode: "text",
@@ -523,7 +593,7 @@ export type PromptInputTextareaProps = {
   onPaste?: (event: ClipboardEvent) => void
 }
 
-const PromptInputTextarea = React.forwardRef<
+const PromptInputEditor = React.forwardRef<
   PromptInputEditorHandle,
   PromptInputTextareaProps
 >(function PromptInputTextarea(
@@ -562,6 +632,20 @@ const PromptInputTextarea = React.forwardRef<
   const paintControllerRef = useRef<ComposerPaintController | null>(null)
   const editorHandleRef = useRef<PromptInputEditorHandle | null>(null)
   const fallbackTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  // Pre-hydration handoff (ADR-0047). The caret the user left in the
+  // server-rendered fallback, reapplied by a Strict Mode editor remount and
+  // dropped on the first edit.
+  const handoffSelectionRef = useRef<{ start: number; end: number } | null>(
+    null
+  )
+  // Set when the editor adopts fallback text newer than this commit's value,
+  // so the same commit's external sync does not overwrite it.
+  const adoptedFallbackValueRef = useRef(false)
+  // Adopted text keeps the layout the fallback painted (compact, even when
+  // wrapped) until the value changes, so the handoff itself never moves the
+  // composer and any expansion happens with input, as in normal typing.
+  const handoffLayoutValueRef = useRef<string | null>(null)
+  const isHydrated = useHydrated()
   const forwardedRef = useRef(ref)
   const callbacks = useRef({
     id,
@@ -653,6 +737,15 @@ const PromptInputTextarea = React.forwardRef<
       }
 
       if (!viewRef.current) return
+      if (handoffLayoutValueRef.current !== null) {
+        if (
+          nextValue === handoffLayoutValueRef.current &&
+          !options?.freshDraft
+        ) {
+          return
+        }
+        handoffLayoutValueRef.current = null
+      }
 
       // Native field sizing keeps the live editor matched to its rendered
       // lines. Clear a stale imperative height left by an older render/HMR;
@@ -828,10 +921,26 @@ const PromptInputTextarea = React.forwardRef<
       const publishActionQuery = createActionQueryPublisher((actionQuery) =>
         callbacks.current.onActionQueryChange?.(actionQuery)
       )
+      // The fallback textarea mirrors the editor after mount, so before it
+      // the only way it differs from the rendered value is text the user
+      // typed into the server-rendered field before hydration.
+      const fallback = fallbackTextareaRef.current
+      const renderedValue = callbacks.current.value
+      const initialValue = fallback?.value ?? renderedValue
+      if (
+        fallback &&
+        !fallback.hidden &&
+        fallback.ownerDocument.activeElement === fallback
+      ) {
+        handoffSelectionRef.current = {
+          start: fallback.selectionStart,
+          end: fallback.selectionEnd,
+        }
+      }
       const state = EditorState.create({
         doc: createPromptInputDocument(
-          callbacks.current.value,
-          callbacks.current.entities
+          initialValue,
+          initialValue === renderedValue ? callbacks.current.entities : []
         ),
         plugins: createPromptInputPlugins(() => callbacks.current.placeholder),
         schema: promptInputSchema,
@@ -860,6 +969,7 @@ const PromptInputTextarea = React.forwardRef<
               return
             }
 
+            handoffSelectionRef.current = null
             const nextValue = readPromptInputDocument(nextState.doc)
             const nextEntities = readPromptInputEntities(nextState.doc)
             if (fallbackTextareaRef.current) {
@@ -937,10 +1047,35 @@ const PromptInputTextarea = React.forwardRef<
           setPromptInputSelection(view, selectionStart, selectionEnd)
         },
       }
+      const handoffSelection = handoffSelectionRef.current
+      let adoptedValue = initialValue
+      if (handoffSelection && fallback) {
+        // Moving focus commits an in-progress IME composition into the
+        // fallback, so its value and caret are read again afterwards.
+        view.focus()
+        adoptedValue = fallback.value
+        if (adoptedValue !== initialValue) {
+          replacePromptInputDocument(view, adoptedValue)
+          handoffSelectionRef.current = {
+            start: fallback.selectionStart,
+            end: fallback.selectionEnd,
+          }
+        }
+        const { start, end } = handoffSelectionRef.current ?? handoffSelection
+        setPromptInputSelection(view, start, end)
+      }
+      if (fallback) fallback.hidden = true
+      if (adoptedValue !== renderedValue) {
+        // Pre-hydration text wins over the stored draft and becomes the draft.
+        adoptedFallbackValueRef.current = true
+        handoffLayoutValueRef.current = adoptedValue
+        callbacks.current.setValue(adoptedValue)
+      }
+
       editorHandleRef.current = handle
       editorRef.current = handle
       assignRef(forwardedRef.current, handle)
-      if (callbacks.current.autoFocus) handle.focus()
+      if (callbacks.current.autoFocus && !handoffSelection) handle.focus()
 
       return () => {
         if (viewRef.current === view) viewRef.current = null
@@ -970,14 +1105,23 @@ const PromptInputTextarea = React.forwardRef<
       }),
       editable: () => !(disabled ?? disabledProp ?? false),
     })
-    replacePromptInputDocument(view, value, entities)
-    view.updateState(view.state)
-    if (fallbackTextareaRef.current) {
-      fallbackTextareaRef.current.value = value
+    // The adopted text reaches `value` through setValue on the next commit.
+    const adoptedValue = adoptedFallbackValueRef.current
+      ? fallbackTextareaRef.current?.value
+      : undefined
+    adoptedFallbackValueRef.current = false
+    if (adoptedValue === undefined) {
+      replacePromptInputDocument(view, value, entities)
+      if (fallbackTextareaRef.current) {
+        fallbackTextareaRef.current.value = value
+      }
     }
+    view.updateState(view.state)
     const freshDraft = appliedDraftKeyRef.current !== draftKey
     appliedDraftKeyRef.current = draftKey
-    applyEditorLayout(fallbackTextareaRef.current, value, { freshDraft })
+    applyEditorLayout(fallbackTextareaRef.current, adoptedValue ?? value, {
+      freshDraft,
+    })
     paintControllerRef.current?.onComposerUpdate()
   }, [
     applyEditorLayout,
@@ -1013,20 +1157,28 @@ const PromptInputTextarea = React.forwardRef<
         className="wcDTda_prosemirror-parent default-browser vertical-scroll-fade-mask max-h-[max(30svh,5rem)] min-h-[var(--deep-research-composer-extra-height,unset)] min-w-0 flex-1 scroll-py-4 [scrollbar-width:thin] overflow-auto group-data-[expanded-composer]/composer:h-full group-data-[expanded-composer]/composer:max-h-none! group-data-[expanded-composer-mode-button]/composer:pe-9"
         style={{ maxHeight: maxHeightStyle }}
       >
+        {/* Typeable in the server HTML until the editor mounts and hides it
+            (ADR-0047). Only the server HTML autofocuses it, matching the
+            editor's mount focus; client mounts never focus it. */}
         <textarea
           ref={setFallbackTextareaRef}
           aria-label={ariaLabel}
           autoCapitalize="sentences"
           autoComplete="off"
           autoCorrect="on"
-          className="wcDTda_fallbackTextarea composer-fallback-textarea"
+          autoFocus={autoFocus && !isHydrated}
+          className={cn(
+            "wcDTda_fallbackTextarea composer-fallback-textarea",
+            EDITOR_CLASS_NAME,
+            className
+          )}
           data-virtualkeyboard="true"
           dir="auto"
+          disabled={disabled ?? disabledProp}
           inputMode="text"
           name="prompt-textarea"
           placeholder={placeholder}
           spellCheck="true"
-          style={{ display: "none" }}
           defaultValue={value}
           rows={1}
         />
@@ -1036,6 +1188,10 @@ const PromptInputTextarea = React.forwardRef<
   )
 })
 
+/** Memoized: typing re-renders it through context; a parent re-render that
+ * changes neither its props nor its context skips it. */
+const PromptInputTextarea = React.memo(PromptInputEditor)
+
 type PromptInputFooterProps = HTMLMotionProps<"div">
 
 function PromptInputFooter({
@@ -1043,7 +1199,7 @@ function PromptInputFooter({
   className,
   ...props
 }: PromptInputFooterProps) {
-  const { layoutDependency } = usePromptInput()
+  const { layoutDependency } = usePromptInputLayout()
   return (
     <motion.div
       layout="position"
@@ -1065,7 +1221,7 @@ function PromptInputActions({
   className,
   ...props
 }: PromptInputActionsProps) {
-  const { layoutDependency } = usePromptInput()
+  const { layoutDependency } = usePromptInputLayout()
   return (
     <motion.div
       layout="position"
@@ -1094,7 +1250,7 @@ function PromptInputAction({
   hideArrow = true,
   ...tooltipProps
 }: PromptInputActionProps) {
-  const { disabled } = usePromptInput()
+  const { disabled } = usePromptInputLayout()
   const trigger = useRender({
     defaultTagName: "button",
     render: children,

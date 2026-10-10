@@ -3,7 +3,8 @@
 @import "./vaul-base.css";
 
 @import "tw-animate-css";
-@plugin "@tailwindcss/typography";
+/* Typography with non-positional-first blockquote quote rules (see the module). */
+@plugin "../lib/markdown/typography-plugin.mjs";
 
 /* Exclude documentation directories from Tailwind's automatic content detection.
    .agents/ contains markdown docs with code examples that include raw Tailwind class
@@ -1710,6 +1711,25 @@
     font-feature-settings: "liga" 0;
     white-space: break-spaces;
     transform: translateY(-0.5px);
+  }
+
+  /* Pre-hydration fallback (ADR-0047): the editor's box until it mounts and
+     sets [hidden]. Content sizing grows it like the editor's paragraphs. */
+  .wcDTda_fallbackTextarea {
+    width: 100%;
+    min-height: 0;
+    field-sizing: content;
+    resize: none;
+    overflow: hidden;
+    background: transparent;
+    border: 0;
+  }
+
+  /* Matches the editor placeholder's 1px inline offset. */
+  .wcDTda_fallbackTextarea::placeholder {
+    color: var(--text-tertiary);
+    opacity: 1;
+    text-indent: 1px;
   }
 
   .composer-prosemirror > p {

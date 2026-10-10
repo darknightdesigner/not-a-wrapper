@@ -20,7 +20,7 @@ import {
 } from "@/lib/reasoning-effort"
 import { cn } from "@/lib/utils"
 import { RiCheckLine } from "@remixicon/react"
-import { useRef, useState } from "react"
+import { memo, useRef, useState } from "react"
 
 type EffortControlProps = {
   /** The selected model's level menu (logical union across routes). */
@@ -72,9 +72,9 @@ function EffortRow({
  * user overrides, and re-picking it clears the override (state stays
  * `undefined`, so the wire still sends nothing and the provider decides).
  * Selection applies to the next message (and retries) and is remembered per
- * model.
+ * model. Memoized so Composer keystrokes skip it.
  */
-function EffortControl({
+const EffortControl = memo(function EffortControl({
   levels,
   value,
   defaultLevel,
@@ -203,6 +203,6 @@ function EffortControl({
       </DropdownMenu>
     </div>
   )
-}
+})
 
 export { EffortControl }

@@ -10,7 +10,7 @@ import {
 import type { SearchMode } from "@/lib/models/types"
 import { cn } from "@/lib/utils"
 import { RiCloseLine, RiGlobalLine, RiGlobalOffLine } from "@remixicon/react"
-import { useState } from "react"
+import { memo, useState } from "react"
 
 type WebSearchControlProps = {
   enabled: boolean
@@ -46,8 +46,9 @@ function getWebSearchControlState({
   }
 }
 
-/** Two-row Composer search affordance. Search state never enters the draft. */
-function WebSearchControl({
+/** Two-row Composer search affordance. Search state never enters the draft.
+ * Memoized so Composer keystrokes skip it. */
+const WebSearchControl = memo(function WebSearchControl({
   enabled,
   mode,
   onEnabledChange,
@@ -137,6 +138,6 @@ function WebSearchControl({
       <TooltipContent>{tooltip}</TooltipContent>
     </Tooltip>
   )
-}
+})
 
 export { WebSearchControl }

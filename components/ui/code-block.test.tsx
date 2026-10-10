@@ -11,7 +11,8 @@
 
 import { buildCodePayload } from "@/benchmarks/chat-performance/fixtures"
 import React, { act } from "react"
-import { createRoot, type Root } from "react-dom/client"
+import { createRoot, hydrateRoot, type Root } from "react-dom/client"
+import { renderToString } from "react-dom/server"
 import {
   afterEach,
   beforeAll,
@@ -32,6 +33,8 @@ const shikiClientMock = vi.hoisted(() => {
     /** When true, highlight promises stay pending until manually resolved. */
     defer: false,
     pending: [] as Array<() => void>,
+    /** Service cache contents, keyed like the real cache's exact tuple. */
+    cache: new Map<string, string>(),
   }
   const highlightCode = vi.fn(
     (args: {
@@ -49,11 +52,19 @@ const shikiClientMock = vi.hoisted(() => {
       return Promise.resolve(html)
     }
   )
-  return { state, highlightCode }
+  const readCachedHighlight = vi.fn(
+    (args: { code: string; language?: string; theme: string }) =>
+      state.cache.get(`${args.theme}:${args.language}:${args.code}`) ?? null
+  )
+  return { state, render, highlightCode, readCachedHighlight }
 })
 
 vi.mock("@/lib/markdown/shiki-client", () => ({
   highlightCode: shikiClientMock.highlightCode,
+}))
+
+vi.mock("@/lib/markdown/highlight-cache", () => ({
+  readCachedHighlight: shikiClientMock.readCachedHighlight,
 }))
 
 const themeMock = vi.hoisted(() => ({ resolvedTheme: "light" as string }))
@@ -77,6 +88,7 @@ describe("CodeBlockCode streaming rendering", () => {
     themeMock.resolvedTheme = "light"
     shikiClientMock.state.defer = false
     shikiClientMock.state.pending.length = 0
+    shikiClientMock.state.cache.clear()
     vi.useFakeTimers({
       toFake: [
         "setTimeout",
@@ -308,5 +320,42 @@ describe("CodeBlockCode streaming rendering", () => {
     expect(plainText()).toBe("const a = 1")
     await advance(1000)
     expect(shikiClientMock.highlightCode).toHaveBeenCalledTimes(1)
+  })
+
+  it("renders a cached tuple on the first commit (remount without a plain flash)", () => {
+    // Highlight work never resolves here, so highlighted DOM can only come
+    // from the synchronous cache read.
+    shikiClientMock.state.defer = true
+    const code = "const cached = true"
+    shikiClientMock.state.cache.set(
+      `github-light:ts:${code}`,
+      shikiClientMock.render(code, "ts", "github-light")
+    )
+    mount({ code, language: "ts", growing: false })
+    expect(highlightedEl()?.textContent).toBe(code)
+  })
+
+  it("hydrates server plain markup even when the client cache already has the tuple", async () => {
+    // Highlight work never resolves, so only the post-hydration cache read
+    // can produce highlighted DOM. Reading the cache during hydration would
+    // mismatch the server HTML, which React leaves unpatched.
+    shikiClientMock.state.defer = true
+    const code = "const hydrated = 1"
+    const host = document.createElement("div")
+    container = host
+    document.body.appendChild(host)
+    host.innerHTML = renderToString(<CodeBlockCode code={code} language="ts" />)
+    shikiClientMock.state.cache.set(
+      `github-light:ts:${code}`,
+      shikiClientMock.render(code, "ts", "github-light")
+    )
+    const recoverableErrors: unknown[] = []
+    await act(async () => {
+      root = hydrateRoot(host, <CodeBlockCode code={code} language="ts" />, {
+        onRecoverableError: (error) => recoverableErrors.push(error),
+      })
+    })
+    expect(recoverableErrors).toEqual([])
+    expect(highlightedEl()?.textContent).toBe(code)
   })
 })

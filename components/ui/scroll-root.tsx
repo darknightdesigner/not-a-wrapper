@@ -24,6 +24,13 @@
  * (see conversation.tsx), so positioning a turn is a single scrollIntoView call
  * — the browser does all the math.
  *
+ * `data-fixed-header` mirrors the app header's fixed mode, published by
+ * whoever renders that header (`ChatChromeProvider`) through
+ * `ScrollRootFixedHeaderProvider`; without it the full header inset stays
+ * reserved. The value lives here, not on the header, so the inset variants stay
+ * plain attribute selectors: a descendant `:has()` on the transcript's scroll
+ * container is re-checked on every streamed insertion.
+ *
  * Runtime state the thread writes onto this element as attributes (consumed by
  * descendant CSS group variants, without React state):
  *   data-stream-active     while a turn is in flight
@@ -39,6 +46,22 @@ import { cn } from "@/lib/utils"
 import { createContext, useCallback, useContext, useMemo, useRef } from "react"
 
 type ScrollRootMode = "expanded-composer" | "voice-focus-mode"
+
+/** Whether the sticky app header reserves its height in the thread inset. */
+export type HeaderFixedMode =
+  | "always"
+  | "less-than-md"
+  | "less-than-xl"
+  | "less-than-xxl"
+  | "never"
+
+const ScrollRootFixedHeaderContext = createContext<HeaderFixedMode | undefined>(
+  undefined
+)
+
+/** Publishes the rendered app header's mode; omit it when no header renders. */
+export const ScrollRootFixedHeaderProvider =
+  ScrollRootFixedHeaderContext.Provider
 
 type ScrollRootContextValue = {
   scrollRef: React.RefObject<HTMLDivElement | null>
@@ -56,6 +79,7 @@ type ScrollRootProps = {
 } & React.HTMLAttributes<HTMLDivElement>
 
 function ScrollRoot({ children, className, ...props }: ScrollRootProps) {
+  const fixedHeader = useContext(ScrollRootFixedHeaderContext)
   const scrollRef = useRef<HTMLDivElement | null>(null)
   const keyboardCleanupRef = useRef<(() => void) | null>(null)
   const setScrollRootRef = useCallback((node: HTMLDivElement | null) => {
@@ -104,16 +128,17 @@ function ScrollRoot({ children, className, ...props }: ScrollRootProps) {
         ref={setScrollRootRef}
         data-scroll-root=""
         data-scrollable-surface=""
+        data-fixed-header={fixedHeader}
         className={cn(
           "@w-sm/main:[scrollbar-gutter:var(--stage-scroll-gutter)] touch:[scrollbar-width:none] group/scroll-root relative flex min-h-0 min-w-0 flex-1 [scrollbar-gutter:stable] flex-col not-print:overflow-x-clip not-print:overflow-y-auto data-stream-active:[overflow-anchor:none] not-print:data-expanded-composer:overflow-y-hidden! not-print:data-voice-focus-mode:overflow-y-hidden!",
           "scroll-pt-(--header-height) [--sticky-padding-bottom:0px] [--sticky-padding-top:var(--header-height)]",
           "[--scroll-root-safe-area-inset-top:calc(var(--sticky-padding-top)+env(safe-area-inset-top,0px))]",
           "[--scroll-root-safe-area-inset-bottom:calc(var(--sticky-padding-bottom)+var(--screen-keyboard-height,0px)+env(safe-area-inset-bottom,0px))]",
           "[--scroll-root-safe-area-height:calc(100lvh-var(--scroll-root-safe-area-inset-top)-var(--scroll-root-safe-area-inset-bottom))]",
-          "has-data-[fixed-header=less-than-md]:md:scroll-pt-0 has-data-[fixed-header=less-than-md]:md:[--sticky-padding-top:0px]",
-          "has-data-[fixed-header=never]:scroll-pt-0 has-data-[fixed-header=never]:[--sticky-padding-top:0px]",
-          "has-data-[fixed-header=less-than-xl]:@w-xl/main:scroll-pt-0 has-data-[fixed-header=less-than-xl]:@w-xl/main:[--sticky-padding-top:0px]",
-          "has-data-[fixed-header=less-than-xxl]:@w-2xl/main:scroll-pt-0 has-data-[fixed-header=less-than-xxl]:@w-2xl/main:[--sticky-padding-top:0px]",
+          "data-[fixed-header=less-than-md]:md:scroll-pt-0 data-[fixed-header=less-than-md]:md:[--sticky-padding-top:0px]",
+          "data-[fixed-header=never]:scroll-pt-0 data-[fixed-header=never]:[--sticky-padding-top:0px]",
+          "data-[fixed-header=less-than-xl]:@w-xl/main:scroll-pt-0 data-[fixed-header=less-than-xl]:@w-xl/main:[--sticky-padding-top:0px]",
+          "data-[fixed-header=less-than-xxl]:@w-2xl/main:scroll-pt-0 data-[fixed-header=less-than-xxl]:@w-2xl/main:[--sticky-padding-top:0px]",
           className
         )}
         {...props}

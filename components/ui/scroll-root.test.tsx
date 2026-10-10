@@ -13,6 +13,7 @@ import {
 } from "vitest"
 import {
   ScrollRoot,
+  ScrollRootFixedHeaderProvider,
   useScrollRoot,
   useStickyPaddingBottom,
 } from "./scroll-root"
@@ -589,30 +590,42 @@ describe("ScrollRoot viewport and footer measurement", () => {
     )
   })
 
-  it("exposes the complete fixed-header and safe-area variable contract", () => {
+  it("carries the published fixed-header mode on the root itself", () => {
+    act(() => root.render(<ScrollRoot>content</ScrollRoot>))
+    const scrollRoot = () =>
+      container.querySelector("[data-scroll-root]") as HTMLElement
+    expect(scrollRoot().hasAttribute("data-fixed-header")).toBe(false)
+
     act(() => {
       root.render(
-        <ScrollRoot>
-          <header data-fixed-header="never" />
-        </ScrollRoot>
+        <ScrollRootFixedHeaderProvider value="never">
+          <ScrollRoot>content</ScrollRoot>
+        </ScrollRootFixedHeaderProvider>
       )
     })
+    expect(scrollRoot().getAttribute("data-fixed-header")).toBe("never")
+  })
+
+  it("exposes the complete fixed-header and safe-area variable contract", () => {
+    act(() => root.render(<ScrollRoot>content</ScrollRoot>))
 
     const scrollRoot = container.querySelector(
       "[data-scroll-root]"
     ) as HTMLElement
 
+    // Plain attribute variants on the root, never a descendant :has().
+    expect(scrollRoot.className).not.toContain("has-")
     expect(scrollRoot.className).toContain(
-      "has-data-[fixed-header=never]:[--sticky-padding-top:0px]"
+      "data-[fixed-header=never]:[--sticky-padding-top:0px]"
     )
     expect(scrollRoot.className).toContain(
-      "has-data-[fixed-header=less-than-md]:md:[--sticky-padding-top:0px]"
+      "data-[fixed-header=less-than-md]:md:[--sticky-padding-top:0px]"
     )
     expect(scrollRoot.className).toContain(
-      "has-data-[fixed-header=less-than-xl]:@w-xl/main:[--sticky-padding-top:0px]"
+      "data-[fixed-header=less-than-xl]:@w-xl/main:[--sticky-padding-top:0px]"
     )
     expect(scrollRoot.className).toContain(
-      "has-data-[fixed-header=less-than-xxl]:@w-2xl/main:[--sticky-padding-top:0px]"
+      "data-[fixed-header=less-than-xxl]:@w-2xl/main:[--sticky-padding-top:0px]"
     )
     expect(scrollRoot.className).toContain(
       "[--scroll-root-safe-area-inset-bottom:calc(var(--sticky-padding-bottom)+var(--screen-keyboard-height,0px)+env(safe-area-inset-bottom,0px))]"

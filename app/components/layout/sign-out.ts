@@ -1,6 +1,7 @@
 "use client"
 
 import { toast } from "@/components/ui/toast"
+import { clearPersistedWindow } from "@/lib/chat-store/chats/persisted-window"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 
 type SignOut = (options?: { returnTo?: string }) => Promise<void>
@@ -31,7 +32,13 @@ export async function signOutAndClearLocalState({
   signOut,
   returnTo = "/",
 }: SignOutAndClearLocalStateOptions) {
-  const cleanupTasks = [resetMessages, resetChats, clearAllIndexedDBStores]
+  const cleanupTasks = [
+    resetMessages,
+    resetChats,
+    clearAllIndexedDBStores,
+    // The signed-in sidebar window (ADR-0048) stores chat titles on device.
+    async () => clearPersistedWindow(),
+  ]
   for (const cleanupTask of cleanupTasks) {
     try {
       await cleanupTask()
