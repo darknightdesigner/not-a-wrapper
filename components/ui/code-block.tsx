@@ -5,6 +5,7 @@
  */
 "use client"
 
+import { createScrollRootIntersectionObserver } from "@/lib/dom/scroll-root-intersection"
 import { peekCachedHighlight } from "@/lib/markdown/highlight-cache"
 import {
   highlightCode,
@@ -12,7 +13,29 @@ import {
 } from "@/lib/markdown/shiki-client"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
-import React, { useEffect, useState, useSyncExternalStore } from "react"
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react"
+
+/** The `CodeBlock` box (the content-visibility element in Markdown). */
+const CodeBlockBoxContext =
+  createContext<React.RefObject<HTMLDivElement | null> | null>(null)
+
+/**
+ * Visible code first (ADR-0016): an uncached block highlights once its box
+ * comes within two screens of the view. The box, not the code inside it:
+ * content-visibility skips the inner layout, which caps the lookahead.
+ */
+const nearViewObserver = createScrollRootIntersectionObserver({
+  rootMargin: "200% 0px",
+  threshold: 0,
+  withoutScrollRoot: "viewport",
+})
 
 export type CodeBlockProps = {
   children?: React.ReactNode
@@ -20,19 +43,23 @@ export type CodeBlockProps = {
 } & React.HTMLProps<HTMLDivElement>
 
 function CodeBlock({ children, className, ...props }: CodeBlockProps) {
+  const boxRef = useRef<HTMLDivElement>(null)
   // Source-fidelity box: 24px radius and asymmetric flow margins. The derived
   // 3xl token is 22px, so the literal radius is intentional.
   return (
-    <div
-      className={cn(
-        "not-prose relative mt-4 mb-1 flex w-full flex-col overflow-clip border",
-        "border-border bg-card text-card-foreground rounded-[24px]",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
+    <CodeBlockBoxContext.Provider value={boxRef}>
+      <div
+        ref={boxRef}
+        className={cn(
+          "not-prose relative mt-4 mb-1 flex w-full flex-col overflow-clip border",
+          "border-border bg-card text-card-foreground rounded-[24px]",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    </CodeBlockBoxContext.Provider>
   )
 }
 
@@ -73,6 +100,8 @@ function CodeBlockCode({
   const theme: ShikiClientTheme =
     appTheme === "dark" ? "github-dark" : "github-light"
   const [highlighted, setHighlighted] = useState<HighlightedCode | null>(null)
+  const boxRef = useContext(CodeBlockBoxContext)
+  const ownRef = useRef<HTMLDivElement>(null)
   // The server never has cached HTML, so hydration renders the plain path
   // and only client renders read the cache.
   const canReadCache = useSyncExternalStore(
@@ -93,18 +122,36 @@ function CodeBlockCode({
     // Lazy service (ADR-0016 "Lazy Shiki"): Shiki core, themes, and the
     // grammar load on first demand; unknown/plain ids resolve to `text`. The
     // service emits the `shiki_highlight` mark for real Shiki runs only.
-    highlightCode({ code, language, theme, signal: controller.signal }).then(
-      (html) => {
-        if (controller.signal.aborted) return
-        setHighlighted({ code, language, theme, html })
-      },
-      () => {
-        // Module or grammar loading failed: keep the React-escaped plain
-        // fallback for this tuple; a later input change retries.
-      }
-    )
-    return () => controller.abort()
-  }, [code, language, theme, growing])
+    const highlight = () => {
+      highlightCode({ code, language, theme, signal: controller.signal }).then(
+        (html) => {
+          if (controller.signal.aborted) return
+          setHighlighted({ code, language, theme, html })
+        },
+        () => {
+          // Module or grammar loading failed: keep the React-escaped plain
+          // fallback for this tuple; a later input change retries.
+        }
+      )
+    }
+    // Cache hits stay immediate; a miss waits until its box nears the view.
+    const target = boxRef?.current ?? ownRef.current
+    if (!target || peekCachedHighlight({ code, language, theme }) !== null) {
+      highlight()
+      return () => controller.abort()
+    }
+    // observe() reports synchronously when IntersectionObserver is missing.
+    let stopObserving = () => {}
+    stopObserving = nearViewObserver.observe(target, (near) => {
+      if (!near) return
+      stopObserving()
+      highlight()
+    })
+    return () => {
+      controller.abort()
+      stopObserving()
+    }
+  }, [code, language, theme, growing, boxRef])
 
   // Captured code text metrics: 14px / 24px (0.875em at 1.71429), 20px inline
   // padding, 12px block padding; the container's card surface shows through.
@@ -134,12 +181,13 @@ function CodeBlockCode({
   // in the same wrapper, so `<script>`-like content renders as text.
   return html !== null ? (
     <div
+      ref={ownRef}
       className={classNames}
       dangerouslySetInnerHTML={{ __html: html }}
       {...props}
     />
   ) : (
-    <div className={classNames} {...props}>
+    <div ref={ownRef} className={classNames} {...props}>
       <pre>
         <code>{code ?? ""}</code>
       </pre>

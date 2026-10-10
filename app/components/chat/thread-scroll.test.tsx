@@ -13,7 +13,6 @@ import {
 } from "vitest"
 import {
   createTurnCenterIntersectionObserver,
-  createTurnIntersectionObserver,
   ThreadScrollEdge,
   TURN_CENTER_INTERSECTION_ROOT_MARGIN,
   TURN_CENTER_INTERSECTION_THRESHOLD,
@@ -175,39 +174,6 @@ describe("thread scroll contract", () => {
     }
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
-  })
-
-  it("gates the shared observer by threshold and tears down per scroll root", () => {
-    const turn = document.createElement("div")
-    container.appendChild(turn)
-    const onChange = vi.fn()
-    const observer = createTurnIntersectionObserver({
-      rootMargin: "10px",
-      threshold: 0.5,
-    })
-
-    const cleanup = observer.observe(turn, onChange)
-    const instance = IntersectionObserverStub.instances[0]
-    expect(instance?.root).toBe(container)
-    expect(instance?.rootMargin).toBe("10px")
-    expect(instance?.thresholds).toEqual([0.5])
-
-    instance?.trigger({
-      intersectionRatio: 0.499,
-      isIntersecting: true,
-      target: turn,
-    })
-    expect(onChange.mock.calls.at(-1)?.[0]).toBe(false)
-    instance?.trigger({
-      intersectionRatio: 0.5,
-      isIntersecting: true,
-      target: turn,
-    })
-    expect(onChange.mock.calls.at(-1)?.[0]).toBe(true)
-
-    cleanup()
-    expect(instance?.unobserve).toHaveBeenCalledWith(turn)
-    expect(instance?.disconnect).toHaveBeenCalledOnce()
   })
 
   it("shares the exact center-band observer per scroll root", () => {
