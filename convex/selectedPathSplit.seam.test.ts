@@ -1,6 +1,7 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
 import { describe, expect, it } from "vitest"
+import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import {
   createToolApprovalRequestForChat,
@@ -104,23 +105,32 @@ async function snapshot(t: T) {
   return new Map(rows)
 }
 
-/** History, the live message, and the unbounded path they must merge into. */
-const views = (t: T, reads?: ReadSet) =>
-  t.withIdentity({ subject: OWNER }).run(async (ctx) => {
+/** History, the live message, and the resume route's whole path they must merge into. */
+async function views(t: T, reads?: ReadSet) {
+  const owner = t.withIdentity({ subject: OWNER })
+  const view = await owner.run(async (ctx) => {
     const recorded = reads ? ({ ...ctx, db: recordReads(ctx.db, reads) } as Ctx) : ctx
     const subscribed = await resolveReadableChatByPublicId(recorded, CHAT)
     const history = await getSelectedPathForViewer(recorded, {
       chat: subscribed.chat,
       viewer: subscribed.user,
+      splitLiveTail: true,
     })
     const { chat, user } = await resolveReadableChatByPublicId(ctx, CHAT)
     const live = await getLiveMessageForViewer(ctx, { chat, viewer: user })
-    const full = await getSelectedPathForViewer(ctx, { chat, viewer: user, unbounded: true })
     // The client's merge (MessagesProvider).
     const appendsLive = live !== null && live._id === history.liveMessageId
     const merged = appendsLive ? [...history.selectedMessages, live] : history.selectedMessages
-    return { history, live, merged, full: full.selectedMessages, liveTail: chat?.liveTail }
+    return { history, live, merged, liveTail: chat?.liveTail }
   })
+  const resume = await owner.query(api.messages.getResumeSelection, { chatId: CHAT })
+  // A client from before the split omits the flag and keeps the whole path.
+  expect(await owner.query(api.messages.getSelectedPath, { chatId: CHAT })).toEqual({
+    selectedMessages: resume.selectedMessages,
+    liveMessageId: null,
+  })
+  return { ...view, full: resume.selectedMessages }
+}
 
 async function seed(t: T) {
   return t.run(async (ctx) => {
@@ -324,7 +334,7 @@ describe("live-tail split", () => {
         let liveId: Id<"messages"> | undefined
         for (let step = 0, steps = 2 + Math.floor(random() * 6); step < steps; step++) {
           const [chat, viewer] = [await ctx.db.get(chatId), await ctx.db.get(userId)]
-          const path = (await getSelectedPathForViewer(ctx, { chat, viewer, unbounded: true })).selectedMessages
+          const path = (await getSelectedPathForViewer(ctx, { chat, viewer })).selectedMessages
           // A path message's parent is the message before it.
           const parentOf = (role: "user" | "assistant") => {
             const index = path.indexOf(pick(path.filter((m) => m.role === role)))

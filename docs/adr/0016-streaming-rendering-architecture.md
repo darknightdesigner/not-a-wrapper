@@ -1,6 +1,7 @@
 # 16. Streaming rendering: direct HTTP foreground, incremental projection, Convex durability
 
-- Status: accepted (2026-07-27), amended (2026-07-31, 2026-09-07)
+- Status: accepted (2026-07-27), amended (2026-07-31, 2026-09-07, 2026-10-09,
+  2026-10-10)
 - Date: 2026-07-27
 - Extended by ADR-0039: authenticated retained-stream replay feeds the same
   SDK rendering state after refresh. Saved text restores immediately; historical
@@ -201,7 +202,8 @@ block top first. Investigation and raw data:
   lookahead because the skipped subtree has no fresh layout. In a fast fling
   (2,000 px per 100 ms) the inner target showed 6 blocks plain (longest 42 ms
   at 1x, 155 ms at 4x); the box showed 1 (5 ms, 40 ms). A one-screen margin
-  showed 10 plain blocks against 6 for two screens (n=5).
+  showed 10 plain blocks against 6 for two screens (n=5). Code nested inside
+  another contained block (a blockquote) still gets the shorter lookahead.
 - **Newest-first queue.** `highlightCode` takes a sequence number when it is
   called, so order follows calls, not grammar arrival. The drain still yields
   two `MessageChannel` hops per block, waits a frame while
@@ -220,7 +222,11 @@ Measured on a scratch route that renders fixed chats through the real
 content-visibility CSS), headless Chromium, n=10 per arm per throttle. TTVH is
 thread mount to the first frame where every code block in view is highlighted.
 The route lacks the sidebar, composer hydration, and Convex delivery, so times
-are lower bounds; the signed-in CI pair on `/c/[id]` decides the gain.
+are lower bounds; the signed-in CI pair on `/c/[id]` decides the gain. The
+visible-first column is the investigation prototype (observing the code, one
+screen of margin). Re-measured on the shipped gate (the box, two screens, n=6),
+the worst case took 303 / 1,375 ms TTVH and held 11,539 DOM nodes with 27
+highlights after the same scroll and a jump to the top.
 
 | Fixture                                   | Metric                                             | First in, first out |  Visible first |
 | ----------------------------------------- | -------------------------------------------------- | ------------------: | -------------: |

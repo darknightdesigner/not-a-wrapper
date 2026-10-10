@@ -11,7 +11,6 @@ import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
 import {
   closestScrollRoot,
   createScrollRootIntersectionObserver,
-  type ScrollRootIntersectionObserver,
 } from "@/lib/dom/scroll-root-intersection"
 import { noteChatProgrammaticScroll } from "@/lib/observability/chat-ui-events"
 import { useCallback, useRef, useState } from "react"
@@ -88,8 +87,6 @@ export function addScrollEndListener(
 }
 export const TURN_CENTER_INTERSECTION_ROOT_MARGIN = "-49% 0px -49% 0px"
 export const TURN_CENTER_INTERSECTION_THRESHOLD = 0
-
-export type TurnIntersectionObserver = ScrollRootIntersectionObserver
 
 export function createTurnCenterIntersectionObserver() {
   return createScrollRootIntersectionObserver({

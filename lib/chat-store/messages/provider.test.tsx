@@ -291,21 +291,27 @@ describe("MessagesProvider local chat hydration", () => {
     const capture: { current: ReturnType<typeof useMessages> | null } = {
       current: null,
     }
+    const rerender = () =>
+      act(() =>
+        root?.render(
+          <MessagesProvider>
+            <MessagesSnapshot captureRef={capture} />
+          </MessagesProvider>
+        )
+      )
     deliver("live")
     renderProvider(capture)
     expect(capture.current?.messages.map((m) => [m.id, m.content])).toEqual([
       ["history", "history"],
       ["live", "live"],
     ])
+    // History that stopped before the live message is not a whole render.
+    convexMocks.queryValues["messages:getLiveMessage"] = undefined
+    rerender()
+    expect(capture.current?.isLoading).toBe(true)
     // A full-path read (no tail handshake) already holds every message.
     deliver(null)
-    act(() =>
-      root?.render(
-        <MessagesProvider>
-          <MessagesSnapshot captureRef={capture} />
-        </MessagesProvider>
-      )
-    )
+    rerender()
     expect(capture.current?.messages.map((m) => m.id)).toEqual(["history"])
   })
 

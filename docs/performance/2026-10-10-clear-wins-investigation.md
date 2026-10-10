@@ -5,6 +5,21 @@ Each one got a benchmark that shows the problem, a scratch prototype, and an
 adversarial review. No product code was changed. This document is the hand-off
 to implementation agents: one PR per win, in the order at the end.
 
+**Outcome (2026-10-10).** All five wins shipped together in one PR, and the
+decisions below were made. Where each one is recorded:
+
+- **PostHog privacy and recorders:** recordings mask all text in client code
+  (`lib/analytics/deferred-analytics.ts`), not as a project setting, and both
+  recorders stay (ADR-0050).
+- **Win 2:** the chosen guest-at-limit design shipped and the signed-in
+  998th-message toast is gone (ADR-0045 amendment).
+- **Win 5:** visible code first with no fade (ADR-0016, "Visible code first").
+- **Win 1:** the live-tail split is opt-in (`getSelectedPath` with
+  `splitLiveTail`), so clients from before it keep the whole path (ADR-0027
+  amendment).
+- **Win 3:** the signed-in browser census is deferred; the seam test is the
+  ratchet (ADR-0049).
+
 ## Summary
 
 | Win | Verdict | Headline evidence | Needs the user |

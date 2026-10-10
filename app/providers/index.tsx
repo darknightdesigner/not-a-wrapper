@@ -4,7 +4,7 @@ import type { NoUserInfo, UserInfo } from "@workos-inc/authkit-nextjs"
 import { AuthKitProvider } from "@workos-inc/authkit-nextjs/components"
 import { ReactNode } from "react"
 import { ConvexClientProvider } from "./convex-client-provider"
-import { PostHogProvider } from "./posthog-provider"
+import { PostHogPageView } from "./posthog-pageview"
 
 type ProvidersProps = {
   children: ReactNode
@@ -14,9 +14,8 @@ type ProvidersProps = {
 export function Providers({ children, initialAuth }: ProvidersProps) {
   return (
     <AuthKitProvider initialAuth={initialAuth}>
-      <PostHogProvider>
-        <ConvexClientProvider>{children}</ConvexClientProvider>
-      </PostHogProvider>
+      <PostHogPageView />
+      <ConvexClientProvider>{children}</ConvexClientProvider>
     </AuthKitProvider>
   )
 }

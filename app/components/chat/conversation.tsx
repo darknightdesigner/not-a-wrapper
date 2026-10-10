@@ -14,6 +14,7 @@ import type {
   EditTurnResult,
   RegenerationTurnOverrides,
 } from "@/lib/chat-turn/chat-turn-controller"
+import type { ScrollRootIntersectionObserver } from "@/lib/dom/scroll-root-intersection"
 import { cn } from "@/lib/utils"
 import { UIMessage as MessageType } from "@ai-sdk/react"
 import {
@@ -37,7 +38,6 @@ import {
   ThreadScrollEdge,
   useConversationTurnObservation,
   useSubmitTurnScrollRef,
-  type TurnIntersectionObserver,
 } from "./thread-scroll"
 import type { ThreadScrollTarget } from "./thread-scroll-target"
 import {
@@ -105,7 +105,7 @@ function TurnRow({
   dataTurnId: string
   dataTestId?: string
   beforeTurn?: ReactNode
-  centerIntersectionObserver: TurnIntersectionObserver
+  centerIntersectionObserver: ScrollRootIntersectionObserver
   isEditing?: boolean
   hasDisplayableContent?: boolean
   onCenterIntersectionChange?: (turnId: string, intersecting: boolean) => void

@@ -1,48 +1,40 @@
 import { fetchGuestUsage } from "@/lib/api"
 
 /**
- * Usage hint (ADR-0045): the guest's remaining daily turns, read while they
- * type so Send can gate a known zero without a round trip. A plain module
+ * Guest usage hint (ADR-0045): the guest's remaining daily turns, read while
+ * they type so Send can gate a known zero without a round trip. A plain module
  * value, not React state or a store, so nothing subscribes or re-renders.
- * Keyed by owner: a value read for one owner never answers for another, and
- * only guests read one. A hint only; `/api/chat` admission enforces.
+ * Guest-only: `runSendTurn` never consults it for a signed-in send. A hint
+ * only; `/api/chat` admission enforces.
  */
-
-export const GUEST_USAGE_OWNER = "guest"
 
 // Fresh until the earlier of this or the next UTC midnight (when allowances
 // reset), so a stale zero never blocks a new day.
 const HINT_TTL_MS = 5 * 60_000
 const DAY_MS = 86_400_000
 
-type UsageHint = { ownerKey: string; remaining: number; observedAt: number }
-
-let hint: UsageHint | null = null
+let hint: { remaining: number; observedAt: number } | null = null
 let pendingRead: Promise<number | null> | null = null
 let lastPrefetchAt = Number.NEGATIVE_INFINITY
 
-/** The owner's fresh remaining turns, or null when none is known. */
-export function readUsageHint(
-  ownerKey: string,
-  now = Date.now()
-): number | null {
-  if (hint?.ownerKey !== ownerKey) return null
+/** The guest's fresh remaining turns, or null when none is known. */
+export function readGuestUsageHint(now = Date.now()): number | null {
+  if (!hint) return null
   const nextUtcMidnight = (Math.floor(hint.observedAt / DAY_MS) + 1) * DAY_MS
   const expiresAt = Math.min(hint.observedAt + HINT_TTL_MS, nextUtcMidnight)
   return now < expiresAt ? hint.remaining : null
 }
 
-export function recordUsageHint(
-  ownerKey: string,
+export function recordGuestUsageHint(
   remaining: number,
   now = Date.now()
 ): void {
-  hint = { ownerKey, remaining, observedAt: now }
+  hint = { remaining, observedAt: now }
 }
 
 /** One admitted turn spent. The expiry stays tied to the server read. */
-export function spendUsageHint(ownerKey: string): void {
-  if (hint?.ownerKey !== ownerKey) return
+export function spendGuestUsageHint(): void {
+  if (!hint) return
   hint = { ...hint, remaining: Math.max(0, hint.remaining - 1) }
 }
 
@@ -51,7 +43,7 @@ export function spendUsageHint(ownerKey: string): void {
 export function loadGuestUsageHint(): Promise<number | null> {
   pendingRead ??= fetchGuestUsage()
     .then((remaining) => {
-      recordUsageHint(GUEST_USAGE_OWNER, remaining)
+      recordGuestUsageHint(remaining)
       return remaining
     })
     .catch(() => null)

@@ -69,6 +69,7 @@ describe("createScrollRootIntersectionObserver", () => {
     const observer = createScrollRootIntersectionObserver({
       rootMargin: "10px",
       threshold: 0.5,
+      withoutScrollRoot: "intersecting",
     })
 
     const cleanup = observer.observe(target, onChange)
@@ -95,6 +96,7 @@ describe("createScrollRootIntersectionObserver", () => {
     createScrollRootIntersectionObserver({
       rootMargin: "0px",
       threshold: 0,
+      withoutScrollRoot: "intersecting",
     }).observe(target, turnChange)
     expect(turnChange).toHaveBeenCalledExactlyOnceWith(true)
     expect(IntersectionObserverStub.instances).toHaveLength(0)

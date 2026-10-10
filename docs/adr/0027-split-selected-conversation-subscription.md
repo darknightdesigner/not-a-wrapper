@@ -127,19 +127,27 @@ re-run's full value and skips only identical results.
 server-only pointer on the chat, `chats.liveTail`
 (`{ messageId, orderId, parentMessageId }`):
 
-- **History** (`getSelectedPath`, same name and args) reads `by_chat_order`
-  with `orderId < liveTail.orderId`. It checks itself: when its walk does not
-  end on `liveTail.parentMessageId` it re-reads the whole path and returns
-  `liveMessageId: null`; otherwise `liveMessageId` names the live message.
+- **History** (`getSelectedPath` with `splitLiveTail: true`) reads
+  `by_chat_order` with `orderId < liveTail.orderId`. It checks itself: when
+  its walk does not end on `liveTail.parentMessageId` it re-reads the whole
+  path and returns `liveMessageId: null`; otherwise `liveMessageId` names the
+  live message.
+- **Opt-in.** Without the flag, `getSelectedPath` returns the whole path with
+  `liveMessageId: null`, as before the split. A client from before it keeps
+  the live message on its path: a tab left open across a deploy, and the
+  paired perf base arm (and the weekly pair's `HEAD^`) on the one shared
+  deployment. A flag-free history would break them: the run would never be
+  on their delivered path while it streams, so Stop would abort only locally
+  and the old resume route would return 404.
 - **Live** (`getLiveMessage`) reads the chat, the live message and its
   `by_chat_parent` sibling range, and returns the message with its branch
   descriptor, or null when it is gone, moved, deselected or not yet visible.
 - **Client.** `MessagesProvider` appends the live message only when its id
   equals `liveMessageId`, so it is never duplicated or misplaced, and maps
   history and live separately. `isLoading` waits for all three queries. The
-  same-transition basis above covers them unchanged: three queries, `chatId`
-  only, one client. A warm-cache entry that was evicted and re-subscribed
-  still receives values at the client's current timestamp.
+  same-transition basis above covers them unchanged: three queries keyed by
+  one `chatId`, one client. A warm-cache entry that was evicted and
+  re-subscribed still receives values at the client's current timestamp.
 - **Stamp.** Prepare resolves `resolveLiveTail(messages, liveId)`
   (`convex/domain/message_branches.ts`) in every branch (send and edit,
   regenerate, approval continuation) from the messages it already holds, and
@@ -180,8 +188,11 @@ server-only pointer on the chat, `chats.liveTail`
 - The warm cache cap is 48 (16 chats times 3). Eviction is per entry, so a
   chat can lose one of its three and then opens in a loading state like any
   miss.
-- A client without `getLiveMessage` (an older deploy) shows the live answer
-  only when the run settles; the sending tab streams it locally either way.
+- Deploys ship the backend first, so older clients meet the new backend and
+  the opt-in keeps them whole. A client newer than its backend fails on the
+  missing `getLiveMessage` and `getResumeSelection`, so the paired perf run
+  needs the branch's functions on its deployment
+  (`benchmarks/chat-performance/browser/README.md`).
 - Proof: `convex/selectedPathSplit.seam.test.ts`. A flow test runs the real
   prepare for sends, a regenerate, a branch switch, a mid-path edit, an
   approval pause and continuation, a supersede and a Stop; after every real
@@ -190,3 +201,4 @@ server-only pointer on the chat, `chats.liveTail`
   history's recorded read set. A property loop over 120 seeded branch trees
   with legacy rows and stale flags (35 refused at stamp, 78 bounded, 7
   self-check fallbacks) finds the merged path equal to the whole path in all.
+  Both check that the flag-free read is that whole path.

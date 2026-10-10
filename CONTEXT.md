@@ -33,7 +33,7 @@ The single client seam — a `usePerUserQuery` hook — every per-user Convex li
 _Avoid_: skip gate, auth ternary, guarded query
 
 **Warm query cache**:
-The convex-helpers query cache mounted at the Convex client boundary (ADR-0031) with a bounded idle TTL and idle-entry cap, so a revisited chat renders its delivered selected-conversation pair on the first commit instead of a loading state. Warming (`useWarmSelectedConversation`, wired to sidebar row hover and click) is a momentary start/end through the cache registry — the same state a consumer leaves on unmount — never a second delivery path: values still flow through the one `ConvexReactClient`, so the ADR-0027 same-transition guarantee holds. It is in-memory only; nothing survives a reload.
+The convex-helpers query cache mounted at the Convex client boundary (ADR-0031) with a bounded idle TTL and idle-entry cap, so a revisited chat renders its delivered selected-conversation queries (path, run state, **Live tail**) on the first commit instead of a loading state. Warming (`useWarmSelectedConversation`, wired to sidebar row hover and click) is a momentary start/end through the cache registry (the same state a consumer leaves on unmount), never a second delivery path: values still flow through the one `ConvexReactClient`, so the ADR-0027 same-transition guarantee holds. It is in-memory only; nothing survives a reload.
 _Avoid_: preloadQuery (the server seam), local-first store, persisted cache
 
 **Client directive**:
@@ -131,6 +131,11 @@ _Status_: implemented 2026-07-23 (async jobs), account jobs 2026-09-27.
 **Selected path**:
 The backend-derived linear path through a chat's message branches used for rendering and model history. Hidden sibling branches stay stored but are not sent to the model until selected.
 _Avoid_: visible messages, active transcript
+
+**Live tail**:
+The streaming assistant message a run writes every checkpoint, split off the **Selected path** read so checkpoints re-send one message instead of the whole path (ADR-0027 amendment). Prepare stamps a server-only `chats.liveTail` pointer only when the path is provably the history followed by that message (`resolveLiveTail`); the run-scoped status projection clears it on completed, failed and aborted, and a branch select clears it. While it is set, `getSelectedPath` with `splitLiveTail` returns the history before it (falling back to the whole path when its walk does not end on the tail's parent) and `getLiveMessage` returns the message alone; the client appends the live message only when its id matches the history's `liveMessageId`. Without the flag `getSelectedPath` returns the whole path, so clients from before the split keep working. Proved by `convex/selectedPathSplit.seam.test.ts`.
+_Avoid_: active message, streaming cursor, sending the boundary as a query argument (an argument-dependent subscription)
+_Status_: implemented 2026-10-10.
 
 **Branch projection**:
 The single client seam that installs the backend's selected path into the AI SDK's flat `useChat` array while a chat is idle: it adopts server ids and branch state onto matching live messages, preserves in-flight optimistic sends, and swaps wholesale when the path diverged (a branch switch, or restoring messages a rejected edit/regeneration sliced out). It is the sole owner of client identity adoption — matching by message identity across the full selected path (not a positional tail patch) and reading server ids through one typed accessor (`readServerMessageId` in `lib/chat-messages/branch.ts`). The client renders the server's selected path; it does not re-derive it. See `docs/adr/0001-client-renders-server-selected-path.md`.

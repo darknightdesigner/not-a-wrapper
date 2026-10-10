@@ -220,6 +220,14 @@ Fork PRs receive no credentials. Setup requires the
 existing `PERF_ENV_FILE` and `PERF_AUTH_PASSWORD` GitHub secrets and valid reference
 captures under the selected policy. Results upload even on failure.
 
+Both arms run against the one Convex deployment in `PERF_ENV_FILE`, and the
+workflow deploys no functions, so it runs whatever was last pushed there
+(normally main). When a PR changes `convex/`, the workflow warns: the signed-in
+pair is valid only after the owner deploys the branch's `convex/` to that
+deployment (agents must not), and main's functions go back afterwards. The new
+backend must still serve the merge-base client, so change public functions
+additively: a new function, or an opt-in argument (ADR-0027's `splitLiveTail`).
+
 ## Diagnostics outside the core gate
 
 `composer-shell.ts` remains the specialized saved-label/CLS/TTFB check.

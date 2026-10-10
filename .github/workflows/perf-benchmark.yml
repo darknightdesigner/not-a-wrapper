@@ -25,6 +25,12 @@ on:
       - "lib/chat-store/messages/**"
       - "lib/chat-store/chats/**"
       - "lib/observability/**"
+      # Cold load, send dispatch, and thread open (ADR-0050, ADR-0045, ADR-0016).
+      - "lib/analytics/**"
+      - "app/providers/**"
+      - "lib/chat-turn/**"
+      - "lib/convex/**"
+      - "lib/dom/**"
       - "benchmarks/chat-performance/**"
       - "instrumentation-client.ts"
       - ".github/workflows/perf-benchmark.yml"
@@ -140,6 +146,10 @@ jobs:
         run: |
           COMMON_BASE=$(git merge-base "$PR_BASE_SHA" HEAD)
           echo "PERF_COMPARE_REF=$COMMON_BASE" >> "$GITHUB_ENV"
+          # Both arms share the PERF_ENV_FILE deployment, which this job never deploys.
+          if ! git diff --quiet "$COMMON_BASE" HEAD -- convex ':(exclude)*.test.ts'; then
+            echo "::warning title=Convex functions changed::Both arms run against the PERF_ENV_FILE deployment's current functions, not this branch's. The signed-in pair is valid only after the owner deploys this branch's convex/ there (see benchmarks/chat-performance/browser/README.md)."
+          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2

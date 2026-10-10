@@ -17,7 +17,7 @@ Extend the existing measurement system instead of building a parallel one. Check
 
 - Policy and protocol: [ADR-0037](../../../docs/adr/0037-chat-responsiveness-measurement.md), [metric dictionary](../../../docs/performance/metric-dictionary.md), [measurement runbook](../../../docs/performance/measurement-runbook.md), [harness README](../../../benchmarks/chat-performance/browser/README.md).
 - Wall clock: `bun run bench:browser` (browser journeys), `bun run bench:chat` (Node render benches).
-- Deterministic ratchets ([ADR-0049](../../../docs/adr/0049-deterministic-count-and-payload-ratchets.md)): `bun run bench:counts`, gated against the merge base by `run-paired.ts`; exact read bytes in `convex/payloadBudgets.seam.test.ts`.
+- Deterministic ratchets ([ADR-0049](../../../docs/adr/0049-deterministic-count-and-payload-ratchets.md)): `bun run bench:counts`, gated against the merge base by `run-paired.ts`; exact read bytes in `convex/payloadBudgets.seam.test.ts`; initial JS bytes and late-only analytics in `scripts/check-initial-js.ts` (CI Build job, [ADR-0050](../../../docs/adr/0050-analytics-load-after-the-composer-handoff.md)); pre-dispatch requests in the paired comparison.
 - Pre-hydration composer guardrail: `benchmarks/chat-performance/browser/composer-handoff.ts` ([ADR-0047](../../../docs/adr/0047-pre-hydration-composer-input.md)).
 - Production builds: `NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true NEXT_DIST_DIR=.next-perf bun run build:next`. Never `bun run build`: it deploys production Convex.
 

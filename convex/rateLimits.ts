@@ -26,10 +26,11 @@ import { authenticatedMutation } from "./lib/authedFunctions"
  * The public `consume` derives its actor key from `ctx.user` (never a client
  * argument), so a caller cannot throttle-evade by spoofing an id. Policy is
  * resolved by allowlisted bucket on the server, so public mutation callers
- * cannot reset allowance by choosing a different limit or window. Guest turn
- * windows (convex/usage.ts) use the same table through `readFixedWindow` /
- * `commitFixedWindow`. Stale buckets are swept on write, and the
- * `sweepExpiredLimiterRows` cron removes rows whose actor never returns.
+ * cannot reset allowance by choosing a different limit or window. Guest and
+ * signed-in turn windows (convex/usage.ts) use the same table through
+ * `readFixedWindow` / `commitFixedWindow`. Stale buckets are swept on write,
+ * and the `sweepExpiredLimiterRows` cron removes rows whose actor never
+ * returns.
  */
 
 export const API_RATE_LIMIT_POLICIES = {

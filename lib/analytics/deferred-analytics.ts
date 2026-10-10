@@ -75,7 +75,8 @@ function loadAnalytics() {
           capture_pageview: false,
           // Document scroll-depth analytics force layout during nested chat scrolling.
           disable_scroll_properties: true,
-          // Chat text is user content: recordings keep layout, never text or input values.
+          // Chat text is user content: recordings mask text nodes and input
+          // values. Attribute values (an `aria-label` with a chat title) are not.
           session_recording: { maskTextSelector: "*", maskAllInputs: true },
           ...(chatUiBenchmark ? { disable_session_recording: true } : {}),
         })

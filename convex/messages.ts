@@ -92,13 +92,13 @@ function toSelectedMessage(
   }
 }
 
-/** Reads a chat's messages in order, optionally only those before `before`. */
-async function readSelectedPath(
-  ctx: Pick<QueryCtx, "db">,
+/** A chat's messages in `orderId` order, or only those before `before`. */
+export async function listMessagesByChatOrder(
+  ctx: Pick<QueryCtx | MutationCtx, "db">,
   chatId: Id<"chats">,
-  before?: number
+  { before }: { before?: number } = {}
 ) {
-  const messages = await ctx.db
+  return await ctx.db
     .query("messages")
     .withIndex("by_chat_order", (q) =>
       before === undefined
@@ -106,22 +106,16 @@ async function readSelectedPath(
         : q.eq("chatId", chatId).lt("orderId", before)
     )
     .collect()
+}
+
+/** The selected path through `messages`, with the branch context it walked. */
+function walkSelectedPath(messages: Doc<"messages">[]) {
   const context = createBranchContext(messages)
   return {
     messages,
     context,
     path: getSelectedPathMessagesFromContext(context),
   }
-}
-
-export async function listMessagesByChatOrder(
-  ctx: Pick<QueryCtx | MutationCtx, "db">,
-  chatId: Id<"chats">
-) {
-  return await ctx.db
-    .query("messages")
-    .withIndex("by_chat_order", (q) => q.eq("chatId", chatId))
-    .collect()
 }
 
 // Selected-conversation projections.
@@ -167,21 +161,22 @@ export type SelectedPathProjection = Infer<typeof vSelectedPathProjection>
 /**
  * The selected visible path and nothing run-shaped. Its read set is
  * chats/projects/users/messages only, so run-doc writes do not re-execute it.
- * While a run streams it is the history: it reads only messages ordered
- * before the chat's live tail, so checkpoint writes to the live message stay
- * outside its read set and `getLiveMessage` carries that message alone.
- * `unbounded` (the resume route's one-shot read) takes the whole path.
+ * With `splitLiveTail` (the subscribed history) it reads only messages
+ * ordered before the chat's live tail while a run streams, so checkpoint
+ * writes to the live message stay outside its read set and `getLiveMessage`
+ * carries that message alone. Without it, the whole path, live message
+ * included.
  */
 export async function getSelectedPathForViewer(
   ctx: QueryCtx,
   {
     chat,
     viewer,
-    unbounded = false,
+    splitLiveTail = false,
   }: {
     chat: Doc<"chats"> | null
     viewer: Doc<"users"> | null
-    unbounded?: boolean
+    splitLiveTail?: boolean
   }
 ): Promise<SelectedPathProjection> {
   // The builder hands only the owner a chat; strangers read shares through
@@ -189,13 +184,15 @@ export async function getSelectedPathForViewer(
   if (!chat || viewer === null || chat.userId !== viewer._id) {
     return { selectedMessages: [], liveMessageId: null }
   }
-  const liveTail = unbounded ? undefined : chat.liveTail
-  let read = await readSelectedPath(ctx, chat._id, liveTail?.orderId)
+  const liveTail = splitLiveTail ? chat.liveTail : undefined
+  let read = walkSelectedPath(
+    await listMessagesByChatOrder(ctx, chat._id, { before: liveTail?.orderId })
+  )
   let liveMessageId = liveTail?.messageId ?? null
   // Self-check: the bounded walk must end on the live message's parent, or
   // appending it would misplace it. Fall back to the whole path.
   if (liveTail && read.path.at(-1)?._id !== liveTail.parentMessageId) {
-    read = await readSelectedPath(ctx, chat._id)
+    read = walkSelectedPath(await listMessagesByChatOrder(ctx, chat._id))
     liveMessageId = null
   }
   const selectedMessages = read.path
@@ -266,8 +263,8 @@ export async function getLiveMessageForViewer(
  * ownership and the points-back check stay server-side; the on-selected-path
  * half lives in the client, which is sound because the selected-conversation
  * queries' values always come from one Convex transition (same client, same
- * `chatId`-only arguments) — the provider nulls the run when its assistant
- * message is absent from the delivered path.
+ * `chatId`) — the provider nulls the run when its assistant message is absent
+ * from the delivered path.
  */
 export async function getSelectedRunStateForViewer(
   ctx: QueryCtx,
@@ -327,11 +324,21 @@ export async function getSelectedRunStateForViewer(
   }
 }
 
+/**
+ * The live-tail split is opt-in (ADR-0027), so a client from before it (a tab
+ * left open across a deploy, the paired perf base arm on the shared
+ * deployment) still reads the whole path: its run validation, Stop target and
+ * resume need the live message on that path.
+ */
 export const getSelectedPath = readableChatQuery({
-  args: {},
+  args: { splitLiveTail: v.optional(v.literal(true)) },
   returns: vSelectedPathProjection,
-  handler: async (ctx) =>
-    getSelectedPathForViewer(ctx, { chat: ctx.chat, viewer: ctx.user }),
+  handler: async (ctx, { splitLiveTail }) =>
+    getSelectedPathForViewer(ctx, {
+      chat: ctx.chat,
+      viewer: ctx.user,
+      splitLiveTail,
+    }),
 })
 
 export const getLiveMessage = readableChatQuery({
@@ -356,10 +363,7 @@ export const getResumeSelection = readableChatQuery({
   args: {},
   handler: async (ctx) => {
     const viewer = { chat: ctx.chat, viewer: ctx.user }
-    const { selectedMessages } = await getSelectedPathForViewer(ctx, {
-      ...viewer,
-      unbounded: true,
-    })
+    const { selectedMessages } = await getSelectedPathForViewer(ctx, viewer)
     return {
       run: await getSelectedRunStateForViewer(ctx, viewer),
       selectedMessages,

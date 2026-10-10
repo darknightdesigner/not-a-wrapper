@@ -13,11 +13,10 @@ import type {
   GuestUsageGate,
 } from "@/lib/chat-turn/chat-turn-controller"
 import {
-  GUEST_USAGE_OWNER,
   loadGuestUsageHint,
-  readUsageHint,
-  recordUsageHint,
-  spendUsageHint,
+  readGuestUsageHint,
+  recordGuestUsageHint,
+  spendGuestUsageHint,
 } from "@/lib/chat-turn/usage-hint"
 import { REMAINING_QUERY_ALERT_THRESHOLD } from "@/lib/config"
 import type { Attachment } from "@/lib/file-handling"
@@ -152,16 +151,16 @@ export function useChatOperations({
     }
     return {
       check: () => {
-        const remaining = readUsageHint(GUEST_USAGE_OWNER)
+        const remaining = readGuestUsageHint()
         return remaining === null
           ? loadGuestUsageHint().then(admit)
           : admit(remaining)
       },
-      spend: () => spendUsageHint(GUEST_USAGE_OWNER),
+      spend: spendGuestUsageHint,
       // A daily-limit refusal the hint missed (another tab, a shared
       // network): the next Send gates locally, and sign-in opens now.
       limitReached: () => {
-        recordUsageHint(GUEST_USAGE_OWNER, 0)
+        recordGuestUsageHint(0)
         setHasDialogAuth(true)
       },
     } satisfies GuestUsageGate & { limitReached: () => void }

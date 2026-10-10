@@ -46,73 +46,57 @@ const USAGE_ERROR_CODES = {
   USER_NOT_FOUND: "USER_NOT_FOUND",
 } as const
 
-type AbuseAdmissionCtx = Pick<MutationCtx, "db"> & {
-  identity: Awaited<ReturnType<MutationCtx["auth"]["getUserIdentity"]>>
-  user: Doc<"users"> | null
-}
-
-/** The signed-in daily window: a private policy, not a `consume` bucket. */
-async function readUserDailyWindow(
-  ctx: Pick<QueryCtx, "db">,
-  user: Doc<"users">
-) {
-  const limit = user.anonymous
-    ? NON_AUTH_DAILY_MESSAGE_LIMIT
-    : AUTH_DAILY_MESSAGE_LIMIT
-  const daily = await readFixedWindow(ctx, {
-    actorKey: `user:${user._id}`,
-    bucket: "user_turns_daily",
-    limit,
-    windowMs: API_RATE_LIMIT_MAX_WINDOW_MS,
-    now: Date.now(),
-  })
-  return { daily, limit }
-}
-
-export async function admitUsageHandler(ctx: AbuseAdmissionCtx) {
-  // Guests are admitted only through `admitGuestTurn` (server-proven).
-  if (!ctx.identity) {
-    throw new Error("Not authenticated")
-  }
-
-  const user = ctx.user
-
-  if (!user) {
-    return {
-      canSend: false,
-      remaining: 0,
-      limit: 0,
-      error: "User not found",
-      errorCode: USAGE_ERROR_CODES.USER_NOT_FOUND,
-    }
-  }
-
-  // Check and count in one transaction, so concurrent sends cannot both pass
-  // the final slot. A refusal writes nothing.
-  const { daily, limit } = await readUserDailyWindow(ctx, user)
-  if (!daily.allowed) {
-    return {
-      canSend: false,
-      remaining: 0,
-      limit,
-      count: daily.currentCount,
-      isAnonymous: user.anonymous,
-    }
-  }
-
-  await commitFixedWindow(ctx, daily)
-  return {
-    canSend: true,
-    remaining: daily.remaining,
-    limit,
-    count: daily.currentCount + 1,
-    isAnonymous: user.anonymous,
-  }
-}
-
 export const admit = optionalAuthMutation({
   args: {},
-  handler: admitUsageHandler,
+  handler: async (ctx) => {
+    // Guests are admitted only through `admitGuestTurn` (server-proven).
+    if (!ctx.identity) {
+      throw new Error("Not authenticated")
+    }
+
+    const { user } = ctx
+    if (!user) {
+      return {
+        canSend: false,
+        remaining: 0,
+        limit: 0,
+        error: "User not found",
+        errorCode: USAGE_ERROR_CODES.USER_NOT_FOUND,
+      }
+    }
+
+    // The signed-in daily window is a private policy, not a `consume` bucket.
+    // Check and count in one transaction, so concurrent sends cannot both pass
+    // the final slot. A refusal writes nothing.
+    const limit = user.anonymous
+      ? NON_AUTH_DAILY_MESSAGE_LIMIT
+      : AUTH_DAILY_MESSAGE_LIMIT
+    const daily = await readFixedWindow(ctx, {
+      actorKey: `user:${user._id}`,
+      bucket: "user_turns_daily",
+      limit,
+      windowMs: API_RATE_LIMIT_MAX_WINDOW_MS,
+      now: Date.now(),
+    })
+    if (!daily.allowed) {
+      return {
+        canSend: false,
+        remaining: 0,
+        limit,
+        count: daily.currentCount,
+        isAnonymous: user.anonymous,
+      }
+    }
+
+    await commitFixedWindow(ctx, daily)
+    return {
+      canSend: true,
+      remaining: daily.remaining,
+      limit,
+      count: daily.currentCount + 1,
+      isAnonymous: user.anonymous,
+    }
+  },
 })
 
 // ---------------------------------------------------------------------------

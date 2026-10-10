@@ -88,7 +88,7 @@ export async function paginateAccountTable(
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .paginate(options)
     // Actor keys mirror their writers: toolLimits.checkAndConsume keys by the
-    // WorkOS subject, rateLimits.consume by the users row id.
+    // WorkOS subject, rateLimits.consume and usage.admit by the users row id.
     case "toolLimitBuckets":
       return await ctx.db
         .query("toolLimitBuckets")

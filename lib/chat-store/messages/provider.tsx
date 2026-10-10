@@ -89,7 +89,8 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const { chatId } = useChatSession()
   // Persistence is a property of the caller, not the id (ADR-0033). A caller
   // is a guest (IndexedDB) only once Convex auth settles signed out, so a
-  // signed-in load stays durable, and loading, while its token syncs.
+  // signed-in load stays durable, and loading, while its token syncs. A
+  // settled Convex auth failure under a live WorkOS session reads IndexedDB.
   const { isAuthenticated: isConvexAuthenticated, isLoading: isAuthLoading } =
     useConvexAuth()
   const isSignedIn = isConvexAuthenticated || isAuthLoading
@@ -102,11 +103,12 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
   // The selected conversation is three subscriptions, all keyed by chatId on
   // one Convex client, so their values arrive from one transition (ADR-0027):
   // run-only writes re-deliver only the run state, and while a run streams
-  // the path is the history before the live tail and the live message comes
-  // alone, so a checkpoint re-sends one message instead of the whole path.
+  // the path is the history before the live tail (`splitLiveTail`) and the
+  // live message comes alone, so a checkpoint re-sends one message instead of
+  // the whole path. `useWarmSelectedConversation` warms these exact args.
   const pathQuery = usePerUserQuery(
     api.messages.getSelectedPath,
-    isDurableChat ? { chatId } : "skip"
+    isDurableChat ? { chatId, splitLiveTail: true } : "skip"
   )
   const runStateQuery = usePerUserQuery(
     api.messages.getSelectedRunState,

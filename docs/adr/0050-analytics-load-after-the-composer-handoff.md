@@ -57,8 +57,9 @@ clear (no production recording was viewed).
   `import("@sentry/nextjs")` would be 102.9 KB). The rates come from the init
   options when the integration attaches.
 - **PostHog.** `import("posthog-js")`, then `init` with the previous options.
-  `posthog-js/react` is gone because it pulls posthog-js into the initial set;
-  `PostHogProvider` only mounts the pageview tracker.
+  `posthog-js/react` is gone because it pulls posthog-js into the initial set,
+  and so is `PostHogProvider`: `app/providers/index.tsx` mounts the pageview
+  tracker directly.
 - **Pageviews.** `captureAnalyticsEvent` queues events until PostHog loads and
   stamps the call time as the event `timestamp`. The tracker passes
   `$current_url`, `$pathname` and `$host`, because PostHog fills unset
@@ -67,13 +68,16 @@ clear (no production recording was viewed).
 - **Recording privacy.** PostHog session recording masks all text and inputs
   on the client: `session_recording: { maskTextSelector: "*", maskAllInputs:
   true }`. posthog-js prefers client masking over the remote config, so this
-  holds while the project setting is null or if it is loosened later.
+  holds while the project setting is null or if it is loosened later. It masks
+  text nodes and input values, not attribute values.
 - **Benchmark builds** (perf flag on) keep both recorders off: no Replay,
   rates 0 and `disable_session_recording` (ADR-0037).
 - **Ratchet** (`scripts/check-initial-js.ts`, after `bun run build:next` in the
-  CI Build job). The root main files must stay within 225 KiB gzip and contain
-  no `rrweb` (either recorder) or `persistence_name` (posthog-js core). Lower
-  the budget as other changes shrink the set (ADR-0049).
+  CI Build job). The root main files must stay within 225 KiB gzip. Neither
+  they nor the root layout's chunks may contain `rrweb` (either recorder) or
+  `persistence_name` (posthog-js core), so a static analytics import in a
+  root-layout client component also fails. Lower the budget as other changes
+  shrink the set (ADR-0049).
 - **Paired gate.** `measurementBootstrap` in
   `benchmarks/chat-performance/browser/measurement-overlay.ts` removes only the
   exact analytics hunks of `instrumentation-client.ts` before comparing base
@@ -93,6 +97,12 @@ clear (no production recording was viewed).
 - With the production remote config, probe text appeared in clear in 4 of 4
   snapshot sets without the masking option and 0 of 4 with it (masked text was
   recorded instead).
+- Attribute values stay in clear, as before: every visible-text match left in
+  the decoded snapshots was an attribute (meta `content`, `aria-label`). Signed-in
+  recordings still carry chat and project titles (sidebar pin buttons'
+  `aria-label`), file names (file chip labels) and activity `title`s. Masking
+  them (`blockSelector` on those controls, or titles out of labels) is a
+  separate decision.
 - Errors before Replay attaches get no replay: hydration errors and everything
   until shortly after the handoff, seconds on slow networks. The Sentry error
   itself is still captured. Session replays miss page load.

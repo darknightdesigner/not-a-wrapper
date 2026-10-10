@@ -5,18 +5,14 @@ import {
 } from "@/convex/lib/serverCallProof"
 import { fetchQuery } from "convex/nextjs"
 
-export type UsageResult = {
-  dailyCount: number
-  dailyLimit: number
-  remaining: number
-}
-
 /**
- * The guest's daily usage for the composer's typing-time hint (ADR-0045).
- * Signed-in users have no pre-send read: `/api/chat` admission is their only
- * per-send check.
+ * The guest's remaining daily turns for the composer's typing-time hint
+ * (ADR-0045), the one field `fetchGuestUsage` reads. Signed-in users have no
+ * pre-send read: `/api/chat` admission is their only per-send check.
  */
-export async function getGuestUsage(guest: GuestActor): Promise<UsageResult> {
+export async function getGuestUsage(
+  guest: GuestActor
+): Promise<{ remaining: number }> {
   const issuedAt = Date.now()
   const usage = await fetchQuery(api.usage.checkGuestUsage, {
     guest,
@@ -27,9 +23,5 @@ export async function getGuestUsage(guest: GuestActor): Promise<UsageResult> {
       issuedAt,
     }),
   })
-  return {
-    dailyCount: usage.count,
-    dailyLimit: usage.limit,
-    remaining: usage.remaining,
-  }
+  return { remaining: usage.remaining }
 }

@@ -73,41 +73,25 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: themeMock.resolvedTheme }),
 }))
 
-class IntersectionObserverStub implements IntersectionObserver {
-  static instances: IntersectionObserverStub[] = []
+// Near-view gate seam: reports "near" at once unless a test captures targets.
+const nearView = vi.hoisted(() => ({
+  capture: false,
+  targets: new Map<Element, (near: boolean) => void>(),
+}))
 
-  readonly root = null
-  readonly rootMargin = "0px"
-  readonly thresholds = [0]
-  readonly observed = new Set<Element>()
-
-  constructor(readonly callback: IntersectionObserverCallback) {
-    IntersectionObserverStub.instances.push(this)
-  }
-
-  disconnect = () => this.observed.clear()
-  observe = (target: Element) => void this.observed.add(target)
-  takeRecords = () => []
-  unobserve = (target: Element) => void this.observed.delete(target)
-
-  report(target: Element, isIntersecting: boolean) {
-    const rect = {} as DOMRectReadOnly
-    this.callback(
-      [
-        {
-          boundingClientRect: rect,
-          intersectionRatio: isIntersecting ? 1 : 0,
-          intersectionRect: rect,
-          isIntersecting,
-          rootBounds: null,
-          target,
-          time: 0,
-        },
-      ],
-      this
-    )
-  }
-}
+vi.mock("@/lib/dom/scroll-root-intersection", () => ({
+  createScrollRootIntersectionObserver: () => ({
+    observe: (target: Element, onChange: (near: boolean) => void) => {
+      if (!nearView.capture) {
+        onChange(true)
+        return () => {}
+      }
+      nearView.targets.set(target, onChange)
+      return () => nearView.targets.delete(target)
+    },
+    disconnect: () => nearView.targets.clear(),
+  }),
+}))
 
 describe("CodeBlockCode streaming rendering", () => {
   let container: HTMLDivElement | null = null
@@ -147,7 +131,7 @@ describe("CodeBlockCode streaming rendering", () => {
     container = null
     root = null
     vi.useRealTimers()
-    vi.unstubAllGlobals()
+    nearView.capture = false
   })
 
   type CodeProps = { code: string; language?: string; growing?: boolean }
@@ -416,8 +400,8 @@ describe("CodeBlockCode streaming rendering", () => {
   })
 
   it("highlights only the block near the view; a cache hit renders highlighted without observing", async () => {
-    IntersectionObserverStub.instances = []
-    vi.stubGlobal("IntersectionObserver", IntersectionObserverStub)
+    nearView.capture = true
+    nearView.targets.clear()
     const cached = "const cached = 1"
     shikiClientMock.state.cache.set(
       `github-light:ts:${cached}`,
@@ -439,16 +423,15 @@ describe("CodeBlockCode streaming rendering", () => {
     })
     const box = (code: string) =>
       container?.querySelector(`[data-code="${code}"]`) ?? document.body
-    const observer = IntersectionObserverStub.instances[0]
     // Uncached blocks wait on their content-visibility box; the hit is final.
-    expect(observer?.observed).toEqual(
+    expect(new Set(nearView.targets.keys())).toEqual(
       new Set([box("const near = 1"), box("const far = 1")])
     )
     expect(box(cached).querySelector("pre.shiki")?.textContent).toBe(cached)
 
     act(() => {
-      observer?.report(box("const near = 1"), true)
-      observer?.report(box("const far = 1"), false)
+      nearView.targets.get(box("const near = 1"))?.(true)
+      nearView.targets.get(box("const far = 1"))?.(false)
     })
     await advance(0)
     expect(
@@ -456,6 +439,8 @@ describe("CodeBlockCode streaming rendering", () => {
     ).toEqual([cached, "const near = 1"])
     expect(box("const near = 1").querySelector("pre.shiki")).not.toBeNull()
     expect(box("const far = 1").querySelector("pre.shiki")).toBeNull()
-    expect(observer?.observed).toEqual(new Set([box("const far = 1")]))
+    expect(new Set(nearView.targets.keys())).toEqual(
+      new Set([box("const far = 1")])
+    )
   })
 })

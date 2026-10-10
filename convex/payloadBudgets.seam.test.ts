@@ -279,6 +279,7 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
     )
     const history = await owner.query(api.messages.getSelectedPath, {
       chatId: CHAT,
+      splitLiveTail: true,
     })
     const liveMessage = await owner.query(api.messages.getLiveMessage, {
       chatId: CHAT,

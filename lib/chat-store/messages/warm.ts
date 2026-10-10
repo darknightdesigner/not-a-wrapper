@@ -16,10 +16,10 @@ export function useWarmSelectedConversation(): (chatId: string) => void {
   const warm = useWarmPerUserQuery()
   return useCallback(
     (chatId: string) => {
-      const args = { chatId }
-      warm(api.messages.getSelectedPath, args)
-      warm(api.messages.getSelectedRunState, args)
-      warm(api.messages.getLiveMessage, args)
+      // Cache keys are key-order sensitive: mirror the provider's literals.
+      warm(api.messages.getSelectedPath, { chatId, splitLiveTail: true })
+      warm(api.messages.getSelectedRunState, { chatId })
+      warm(api.messages.getLiveMessage, { chatId })
     },
     [warm]
   )

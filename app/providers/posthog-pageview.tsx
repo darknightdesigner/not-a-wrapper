@@ -23,7 +23,9 @@ function PostHogPageViewTracker() {
   return null
 }
 
-// Next requires a Suspense boundary around useSearchParams.
+// No PostHog context provider: posthog-js loads after the composer handoff
+// (ADR-0050), and `posthog-js/react` would pull it back into the initial
+// bundle. Next requires a Suspense boundary around useSearchParams.
 export function PostHogPageView() {
   return (
     <Suspense fallback={null}>

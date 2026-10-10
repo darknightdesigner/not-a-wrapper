@@ -41,11 +41,14 @@ export default defineSchema({
     anonymous: v.optional(v.boolean()),
     premium: v.optional(v.boolean()),
 
+    // Retired send counters: signed-in windows live in `apiRateLimits`
+    // (convex/usage.ts). Nothing writes them; optional until production rows
+    // are contracted.
     messageCount: v.optional(v.number()),
     dailyMessageCount: v.optional(v.number()),
     dailyReset: v.optional(v.number()),
-
     lastActiveAt: v.optional(v.number()),
+
     lastSyncedFromWorkOSAt: v.optional(v.number()),
     workosUpdatedAt: v.optional(v.string()),
     // Account lifecycle (ADR-0044). Either value makes the account rejected at

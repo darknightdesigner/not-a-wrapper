@@ -18,13 +18,13 @@ export function closestScrollRoot(el: Element | null): HTMLElement | null {
 export function createScrollRootIntersectionObserver({
   rootMargin,
   threshold,
-  withoutScrollRoot = "intersecting",
+  withoutScrollRoot,
 }: {
   rootMargin: string
   threshold: number
   /** No `[data-scroll-root]` ancestor: "intersecting" reports true once;
    * "viewport" observes against the viewport. */
-  withoutScrollRoot?: "intersecting" | "viewport"
+  withoutScrollRoot: "intersecting" | "viewport"
 }): ScrollRootIntersectionObserver {
   // A null key is the viewport.
   const roots = new Map<
