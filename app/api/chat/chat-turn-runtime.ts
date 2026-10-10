@@ -133,6 +133,7 @@ import {
   createToolCallLogSink,
   createToolTraceLogSink,
 } from "./outcome-sinks"
+import { withAnswerStallTimeout } from "./provider-stall-timeout"
 import { normalizeChatError, type PublicChatError } from "./public-error"
 import { PublicChatHttpError } from "./public-http-error"
 import { createReasoningActivityTracker } from "./reasoning-activity-tracker"
@@ -1564,7 +1565,9 @@ export function createChatTurnRuntime(args: {
               return used === null || used >= providerMaxOutputTokens
             }
       return streamText({
-        model: aiModel,
+        // A provider that goes silent mid-answer fails the turn after
+        // ANSWER_STALL_TIMEOUT_MS instead of hanging to the provider deadline.
+        model: withAnswerStallTimeout(aiModel),
         instructions: enrichedSystemPrompt,
         messages: modelMessages,
         tools: tool.tools,
