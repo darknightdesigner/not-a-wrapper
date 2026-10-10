@@ -141,6 +141,13 @@ a 5xx and no data.
   Reapers skip a deleted account's chats; the drain owns them, and its
   `liveRuns` phase leaves nothing in the reapers' ranges before any phase
   that can block.
+- Every authenticated query reads the caller's users row through
+  `getOptionalAuth`, so any write to that row re-runs every open subscription
+  of that account (amended 2026-10-10). The row therefore takes no hot or
+  per-turn writes: per-send counters live in `apiRateLimits` windows
+  (ADR-0021), and `users.getCurrent` returns a profile projection, not the
+  row. User-initiated profile edits (name, prompt, favorites) are fine. Keep
+  the reads: they are what end a rejected account's open subscriptions.
 - A row created by the bootstrap has no email, name, or avatar until the
   verified webhook arrives. The client shows the WorkOS session's own name
   and picture meanwhile.

@@ -12,9 +12,8 @@ import {
   markChatPerf,
 } from "@/lib/observability/chat-performance"
 import { useChatNavigationPerfMarks } from "@/lib/observability/chat-performance-client"
-import { useUser } from "@/lib/user-store/provider"
 import type { UIMessage } from "ai"
-import { useMutation } from "convex/react"
+import { useConvexAuth, useMutation } from "convex/react"
 import {
   createContext,
   useCallback,
@@ -88,12 +87,14 @@ export function useResetMessages() {
 
 export function MessagesProvider({ children }: { children: React.ReactNode }) {
   const { chatId } = useChatSession()
-  // Persistence is a property of the caller, not the id (ADR-0033): the
-  // server-seeded app user marks a durable chat; a guest reads IndexedDB.
-  const { user } = useUser()
-  const isAuthenticated = Boolean(user?.id)
+  // Persistence is a property of the caller, not the id (ADR-0033). A caller
+  // is a guest (IndexedDB) only once Convex auth settles signed out, so a
+  // signed-in load stays durable, and loading, while its token syncs.
+  const { isAuthenticated: isConvexAuthenticated, isLoading: isAuthLoading } =
+    useConvexAuth()
+  const isSignedIn = isConvexAuthenticated || isAuthLoading
   const messagePersistenceMode = chatId
-    ? getMessagePersistenceMode(isAuthenticated)
+    ? getMessagePersistenceMode(isSignedIn)
     : null
 
   const isDurableChat = chatId !== null && messagePersistenceMode === "server"
@@ -284,7 +285,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
   const selectMessageBranch = useCallback(
     async (messageId: string) => {
-      if (!chatId || !isAuthenticated) return
+      if (!chatId || !isSignedIn) return
 
       // Do NOT wipe optimistic state here. Clearing it blanked the thread until
       // the Convex query round-tripped. The selected path is owned by the
@@ -301,7 +302,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
         toast({ title: "Failed to switch branch", status: "error" })
       }
     },
-    [chatId, isAuthenticated, selectBranchMutation]
+    [chatId, isSignedIn, selectBranchMutation]
   )
 
   // Callers may replace only optimistic rows; server rows remain query-owned.

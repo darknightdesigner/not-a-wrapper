@@ -8,10 +8,11 @@ import schema from "./schema"
 import { modules } from "./test.setup"
 
 // Payload budgets (ADR-0049): serialized result bytes of the reads every chat
-// open and sidebar render subscribes to, over one deterministic realistic
-// fixture. Exact bytes are reproducible (fixed clock, counter ids), so a
-// change is a real payload change. Fails on any growth (regression) and when
-// more than 1% under budget (ratchet: lower it so a win cannot decay).
+// open, sidebar render and signed-in page subscribes to, over one
+// deterministic realistic fixture. Exact bytes are reproducible (fixed clock,
+// counter ids), so a change is a real payload change. Fails on any growth
+// (regression) and when more than 1% under budget (ratchet: lower it so a win
+// cannot decay).
 // Regenerate: run `bunx vitest run convex/payloadBudgets.seam.test.ts` and
 // paste the `PAYLOAD_BUDGETS` object printed in the failure.
 const PAYLOAD_BUDGETS = {
@@ -20,6 +21,7 @@ const PAYLOAD_BUDGETS = {
   selectedRunStateSettled: 173,
   recentWindowFirstPage: 9_667,
   pinned: 2_334,
+  currentUser: 356,
 }
 const RATCHET_TOLERANCE = 0.01
 
@@ -238,11 +240,20 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
 
   it("keeps every subscribed read within its checked-in budget", async () => {
     const t = makeT()
+    // A synced production row: profile, preferences and the server-only
+    // fields `getCurrent` must not ship (email, WorkOS sync stamps).
     const userId = await t.run((ctx) =>
       ctx.db.insert("users", {
         workosUserId: OWNER,
         email: `${OWNER}@example.com`,
         displayName: "Payload Owner",
+        profileImage: "https://workoscdn.com/images/v1/payload-owner-avatar",
+        anonymous: false,
+        premium: false,
+        favoriteModels: ["claude-sonnet-5", "gpt-5", "gemini-3-pro"],
+        systemPrompt: "Answer concisely and cite sources.",
+        lastSyncedFromWorkOSAt: 1_799_999_000_000,
+        workosUpdatedAt: "2027-01-01T00:00:00.000Z",
       })
     )
     const { runId, assistantMessageId } = await seedLongChat(t, userId)
@@ -272,6 +283,7 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
       paginationOpts: { numItems: SIDEBAR_WINDOW_PAGE_SIZE, cursor: null },
     })
     const pinned = await owner.query(api.chats.getPinnedForCurrentUser, {})
+    const currentUser = await owner.query(api.users.getCurrent, {})
 
     // Shape guards: a budget only means something over the intended fixture.
     expect(path.selectedMessages).toHaveLength(TURNS * 2)
@@ -286,6 +298,7 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
       selectedRunStateSettled: bytes(settled),
       recentWindowFirstPage: bytes(recent),
       pinned: bytes(pinned),
+      currentUser: bytes(currentUser),
     }
     const violations = (Object.keys(PAYLOAD_BUDGETS) as PayloadName[]).flatMap(
       (name) => {

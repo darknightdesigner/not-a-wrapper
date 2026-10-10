@@ -72,37 +72,25 @@ const baseUser: UserProfile = {
   profile_image: null,
   anonymous: false,
   premium: null,
-  message_count: null,
-  daily_message_count: null,
-  daily_reset: null,
-  last_active_at: null,
   created_at: null,
   favorite_models: null,
   system_prompt: null,
 }
 
 describe("mergeUserProfileWithConvexFields", () => {
-  it("reflects Convex-managed premium and usage fields in user context", () => {
+  it("reflects Convex-managed profile fields in user context", () => {
     expect(
       mergeUserProfileWithConvexFields(baseUser, {
         _creationTime: 100,
         displayName: "Convex User",
         anonymous: false,
         premium: true,
-        messageCount: 12,
-        dailyMessageCount: 3,
-        dailyReset: 200,
-        lastActiveAt: 400,
         favoriteModels: ["openai/gpt-5"],
         systemPrompt: "Be concise",
       })
     ).toMatchObject({
       display_name: "Convex User",
       premium: true,
-      message_count: 12,
-      daily_message_count: 3,
-      daily_reset: "200",
-      last_active_at: "400",
       created_at: "100",
       favorite_models: ["openai/gpt-5"],
       system_prompt: "Be concise",
@@ -115,10 +103,6 @@ describe("mergeUserProfileWithConvexFields", () => {
       display_name: "Existing User",
       anonymous: true,
       premium: true,
-      message_count: 8,
-      daily_message_count: 4,
-      daily_reset: "200",
-      last_active_at: "400",
       created_at: "50",
       favorite_models: ["anthropic/claude-sonnet-4"],
       system_prompt: "Keep answers terse",
@@ -132,10 +116,6 @@ describe("mergeUserProfileWithConvexFields", () => {
       display_name: "Existing User",
       anonymous: true,
       premium: true,
-      message_count: 8,
-      daily_message_count: 4,
-      daily_reset: "200",
-      last_active_at: "400",
       created_at: "100",
       favorite_models: ["anthropic/claude-sonnet-4"],
       system_prompt: "Keep answers terse",
@@ -250,7 +230,6 @@ describe("UserProvider", () => {
       _creationTime: 100,
       workosUserId: "user-1",
       profileImage: "https://workos.test/avatar.png",
-      lastActiveAt: 100,
     }
   }
 
@@ -293,6 +272,31 @@ describe("UserProvider", () => {
     act(() => root?.unmount())
     root = null
     expect((window as ChatUiWindow).__chatAccountReady).toBeUndefined()
+  })
+
+  it("does not re-render consumers when the provider re-renders with unchanged fields", () => {
+    setAuthenticatedProfileUser()
+    const consumerRender = vi.fn()
+    function Consumer() {
+      useUser()
+      consumerRender()
+      return null
+    }
+    // A stable child element re-renders only through the context value.
+    const child = React.createElement(Consumer)
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    const render = () =>
+      act(() =>
+        root?.render(
+          React.createElement(UserProvider, { initialUser: null }, child)
+        )
+      )
+    render()
+    const settledRenders = consumerRender.mock.calls.length
+    render()
+    expect(consumerRender).toHaveBeenCalledTimes(settledRenders)
   })
 
   it("retries a rejected bootstrap only on request and keeps admission closed until its row arrives", async () => {
@@ -416,7 +420,7 @@ describe("UserProvider", () => {
 
     providerMocks.convexUser = {
       ...providerMocks.convexUser,
-      lastActiveAt: 200,
+      systemPrompt: "Updated",
     }
     renderProvider()
 
@@ -493,7 +497,6 @@ describe("UserProvider", () => {
       _creationTime: 200,
       workosUserId: "user-2",
       profileImage: "https://workos.test/other-avatar.png",
-      lastActiveAt: 200,
     }
     renderProvider()
 
@@ -523,7 +526,6 @@ describe("UserProvider", () => {
       _creationTime: 200,
       workosUserId: "user-2",
       profileImage: "https://workos.test/other-avatar.png",
-      lastActiveAt: 200,
     }
     renderProvider()
 
@@ -539,7 +541,7 @@ describe("UserProvider", () => {
 
     providerMocks.convexUser = {
       ...providerMocks.convexUser,
-      lastActiveAt: 300,
+      systemPrompt: "Updated",
     }
     renderProvider()
 

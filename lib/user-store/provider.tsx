@@ -25,6 +25,7 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PropsWithChildren,
@@ -213,10 +214,6 @@ function UserStateProvider({ children, initialUser }: UserProviderProps) {
         profile_image: workosUser.profilePictureUrl,
         anonymous: false,
         premium: prevUser?.premium ?? null,
-        message_count: prevUser?.message_count ?? null,
-        daily_message_count: prevUser?.daily_message_count ?? null,
-        daily_reset: prevUser?.daily_reset ?? null,
-        last_active_at: prevUser?.last_active_at ?? null,
         created_at: prevUser?.created_at ?? null,
         favorite_models: prevUser?.favorite_models ?? null,
         system_prompt: prevUser?.system_prompt ?? null,
@@ -303,12 +300,17 @@ function UserStateProvider({ children, initialUser }: UserProviderProps) {
     return () => noteChatAccountReadiness(undefined)
   }, [isChatAdmissionReady])
 
+  // Every `useUser()` consumer re-renders when this value changes, so it
+  // changes only when one of its fields does.
+  const contextValue = useMemo(
+    () => ({ user, isLoading, isChatAdmissionReady, updateUser }),
+    [user, isLoading, isChatAdmissionReady, updateUser]
+  )
+
   if (accountRejection !== null) throw accountRejection
 
   return (
-    <UserContext.Provider value={{ user, isLoading, isChatAdmissionReady, updateUser }}>
-      {children}
-    </UserContext.Provider>
+    <UserContext.Provider value={contextValue}>{children}</UserContext.Provider>
   )
 }
 

@@ -10,6 +10,8 @@ transition also settles or releases the run's usage reservation).
 converts the worst-case admission reservation into final spend. 2026-09-27 —
 cached input settles at the cache-read rate, and provider-side retention and
 actor attribution are recorded (see "Provider retention and attribution").
+2026-10-10: the signed-in daily counter moves off the users row into an
+`apiRateLimits` window (see "Existing counters").
 
 **Context.** ADR-0020 made Priority/Fallback API-key preferences real routing
 tiers, but the platform tier admits by list membership (`FREE_MODELS_IDS`)
@@ -425,18 +427,29 @@ balance negative. Estimation is admission control, not the final charge.
   secret, and changes for everyone if the secret rotates; without a usable
   secret, none is sent.
 
-## Existing counters
+## Existing counters (amended 2026-10-10)
 
-`users.dailyMessageCount` (and the ADR-0045 guest windows) remain **abuse
-rate limits** only. The retired pro-model fields remain optional in the schema
-only until production preflight proves older user rows can be contracted
-safely. For signed-in users the chat route calls one `usage.admit` mutation
-that checks and increments the counter in the same transaction, before the
-credential source is known (guests are admitted by `usage.admitGuestTurn`
-instead). This prevents concurrent requests from both passing a read-only
-check at the final slot. Once admitted, the attempt counts even if later
-credential or preparation work fails; this is abuse control, not economic
-settlement. The economic admission remains the reservation itself.
+The daily message counters remain **abuse rate limits** only. Signed-in and
+guest (ADR-0045) turns both count in `apiRateLimits` fixed windows over a UTC
+day. The signed-in window is bucket `user_turns_daily`, keyed by
+`user:${userId}`, with a private policy (it is not a `rateLimits.consume`
+bucket); account deletion and the limiter sweep already drain its rows. For
+signed-in users the chat route calls one `usage.admit` mutation that checks
+and counts the window in the same transaction, before the credential source
+is known (guests are admitted by `usage.admitGuestTurn` instead). This
+prevents concurrent requests from both passing a read-only check at the final
+slot. Once admitted, the attempt counts even if later credential or
+preparation work fails; this is abuse control, not economic settlement. The
+economic admission remains the reservation itself.
+
+Admission never writes the users row. Every authenticated query reads that row
+(ADR-0044), so the old per-send counter patch re-ran every open subscription
+and re-rendered the signed-in app on each send. `users.messageCount`,
+`dailyMessageCount`, `dailyReset` and `lastActiveAt` are no longer written or
+read. Like the retired pro-model fields, they stay optional in the schema only
+until production preflight proves older user rows can be contracted safely.
+Signed-in counts restarted at zero on the day this shipped (accepted: an abuse
+limit, not billing).
 
 ## Alternatives considered
 

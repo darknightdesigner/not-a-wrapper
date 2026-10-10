@@ -44,8 +44,10 @@ const persistMocks = vi.hoisted(() => {
   }
 })
 
+// Persistence follows Convex auth (ADR-0033): settled signed out is a guest
+// reading IndexedDB; signed in, or still syncing a token, is durable.
 const convexMocks = vi.hoisted(() => ({
-  isAuthenticated: true,
+  isAuthenticated: false,
   isAuthLoading: false,
   queryValue: undefined as unknown,
   mutationFn: vi.fn(),
@@ -54,16 +56,6 @@ const convexMocks = vi.hoisted(() => ({
 
 const sessionMocks = vi.hoisted(() => ({
   chatId: "local-thread" as string | null,
-}))
-
-// Persistence is derived from the server-seeded app user (ADR-0033): null is
-// a guest reading IndexedDB; an id is a durable chat read through Convex.
-const userMocks = vi.hoisted(() => ({
-  user: null as { id: string } | null,
-}))
-
-vi.mock("@/lib/user-store/provider", () => ({
-  useUser: () => ({ user: userMocks.user }),
 }))
 
 vi.mock("../persist", () => ({
@@ -137,13 +129,12 @@ describe("MessagesProvider local chat hydration", () => {
     }
     persistMocks.readFromIndexedDB.mockClear()
     persistMocks.writeToIndexedDB.mockClear()
-    convexMocks.isAuthenticated = true
+    convexMocks.isAuthenticated = false
     convexMocks.isAuthLoading = false
     convexMocks.queryValue = undefined
     convexMocks.mutationFn.mockReset()
     convexMocks.useQuery.mockClear()
     sessionMocks.chatId = "local-thread"
-    userMocks.user = null
     resetCachedMessagesSnapshot()
   })
 
@@ -250,9 +241,9 @@ describe("MessagesProvider local chat hydration", () => {
     expect(persistMocks.readFromIndexedDB).not.toHaveBeenCalled()
   })
 
-  it.each([null, "durable-chat"])("hydrates %s without an unrelated local-cache commit", async (chatId) => {
+  it.each([null, "durable-chat"])("hydrates %s while a signed-in token syncs, without an unrelated local-cache commit", async (chatId) => {
     sessionMocks.chatId = chatId
-    userMocks.user = { id: "user-1" }
+    convexMocks.isAuthLoading = true
     const capture: { current: ReturnType<typeof useMessages> | null } = { current: null }
     const onRender = vi.fn()
     const tree = (
@@ -270,10 +261,7 @@ describe("MessagesProvider local chat hydration", () => {
     expect(persistMocks.readFromIndexedDB).not.toHaveBeenCalled()
   })
 
-  it("does not keep a durable chat loading while the Convex auth gate is closed", async () => {
-    userMocks.user = { id: "user-1" }
-    convexMocks.isAuthenticated = false
-    convexMocks.isAuthLoading = false
+  it("does not keep a chat loading once Convex auth settles signed out", async () => {
     sessionMocks.chatId = "server-thread"
     const capture: { current: ReturnType<typeof useMessages> | null } = {
       current: null,
