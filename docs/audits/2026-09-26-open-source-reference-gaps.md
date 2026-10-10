@@ -3988,18 +3988,19 @@ specific dead code by hand. This adds the check that catches it automatically.
 
 Severity: Medium.
 
-Status: fixed 2026-10-09 (#208), as described under Fix below. Before the fix,
-one worktree caused about 1,500 false test failures (React loaded from the
+Status: fixed 2026-10-09 (#208), as described under Fix below. The diagnosis
+and line numbers below describe the code before #208. Before the fix, one
+worktree caused about 1,500 false test failures (React loaded from the
 worktree's own `node_modules`) and about 880 lint errors.
 
 **What is wrong.** Claude Code keeps spare copies of the repo, called
 worktrees, inside `.claude/worktrees/`. Vitest and ESLint do not skip that
 folder, so `bun run test` and `bun run lint` in the main checkout also run
-every copy: right now 300 extra test files from another commit (`4defcd3c`,
-while this checkout is at `ac026463`), mixed with main-tree code. Runs take
-about twice as long and can fail on another branch's unfinished work. If a
-worktree holds a build or a Playwright capture, lint can also run out of
-memory.
+every copy: at audit time, 300 extra test files from another commit
+(`4defcd3c`, while this checkout is at `ac026463`), mixed with main-tree code.
+Runs take about twice as long and can fail on another branch's unfinished
+work. If a worktree holds a build or a Playwright capture, lint can also run
+out of memory.
 
 **Our code.**
 - `vitest.config.ts:5-13`: sets no `exclude`. Vitest 4's default skips only
