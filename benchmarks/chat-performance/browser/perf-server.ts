@@ -4,7 +4,7 @@
  * a survivor keeps serving the port and a later capture on it would silently
  * measure a stale build.
  */
-import { spawn, type ChildProcess, type StdioOptions } from "node:child_process"
+import { execFileSync, spawn, type ChildProcess, type StdioOptions } from "node:child_process"
 import { existsSync } from "node:fs"
 import path from "node:path"
 
@@ -46,6 +46,25 @@ function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
   }
 }
 
+/**
+ * Zombies keep their group id and still accept signal 0, so where nothing reaps
+ * orphans (a container without an init) a dead `next start` would look alive.
+ * Live means a member that is not a zombie; without `ps`, trust the probe.
+ */
+function groupHasLiveMember(pgid: number) {
+  if (!signalGroup(pgid, 0)) return false
+  try {
+    return execFileSync("ps", ["-A", "-o", "pgid=,stat="], { encoding: "utf8" })
+      .split("\n")
+      .some((line) => {
+        const [group, stat] = line.trim().split(/\s+/)
+        return Number(group) === pgid && !stat?.startsWith("Z")
+      })
+  } catch {
+    return true
+  }
+}
+
 const liveGroups = new Set<number>()
 let exitHookInstalled = false
 
@@ -84,7 +103,7 @@ async function stopGroup(pgid: number, baseUrl: string) {
     signalGroup(pgid, signal)
     const deadline = Date.now() + waitMs
     while (Date.now() < deadline) {
-      if (!signalGroup(pgid, 0) && !(await isServing(baseUrl))) {
+      if (!groupHasLiveMember(pgid) && !(await isServing(baseUrl))) {
         liveGroups.delete(pgid)
         return
       }
