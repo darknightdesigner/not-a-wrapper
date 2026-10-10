@@ -69,10 +69,13 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
   once and carries over to the live rows. The durable commands wait for the
   same Convex auth readiness gate as first-turn creation before calling the
   mutation; a timeout rolls back and shows the existing failure toast.
+- **Bound to the live identity.** The window is read and written only while
+  the live AuthKit user is the owner, so a tab whose session moved to another
+  user neither shows the old owner's rows nor writes the new user's rows
+  under the old owner. AuthKit is seeded from the server session, so a
+  reload still paints on the first render.
 - **Write-through on change.** Only delivered live reads (window, pinned, and
-  projects) are serialized, and only while the live AuthKit user is the
-  owner, so a tab whose session moved to another user never writes that
-  user's rows under the old owner.
+  projects) are serialized.
   The write runs in `requestIdleCallback` (2 s timeout; `setTimeout` where
   unsupported) and is skipped when the string equals what is stored. Status
   changes during a stream produce the same string and write nothing. A
@@ -84,15 +87,17 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
 - **Cleared on sign-out.** `signOutAndClearLocalState` deletes the key and
   stops further writes for the document, so a late live update cannot write
   the departing user's rows back. Every other open tab sees the removal as a
-  storage event and stops its writes too. There is no client account-deletion path
+  storage event and stops its writes too. A sign-out that fails without
+  navigating resumes this document's writes. There is no client account-deletion path
   that clears local data; deletion ends the session and the next signed-out
   load deletes the key.
 
 ## Consequences
 
-- A signed-in reload paints the whole sidebar, in both grouping modes,
-  without waiting for Convex: `app-sidebar.tsx` uses `persistedProjects`
-  while its live project read is undefined, so its
+- A signed-in reload paints the cached sidebar window (up to 25 recent chats,
+  50 pinned chats, and 100 projects) in both grouping modes without waiting
+  for Convex: `app-sidebar.tsx` uses `persistedProjects` while its live
+  project read is undefined, so its
   `isLoggedIn && projectDocs === undefined` gate only holds the loading
   state when there is no persisted window (first load on a device, or after
   sign-out).

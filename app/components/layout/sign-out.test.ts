@@ -1,5 +1,8 @@
 import { toast } from "@/components/ui/toast"
-import { clearPersistedWindow } from "@/lib/chat-store/chats/persisted-window"
+import {
+  clearPersistedWindow,
+  resumePersistedWindowWrites,
+} from "@/lib/chat-store/chats/persisted-window"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { isNextRedirectError, signOutAndClearLocalState } from "./sign-out"
@@ -10,6 +13,7 @@ vi.mock("@/components/ui/toast", () => ({
 
 vi.mock("@/lib/chat-store/chats/persisted-window", () => ({
   clearPersistedWindow: vi.fn(),
+  resumePersistedWindowWrites: vi.fn(),
 }))
 
 vi.mock("@/lib/chat-store/persist", () => ({
@@ -53,6 +57,7 @@ describe("signOutAndClearLocalState", () => {
     expect(clearAllIndexedDBStores).toHaveBeenCalledOnce()
     expect(options.signOut).toHaveBeenCalledWith({ returnTo: "/" })
     expect(toast).not.toHaveBeenCalled()
+    expect(resumePersistedWindowWrites).not.toHaveBeenCalled()
   })
 
   it("shows a failure toast when sign-out fails without redirecting", async () => {
@@ -65,6 +70,8 @@ describe("signOutAndClearLocalState", () => {
       title: "Failed to sign out",
       status: "error",
     })
+    // Still signed in: the sidebar window may be written again.
+    expect(resumePersistedWindowWrites).toHaveBeenCalledOnce()
   })
 
   it("continues sign-out when local cleanup fails", async () => {

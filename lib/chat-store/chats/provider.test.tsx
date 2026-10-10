@@ -840,6 +840,7 @@ describe("ChatsProvider guest local chats", () => {
     it("paints the owner's persisted rows while live data is pending", async () => {
       persistWindow("user-1", ["cached-a", "cached-b"])
       convexMocks.isLoading = true
+      convexMocks.authUserId = "user-1"
       const capture: { current: ReturnType<typeof useChats> | null } = {
         current: null,
       }
@@ -883,18 +884,27 @@ describe("ChatsProvider guest local chats", () => {
       )
     })
 
-    it("writes nothing when the live AuthKit user is not the owner", async () => {
+    it("neither shows nor writes the owner's window when AuthKit holds another user", async () => {
       vi.useFakeTimers()
+      persistWindow("user-1", ["cached-a"])
+      convexMocks.isLoading = true
       convexMocks.authUserId = "user-2"
-      deliverLiveWindow()
       const capture: { current: ReturnType<typeof useChats> | null } = {
         current: null,
       }
 
       renderProvider(capture, "user-1")
+      expect(capture.current?.isLoading).toBe(true)
+      expect(capture.current?.chats).toEqual([])
+      expect(capture.current?.persistedProjects).toBeNull()
+
+      deliverLiveWindow()
+      rerenderProvider(capture, "user-1")
       act(() => vi.runAllTimers())
 
-      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).toBeNull()
+      expect(localStorage.getItem(PERSISTED_WINDOW_STORAGE_KEY)).not.toContain(
+        "chat-server"
+      )
     })
 
     it("ignores and removes another owner's window", async () => {

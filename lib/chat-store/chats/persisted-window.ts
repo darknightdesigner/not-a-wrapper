@@ -328,3 +328,8 @@ export function clearPersistedWindow() {
   removeRaw()
   invalidate()
 }
+
+/** A sign-out that failed without navigating leaves this session in place. */
+export function resumePersistedWindowWrites() {
+  writesStopped = false
+}

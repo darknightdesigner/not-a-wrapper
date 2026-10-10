@@ -306,9 +306,15 @@ export function ChatsProvider({
     isConvexAuthenticated,
     firstPagePending: projectDocs === undefined,
   })
+  // The window is bound to the live AuthKit identity, not only the
+  // server-seeded prop: if this tab's session moves to another user, the old
+  // owner's rows are neither shown nor written. AuthKit seeds its user from
+  // the server's initialAuth, so a reload still paints on the first render.
+  const { user: authUser } = useAuth()
+  const isSessionOwner = userId !== undefined && authUser?.id === userId
   const persistedWindow = usePersistedWindow(
     userId,
-    isLivePending || areProjectsPending
+    isSessionOwner && (isLivePending || areProjectsPending)
   )
   const displayedPersistedWindow = isLivePending
     ? (persistedWindow?.chats ?? null)
@@ -326,14 +332,10 @@ export function ChatsProvider({
 
   // Write-through on change: only delivered live reads are persisted, and the
   // serialized string drops run status, so status-only updates write nothing.
-  // Writes are bound to the live AuthKit identity, not only the server-seeded
-  // prop: if this tab's session moves to another user, nothing is written
-  // under the old owner.
-  const { user: authUser } = useAuth()
   const persistableWindow = useMemo(
     () =>
       userId &&
-      authUser?.id === userId &&
+      isSessionOwner &&
       isConvexAuthenticated &&
       !isLivePending &&
       projectDocs !== undefined
@@ -341,7 +343,7 @@ export function ChatsProvider({
         : null,
     [
       userId,
-      authUser?.id,
+      isSessionOwner,
       isConvexAuthenticated,
       isLivePending,
       serverChats,

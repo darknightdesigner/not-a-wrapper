@@ -1,7 +1,10 @@
 "use client"
 
 import { toast } from "@/components/ui/toast"
-import { clearPersistedWindow } from "@/lib/chat-store/chats/persisted-window"
+import {
+  clearPersistedWindow,
+  resumePersistedWindowWrites,
+} from "@/lib/chat-store/chats/persisted-window"
 import { clearAllIndexedDBStores } from "@/lib/chat-store/persist"
 
 type SignOut = (options?: { returnTo?: string }) => Promise<void>
@@ -52,6 +55,7 @@ export async function signOutAndClearLocalState({
   } catch (error) {
     if (isNextRedirectError(error)) return
 
+    resumePersistedWindowWrites()
     console.error("Sign out failed:", error)
     toast({ title: "Failed to sign out", status: "error" })
   }
