@@ -1,5 +1,6 @@
 /** @vitest-environment jsdom */
 
+import { getFunctionName, type FunctionReference } from "convex/server"
 import React, { act } from "react"
 import { createRoot, hydrateRoot, type Root } from "react-dom/client"
 import { renderToString } from "react-dom/server"
@@ -50,6 +51,8 @@ const convexMocks = vi.hoisted(() => ({
   isAuthenticated: false,
   isAuthLoading: false,
   queryValue: undefined as unknown,
+  // Per-query values by function name; falls back to `queryValue`.
+  queryValues: {} as Record<string, unknown>,
   mutationFn: vi.fn(),
   useQuery: vi.fn(),
 }))
@@ -74,9 +77,12 @@ vi.mock("convex/react", () => ({
 }))
 // The seam's useQuery is the convex-helpers cached variant (ADR-0031).
 vi.mock("convex-helpers/react/cache", () => ({
-  useQuery: (...args: unknown[]) => {
-    convexMocks.useQuery(...args)
-    return convexMocks.queryValue
+  useQuery: (query: FunctionReference<"query">, ...args: unknown[]) => {
+    convexMocks.useQuery(query, ...args)
+    const name = getFunctionName(query)
+    return name in convexMocks.queryValues
+      ? convexMocks.queryValues[name]
+      : convexMocks.queryValue
   },
 }))
 
@@ -132,6 +138,7 @@ describe("MessagesProvider local chat hydration", () => {
     convexMocks.isAuthenticated = false
     convexMocks.isAuthLoading = false
     convexMocks.queryValue = undefined
+    convexMocks.queryValues = {}
     convexMocks.mutationFn.mockReset()
     convexMocks.useQuery.mockClear()
     sessionMocks.chatId = "local-thread"
@@ -259,6 +266,47 @@ describe("MessagesProvider local chat hydration", () => {
     expect(capture.current?.isLoading).toBe(chatId !== null)
     expect(capture.current?.messages).toEqual([])
     expect(persistMocks.readFromIndexedDB).not.toHaveBeenCalled()
+  })
+
+  it("appends the live message only after the history that stopped before it", () => {
+    sessionMocks.chatId = "durable-chat"
+    convexMocks.isAuthenticated = true
+    const message = (id: string) => ({
+      _id: id,
+      role: "assistant",
+      parts: [{ type: "text", text: id }],
+      status: "streaming",
+      createdAt: 1,
+    })
+    const deliver = (liveMessageId: string | null) => {
+      convexMocks.queryValues = {
+        "messages:getSelectedPath": {
+          selectedMessages: [message("history")],
+          liveMessageId,
+        },
+        "messages:getSelectedRunState": null,
+        "messages:getLiveMessage": message("live"),
+      }
+    }
+    const capture: { current: ReturnType<typeof useMessages> | null } = {
+      current: null,
+    }
+    deliver("live")
+    renderProvider(capture)
+    expect(capture.current?.messages.map((m) => [m.id, m.content])).toEqual([
+      ["history", "history"],
+      ["live", "live"],
+    ])
+    // A full-path read (no tail handshake) already holds every message.
+    deliver(null)
+    act(() =>
+      root?.render(
+        <MessagesProvider>
+          <MessagesSnapshot captureRef={capture} />
+        </MessagesProvider>
+      )
+    )
+    expect(capture.current?.messages.map((m) => m.id)).toEqual(["history"])
   })
 
   it("does not keep a chat loading once Convex auth settles signed out", async () => {

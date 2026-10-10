@@ -99,6 +99,17 @@ export default defineSchema({
     ),
     // Guards the projection so a late terminal event cannot clobber a newer run.
     statusRunId: v.optional(v.id("generationRuns")),
+    // Live tail (ADR-0027): the streaming assistant message the history read
+    // stops before. Stamped at prepare only when the selected path is exactly
+    // history then this message; cleared at terminal and branch select.
+    // Server-only: `toClientChat` strips it from every chat read.
+    liveTail: v.optional(
+      v.object({
+        messageId: v.id("messages"),
+        orderId: v.number(),
+        parentMessageId: v.id("messages"),
+      })
+    ),
     lastRunEndedAt: v.optional(v.number()),
     lastRunStatus: v.optional(
       v.union(v.literal("completed"), v.literal("failed"))

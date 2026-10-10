@@ -99,9 +99,11 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
 
   const isDurableChat = chatId !== null && messagePersistenceMode === "server"
 
-  // The path and run state subscribe separately so run-only writes do not
-  // re-deliver the full message path. Both queries use the same chatId and
-  // Convex client, so their values are delivered from one transition.
+  // The selected conversation is three subscriptions, all keyed by chatId on
+  // one Convex client, so their values arrive from one transition (ADR-0027):
+  // run-only writes re-deliver only the run state, and while a run streams
+  // the path is the history before the live tail and the live message comes
+  // alone, so a checkpoint re-sends one message instead of the whole path.
   const pathQuery = usePerUserQuery(
     api.messages.getSelectedPath,
     isDurableChat ? { chatId } : "skip"
@@ -110,42 +112,70 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
     api.messages.getSelectedRunState,
     isDurableChat ? { chatId } : "skip"
   )
+  const liveQuery = usePerUserQuery(
+    api.messages.getLiveMessage,
+    isDurableChat ? { chatId } : "skip"
+  )
   const canSubscribeToMessages = pathQuery.isAuthReady
-  const isMessagesLoading = pathQuery.isLoading || runStateQuery.isLoading
-  const convexMessages = pathQuery.data?.selectedMessages
+  const isMessagesLoading =
+    pathQuery.isLoading || runStateQuery.isLoading || liveQuery.isLoading
+  const historyMessages = pathQuery.data?.selectedMessages
+  // Append the live message only after the history that stopped before it;
+  // a full-path fallback (liveMessageId null) already holds it.
+  const liveMessage =
+    liveQuery.data && liveQuery.data._id === pathQuery.data?.liveMessageId
+      ? liveQuery.data
+      : null
   const rawSelectedRun = runStateQuery.data ?? null
   // Client half of the run validation: a run may drive
   // presentation only while its assistant message is on the DELIVERED
   // selected path (the points-back half stayed server-side). Same-transition
   // delivery makes this check sound; "run known, path unknown" resolves null.
   const selectedRun = useMemo(() => {
-    if (!canSubscribeToMessages || !rawSelectedRun) return null
+    if (!canSubscribeToMessages || !rawSelectedRun || !historyMessages) {
+      return null
+    }
+    const { assistantMessageId } = rawSelectedRun
     const onDeliveredPath =
-      convexMessages?.some(
-        (message) => message._id === rawSelectedRun.assistantMessageId
-      ) ?? false
+      liveMessage?._id === assistantMessageId ||
+      historyMessages.some((message) => message._id === assistantMessageId)
     return onDeliveredPath ? rawSelectedRun : null
-  }, [canSubscribeToMessages, rawSelectedRun, convexMessages])
+  }, [canSubscribeToMessages, rawSelectedRun, historyMessages, liveMessage])
 
   const selectBranchMutation = useMutation(api.messages.selectBranch)
 
-  const serverMessages: ExtendedUIMessage[] = useMemo(() => {
-    if (!canSubscribeToMessages || !convexMessages) return []
-    return convexMessages.map((msg) =>
-      durableStoredMessageToUiMessage(msg)
-    ) as ExtendedUIMessage[]
-  }, [canSubscribeToMessages, convexMessages])
+  // History and the live message map separately, so a checkpoint maps one.
+  const historyUiMessages = useMemo(
+    () =>
+      canSubscribeToMessages && historyMessages
+        ? (historyMessages.map((msg) =>
+            durableStoredMessageToUiMessage(msg)
+          ) as ExtendedUIMessage[])
+        : [],
+    [canSubscribeToMessages, historyMessages]
+  )
+  const serverMessages: ExtendedUIMessage[] = useMemo(
+    () =>
+      liveMessage
+        ? [
+            ...historyUiMessages,
+            durableStoredMessageToUiMessage(liveMessage) as ExtendedUIMessage,
+          ]
+        : historyUiMessages,
+    [historyUiMessages, liveMessage]
+  )
 
   // Selected-conversation client counters: selected count and
-  // mapping duration, counts only — no content, no ids. Render must stay
-  // pure, so the duration is measured post-commit by timing one additional
-  // mapping pass of the same update; instrumentation is off by default and
-  // this cost exists only in diagnostic builds (documented in the runbook).
+  // mapping duration of a history delivery, counts only — no content, no ids.
+  // Render must stay pure, so the duration is measured post-commit by timing
+  // one additional mapping pass of the same update; instrumentation is off by
+  // default and this cost exists only in diagnostic builds (documented in the
+  // runbook). Keyed on history alone, so it adds nothing per checkpoint.
   useEffect(() => {
     if (!isChatPerfClientEnabled()) return
-    if (!canSubscribeToMessages || !convexMessages) return
+    if (!canSubscribeToMessages || !historyMessages) return
     const mappingStart = performance.now()
-    const mapped = convexMessages.map((msg) =>
+    const mapped = historyMessages.map((msg) =>
       durableStoredMessageToUiMessage(msg)
     )
     markChatPerf("selected_conversation_client", {
@@ -153,7 +183,7 @@ export function MessagesProvider({ children }: { children: React.ReactNode }) {
       mappingDurationMs:
         Math.round((performance.now() - mappingStart) * 100) / 100,
     })
-  }, [canSubscribeToMessages, convexMessages])
+  }, [canSubscribeToMessages, historyMessages])
 
   const subscribeToCachedMessages = useCallback(
     (listener: () => void) => {

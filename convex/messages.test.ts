@@ -376,10 +376,8 @@ describe("selected conversation projections", () => {
       "message_assistant_1",
     ])
     expect(path.selectedMessages[1]?.generationRunId).toBe(world.runId)
-    expect(path.pathVersion).toMatchObject({
-      count: 2,
-      tailMessageId: world.assistantId,
-    })
+    // No live tail stamped, so this is the whole path.
+    expect(path.liveMessageId).toBeNull()
     expect(runState).toMatchObject({
       runId: world.runId,
       assistantMessageId: world.assistantId,

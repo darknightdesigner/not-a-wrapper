@@ -66,6 +66,18 @@ export function selectProjectChatPreview(
 }
 
 /**
+ * A chat doc as clients read it: without the server-only live tail
+ * (ADR-0027), so the pointer never reaches the sidebar, the persisted window
+ * (ADR-0048) or `getById`.
+ */
+export function toClientChat({
+  liveTail: _liveTail,
+  ...chat
+}: Doc<"chats">): Omit<Doc<"chats">, "liveTail"> {
+  return chat
+}
+
+/**
  * The current user's pinned chats over the composite sidebar index — a small,
  * live read rendered as its own sidebar section alongside the paginated
  * recency window (ADR-0005). Project membership is retained so the sidebar can
@@ -89,7 +101,7 @@ export async function getPinnedForCurrentUserHandler(
     .filter((q) => q.eq(q.field("deletingAt"), undefined))
     .order("desc")
     .collect()
-  return await filterActiveChats(ctx, chats)
+  return (await filterActiveChats(ctx, chats)).map(toClientChat)
 }
 
 export const getPinnedForCurrentUser = maybeAuthQuery({
@@ -115,7 +127,7 @@ export async function listForCurrentUserPaginatedHandler(
     return { page: [], isDone: true, continueCursor: "" }
   }
 
-  return await ctx.db
+  const result = await ctx.db
     .query("chats")
     .withIndex("by_user_project_updated", (q) =>
       q.eq("userId", user._id).eq("projectId", undefined)
@@ -124,6 +136,7 @@ export async function listForCurrentUserPaginatedHandler(
     .filter((q) => q.eq(q.field("deletingAt"), undefined))
     .order("desc")
     .paginate(paginationOpts)
+  return { ...result, page: result.page.map(toClientChat) }
 }
 
 export const listForCurrentUserPaginated = maybeAuthQuery({
@@ -165,7 +178,7 @@ export async function getRecentWindowForCurrentUserHandler(
     .paginate(paginationOpts)
   return {
     ...result,
-    page: await filterActiveChats(ctx, result.page),
+    page: (await filterActiveChats(ctx, result.page)).map(toClientChat),
   }
 }
 
@@ -199,7 +212,7 @@ export async function getProjectChatDirectoryForProject(
         .take(PROJECT_CHAT_PREVIEW_SCAN_LIMIT)
 
       return {
-        chat,
+        chat: toClientChat(chat),
         preview: selectProjectChatPreview(messages),
       }
     })
@@ -264,7 +277,7 @@ export async function searchByTitleForCurrentUserHandler(
     )
     .filter((q) => q.eq(q.field("deletingAt"), undefined))
     .take(CHAT_SEARCH_RESULT_LIMIT)
-  return await filterActiveChats(ctx, chats)
+  return (await filterActiveChats(ctx, chats)).map(toClientChat)
 }
 
 export const searchByTitle = maybeAuthQuery({
@@ -279,7 +292,7 @@ export const searchByTitle = maybeAuthQuery({
  */
 export const getById = readableChatQuery({
   args: {},
-  handler: async (ctx) => ctx.chat,
+  handler: async (ctx) => (ctx.chat ? toClientChat(ctx.chat) : null),
 })
 
 type NewChatArgs = {

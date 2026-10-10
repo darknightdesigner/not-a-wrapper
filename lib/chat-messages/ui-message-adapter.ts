@@ -8,7 +8,8 @@ export type DurableStoredMessageLike = {
   _id: string
   clientMessageId?: string
   role: "user" | "assistant" | "system"
-  content: string
+  /** Omitted by the selected-conversation reads when it equals the text parts. */
+  content?: string
   parts: unknown
   status: DurableMessageStatus
   metadata?: unknown

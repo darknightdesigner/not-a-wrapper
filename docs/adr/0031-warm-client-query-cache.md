@@ -37,9 +37,11 @@ not deliver anything, so that guarantee is unaffected.
   cost lens) than saving a switch. Idle cap 32 entries, global to every
   cached per-user query: the session-long reads (user document, key status,
   preferences) never go idle, so in practice that is ~16 parked chats × the
-  pair. At the cap a departing query is dropped instead
-  of parked and a warm is skipped, so the hit guarantee below holds for
-  chats left within the cap and the TTL.
+  pair. (48 since 2026-10-10: the ADR-0027 live tail adds `getLiveMessage`,
+  warmed with the pair; eviction is per entry, so a chat can lose one of its
+  three and open in a loading state.) At the cap a departing query is
+  dropped instead of parked and a warm is skipped, so the hit guarantee below
+  holds for chats left within the cap and the TTL.
 - Warm ahead of the route. `useWarmPerUserQuery` opens a query as a
   momentary registry `start()` + `end()` — exactly the parked state a
   consumer leaves on unmount — gated on Convex auth readiness like the seam.

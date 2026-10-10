@@ -1,6 +1,6 @@
-import { v } from "convex/values"
+import { v, type Infer } from "convex/values"
 import type { Doc, Id } from "./_generated/dataModel"
-import { mutation, type MutationCtx, type QueryCtx } from "./_generated/server"
+import type { MutationCtx, QueryCtx } from "./_generated/server"
 import {
   bucketPow2,
   logChatPerfConvex,
@@ -13,46 +13,105 @@ import {
   getSelectedPathMessagesFromContext,
   type MessageBranchInfo,
 } from "./domain/message_branches"
+import { extractTextFromMessageParts } from "./domain/message_facts"
 import { isVisibleChatMessage } from "./domain/message_visibility"
-import { recordChatActivity } from "./domain/project_activity"
+import { patchChatActivity } from "./domain/project_activity"
 import { requireOwnedChat } from "./lib/auth"
 import { ownedChatMutation, readableChatQuery } from "./lib/authedFunctions"
+import { vToolInvocationStreamMetadata } from "./lib/messageMetadata"
+import schema from "./schema"
 
-function withBranchMetadata(
-  selectedMessages: Doc<"messages">[],
-  getBranchInfo: (message: Doc<"messages">) => MessageBranchInfo | undefined
-) {
-  return selectedMessages.map((message) => {
-    const branch = getBranchInfo(message)
-    if (!branch) return message
-
-    const metadata =
-      message.metadata &&
-      typeof message.metadata === "object" &&
-      !Array.isArray(message.metadata)
-        ? message.metadata
-        : {}
-
-    return {
-      ...message,
-      metadata: {
-        ...metadata,
-        branch,
-      },
-    }
-  })
-}
+const vMessageBranchInfo = v.object({
+  messageId: v.id("messages"),
+  currentIndex: v.number(),
+  total: v.number(),
+  siblings: v.array(
+    v.object({
+      messageId: v.id("messages"),
+      clientMessageId: v.optional(v.string()),
+    })
+  ),
+})
 
 /**
- * Selected visible path plus branch descriptors. The whole projection shares
- * one branch context.
+ * One message as the selected-conversation reads ship it: only the fields the
+ * client adapter reads. `content` is omitted when it equals the text parts,
+ * which the adapter derives with the same `extractTextFromMessageParts`.
  */
-function getVisibleSelectedMessages(messages: Doc<"messages">[]) {
-  const context = createBranchContext(messages)
-  return withBranchMetadata(
-    getSelectedPathMessagesFromContext(context).filter(isVisibleChatMessage),
-    (message) => getBranchInfoForMessageFromContext(context, message)
+export const vSelectedMessage = schema.tables.messages.validator
+  .pick(
+    "clientMessageId",
+    "role",
+    "parts",
+    "status",
+    "requestId",
+    "generationRunId",
+    "model",
+    "provider",
+    "finishReason",
+    "usage",
+    "error",
+    "errorRecovery",
+    "createdAt"
   )
+  .extend({
+    _id: v.id("messages"),
+    content: v.optional(v.string()),
+    metadata: v.optional(
+      vToolInvocationStreamMetadata.extend({
+        branch: v.optional(vMessageBranchInfo),
+      })
+    ),
+  })
+export type SelectedMessage = Infer<typeof vSelectedMessage>
+
+function toSelectedMessage(
+  message: Doc<"messages">,
+  branch: MessageBranchInfo | undefined
+): SelectedMessage {
+  const { content, metadata } = message
+  return {
+    _id: message._id,
+    clientMessageId: message.clientMessageId,
+    role: message.role,
+    ...(content === extractTextFromMessageParts(message.parts)
+      ? {}
+      : { content }),
+    parts: message.parts,
+    status: message.status,
+    requestId: message.requestId,
+    generationRunId: message.generationRunId,
+    model: message.model,
+    provider: message.provider,
+    finishReason: message.finishReason,
+    usage: message.usage,
+    error: message.error,
+    errorRecovery: message.errorRecovery,
+    metadata: branch ? { ...metadata, branch } : metadata,
+    createdAt: message.createdAt,
+  }
+}
+
+/** Reads a chat's messages in order, optionally only those before `before`. */
+async function readSelectedPath(
+  ctx: Pick<QueryCtx, "db">,
+  chatId: Id<"chats">,
+  before?: number
+) {
+  const messages = await ctx.db
+    .query("messages")
+    .withIndex("by_chat_order", (q) =>
+      before === undefined
+        ? q.eq("chatId", chatId)
+        : q.eq("chatId", chatId).lt("orderId", before)
+    )
+    .collect()
+  const context = createBranchContext(messages)
+  return {
+    messages,
+    context,
+    path: getSelectedPathMessagesFromContext(context),
+  }
 }
 
 export async function listMessagesByChatOrder(
@@ -93,43 +152,60 @@ export type SelectedRunProjection = {
   pendingApproval: PendingApprovalProjection | null
 }
 
-export type SelectedPathProjection = {
-  selectedMessages: ReturnType<typeof getVisibleSelectedMessages>
+export const vSelectedPathProjection = v.object({
+  selectedMessages: v.array(vSelectedMessage),
   /**
-   * Cheap reconciliation fingerprint derived from the data this execution
-   * read — no schema change, sufficient for client-side consistency
-   * assertions, NOT a server-side gate.
+   * The live message this history stopped before (ADR-0027 live tail), or
+   * null when it read the whole path. The client appends `getLiveMessage`
+   * only when its id matches, so the live message is never duplicated or
+   * misplaced.
    */
-  pathVersion: {
-    count: number
-    tailMessageId: Id<"messages"> | null
-    maxUpdatedAt: number
-  }
-}
+  liveMessageId: v.union(v.id("messages"), v.null()),
+})
+export type SelectedPathProjection = Infer<typeof vSelectedPathProjection>
 
 /**
- * The selected visible path and nothing run-shaped. Its Convex read set is
- * chats/projects/users/messages only, so
- * run-doc writes (deduped snapshot beats, heartbeats, tool steps, approval
- * bookkeeping) do not re-execute the full message collect. Derivation uses
- * the shared branch context so branch and sibling semantics stay consistent.
+ * The selected visible path and nothing run-shaped. Its read set is
+ * chats/projects/users/messages only, so run-doc writes do not re-execute it.
+ * While a run streams it is the history: it reads only messages ordered
+ * before the chat's live tail, so checkpoint writes to the live message stay
+ * outside its read set and `getLiveMessage` carries that message alone.
+ * `unbounded` (the resume route's one-shot read) takes the whole path.
  */
 export async function getSelectedPathForViewer(
   ctx: QueryCtx,
   {
     chat,
     viewer,
-  }: { chat: Doc<"chats"> | null; viewer: Doc<"users"> | null }
-): Promise<SelectedPathProjection> {
-  const empty: SelectedPathProjection = {
-    selectedMessages: [],
-    pathVersion: { count: 0, tailMessageId: null, maxUpdatedAt: 0 },
+    unbounded = false,
+  }: {
+    chat: Doc<"chats"> | null
+    viewer: Doc<"users"> | null
+    unbounded?: boolean
   }
+): Promise<SelectedPathProjection> {
   // The builder hands only the owner a chat; strangers read shares through
   // the share view (ADR-0043). Fail closed if that ever changes.
-  if (!chat || viewer === null || chat.userId !== viewer._id) return empty
-  const messages = await listMessagesByChatOrder(ctx, chat._id)
-  const selectedMessages = getVisibleSelectedMessages(messages)
+  if (!chat || viewer === null || chat.userId !== viewer._id) {
+    return { selectedMessages: [], liveMessageId: null }
+  }
+  const liveTail = unbounded ? undefined : chat.liveTail
+  let read = await readSelectedPath(ctx, chat._id, liveTail?.orderId)
+  let liveMessageId = liveTail?.messageId ?? null
+  // Self-check: the bounded walk must end on the live message's parent, or
+  // appending it would misplace it. Fall back to the whole path.
+  if (liveTail && read.path.at(-1)?._id !== liveTail.parentMessageId) {
+    read = await readSelectedPath(ctx, chat._id)
+    liveMessageId = null
+  }
+  const selectedMessages = read.path
+    .filter(isVisibleChatMessage)
+    .map((message) =>
+      toSelectedMessage(
+        message,
+        getBranchInfoForMessageFromContext(read.context, message)
+      )
+    )
 
   if (shouldSampleChatPerfConvex()) {
     let partsBytes = 0
@@ -141,30 +217,55 @@ export async function getSelectedPathForViewer(
       // Size estimate only.
     }
     logChatPerfConvex("selected_conversation_read", {
-      messagesReadBucket: bucketPow2(messages.length),
+      messagesReadBucket: bucketPow2(read.messages.length),
       selectedCountBucket: bucketPow2(selectedMessages.length),
       partsBytesBucket: bucketPow2(partsBytes),
     })
   }
 
-  return {
-    selectedMessages,
-    pathVersion: {
-      count: selectedMessages.length,
-      tailMessageId: selectedMessages.at(-1)?._id ?? null,
-      maxUpdatedAt: selectedMessages.reduce(
-        (max, message) => Math.max(max, message.updatedAt ?? 0),
-        0
-      ),
-    },
+  return { selectedMessages, liveMessageId }
+}
+
+/**
+ * The live tail's message alone, with its branch descriptor from its sibling
+ * group. Null without a live tail, for non-owners, and when the message is
+ * gone, moved, deselected or not yet visible.
+ */
+export async function getLiveMessageForViewer(
+  ctx: QueryCtx,
+  { chat, viewer }: { chat: Doc<"chats"> | null; viewer: Doc<"users"> | null }
+): Promise<SelectedMessage | null> {
+  if (!chat?.liveTail || viewer === null || chat.userId !== viewer._id) {
+    return null
   }
+  const { messageId, parentMessageId } = chat.liveTail
+  const message = await ctx.db.get(messageId)
+  if (
+    !message ||
+    message.chatId !== chat._id ||
+    message.parentMessageId !== parentMessageId ||
+    message.selected === false ||
+    !isVisibleChatMessage(message)
+  ) {
+    return null
+  }
+  const siblings = await ctx.db
+    .query("messages")
+    .withIndex("by_chat_parent", (q) =>
+      q.eq("chatId", chat._id).eq("parentMessageId", parentMessageId)
+    )
+    .collect()
+  return toSelectedMessage(
+    message,
+    getBranchInfoForMessageFromContext(createBranchContext(siblings), message)
+  )
 }
 
 /**
  * The tiny per-beat run state. Non-owner viewers get null. Run↔chat
  * ownership and the points-back check stay server-side; the on-selected-path
- * half lives in the client, which is sound because both queries'
- * values always come from one Convex transition (same client, same
+ * half lives in the client, which is sound because the selected-conversation
+ * queries' values always come from one Convex transition (same client, same
  * `chatId`-only arguments) — the provider nulls the run when its assistant
  * message is absent from the delivered path.
  */
@@ -228,14 +329,42 @@ export async function getSelectedRunStateForViewer(
 
 export const getSelectedPath = readableChatQuery({
   args: {},
+  returns: vSelectedPathProjection,
   handler: async (ctx) =>
     getSelectedPathForViewer(ctx, { chat: ctx.chat, viewer: ctx.user }),
+})
+
+export const getLiveMessage = readableChatQuery({
+  args: {},
+  returns: v.union(vSelectedMessage, v.null()),
+  handler: async (ctx) =>
+    getLiveMessageForViewer(ctx, { chat: ctx.chat, viewer: ctx.user }),
 })
 
 export const getSelectedRunState = readableChatQuery({
   args: {},
   handler: async (ctx) =>
     getSelectedRunStateForViewer(ctx, { chat: ctx.chat, viewer: ctx.user }),
+})
+
+/**
+ * The resume route's read (ADR-0039): run state and the whole selected path,
+ * live message included, from one snapshot, so its on-path check and
+ * selection frame agree.
+ */
+export const getResumeSelection = readableChatQuery({
+  args: {},
+  handler: async (ctx) => {
+    const viewer = { chat: ctx.chat, viewer: ctx.user }
+    const { selectedMessages } = await getSelectedPathForViewer(ctx, {
+      ...viewer,
+      unbounded: true,
+    })
+    return {
+      run: await getSelectedRunStateForViewer(ctx, viewer),
+      selectedMessages,
+    }
+  },
 })
 
 /**
@@ -261,7 +390,9 @@ export async function selectBranchForChat(
   const now = Date.now()
   await createMessageBranchWriter(ctx, { chatId, now }).select(targetMessage._id)
 
-  await recordChatActivity(ctx, chat, now)
+  // A branch write breaks the live-tail invariant; history reads the whole
+  // path again until the next prepare stamps a new tail.
+  await patchChatActivity(ctx, chat, { liveTail: undefined }, now)
   return targetMessage._id
 }
 

@@ -31,10 +31,12 @@ import { parseArgs } from "node:util"
 import { getConvexSiteUrl } from "@/app/api/_lib/convex-site-url"
 import { api } from "@/convex/_generated/api"
 import type { Id } from "@/convex/_generated/dataModel"
+import { extractTextFromMessageParts } from "@/convex/domain/message_facts"
 import {
   CANCELLATION_SETTLEMENT_PROTOCOL_VERSION,
   signChatAdmissionProof,
 } from "@/convex/lib/chatAdmissionProof"
+import type { SelectedMessage } from "@/convex/messages"
 import { createChatPublicId } from "@/lib/chat-store/identity"
 import { WorkOS } from "@workos-inc/node"
 import { ConvexHttpClient } from "convex/browser"
@@ -42,6 +44,10 @@ import { getConvexSize } from "convex/values"
 import { DEFAULT_AGENT_EMAIL } from "./lib/agent-auth"
 
 const MiB = 1024 * 1024
+/** Stored bytes; the read omits `content` when it equals the text parts. */
+const storedBytes = (message: SelectedMessage) =>
+  getConvexSize(message.content ?? extractTextFromMessageParts(message.parts)) +
+  getConvexSize(message.parts)
 const CHAT_TITLE = "convex-read-limits smoke"
 const MODEL = "gpt-5-mini"
 const PROVIDER = "openai"
@@ -143,8 +149,7 @@ async function main() {
   async function selectedPath(chatId: string) {
     const path = await client.query(api.messages.getSelectedPath, { chatId })
     const bytes = path.selectedMessages.reduce(
-      (sum, message) =>
-        sum + getConvexSize(message.content) + getConvexSize(message.parts),
+      (sum, message) => sum + storedBytes(message),
       0
     )
     return { messages: path.selectedMessages, bytes }
@@ -245,9 +250,7 @@ async function main() {
     const storedParts: unknown[] = Array.isArray(stored?.parts)
       ? stored.parts
       : []
-    result.storedBytes = stored
-      ? getConvexSize(stored.content) + getConvexSize(stored.parts)
-      : 0
+    result.storedBytes = stored ? storedBytes(stored) : 0
     result.omittedToolOutputs = storedParts.filter((part) =>
       JSON.stringify(part).includes('"_truncated":true')
     ).length

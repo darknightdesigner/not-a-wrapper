@@ -1,7 +1,7 @@
 # ADR-0027: Split the selected-conversation subscription
 
 **Status:** Accepted 2026-08-28; rollback removed 2026-08-30 after production
-verification
+verification; amended 2026-10-10 (live tail)
 **Date:** 2026-08-28
 
 ## Context
@@ -94,7 +94,8 @@ classification stays client-side.
   ~23 KB path re-collect + re-delivery. Content beats still re-execute the
   path query — per-execution read cost is untouched by this ADR (that is
   Experiment 2b, range-bounded settled-history pagination, gated on
-  prefix-derivability property tests).
+  prefix-derivability property tests). Done: see the live-tail amendment
+  below.
 - Tests pin owner and non-owner projection rules, server-side points-back
   validation, client-side on-path validation, and the live run query's narrow
   read set.
@@ -113,3 +114,79 @@ classification stays client-side.
   from ~2 MiB chats) and each message is capped at 896 KiB (`capMessagePayload`,
   CONTEXT.md "Message payload cap"), so both sides hit that bound at the same
   ~16 MiB.
+
+## Amendment 2026-10-10: the live tail (Experiment 2b)
+
+**Problem.** The live assistant message sat inside `getSelectedPath`'s
+message range, so every 750 ms checkpoint re-ran it and re-sent the whole
+path. A 45 s answer in an 18-message chat sent 36 path frames of 509 to
+597 KB (19.6 MB); the live message was 6.3% of those bytes. Convex sends a
+re-run's full value and skips only identical results.
+
+**Decision.** While a run streams, the path is two queries keyed by a
+server-only pointer on the chat, `chats.liveTail`
+(`{ messageId, orderId, parentMessageId }`):
+
+- **History** (`getSelectedPath`, same name and args) reads `by_chat_order`
+  with `orderId < liveTail.orderId`. It checks itself: when its walk does not
+  end on `liveTail.parentMessageId` it re-reads the whole path and returns
+  `liveMessageId: null`; otherwise `liveMessageId` names the live message.
+- **Live** (`getLiveMessage`) reads the chat, the live message and its
+  `by_chat_parent` sibling range, and returns the message with its branch
+  descriptor, or null when it is gone, moved, deselected or not yet visible.
+- **Client.** `MessagesProvider` appends the live message only when its id
+  equals `liveMessageId`, so it is never duplicated or misplaced, and maps
+  history and live separately. `isLoading` waits for all three queries. The
+  same-transition basis above covers them unchanged: three queries, `chatId`
+  only, one client. A warm-cache entry that was evicted and re-subscribed
+  still receives values at the client's current timestamp.
+- **Stamp.** Prepare resolves `resolveLiveTail(messages, liveId)`
+  (`convex/domain/message_branches.ts`) in every branch (send and edit,
+  regenerate, approval continuation) from the messages it already holds, and
+  writes it with the slot claim; an unresolved tail clears a stale one. It
+  resolves only when the live message has the highest `orderId`, the walk
+  without it ends on its explicit parent, the full walk is that walk plus the
+  live message, and every sibling names that parent explicitly. Legacy or
+  stale `selected` flags and inferred parents fail, so those chats keep the
+  full read.
+- **Clear.** The run-scoped status projection clears it on completed, failed
+  and aborted (an approval pause keeps it), so a superseded run's late
+  terminal cannot clear a newer run's tail. `selectBranch` clears it too.
+- **Resume route.** `getResumeSelection` returns run state and the whole path,
+  live message included, from one snapshot (it also removes the route's old
+  two-fetch race).
+- **Hidden pointer.** `toClientChat` strips `liveTail` from every chat read,
+  so it never reaches the sidebar, the persisted window (ADR-0048) or
+  `getById`.
+- **Field trim.** Both queries return `vSelectedMessage` through a `returns`
+  validator: only the fields the client adapter reads, with `content` omitted
+  when it equals the text parts (the adapter derives it with the same
+  `extractTextFromMessageParts`). `pathVersion` had no reader and is gone.
+
+| Query | Reads | Written by a checkpoint |
+| --- | --- | --- |
+| History | users row, chat, owner, project, messages before the tail | No |
+| Live | chat, live message, its sibling range | Yes, the live message |
+| Run state | unchanged | Yes, the run (deduped unless the projection changes) |
+
+**Consequences.**
+
+- A checkpoint re-sends only the live message: 2,585 B in the 120-turn
+  fixture, against the whole path (645,851 B before the trim, 424,814 B
+  after). Budgets in ADR-0049.
+- History still re-runs on chat-doc and users-row writes (title, approval
+  pause), deduped and unsent; its result changes only at prepare, terminal
+  and branch select.
+- The warm cache cap is 48 (16 chats times 3). Eviction is per entry, so a
+  chat can lose one of its three and then opens in a loading state like any
+  miss.
+- A client without `getLiveMessage` (an older deploy) shows the live answer
+  only when the run settles; the sending tab streams it locally either way.
+- Proof: `convex/selectedPathSplit.seam.test.ts`. A flow test runs the real
+  prepare for sends, a regenerate, a branch switch, a mid-path edit, an
+  approval pause and continuation, a supersede and a Stop; after every real
+  checkpoint the merged path equals the whole path, the write set is exactly
+  the live message and the run, and neither version of either falls in
+  history's recorded read set. A property loop over 120 seeded branch trees
+  with legacy rows and stale flags (35 refused at stamp, 78 bounded, 7
+  self-check fallbacks) finds the merged path equal to the whole path in all.

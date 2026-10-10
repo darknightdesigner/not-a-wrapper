@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SIDEBAR_WINDOW_PAGE_SIZE } from "../lib/config"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
+import { resolveLiveTail } from "./domain/message_branches"
+import { listMessagesByChatOrder } from "./messages"
 import schema from "./schema"
 import { modules } from "./test.setup"
 
@@ -16,7 +18,9 @@ import { modules } from "./test.setup"
 // Regenerate: run `bunx vitest run convex/payloadBudgets.seam.test.ts` and
 // paste the `PAYLOAD_BUDGETS` object printed in the failure.
 const PAYLOAD_BUDGETS = {
-  selectedPath: 645_851,
+  selectedPathSettled: 424_814,
+  selectedPathDuringRun: 422_258,
+  liveMessage: 2_585,
   selectedRunStateLive: 175,
   selectedRunStateSettled: 173,
   recentWindowFirstPage: 9_667,
@@ -256,11 +260,27 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
         workosUpdatedAt: "2027-01-01T00:00:00.000Z",
       })
     )
-    const { runId, assistantMessageId } = await seedLongChat(t, userId)
+    const { chatId, runId, assistantMessageId } = await seedLongChat(t, userId)
     await seedSidebar(t, userId)
     const owner = t.withIdentity({ subject: OWNER })
 
     const path = await owner.query(api.messages.getSelectedPath, {
+      chatId: CHAT,
+    })
+    // The live tail as prepare stamps it: while the answer streams, history
+    // stops before it and each checkpoint re-sends the live message alone.
+    await t.run(async (ctx) =>
+      ctx.db.patch(chatId, {
+        liveTail: resolveLiveTail(
+          await listMessagesByChatOrder(ctx, chatId),
+          assistantMessageId
+        ),
+      })
+    )
+    const history = await owner.query(api.messages.getSelectedPath, {
+      chatId: CHAT,
+    })
+    const liveMessage = await owner.query(api.messages.getLiveMessage, {
       chatId: CHAT,
     })
     const live = await owner.query(api.messages.getSelectedRunState, {
@@ -287,13 +307,18 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
 
     // Shape guards: a budget only means something over the intended fixture.
     expect(path.selectedMessages).toHaveLength(TURNS * 2)
+    expect(history.liveMessageId).toBe(assistantMessageId)
+    expect(history.selectedMessages).toHaveLength(TURNS * 2 - 1)
+    expect(liveMessage?._id).toBe(assistantMessageId)
     expect(live?.status).toBe("streaming")
     expect(settled?.status).toBe("completed")
     expect(recent.page).toHaveLength(SIDEBAR_WINDOW_PAGE_SIZE)
     expect(pinned).toHaveLength(PINNED_CHATS)
 
     const measured: Record<PayloadName, number> = {
-      selectedPath: bytes(path),
+      selectedPathSettled: bytes(path),
+      selectedPathDuringRun: bytes(history),
+      liveMessage: bytes(liveMessage),
       selectedRunStateLive: bytes(live),
       selectedRunStateSettled: bytes(settled),
       recentWindowFirstPage: bytes(recent),

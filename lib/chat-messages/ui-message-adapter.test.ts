@@ -27,14 +27,13 @@ describe("durableStoredMessageToUiMessage", () => {
     })
   })
 
-  it("maps an assistant message with stored text parts", () => {
+  it("derives content the selected-path read omits from the text parts", () => {
     const parts = [{ type: "text" as const, text: "partial output" }]
 
     expect(
       durableStoredMessageToUiMessage({
         _id: "message_2",
         role: "assistant",
-        content: "partial output",
         parts,
         status: "streaming",
         createdAt: 200,
