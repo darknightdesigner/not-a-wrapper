@@ -120,7 +120,8 @@ V8's slower path. The service now:
   Code containing non-Latin-1 characters stays two-byte.
 - Keeps finished HTML in a Shiki-free module LRU
   (`lib/markdown/highlight-cache.ts`) keyed by the exact (code, fenced
-  language, theme) tuple, capped at 200 variants and 2M characters. Records
+  language, theme) tuple, capped at 200 variants and 2M characters counted
+  over code, fence labels and HTML. Records
   hold their own flat key copy so a cached block never retains the message it
   was sliced from. A degraded `text` render after a failed grammar load is not
   cached. `CodeBlockCode` reads the cache synchronously during render, gated by

@@ -18,10 +18,17 @@ it("bounds variants of a single code by entries and characters", () => {
   expect(readCachedHighlight(variant("l0"))).toBeNull()
   expect(readCachedHighlight(variant("l1"))).toBe("<i>")
 
-  // Three 800K-char variants exceed the 2M character cap.
-  clearHighlightCacheForTests()
+  // Three 800K-char variants exceed the 2M character cap, whether the
+  // characters sit in the HTML or in the fence label.
   const big = "y".repeat(800_000)
-  for (const language of ["a", "b", "c"]) storeHighlight(variant(language), big)
-  expect(readCachedHighlight(variant("a"))).toBeNull()
-  expect(readCachedHighlight(variant("c"))).toBe(big)
+  for (const [label, html] of [
+    ["", big],
+    [big, "<i>"],
+  ]) {
+    clearHighlightCacheForTests()
+    for (const tag of ["a", "b", "c"])
+      storeHighlight(variant(tag + label), html)
+    expect(readCachedHighlight(variant(`a${label}`))).toBeNull()
+    expect(readCachedHighlight(variant(`c${label}`))).toBe(html)
+  }
 })
