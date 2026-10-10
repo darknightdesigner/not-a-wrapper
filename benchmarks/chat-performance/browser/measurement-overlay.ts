@@ -28,11 +28,39 @@ export const MEASUREMENT_HOOK_FILES = [
   "lib/user-store/provider.tsx",
 ] as const
 
-/** Ignore only this audited product setting when comparing measurement bootstrap. */
+/**
+ * Audited product-analytics text in instrumentation-client.ts, removed in order
+ * before comparing. Only these exact hunks may differ; observer installation
+ * and reporting are compared byte for byte.
+ */
+const PRODUCT_ANALYTICS_HUNKS = [
+  // PostHog scroll-depth opt-out.
+  "    // Document scroll-depth analytics force layout during nested chat scrolling.\n" +
+    "    disable_scroll_properties: true,\n",
+  // ADR-0050: eager Replay and PostHog (base) moved behind the composer handoff (head).
+  'import posthog from "posthog-js"\n',
+  "  // Deterministic captures exclude remotely configured/random replay work.\n" +
+    "  integrations: chatUiBenchmark ? [] : [\n" +
+    "    Sentry.replayIntegration({\n" +
+    "      maskAllText: true,\n" +
+    "      maskAllInputs: true,\n" +
+    "      blockAllMedia: true,\n" +
+    "    }),\n" +
+    "  ],\n",
+  "const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY\n\n" +
+    "if (posthogKey && !posthog.__loaded) {\n" +
+    "  posthog.init(posthogKey, {\n" +
+    "    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,\n" +
+    '    person_profiles: "identified_only",\n' +
+    "    capture_pageview: false,\n" +
+    "    ...(chatUiBenchmark ? { disable_session_recording: true } : {}),\n" +
+    "  })\n" +
+    "}\n\n",
+  'import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"\n',
+  "// Replay (with the rates above) and PostHog load after the composer handoff (ADR-0050).\n" +
+    "startDeferredAnalytics()\n\n",
+]
+
 export function measurementBootstrap(source: string): string {
-  return source.replace(
-    "    // Document scroll-depth analytics force layout during nested chat scrolling.\n" +
-      "    disable_scroll_properties: true,\n",
-    "",
-  )
+  return PRODUCT_ANALYTICS_HUNKS.reduce((text, hunk) => text.replace(hunk, ""), source)
 }
