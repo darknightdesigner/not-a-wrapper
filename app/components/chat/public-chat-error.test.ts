@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { presentChatStreamError } from "./public-chat-error"
+import {
+  hasPublicChatErrorCode,
+  presentChatStreamError,
+} from "./public-chat-error"
+
+const guest = { isAuthenticated: false }
 
 describe("presentChatStreamError", () => {
   it("swallows a lost approval-continuation race by structured code", () => {
@@ -9,7 +14,7 @@ describe("presentChatStreamError", () => {
         code: "APPROVAL_CONTINUATION_CONFLICT",
       })
     )
-    expect(presentChatStreamError(error)).toEqual({
+    expect(presentChatStreamError(error, guest)).toEqual({
       kind: "swallow",
       reason: "approval-continuation-lost-race",
     })
@@ -22,22 +27,42 @@ describe("presentChatStreamError", () => {
         code: "APPROVAL_UNRESOLVED",
       })
     )
-    expect(presentChatStreamError(error)).toEqual({
+    expect(presentChatStreamError(error, guest)).toEqual({
       kind: "toast",
       title: "Your approval decision was not recorded. Approve or deny it again.",
     })
   })
 
+  it("offers a guest at the daily limit sign-in instead of a toast", () => {
+    const error = new Error(
+      JSON.stringify({
+        error: "Daily message limit reached (5). Sign in to keep chatting.",
+        code: "DAILY_LIMIT_REACHED",
+      })
+    )
+    expect(presentChatStreamError(error, guest)).toEqual({ kind: "sign-in" })
+    expect(
+      presentChatStreamError(error, { isAuthenticated: true })
+    ).toMatchObject({ kind: "toast" })
+    // Presented here, so the turn runner adds no second, generic toast.
+    expect(hasPublicChatErrorCode(error)).toBe(true)
+    expect(hasPublicChatErrorCode(new Error("fetch failed"))).toBe(false)
+  })
+
   it("falls back to a generic title for opaque transport errors", () => {
-    expect(presentChatStreamError(new Error("fetch failed"))).toEqual({
+    expect(presentChatStreamError(new Error("fetch failed"), guest)).toEqual({
       kind: "toast",
       title: "Something went wrong. Please try again.",
     })
-    expect(presentChatStreamError(new Error("Failed to fetch"))).toEqual({
-      kind: "toast",
-      title: "Something went wrong. Please try again.",
-    })
-    expect(presentChatStreamError(new Error("Rate limit exceeded"))).toEqual({
+    expect(presentChatStreamError(new Error("Failed to fetch"), guest)).toEqual(
+      {
+        kind: "toast",
+        title: "Something went wrong. Please try again.",
+      }
+    )
+    expect(
+      presentChatStreamError(new Error("Rate limit exceeded"), guest)
+    ).toEqual({
       kind: "toast",
       title: "Rate limit exceeded",
     })

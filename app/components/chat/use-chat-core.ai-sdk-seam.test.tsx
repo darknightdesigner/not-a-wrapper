@@ -369,7 +369,11 @@ describe("useChatCore × real @ai-sdk/react finalization", () => {
       chatId,
       user: authenticatedUser,
       isChatAdmissionReady: true,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage: {
+        check: () => true,
+        spend: () => {},
+        limitReached: () => {},
+      },
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       ensureChatExists: vi.fn(async () => ({ chatId: CHAT_ID })),
       bumpChat: vi.fn(),

@@ -461,12 +461,22 @@ async function runScenarioOnce(
   // A response can fail before the first-visible waiter attaches.
   void failedPost.catch(() => undefined)
   let chatRequestCount = 0
+  // Same-origin `/api/*` requests between the measured Send click and its
+  // `/api/chat` POST (ADR-0049): each is awaited before dispatch, so the count
+  // is the round trips added to click-to-request.
+  let preDispatchWindowOpen = false
+  let preDispatchApiRequests = 0
   let routeErrorStart = serverRouteErrors.length
   page.on("request", (request) => {
-    if (
-      new URL(request.url()).pathname === "/api/chat" &&
-      request.method() === "POST"
-    ) chatRequestCount++
+    const url = new URL(request.url())
+    if (url.pathname === "/api/chat" && request.method() === "POST") {
+      chatRequestCount++
+      preDispatchWindowOpen = false
+    } else if (
+      preDispatchWindowOpen &&
+      url.origin === new URL(baseUrl).origin &&
+      url.pathname.startsWith("/api/")
+    ) preDispatchApiRequests++
   })
   page.on("response", (response) => {
     if (
@@ -563,6 +573,7 @@ async function runScenarioOnce(
         tracing = true
       }
     }
+    preDispatchWindowOpen = true
     await page.locator('[data-testid="send-button"]').click()
 
     // Durable turns navigate to the server chat URL on acceptance.
@@ -1081,6 +1092,7 @@ async function runScenarioOnce(
         "chat_send_intent",
         "request_dispatched"
       ),
+      preDispatchApiRequests,
       dispatchToFirstStreamChunkMs: diff(
         marks,
         "request_dispatched",
@@ -1583,6 +1595,9 @@ async function main() {
         ),
         sendToRequestDispatchedMs: summarize(
           numeric((run) => run.sendToRequestDispatchedMs)
+        ),
+        preDispatchApiRequests: summarize(
+          numeric((run) => run.preDispatchApiRequests)
         ),
         dispatchToFirstStreamChunkMs: summarize(
           numeric((run) => run.dispatchToFirstStreamChunkMs)

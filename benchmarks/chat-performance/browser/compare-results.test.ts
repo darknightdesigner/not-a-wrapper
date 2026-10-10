@@ -328,6 +328,29 @@ describe("performance evidence contract", () => {
     ])
   })
 
+  it("gates pre-dispatch API requests at zero tolerance while older captures still compare", () => {
+    const counted = (count: number) => {
+      const value = result("responsiveness")
+      for (const scenario of value.scenarios) {
+        for (const run of scenario.runs) run.preDispatchApiRequests = count
+        scenario.metrics.preDispatchApiRequests = summarize(Array(5).fill(count))
+      }
+      return value
+    }
+    expect(compareResults(counted(1), counted(0))).toEqual([])
+    expect(compareResults(counted(0), counted(1))).toContain(
+      `${scenarioKey(counted(0).scenarios[0])} preDispatchApiRequests: 0 → 1`
+    )
+    // A capture from before the count existed compares on time alone.
+    expect(compareResults(result("responsiveness"), counted(1))).toEqual([])
+    const partial = counted(0)
+    delete partial.scenarios[0].runs[0].preDispatchApiRequests
+    partial.scenarios[0].metrics.preDispatchApiRequests = summarize(Array(4).fill(0))
+    expect(validateCoverage(partial)).toContain(
+      `${partial.scenarios[0].id}: preDispatchApiRequests missing from an individual run`
+    )
+  })
+
   it("distinguishes delivery shapes and never overwrites a baseline", () => {
     const base = result("standard")
     const slab = base.scenarios.find((scenario) => scenario.id === "mixed-markdown-30-slab")!

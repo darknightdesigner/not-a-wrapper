@@ -68,15 +68,12 @@ describe("signed-in turn admission", () => {
     for (const count of [1, 2]) {
       await expect(
         caller(t).mutation(api.usage.admit, {})
-      ).resolves.toMatchObject({ canSend: true, count })
+      ).resolves.toMatchObject({
+        canSend: true,
+        count,
+        remaining: AUTH_DAILY_MESSAGE_LIMIT - count,
+      })
     }
-    await expect(caller(t).query(api.usage.checkUsage, {})).resolves.toEqual({
-      canSend: true,
-      remaining: AUTH_DAILY_MESSAGE_LIMIT - 2,
-      limit: AUTH_DAILY_MESSAGE_LIMIT,
-      count: 2,
-      isAnonymous: false,
-    })
     expect(await t.run((ctx) => ctx.db.get(userId))).toEqual(before)
   })
 

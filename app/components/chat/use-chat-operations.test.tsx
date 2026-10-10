@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-import { checkRateLimits } from "@/lib/api"
 import type {
   FirstTurnChat,
   FirstTurnChatResult,
@@ -23,12 +22,6 @@ import { useChatOperations } from "./use-chat-operations"
 vi.mock("@/components/ui/toast", () => ({
   toast: vi.fn(),
 }))
-
-vi.mock("@/lib/api", () => ({
-  checkRateLimits: vi.fn(),
-}))
-
-const mockCheckRateLimits = vi.mocked(checkRateLimits)
 
 const localStorageMock = (() => {
   let store = new Map<string, string>()
@@ -106,9 +99,6 @@ describe("useChatOperations", () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
-    mockCheckRateLimits.mockResolvedValue({
-      remaining: 10,
-    })
   })
 
   afterEach(() => {
@@ -172,6 +162,23 @@ describe("useChatOperations", () => {
       ...overrides,
     }
   }
+
+  it("gates a guest locally, with no round trip, once a send was refused at the limit", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+    const setHasDialogAuth = vi.fn()
+    const { operations } = renderOperations(
+      baseProps({ isAuthenticated: false, setHasDialogAuth })
+    )
+
+    operations().guestUsage.limitReached()
+    expect(setHasDialogAuth).toHaveBeenCalledWith(true)
+    setHasDialogAuth.mockClear()
+
+    expect(operations().guestUsage.check()).toBe(false)
+    expect(setHasDialogAuth).toHaveBeenCalledWith(true)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
 
   it("commits the minted identity at begin and creates the guest chat under it", async () => {
     localStorage.setItem(GUEST_CHAT_STORAGE_KEY, "stale-guest-chat")

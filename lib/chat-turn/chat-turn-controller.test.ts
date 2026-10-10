@@ -90,10 +90,13 @@ function createHarness() {
       events.push("resolveUserId")
       return "user-1"
     }),
-    checkLimitsAndNotify: vi.fn(async () => {
-      events.push("checkLimitsAndNotify")
-      return true
-    }),
+    guestUsage: {
+      check: vi.fn(() => {
+        events.push("guestUsage.check")
+        return true
+      }),
+      spend: vi.fn(),
+    },
     firstTurn: {
       begin: vi.fn(() => {
         events.push("firstTurn.begin")
@@ -133,6 +136,7 @@ function createHarness() {
     toastError: vi.fn((title) => {
       events.push(`toastError:${title}`)
     }),
+    isPresentedRefusal: vi.fn(() => false),
     bumpChat: vi.fn(() => {
       events.push("bumpChat")
     }),
@@ -195,8 +199,9 @@ describe("chat turn controller", () => {
     expect(local.events.indexOf("setMessages")).toBeLessThan(
       local.events.indexOf("resolveUserId")
     )
-    expect(local.events.indexOf("setMessages")).toBeLessThan(
-      local.events.indexOf("checkLimitsAndNotify")
+    // The guest gate answers before anything paints, with no round trip.
+    expect(local.events.indexOf("guestUsage.check")).toBeLessThan(
+      local.events.indexOf("setMessages")
     )
     expect(local.events.indexOf("setMessages")).toBeLessThan(
       local.events.indexOf("ensureChatExists")
@@ -228,6 +233,7 @@ describe("chat turn controller", () => {
     expect(local.getMessages()).toEqual([optimisticMessage])
     expect(local.storeAdapters.cacheAndAddMessage).toHaveBeenCalledTimes(1)
     expect(onSuccess).toHaveBeenCalledWith("chat-1")
+    expect(local.adapters.guestUsage.spend).toHaveBeenCalledTimes(1)
 
     const durable = createHarness()
     durable.setRoutePersistsMessages(true)
@@ -239,12 +245,32 @@ describe("chat turn controller", () => {
 
     expect(durable.adapters.sendMessage).toHaveBeenCalledTimes(1)
     expect(durable.storeAdapters.cacheAndAddMessage).not.toHaveBeenCalled()
+    // Signed-in sends have no pre-send usage check; /api/chat admits them.
+    expect(durable.adapters.guestUsage.check).not.toHaveBeenCalled()
+    expect(durable.adapters.guestUsage.spend).not.toHaveBeenCalled()
   })
 
-  it("rolls back the immediate optimistic state when send is limit-denied", async () => {
+  it("stops a guest at a known zero before any route, row, or request", async () => {
+    const { adapters, controller, setCurrentChatId } = createHarness()
+    setCurrentChatId(null)
+    // The hook opens sign-in and answers false synchronously.
+    adapters.guestUsage.check = vi.fn(() => false)
+
+    await controller.runSendTurn({ text: "Hello" })
+
+    expect(adapters.firstTurn.begin).not.toHaveBeenCalled()
+    expect(adapters.setIsSending).not.toHaveBeenCalled()
+    expect(adapters.setMessages).not.toHaveBeenCalled()
+    expect(adapters.resolveUserId).not.toHaveBeenCalled()
+    expect(adapters.ensureChatExists).not.toHaveBeenCalled()
+    expect(adapters.sendMessage).not.toHaveBeenCalled()
+  })
+
+  it("rolls back the optimistic state when a guest's send-time usage read finds zero", async () => {
     const { adapters, controller, getMessages } = createHarness()
     let resolveLimit!: (allowed: boolean) => void
-    adapters.checkLimitsAndNotify = vi.fn(
+    // No fresh hint: the gate reads now and answers after the row paints.
+    adapters.guestUsage.check = vi.fn(
       () =>
         new Promise<boolean>((resolve) => {
           resolveLimit = resolve
@@ -597,6 +623,21 @@ describe("chat turn controller", () => {
     expect(confirmDispatched).not.toHaveBeenCalled()
     expect(getMessages()).toEqual([])
     expect(adapters.toastError).toHaveBeenCalledWith("Failed to send message")
+  })
+
+  it("leaves a refusal with a public code to the stream's error handler", async () => {
+    const { adapters, controller } = createHarness()
+    const refusal = new Error(JSON.stringify({ code: "DAILY_LIMIT_REACHED" }))
+    adapters.sendMessageAndWaitForAcceptance = vi.fn(async () => {
+      throw refusal
+    })
+    adapters.isPresentedRefusal = vi.fn(() => true)
+
+    await controller.runSendTurn({ text: "Hello" })
+
+    expect(adapters.isPresentedRefusal).toHaveBeenCalledWith(refusal)
+    expect(adapters.toastError).not.toHaveBeenCalled()
+    expect(adapters.guestUsage.spend).not.toHaveBeenCalled()
   })
 
   it("accepts an explicitly stopped turn when local abort races request acceptance", async () => {

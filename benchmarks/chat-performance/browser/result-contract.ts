@@ -64,6 +64,7 @@ const scenario = z
           scrollAutomationDispatchMs: duration.optional(),
           scrollBrowserToPresentationMs: z.number().finite().positive().optional(),
           sendToFirstVisibleTextMs: duration.optional(),
+          preDispatchApiRequests: z.number().int().nonnegative().optional(),
           totalBlockingTimeMs: duration.optional(),
           reloadToAuthoritativeMs: duration.optional(),
           // Signed ordering offset: a durable receipt can precede local terminal.
@@ -240,6 +241,11 @@ const GATES: Record<string, { relative: number; floor: number }> = {
   reloadToAuthoritativeMs: { relative: 0.35, floor: 150 },
 }
 
+// Deterministic counts (ADR-0049): the candidate may never exceed the base.
+// Compared only when both captures recorded one, so older captures still
+// compare; a capture that records one must record it in every run.
+const COUNT_GATES = new Set(["preDispatchApiRequests"])
+
 type RawRun = ComparableResult["scenarios"][number]["runs"][number]
 const NATIVE_SCROLL_METRICS = [
   "scrollInputToPresentationMs", "scrollAutomationDispatchMs", "scrollBrowserToPresentationMs",
@@ -249,6 +255,7 @@ const RAW_RUN_METRICS = {
   scrollAutomationDispatchMs: (run: RawRun) => run.scrollAutomationDispatchMs,
   scrollBrowserToPresentationMs: (run: RawRun) => run.scrollBrowserToPresentationMs,
   sendToFirstVisibleTextMs: (run: RawRun) => run.sendToFirstVisibleTextMs,
+  preDispatchApiRequests: (run: RawRun) => run.preDispatchApiRequests,
   totalBlockingTimeMs: (run: RawRun) => run.totalBlockingTimeMs,
   reloadToAuthoritativeMs: (run: RawRun) => run.reloadToAuthoritativeMs,
   prepareMs: (run: RawRun) => run.timingReceipt?.prepareMs,
@@ -427,7 +434,7 @@ export function validateCoverage(result: ComparableResult): string[] {
     for (const [metric, read] of Object.entries(RAW_RUN_METRICS)) {
       const samples = observedNumbers(value.runs.map(read))
       if (
-        metric in GATES &&
+        (metric in GATES || COUNT_GATES.has(metric)) &&
         samples.length > 0 &&
         samples.length !== value.sampleCount
       )
@@ -564,6 +571,12 @@ export function assessComparison(
         Math.max(before.p50 * gate.relative, gate.floor)
       )
         regressions.push(`${key} ${metric}: ${before.p50} → ${after.p50}ms`)
+    }
+    for (const metric of COUNT_GATES) {
+      const before = a.metrics[metric]
+      const after = b.metrics[metric]
+      if (before?.n && after?.n && after.max > before.max)
+        regressions.push(`${key} ${metric}: ${before.max} → ${after.max}`)
     }
   }
   if (Boolean(base.threadSwitch) !== Boolean(current.threadSwitch))

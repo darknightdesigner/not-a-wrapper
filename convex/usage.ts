@@ -12,7 +12,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
-import { optionalAuthMutation, optionalAuthQuery } from "./lib/authedFunctions"
+import { optionalAuthMutation } from "./lib/authedFunctions"
 import { requireServerCallProof, type GuestActor } from "./lib/serverCallProof"
 import {
   API_RATE_LIMIT_MAX_WINDOW_MS,
@@ -68,37 +68,6 @@ async function readUserDailyWindow(
   })
   return { daily, limit }
 }
-
-/** Check whether the signed-in caller has reached their daily limit. */
-export const checkUsage = optionalAuthQuery({
-  args: {},
-  handler: async (ctx) => {
-    if (!ctx.identity) {
-      throw new Error("Not authenticated")
-    }
-
-    const user = ctx.user
-
-    if (!user) {
-      return {
-        canSend: false,
-        remaining: 0,
-        limit: 0,
-        error: "User not found",
-        errorCode: USAGE_ERROR_CODES.USER_NOT_FOUND,
-      }
-    }
-
-    const { daily, limit } = await readUserDailyWindow(ctx, user)
-    return {
-      canSend: daily.allowed,
-      remaining: Math.max(0, limit - daily.currentCount),
-      limit,
-      count: daily.currentCount,
-      isAnonymous: user.anonymous,
-    }
-  },
-})
 
 export async function admitUsageHandler(ctx: AbuseAdmissionCtx) {
   // Guests are admitted only through `admitGuestTurn` (server-proven).
@@ -363,7 +332,7 @@ export const releaseGuestTurn = mutation({
   },
 })
 
-/** The guest's remaining daily turns, for the composer's pre-send hint. */
+/** The guest's remaining daily turns, for the composer's typing-time hint. */
 export const checkGuestUsage = query({
   args: {
     guest: guestActorValidator,

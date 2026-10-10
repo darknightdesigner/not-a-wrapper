@@ -1,5 +1,4 @@
 import { toast } from "@/components/ui/toast"
-import { checkRateLimits } from "@/lib/api"
 import type {
   CreateFirstTurnChatInput,
   FirstTurnChatResult,
@@ -11,10 +10,18 @@ import {
 import type {
   EnsureChatForTurnArgs,
   EnsuredTurnChat,
+  GuestUsageGate,
 } from "@/lib/chat-turn/chat-turn-controller"
+import {
+  GUEST_USAGE_OWNER,
+  loadGuestUsageHint,
+  readUsageHint,
+  recordUsageHint,
+  spendUsageHint,
+} from "@/lib/chat-turn/usage-hint"
 import { REMAINING_QUERY_ALERT_THRESHOLD } from "@/lib/config"
 import type { Attachment } from "@/lib/file-handling"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 
 /**
  * The first turn's allocation (ADR-0033). The chat id is minted and committed
@@ -126,30 +133,39 @@ export function useChatOperations({
     }
   }
 
-  const checkLimitsAndNotify = async (uid: string): Promise<boolean> => {
-    try {
-      const rateData = await checkRateLimits(uid, isAuthenticated)
-
-      if (rateData.remaining === 0 && !isAuthenticated) {
+  // The guest usage gate (ADR-0045). The typing-time hint answers at Send
+  // with no round trip; a Send with no fresh hint (a ?prompt= auto-send)
+  // reads one, and a failed read lets the send through for admission to judge.
+  const guestUsage = useMemo(() => {
+    const admit = (remaining: number | null) => {
+      if (remaining === 0) {
         setHasDialogAuth(true)
         return false
       }
-
-      if (rateData.remaining === REMAINING_QUERY_ALERT_THRESHOLD) {
+      if (remaining === REMAINING_QUERY_ALERT_THRESHOLD) {
         toast({
-          title: `Only ${rateData.remaining} quer${
-            rateData.remaining === 1 ? "y" : "ies"
-          } remaining today.`,
+          title: `Only ${REMAINING_QUERY_ALERT_THRESHOLD} queries remaining today.`,
           status: "info",
         })
       }
-
       return true
-    } catch (err) {
-      console.error("Rate limit check failed:", err)
-      return false
     }
-  }
+    return {
+      check: () => {
+        const remaining = readUsageHint(GUEST_USAGE_OWNER)
+        return remaining === null
+          ? loadGuestUsageHint().then(admit)
+          : admit(remaining)
+      },
+      spend: () => spendUsageHint(GUEST_USAGE_OWNER),
+      // A daily-limit refusal the hint missed (another tab, a shared
+      // network): the next Send gates locally, and sign-in opens now.
+      limitReached: () => {
+        recordUsageHint(GUEST_USAGE_OWNER, 0)
+        setHasDialogAuth(true)
+      },
+    } satisfies GuestUsageGate & { limitReached: () => void }
+  }, [setHasDialogAuth])
 
   const createAllocatedChat = async (
     allocation: FirstTurnAllocation,
@@ -295,7 +311,7 @@ export function useChatOperations({
   }
 
   return {
-    checkLimitsAndNotify,
+    guestUsage,
     ensureChatExists,
     beginFirstTurn,
     rollbackFirstTurn,

@@ -94,11 +94,11 @@ replaces it in place (the one-time re-mint below). The provider emits
 
 In `runSendTurn`, a turn that starts without a chat calls
 `firstTurn.begin()` BEFORE the optimistic user row is inserted, so the route,
-the optimistic row, and the pending state land in one React batch; the
-rate-limit read, creation, and transport dispatch all happen after. The
-session commit re-renders the surface with the new id before the rate-limit
-read resolves, so `ensureChatExists` consults its allocation before the
-`chatId` prop.
+the optimistic row, and the pending state land in one React batch; creation
+and transport dispatch happen after (a guest at a known zero is stopped before
+`begin()` by the usage hint, ADR-0045). The session commit can re-render the
+surface with the new id before creation runs, so `ensureChatExists` consults
+its allocation before the `chatId` prop.
 
 ### 4. Idempotent creation
 

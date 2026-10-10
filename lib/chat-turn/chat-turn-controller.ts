@@ -109,6 +109,17 @@ export type EnsuredTurnChat = {
   }
 }
 
+/** Guest sends only (ADR-0045). Signed-in sends never consult it: `/api/chat`
+ * admission is their only per-send check. */
+export type GuestUsageGate = {
+  /** Answers from the typing-time usage hint: false once it has opened
+   * sign-in for a known zero; a Promise only when no fresh hint exists and it
+   * is reading one now. */
+  check: () => boolean | Promise<boolean>
+  /** The server admitted, and so counted, one guest turn. */
+  spend: () => void
+}
+
 export type ChatTurnAdapters = {
   /** Clock seam for deterministic turn-lifecycle tests; production defaults
    * to the browser clock and reads it exactly once per optimistic send. */
@@ -129,7 +140,7 @@ export type ChatTurnAdapters = {
    * internally; callers never build or hold the store. */
   store: ChatTurnStoreAdapters
   resolveUserId: () => Promise<string | null>
-  checkLimitsAndNotify: (userId: string) => Promise<boolean>
+  guestUsage: GuestUsageGate
   /**
    * First-turn identity seam (ADR-0033). `begin` mints the client chat id and
    * commits its route synchronously — before the optimistic row paints and
@@ -167,6 +178,9 @@ export type ChatTurnAdapters = {
    */
   consumeLocalStopIntent?: () => boolean
   toastError: (title: string) => void
+  /** True when the stream's error handler already presented this refusal
+   * (it carries a public error code), so the runner adds no generic toast. */
+  isPresentedRefusal: (error: unknown) => boolean
   bumpChat: (chatId: string) => void
   setLastFinishReason: (finishReason: string | undefined) => void
   reportError: (message: string, error: unknown) => void
@@ -205,7 +219,6 @@ export type EditTurnFailureReason =
   | "missing-message-timestamp"
   | "message-too-long"
   | "auth-required"
-  | "limit-denied"
   | "plan-rejected"
   | "dispatch-failed"
 
@@ -322,6 +335,13 @@ async function runSendTurn(
     return
   }
 
+  // Guests gate on the typing-time usage hint before any route, row, or
+  // request exists: a known zero has already opened sign-in (ADR-0045).
+  const guestUsage = snapshot.isAuthenticated
+    ? true
+    : adapters.guestUsage.check()
+  if (guestUsage === false) return
+
   adapters.setIsSending(true)
   adapters.resetLocalStopIntent?.()
   adapters.setIsSubmitting(true)
@@ -344,7 +364,7 @@ async function runSendTurn(
   }
 
   // The route commits at Send, in the same batch as the optimistic row and
-  // the pending state below — before the rate-limit read, creation, or
+  // the pending state below — before any guest usage read, creation, or
   // transport dispatch. Rejected payloads above never reach this point.
   if (startedWithoutChat) {
     adapters.firstTurn.begin()
@@ -366,7 +386,7 @@ async function runSendTurn(
 
     // The visible turn is an event-owned fact, not a persistence receipt.
     // Insert it in the same React batch as isSubmitting so the user row,
-    // pending assistant, and Stop control paint without waiting for rate-limit
+    // pending assistant, and Stop control paint without waiting for usage
     // I/O, chat creation, routing, attachment binding, or transport acceptance.
     const initialOptimisticMessage = optimisticMessage
     adapters.setMessages((prev) => [...prev, initialOptimisticMessage])
@@ -407,10 +427,9 @@ async function runSendTurn(
       return
     }
 
-    const allowed = await adapters.checkLimitsAndNotify(userId)
-    if (!allowed) {
-      return
-    }
+    // A guest with no fresh hint waits for the read the gate started: one
+    // round trip, as before the hint, never more.
+    if (!(await guestUsage)) return
 
     const ensured = await adapters.ensureChatExists({
       userId,
@@ -555,8 +574,9 @@ async function runSendTurn(
     // has claimed the idempotent first-message row. A pre-response failure —
     // including an ambiguous network loss after the server committed — throws
     // above and retains the original identity for a safe same-id retry.
+    if (!snapshot.isAuthenticated) adapters.guestUsage.spend()
     finalizeAcceptedTurn()
-  } catch {
+  } catch (error) {
     if (
       finalizeAcceptedTurn !== null &&
       adapters.consumeLocalStopIntent?.() === true
@@ -564,7 +584,11 @@ async function runSendTurn(
       finalizeAcceptedTurn()
       return
     }
-    adapters.toastError(SEND_ERROR_MESSAGE)
+    // The stream's error handler already showed this refusal; a second,
+    // generic toast would only repeat it.
+    if (!adapters.isPresentedRefusal(error)) {
+      adapters.toastError(SEND_ERROR_MESSAGE)
+    }
   } finally {
     if (!keepOptimistic) {
       removeOptimistic()
@@ -683,12 +707,6 @@ async function runEditTurn(
       const message = "Please sign in and try again."
       adapters.toastError(message)
       return reject("auth-required", message)
-    }
-
-    const allowed = await adapters.checkLimitsAndNotify(userId)
-    if (!allowed) {
-      adapters.setMessages(editPlan.originalMessages)
-      return reject("limit-denied", "Message limit reached.")
     }
 
     // Edits never allocate: the durable-chat guard above proved chatId names

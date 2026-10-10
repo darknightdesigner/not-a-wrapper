@@ -3,32 +3,15 @@ import {
   createGuestUserId,
   GUEST_USER_STORAGE_KEY,
 } from "./chat-store/identity"
-import { fetchClient } from "./fetch"
 
-export async function checkRateLimits(
-  userId: string,
-  isAuthenticated: boolean
-) {
-  try {
-    const res = await fetchClient(
-      `/api/rate-limits?userId=${userId}&isAuthenticated=${isAuthenticated}`,
-      {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      }
-    )
-    const responseData = await res.json()
-    if (!res.ok) {
-      throw new Error(
-        responseData.error ||
-          `Failed to check rate limits: ${res.status} ${res.statusText}`
-      )
-    }
-    return responseData
-  } catch (err) {
-    console.error("Error checking rate limits:", err)
-    throw err
+/** The guest's remaining daily turns (ADR-0045): a hint, never the gate. */
+export async function fetchGuestUsage(): Promise<number> {
+  const res = await fetch("/api/rate-limits")
+  const { remaining }: { remaining?: unknown } = await res.json()
+  if (!res.ok || typeof remaining !== "number") {
+    throw new Error(`Guest usage read failed: ${res.status}`)
   }
+  return remaining
 }
 
 export const getOrCreateGuestUserId = async (

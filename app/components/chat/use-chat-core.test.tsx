@@ -228,6 +228,13 @@ const authenticatedUser = {
   system_prompt: "system prompt",
 }
 
+// Signed-in turns never consult the guest usage gate.
+const guestUsage = {
+  check: () => true,
+  spend: () => {},
+  limitReached: () => {},
+}
+
 async function flushAsyncWork() {
   await act(async () => {
     await Promise.resolve()
@@ -301,13 +308,11 @@ describe("useChatCore prompt query handling", () => {
     chatId = "chat-project",
     initialMessages = [],
     ensureChatExists = vi.fn(async () => ({ chatId: "chat-project" })),
-    checkLimitsAndNotify = vi.fn(async () => true),
   }: {
     search: string
     chatId?: string | null
     initialMessages?: UIMessage[]
     ensureChatExists?: Parameters<typeof useChatCore>[0]["ensureChatExists"]
-    checkLimitsAndNotify?: (uid: string) => Promise<boolean>
   }) {
     window.history.replaceState(
       null,
@@ -329,7 +334,7 @@ describe("useChatCore prompt query handling", () => {
         chatId,
         user: authenticatedUser,
         isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-        checkLimitsAndNotify,
+        guestUsage,
         ensureChatExists,
         firstTurn: { begin: () => "chat-1", rollback: () => {} },
         bumpChat: chatCoreMocks.bumpChat,
@@ -363,7 +368,6 @@ describe("useChatCore prompt query handling", () => {
     rerender()
 
     return {
-      checkLimitsAndNotify,
       ensureChatExists,
       rerender,
       getCore: () => currentCoreRef.current,
@@ -575,7 +579,7 @@ describe("useChatCore prompt query handling", () => {
     try {
       const { getCore } = renderCore({
         search: "",
-        checkLimitsAndNotify: vi.fn(async () => false),
+        ensureChatExists: vi.fn(async () => null),
       })
       await act(async () => {
         await expect(
@@ -698,7 +702,7 @@ describe("useChatCore selected-path projection", () => {
       chatId,
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_projection" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,
@@ -913,7 +917,7 @@ describe("useChatCore stream re-adoption on return", () => {
       chatId,
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_a" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,
@@ -1122,7 +1126,7 @@ describe("useChatCore deferred durable Stop (projection gap)", () => {
       chatId: "chat_stopgap",
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_stopgap" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,
