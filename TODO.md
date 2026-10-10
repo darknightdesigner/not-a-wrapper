@@ -439,11 +439,13 @@ project can exceed the 16 MiB read limit and any message write in the project
 re-runs it. Paginate it and store the preview on the chat.
 - **Bound the selected-path read:** `messages.getSelectedPath`
 (`convex/messages.ts`) reads every message in the chat and returns the whole
-selected path, so a 120-turn chat ships 645,851 bytes on open (ADR-0049 payload
-budget) and any message write re-runs it. Return a recent window with a cursor
-for older turns, as ADR-0005 bounds the sidebar and T3 Code bounds thread
-history (`docs/internals/performance-regressions.md`). Pairs with the branch
-pointer item above, which makes the path a parent walk.
+selected path, so the checked-in 120-turn payload fixture ships 645,851 bytes
+on open (ADR-0049 budget) and any message write re-runs it. Return a recent
+window with a cursor for older turns, as ADR-0005 bounds the sidebar and T3
+Code bounds thread history
+([guide](https://github.com/pingdotgg/t3code/blob/main/docs/internals/performance-regressions.md),
+summarized in `.agents/skills/make-chat-faster/references/t3-code.md`). Pairs
+with the branch pointer item above, which makes the path a parent walk.
 - **Move send counters off the users row:** They live on `users`
 (`convex/usage.ts`), so every query reading that row re-runs on each send.
 Guest counters already live in `apiRateLimits` fixed windows (ADR-0045); give

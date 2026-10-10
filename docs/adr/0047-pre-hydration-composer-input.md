@@ -112,9 +112,10 @@ Option 2, in `components/ui/prompt-input.tsx`.
 
 - Dev server, 1280 px, guest: time to typeable about 100 ms median vs
   about 455 ms for editor-editable. All three handoff cases pass at all four
-  widths: 0 px field and surface movement and zero composer layout shift,
-  including wrapped pre-hydration text. Production numbers are measured
-  separately.
+  widths with the exact typed text and 0 px field movement at the handoff.
+  The quiet cases also hold 0 px surface movement and zero composer layout
+  shift, including wrapped pre-hydration text; the through case keeps typing,
+  so it does not measure those. Production numbers are measured separately.
 - Pre-hydration typing cannot expand the composer (expansion is
   JS-measured), so wrapped text stays compact through the handoff and
   expands on the first edit after it. Until that edit the Expand control is

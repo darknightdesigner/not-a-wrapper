@@ -8,8 +8,10 @@ byte-identical). Candidate is the working tree before the final commit
 `layout-app.tsx` (used by test pages, not chat routes) and a type import move.
 Both are local production builds (`NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true`,
 `.next-perf`), measured on one Apple M4 Max with Chromium 151.0.7922.34,
-headless, fresh guest contexts, base and candidate interleaved. Raw JSON stayed
-in the session scratchpad. This is local evidence, not CI certification.
+headless, fresh guest contexts, base and candidate interleaved. The raw local
+JSON was not retained, so these rows are local evidence, not CI certification.
+The retained paired record (ADR-0037 revision and build identities plus raw
+results) is the perf workflow's base vs candidate artifacts for this change.
 
 ## Product changes
 
@@ -89,10 +91,12 @@ fell about 1.7 s. Unattributed.
   wrong build silently.
 - Composer handoff (ADR-0047): all 12 cases (through, quiet-line,
   quiet-wrapped at 375, 768, 1280 and 1920 px) passed twice on the candidate
-  build: exact text and draft, 0.00 px field delta, composer CLS 0, Send before
+  build: exact text and draft and a 0.00 px field delta in every case, composer
+  CLS 0 in the quiet cases (the through case does not measure it), Send before
   hydration never navigated.
-- Payload budgets: five subscribed reads pinned to exact bytes; reproducible
-  across runs.
+- Payload budgets: five subscribed reads have budgets equal to their fixture
+  bytes, which are identical across runs. Any increase fails, and a drop over
+  1% fails until the budget is lowered.
 - Harness unit tests: 11 files, 142 tests pass.
 
 ## Measurement notes
