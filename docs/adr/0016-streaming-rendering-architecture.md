@@ -207,8 +207,9 @@ popup mounts at opacity 0 and turns visible through a `setState` from its own
 animation-frame batcher: a default-priority update that React renders in a
 later Scheduler task, behind any publication in that frame. Cheaper frames from
 the 2026-10-09 work raised publications over the same constrained stream
-(471/425/309/352 to 645/481/406/466 across four CI runs), and the pooled late
-menu open p50 rose from 171 to 324 ms (20 samples per side). In the head trace
+(471/425/309/352 to 645/481/406/466 across four CI runs, 13% to 37% more),
+and in the signed-in `interact-constrained` plus-menu journey the pooled late
+menu open p50 rose from 171 to 324 ms (4 paired runs, 20 samples per side). In the head trace
 the popup mounted 78 ms after pointerdown (base 144 ms), but the next frame
 carried a 99.7 ms publication render, so the visible state committed at about
 296 ms and the menu frame landed at about 420 ms; in base that frame had no

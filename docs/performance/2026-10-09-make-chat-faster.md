@@ -31,10 +31,13 @@ results) is the perf workflow's base vs candidate artifacts for this change.
   blockquote quote rules are re-keyed to `p:is(blockquote *)` (ADR-0017,
   ADR-0049).
 - Interaction priority (added after the CI pair): cheaper frames raised
-  streaming publications 13 to 37%, and each one is a synchronous render in
-  the frame where a Base UI popup turns visible, so the constrained late menu
-  open rose from 171 to 324 ms (pooled p50). Click-opened popups now hold
-  streaming paint for at most 300 ms (ADR-0016 amendment, 2026-10-10).
+  streaming publication counts by 13% to 37%, and each publication is a
+  synchronous render in the frame where a Base UI popup turns visible. In the
+  CI pair's signed-in `interact-constrained` journey (plus menu, 4 paired
+  runs, 20 samples per side), the pooled late menu open p50 rose from 171 to
+  324 ms. Click-opened popups now hold streaming paint for at most 300 ms
+  (ADR-0016 amendment, 2026-10-10). This is a different scenario from the
+  local guest auth-popover proxy in the table below.
 
 ## Measured results
 
@@ -62,7 +65,7 @@ results) is the perf workflow's base vs candidate artifacts for this change.
 | Constrained content frame p50 / p95 | guest interact, 4x CPU, 390 px, constrained network, 10 runs | 15.1 / 34.6 ms | 12.6 / 23.9 ms |
 | Constrained late content frame p50 / p95 | same, after 80% of the answer | 25.4 / 48.5 ms | 17.1 / 32.8 ms |
 | Constrained late typing p50 / p95 | same, 80 samples | 16.9 / 48.4 ms | 11.2 / 23.8 ms |
-| Constrained late menu open, median | same, n=10 | 60.7 ms (43.9 to 85.7) | 51.5 ms (42.2 to 65.0) |
+| Constrained late menu open, local guest auth-popover proxy, median | same, n=10 | 60.7 ms (43.9 to 85.7) | 51.5 ms (42.2 to 65.0) |
 | Constrained rAF gaps over 40 ms per run, median | same | 21 | 7 |
 | Wheel to next frame late in a stream, p50 / p95 | scratch probe, 5 streams x 10 wheels | 13.8 / 22.0 ms @1x, 61.4 / 87.0 ms @4x | 12.6 / 17.2 ms @1x, 37.4 / 64.5 ms @4x |
 | Payload budgets | `payloadBudgets.seam.test.ts`, 3 runs | | pass, identical bytes, equal to budgets |
@@ -73,10 +76,10 @@ blocking-time medians barely move there; the constrained profile and the
 stream traces show the change. No streaming metric crosses the ADR-0037
 relative gate (35% and its floor) when applied to these pooled medians.
 
-Not regressions, but listed: constrained early menu open 64.4 to 68.9 ms median
-(ranges 58.7 to 83.0 and 57.5 to 73.3, p95 lower), and unthrottled
-interact first-text frame 155.0 to 177.1 ms median (bimodal around 145 and 185
-ms in both arms). JavaScript in the stream traces rose 5,395 to 5,529 ms
+Not regressions, but listed: constrained early menu open (same guest proxy)
+64.4 to 68.9 ms median (ranges 58.7 to 83.0 and 57.5 to 73.3, p95 lower), and
+unthrottled interact first-text frame 155.0 to 177.1 ms median (bimodal around
+145 and 185 ms in both arms). JavaScript in the stream traces rose 5,395 to 5,529 ms
 (+2.5%, n=5, ranges do not overlap); it sits in React's scheduled render
 callback, while React renders over the same stream fell (mean of 2 streams:
 104,967 to 104,475 components, 890,543 to 877,725 hooks) and style plus layout
