@@ -19,9 +19,7 @@
  * SHELL_MODEL_ID (default the free Gemma route), SHELL_EFFORT_LABEL
  * (default "High").
  */
-import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import { writeFileSync } from "node:fs"
 import { getModelInfo } from "@/lib/models"
 import { getModelDisplayName } from "@/lib/models/presentation"
 import { chromium, type Browser, type BrowserContext } from "playwright"
@@ -30,6 +28,7 @@ import {
   getPerfAuthPassword,
   PERF_AUTH_EMAIL,
 } from "./ensure-auth-user"
+import { startPerfServer, type PerfServer } from "./perf-server"
 
 const PERF_PORT = Number(process.env.PERF_PORT ?? 3112)
 const RUNS = Number(process.env.RUNS ?? 10)
@@ -37,70 +36,15 @@ const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const SHELL_MODEL_ID =
   process.env.SHELL_MODEL_ID ?? "openrouter:google/gemma-4-26b-a4b-it:free"
 const SHELL_EFFORT_LABEL = process.env.SHELL_EFFORT_LABEL ?? "High"
-const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "../../.."
-)
 
 const MODEL_TRIGGER = '[aria-label^="Select model"]'
 const EFFORT_TRIGGER = "[data-effort-control]"
 const COMPOSER_FORM = '[data-slot="prompt-input-surface"]'
 
-let serverProcess: ChildProcess | null = null
+let server: PerfServer | undefined
 
 function log(message: string) {
   console.log(`[composer-shell] ${message}`)
-}
-
-export async function waitForServer(baseUrl: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(baseUrl, { redirect: "manual" })
-      if (response.status < 500) return
-    } catch {
-      // Not up yet.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300))
-  }
-  throw new Error(`server at ${baseUrl} did not become ready in ${timeoutMs}ms`)
-}
-
-export async function assertPortFree(baseUrl: string): Promise<void> {
-  try {
-    await fetch(baseUrl, { redirect: "manual" })
-  } catch {
-    return
-  }
-  // A leftover server would silently serve another build's bundle.
-  throw new Error(`${baseUrl} is already serving; stop it (or pass BASE_URL)`)
-}
-
-export function spawnServer(): void {
-  if (!existsSync(path.join(REPO_ROOT, DIST_DIR, "BUILD_ID"))) {
-    throw new Error(
-      `no production build at ${DIST_DIR}: NEXT_DIST_DIR=${DIST_DIR} bun run build:next`
-    )
-  }
-  log(`starting server on :${PERF_PORT} (dist: ${DIST_DIR})`)
-  // Own process group so stopServer() reaches `next start` behind bunx.
-  serverProcess = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
-    cwd: REPO_ROOT,
-    env: { ...process.env, NEXT_DIST_DIR: DIST_DIR },
-    stdio: ["ignore", "ignore", "inherit"],
-    detached: true,
-  })
-}
-
-export function stopServer() {
-  if (serverProcess?.pid) {
-    try {
-      process.kill(-serverProcess.pid, "SIGTERM")
-    } catch {
-      serverProcess.kill("SIGTERM")
-    }
-  }
-  serverProcess = null
 }
 
 async function signIn(browser: Browser, baseUrl: string) {
@@ -332,9 +276,8 @@ async function main() {
   const externalBaseUrl = process.env.BASE_URL
   const baseUrl = externalBaseUrl ?? `http://localhost:${PERF_PORT}`
   if (!externalBaseUrl) {
-    await assertPortFree(baseUrl)
-    spawnServer()
-    await waitForServer(baseUrl, 60000)
+    log(`starting server on :${PERF_PORT} (dist: ${DIST_DIR})`)
+    server = await startPerfServer({ port: PERF_PORT, distDir: DIST_DIR })
   }
   const browser = await chromium.launch({
     ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
@@ -410,14 +353,14 @@ async function main() {
     }
   } finally {
     await browser.close()
-    stopServer()
+    await server?.stop()
   }
 }
 
 if (import.meta.main) {
-  main().catch((error) => {
-    stopServer()
+  main().catch(async (error) => {
     console.error(error)
+    await server?.stop().catch(console.error)
     process.exit(1)
   })
 }
