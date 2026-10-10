@@ -1,3 +1,5 @@
+"use client"
+
 import {
   floatingMenuContentClassName,
   floatingMenuItemActiveClassName,
@@ -7,13 +9,21 @@ import {
   floatingSurfaceClassName,
 } from "@/components/ui/floating-surface"
 import { Icon } from "@/components/ui/icon"
+import { useOpenIntentPriority } from "@/lib/chat-performance/interaction-priority"
 import { cn } from "@/lib/utils"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { RiArrowRightSLine, RiCheckLine } from "@remixicon/react"
 import * as React from "react"
 
-function DropdownMenu({ ...props }: MenuPrimitive.Root.Props) {
-  return <MenuPrimitive.Root data-slot="dropdown-menu" {...props} />
+function DropdownMenu({
+  onOpenChange,
+  onOpenChangeComplete,
+  ...props
+}: MenuPrimitive.Root.Props) {
+  const priority = useOpenIntentPriority(onOpenChange, onOpenChangeComplete)
+  return (
+    <MenuPrimitive.Root data-slot="dropdown-menu" {...props} {...priority} />
+  )
 }
 
 function DropdownMenuPortal({ ...props }: MenuPrimitive.Portal.Props) {

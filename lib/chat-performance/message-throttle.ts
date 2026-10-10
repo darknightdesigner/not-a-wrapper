@@ -1,3 +1,4 @@
+import { isStreamingPaintHeld } from "@/lib/chat-performance/interaction-priority"
 import { markChatPerf } from "@/lib/observability/chat-performance"
 import { noteChatPublicationFrame } from "@/lib/observability/chat-ui-events"
 import type { Chat, UIMessage } from "@ai-sdk/react"
@@ -15,7 +16,9 @@ type ScheduledPublication =
  * This only coalesces subscriber notifications, so there is no second text
  * store to reconcile. Non-streaming writes and terminal status/error
  * transitions publish synchronously; a pending frame is cancelled first so
- * it cannot repaint stale work after completion, Stop, or failure.
+ * it cannot repaint stale work after completion, Stop, or failure. While a
+ * click-opened popup holds streaming paint, the frame's publication moves to
+ * a later frame (`interaction-priority.ts`).
  */
 export function subscribeToFrameAlignedMessages<UI_MESSAGE extends UIMessage>(
   chat: Chat<UI_MESSAGE>,
@@ -71,12 +74,14 @@ export function subscribeToFrameAlignedMessages<UI_MESSAGE extends UIMessage>(
     if (scheduled) return
 
     if (typeof requestAnimationFrame === "function") {
-      scheduled = {
-        kind: "frame",
-        id: requestAnimationFrame(() => {
-          if (publish()) noteChatPublicationFrame()
-        }),
+      const onFrame = () => {
+        if (isStreamingPaintHeld()) {
+          scheduled = { kind: "frame", id: requestAnimationFrame(onFrame) }
+          return
+        }
+        if (publish()) noteChatPublicationFrame()
       }
+      scheduled = { kind: "frame", id: requestAnimationFrame(onFrame) }
       return
     }
 

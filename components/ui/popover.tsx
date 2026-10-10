@@ -1,10 +1,18 @@
+"use client"
+
 import { floatingSurfaceClassName } from "@/components/ui/floating-surface"
+import { useOpenIntentPriority } from "@/lib/chat-performance/interaction-priority"
 import { cn } from "@/lib/utils"
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover"
 import * as React from "react"
 
-function Popover({ ...props }: PopoverPrimitive.Root.Props) {
-  return <PopoverPrimitive.Root data-slot="popover" {...props} />
+function Popover({
+  onOpenChange,
+  onOpenChangeComplete,
+  ...props
+}: PopoverPrimitive.Root.Props) {
+  const priority = useOpenIntentPriority(onOpenChange, onOpenChangeComplete)
+  return <PopoverPrimitive.Root data-slot="popover" {...props} {...priority} />
 }
 
 function PopoverTrigger({

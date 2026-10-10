@@ -30,6 +30,11 @@ results) is the perf workflow's base vs candidate artifacts for this change.
   `data-fixed-header` instead of `has-data-[...]` variants, and typography's
   blockquote quote rules are re-keyed to `p:is(blockquote *)` (ADR-0017,
   ADR-0049).
+- Interaction priority (added after the CI pair): cheaper frames raised
+  streaming publications 13 to 37%, and each one is a synchronous render in
+  the frame where a Base UI popup turns visible, so the constrained late menu
+  open rose from 171 to 324 ms (pooled p50). Click-opened popups now hold
+  streaming paint for at most 300 ms (ADR-0016 amendment, 2026-10-10).
 
 ## Measured results
 

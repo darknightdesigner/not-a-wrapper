@@ -199,6 +199,30 @@ Production-browser selection evidence is recorded separately from this
 architectural decision. A candidate build is not release-validated until the
 normal and 4× CPU frame gates in the results document pass.
 
+### Interaction priority over streaming paint (amendment, 2026-10-10)
+
+A publication runs in `requestAnimationFrame` and notifies a
+`useSyncExternalStore`, so it renders synchronously inside the frame. A Base UI
+popup mounts at opacity 0 and turns visible through a `setState` from its own
+animation-frame batcher: a default-priority update that React renders in a
+later Scheduler task, behind any publication in that frame. Cheaper frames from
+the 2026-10-09 work raised publications over the same constrained stream
+(471/425/309/352 to 645/481/406/466 across four CI runs), and the pooled late
+menu open p50 rose from 171 to 324 ms (20 samples per side). In the head trace
+the popup mounted 78 ms after pointerdown (base 144 ms), but the next frame
+carried a 99.7 ms publication render, so the visible state committed at about
+296 ms and the menu frame landed at about 420 ms; in base that frame had no
+publication and the popup committed at 288 ms.
+
+Click-opened popups therefore win: the shared `Popover` and `DropdownMenu`
+wrappers hold streaming paint from open intent until Base UI reports the open
+complete (after the starting style clears), the popup closes, or the root
+unmounts (`lib/chat-performance/interaction-priority.ts`). While held, the
+frame's publication moves to a later frame. The one-per-frame invariant and
+the synchronous terminal, Stop, error, and non-streaming publications are
+unchanged, and every hold expires after 300 ms, so a stream never stalls.
+Hover opens and tooltips never hold.
+
 ### Provider smoothing
 
 `smoothStream()` is not used. It may be introduced only for a specific
