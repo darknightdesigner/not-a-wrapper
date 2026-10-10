@@ -18,6 +18,10 @@ import type {
   DurableWorkerCall,
   DurableWorkerWire,
 } from "./durable-turn-runtime"
+import {
+  ANSWER_STALL_TIMEOUT_MS,
+  ProviderStallError,
+} from "./provider-stall-timeout"
 
 // AI SDK seam tests: run the REAL `ai` package —
 // streamText, its v7 callback names (onStepEnd/onEnd/prepareStep), tool
@@ -333,6 +337,30 @@ function makeMcpToolsFixture() {
   }
 
   return { loadResult, weatherExecute }
+}
+
+/** Starts answering, then goes silent on an open connection. */
+function makeStalledAnswerModel() {
+  const provider: { cancelReason?: unknown } = {}
+  const model = new MockLanguageModelV4({
+    doStream: async () => ({
+      stream: new ReadableStream<LanguageModelV4StreamPart>({
+        start(controller) {
+          controller.enqueue({ type: "stream-start", warnings: [] })
+          controller.enqueue({ type: "text-start", id: "t1" })
+          controller.enqueue({
+            type: "text-delta",
+            id: "t1",
+            delta: "Partial answer ",
+          })
+        },
+        cancel(reason) {
+          provider.cancelReason = reason
+        },
+      }),
+    }),
+  })
+  return { model, provider }
 }
 
 function makeInput(overrides: Partial<ChatTurnInput> = {}): ChatTurnInput {
@@ -833,6 +861,67 @@ describe("chat turn runtime × real ai@7 streamText", () => {
         0
       )
       expect(vi.getTimerCount()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("fails a turn whose provider goes silent mid-answer through the durable failure path", async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(0)
+    try {
+      const { loadResult } = makeMcpToolsFixture()
+      vi.mocked(loadUserMcpTools).mockResolvedValue(
+        loadResult as unknown as Awaited<ReturnType<typeof loadUserMcpTools>>
+      )
+      const { model, provider } = makeStalledAnswerModel()
+      vi.mocked(createLanguageModel).mockReturnValue(
+        model as unknown as ReturnType<typeof createLanguageModel>
+      )
+      // The lease stays healthy: only the provider is silent.
+      const calls: DurableWorkerCall[] = []
+      const wire = (async (call: DurableWorkerCall) => {
+        calls.push(call)
+        return call.op === "heartbeatGenerationRun"
+          ? { result: { kind: "renewed", leaseExpiresAt: Date.now() + 45_000 } }
+          : undefined
+      }) as RecordingWire
+      wire.calls = calls
+
+      const runtime = createChatTurnRuntime({
+        input: makeInput({ requestId: "req-seam-stall" }),
+        deps: makeDeps(makeDurableFetchMutation(), wire),
+      })
+      await runtime.prepare()
+      const response = await runtime.toResponse(new AbortController().signal)
+      const reader = response.body!.getReader()
+      const decoder = new TextDecoder()
+      let sse = ""
+      while (!sse.includes('"type":"text-delta"')) {
+        const next = await reader.read()
+        expect(next.done).toBe(false)
+        sse += decoder.decode(next.value, { stream: true })
+      }
+
+      await vi.advanceTimersByTimeAsync(ANSWER_STALL_TIMEOUT_MS)
+      while (true) {
+        const next = await reader.read()
+        if (next.done) break
+        sse += decoder.decode(next.value, { stream: true })
+      }
+
+      expect(extractTextDeltasFromSse(sse)).toBe("Partial answer ")
+      expect(sse).toContain(
+        '"type":"error","errorText":"An error occurred. Please try again."'
+      )
+      expect(provider.cancelReason).toBeInstanceOf(ProviderStallError)
+      await vi.waitFor(() => {
+        expect(wireCalls(wire, "markGenerationRunFailed")).toHaveLength(1)
+      })
+      expect(wireCalls(wire, "markGenerationRunFailed")[0].args).toMatchObject({
+        error: "An error occurred. Please try again.",
+      })
+      expect(wireCalls(wire, "markGenerationRunAborted")).toHaveLength(0)
     } finally {
       vi.useRealTimers()
     }
