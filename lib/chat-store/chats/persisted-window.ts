@@ -287,21 +287,27 @@ function subscribe(
 
 /**
  * The owner's persisted window. Hydration and the first client render return
- * null like the server, and the window is adopted in a transition after mount:
- * a synchronous post-hydration render would mount every cached row in the
- * frame where the composer becomes ready (ADR-0048). Later store changes
- * update synchronously. Pass `active: false` once every live read it stands
- * in for has been delivered: the snapshot is then a stable null and other
- * tabs' writes do not re-render.
+ * null like the server. Each move into an adoptable state (mount, owner
+ * change, inactive to active) is adopted in a transition: a synchronous
+ * render would mount every cached row, after hydration in the frame where the
+ * composer becomes ready (ADR-0048). Store changes after adoption update
+ * synchronously. Pass `active: false` once every live read it stands in for
+ * has been delivered: the snapshot is then a stable null and other tabs'
+ * writes do not re-render.
  */
 export function usePersistedWindow(
   owner: string | undefined,
   active: boolean
 ): PersistedSidebarWindow | null {
-  const [adopted, setAdopted] = useState(false)
+  const eligibleOwner = active && owner ? owner : null
+  const [adoptedOwner, setAdoptedOwner] = useState<string | null>(null)
+  // Leaving eligibility forgets the adoption, so the next entry defers again.
+  if (eligibleOwner === null && adoptedOwner !== null) setAdoptedOwner(null)
   useEffect(() => {
-    startTransition(() => setAdopted(true))
-  }, [])
+    if (eligibleOwner !== null)
+      startTransition(() => setAdoptedOwner(eligibleOwner))
+  }, [eligibleOwner])
+  const adopted = eligibleOwner !== null && adoptedOwner === eligibleOwner
   const subscribeOwner = useCallback(
     (onChange: () => void) => subscribe(owner, active, onChange),
     [owner, active]

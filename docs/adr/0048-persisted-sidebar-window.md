@@ -57,8 +57,9 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
   `persistedProjects` while it is pending. Once nothing is pending the hook
   returns a stable null and ignores other tabs' writes.
 - **Adopted in a transition.** Hydration and the first client render return
-  null like the server; a mount effect adopts the window with
-  `startTransition`, and later store changes update synchronously. The first
+  null like the server; each move into an adoptable state (mount, owner
+  change, inactive to active) adopts the window with `startTransition`, and
+  store changes after adoption update synchronously. The first
   version let `useSyncExternalStore` adopt it in the synchronous
   post-hydration render, which mounted every cached row in the frame where the
   composer becomes ready: in the CI pair, every signed-in scenario that

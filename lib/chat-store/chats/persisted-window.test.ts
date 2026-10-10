@@ -170,8 +170,8 @@ describe("persisted sidebar window", () => {
       store.PERSISTED_WINDOW_STORAGE_KEY,
       store.serializePersistedWindow("user-1", [chat("a")], [])
     )
-    function Rows() {
-      const persisted = store.usePersistedWindow("user-1", true)
+    function Rows({ active }: { active: boolean }) {
+      const persisted = store.usePersistedWindow("user-1", active)
       const ids = persisted?.chats.map((row) => row.id).join()
       return createElement("p", null, ids ?? "none")
     }
@@ -182,10 +182,19 @@ describe("persisted sidebar window", () => {
     transitions.hold = true
     let root: ReturnType<typeof hydrateRoot> | undefined
     await act(async () => {
-      root = hydrateRoot(container, createElement(Rows))
+      root = hydrateRoot(container, createElement(Rows, { active: true }))
     })
     expect(container.textContent).toBe("none")
 
+    transitions.hold = false
+    act(() => transitions.held.splice(0).forEach(startTransition))
+    expect(container.textContent).toBe("a")
+
+    // Becoming eligible again later (re-auth) defers the same way.
+    act(() => root?.render(createElement(Rows, { active: false })))
+    transitions.hold = true
+    act(() => root?.render(createElement(Rows, { active: true })))
+    expect(container.textContent).toBe("none")
     transitions.hold = false
     act(() => transitions.held.splice(0).forEach(startTransition))
     expect(container.textContent).toBe("a")
