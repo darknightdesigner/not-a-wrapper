@@ -1,7 +1,7 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { SIDEBAR_WINDOW_PAGE_SIZE } from "../lib/chat-store/chats/sidebar-window"
+import { SIDEBAR_WINDOW_PAGE_SIZE } from "../lib/config"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
 import schema from "./schema"
@@ -190,7 +190,10 @@ async function seedLongChat(t: T, userId: Id<"users">) {
       heartbeatAt: 1_800_000_000_000,
       updatedAt: TURNS,
     })
-    await ctx.db.patch(chatId, { statusRunId: runId, liveRunStatus: "streaming" })
+    await ctx.db.patch(chatId, {
+      statusRunId: runId,
+      liveRunStatus: "streaming",
+    })
     return { chatId, runId, assistantMessageId }
   })
 }
@@ -289,9 +292,13 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
         const budget = PAYLOAD_BUDGETS[name]
         const actual = measured[name]
         if (actual > budget)
-          return [`${name}: ${actual} bytes exceeds budget ${budget} (+${actual - budget})`]
+          return [
+            `${name}: ${actual} bytes exceeds budget ${budget} (+${actual - budget})`,
+          ]
         if (actual < budget * (1 - RATCHET_TOLERANCE))
-          return [`${name}: ${actual} bytes is well below budget ${budget}; lower the budget to lock in the win`]
+          return [
+            `${name}: ${actual} bytes is well below budget ${budget}; lower the budget to lock in the win`,
+          ]
         return []
       }
     )

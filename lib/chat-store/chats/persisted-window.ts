@@ -1,9 +1,9 @@
 "use client"
 
 import type { Doc } from "@/convex/_generated/dataModel"
+import { SIDEBAR_WINDOW_PAGE_SIZE } from "@/lib/config"
 import { useCallback, useSyncExternalStore } from "react"
 import type { Chats } from "../types"
-import { SIDEBAR_WINDOW_PAGE_SIZE } from "./sidebar-window"
 
 /**
  * The persisted sidebar window for signed-in users (ADR-0048): the last

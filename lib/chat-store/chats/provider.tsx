@@ -26,7 +26,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { getDefaultModelForUser, SYSTEM_PROMPT_DEFAULT } from "../../config"
+import {
+  getDefaultModelForUser,
+  SIDEBAR_WINDOW_PAGE_SIZE,
+  SYSTEM_PROMPT_DEFAULT,
+} from "../../config"
 import { CHAT_PUBLIC_ID_CONFLICT_CODE } from "../identity"
 import { clearMessagesCache } from "../messages/api"
 import { convexChatToChat, type Chats } from "../types"
@@ -51,7 +55,6 @@ import {
   deriveSidebarLoading,
   isLiveWindowPending,
   partitionSidebarChats,
-  SIDEBAR_WINDOW_PAGE_SIZE,
   type OptimisticOperation,
 } from "./sidebar-window"
 

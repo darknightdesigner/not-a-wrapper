@@ -90,9 +90,6 @@ export function partitionSidebarChats(chats: Chats[]): {
   return { pinned, nonPinned }
 }
 
-/** Rows per sidebar window page; also bounds the persisted window (ADR-0048). */
-export const SIDEBAR_WINDOW_PAGE_SIZE = 25
-
 type SidebarLiveParams = {
   isConvexAuthLoading: boolean
   isConvexAuthenticated: boolean
