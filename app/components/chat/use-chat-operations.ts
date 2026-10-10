@@ -93,6 +93,9 @@ export function useChatOperations({
   // which does NOT remount the mounted Chat, or a rollback) must invalidate
   // it, or the next first turn would silently append to the previous chat.
   const allocationRef = useRef<FirstTurnAllocation | null>(null)
+  // A guest's local chat awaiting its first acceptance. Kept apart from the
+  // allocation, which Back clears, so a later refusal can still discard it.
+  const unacceptedLocalChatRef = useRef<string | null>(null)
   const previousChatIdRef = useRef(chatId)
   useEffect(() => {
     const previousChatId = previousChatIdRef.current
@@ -124,14 +127,16 @@ export function useChatOperations({
    * back only on a guest sign-in refusal, which committed nothing (ADR-0045).
    */
   const rollbackFirstTurn = () => {
-    const current = allocationRef.current
-    if (!current || (current.committed && !current.local)) return
-    allocationRef.current = null
-    if (current.local) {
-      void deleteChat(current.chatId).catch((error: unknown) => {
+    const refusedLocalChat = unacceptedLocalChatRef.current
+    unacceptedLocalChatRef.current = null
+    if (refusedLocalChat) {
+      void deleteChat(refusedLocalChat).catch((error: unknown) => {
         console.error("Failed to discard a refused guest chat:", error)
       })
     }
+    const current = allocationRef.current
+    if (!current || (current.committed && !current.local)) return
+    allocationRef.current = null
     resetChatIdentity()
   }
 
@@ -230,7 +235,15 @@ export function useChatOperations({
         local: true,
       }
       localStorage.setItem(GUEST_CHAT_STORAGE_KEY, activeChatId)
-      return { chatId: activeChatId }
+      unacceptedLocalChatRef.current = activeChatId
+      return {
+        chatId: activeChatId,
+        confirmDispatched: () => {
+          if (unacceptedLocalChatRef.current === activeChatId) {
+            unacceptedLocalChatRef.current = null
+          }
+        },
+      }
     }
 
     allocationRef.current = {

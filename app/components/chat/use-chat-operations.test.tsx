@@ -196,7 +196,8 @@ describe("useChatOperations", () => {
 
     const ensured = await operations().ensureChatExists(turnArgs())
 
-    expect(ensured).toEqual({ chatId: "chat-minted" })
+    expect(ensured?.chatId).toBe("chat-minted")
+    expect(ensured?.firstTurn).toBeUndefined()
     expect(createFirstTurnChat).toHaveBeenCalledWith({
       publicId: "chat-minted",
       model: "openai/gpt-5-mini",
@@ -211,6 +212,25 @@ describe("useChatOperations", () => {
     operations().rollbackFirstTurn()
     expect(props.resetChatIdentity).toHaveBeenCalledOnce()
     expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
+  })
+
+  it("discards a refused guest chat even after Back cleared the allocation", async () => {
+    const createFirstTurnChat = vi
+      .fn<(input: unknown) => Promise<FirstTurnChatResult>>()
+      .mockResolvedValue(localFirstTurn("chat-minted"))
+    const props = baseProps({ isAuthenticated: false, createFirstTurnChat })
+    const { operations, rerender } = renderOperations(props)
+
+    operations().beginFirstTurn()
+    await operations().ensureChatExists(turnArgs())
+    // Back to onboarding while the dispatch is in flight.
+    rerender({ ...props, chatId: "chat-minted" })
+    rerender({ ...props, chatId: null })
+    operations().rollbackFirstTurn()
+
+    expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
+    // Back already left the route; nothing to reset.
+    expect(props.resetChatIdentity).not.toHaveBeenCalled()
   })
 
   it("creates a durable first turn under the committed id even after the chatId prop caught up", async () => {
