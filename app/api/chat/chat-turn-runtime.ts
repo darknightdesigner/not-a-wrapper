@@ -398,15 +398,6 @@ function bucketLatencyMs(latencyMs: number): string {
   return "gt_15s"
 }
 
-function getSlowRequestThresholdMs(): number {
-  const fallback = 30000
-  const parsed = Number.parseInt(
-    process.env.SENTRY_CHAT_SLOW_REQUEST_MS ?? "",
-    10
-  )
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-}
-
 function getStalledContinuationThresholdMs(): number {
   const fallback = 30000
   // setTimeout overflows past 2^31-1 ms and fires immediately; clamp so a
@@ -602,7 +593,6 @@ export function createChatTurnRuntime(args: {
   // The full execution plan, assigned at the end of a successful prepare().
   let prepared: PreparedTurn | null = null
 
-  const slowRequestThresholdMs = getSlowRequestThresholdMs()
   const stalledContinuationThresholdMs = getStalledContinuationThresholdMs()
 
   async function prepare(): Promise<void> {
@@ -1987,34 +1977,6 @@ export function createChatTurnRuntime(args: {
             inputTokens: usage?.inputTokens,
             outputTokens: usage?.outputTokens,
           })
-          if (totalLatencyMs >= slowRequestThresholdMs) {
-            Sentry.captureMessage("chat_slow_request", {
-              level: "warning",
-              tags: {
-                route: "api/chat",
-                chat_provider: resolvedProvider,
-                chat_model: model,
-                chat_tool_outcome: toolOutcome,
-                chat_finish_reason: finishReason ?? "unknown",
-                chat_error_type: "none",
-              },
-              extra: {
-                requestId,
-                chatId,
-                totalLatencyMs,
-                firstTokenLatencyMs,
-                thresholdMs: slowRequestThresholdMs,
-                totalToolCalls,
-                failedToolCalls,
-                timeoutToolCalls,
-                budgetDeniedToolCalls,
-                inputTokens: usage?.inputTokens,
-                outputTokens: usage?.outputTokens,
-                isAuthenticated,
-              },
-            })
-          }
-
           // Finish reason observability — log truncation (finishReason: "length")
           // so we can detect max_tokens exhaustion in dev and production.
           if (finishReason === "length") {
