@@ -471,8 +471,11 @@ async function main() {
       for (const handoffCase of CASES) {
         const run = await runHandoffCase(browser, baseUrl, width, handoffCase)
         handoffs.push(run)
+        // Quiet-case metrics are NaN for the through case by design.
+        const fixed = (value: number, digits: number) =>
+          Number.isNaN(value) ? "n/a" : value.toFixed(digits)
         log(
-          `${width}px ${handoffCase}: ${run.ok ? "pass" : `FAIL (${run.failures.join("; ")})`}, ${run.typed} keys (release after ${run.keysBeforeRelease}), field delta ${run.fieldHandoffDeltaPx.toFixed(2)} px, settled surface delta ${run.surfaceSettledDeltaPx.toFixed(2)} px, composer CLS ${run.composerCls.toFixed(4)}, autofocused ${run.autofocused}`
+          `${width}px ${handoffCase}: ${run.ok ? "pass" : `FAIL (${run.failures.join("; ")})`}, ${run.typed} keys (release after ${run.keysBeforeRelease}), field delta ${fixed(run.fieldHandoffDeltaPx, 2)} px, settled surface delta ${fixed(run.surfaceSettledDeltaPx, 2)} px, composer CLS ${fixed(run.composerCls, 4)}, autofocused ${run.autofocused}`
         )
       }
     }

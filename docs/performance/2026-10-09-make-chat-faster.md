@@ -2,7 +2,10 @@
 
 Final before/after for the five items taken from Anthropic's "How we made
 claude.ai 3x faster" and Theo's commentary. Base is `4be66f67` (HEAD before this
-work); candidate is the uncommitted working tree on `darknight/batcave-signal`.
+work; captured from a local snapshot commit whose product files are
+byte-identical). Candidate is the working tree before the final commit
+`c84a0582`, which added only the default-header `data-fixed-header` wiring in
+`layout-app.tsx` (used by test pages, not chat routes) and a type import move.
 Both are local production builds (`NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true`,
 `.next-perf`), measured on one Apple M4 Max with Chromium 151.0.7922.34,
 headless, fresh guest contexts, base and candidate interleaved. Raw JSON stayed
@@ -56,7 +59,7 @@ in the session scratchpad. This is local evidence, not CI certification.
 | Constrained rAF gaps over 40 ms per run, median | same | 21 | 7 |
 | Wheel to next frame late in a stream, p50 / p95 | scratch probe, 5 streams x 10 wheels | 13.8 / 22.0 ms @1x, 61.4 / 87.0 ms @4x | 12.6 / 17.2 ms @1x, 37.4 / 64.5 ms @4x |
 | Payload budgets | `payloadBudgets.seam.test.ts`, 3 runs | | pass, identical bytes, equal to budgets |
-| Signed-in reload to sidebar rows | | pending | pending |
+| Signed-in reload to sidebar rows (dev server, user's Chrome, n=1) | | not measured; base waits for the live read, which needs auth (done at 1,184 ms in the candidate load) | rows at 474 ms, with the page interactive |
 
 Unthrottled streaming on this machine is near idle, so content-frame and
 blocking-time medians barely move there; the constrained profile and the
@@ -114,8 +117,8 @@ about 28.6 s delivered) in both arms, so the receipt tolerance was 30%, not
 ## Open follow-ups
 
 - Signed-in journeys (`interact-long-answer`, `interact-constrained`, cold and
-  warm sends) and the signed-in reload to sidebar rows check need the CI pair or
-  the user's Chrome.
+  warm sends) need the CI pair. The signed-in sidebar reload was checked once in
+  the user's Chrome on the dev server; a production-build number is still open.
 - Guest-only harness runs cannot find a direct scroll-root wheel target in the
   guest layout here (thread content covers the gutter) in either arm.
 - The deterministic provider schedules each chunk relative to the last, so
