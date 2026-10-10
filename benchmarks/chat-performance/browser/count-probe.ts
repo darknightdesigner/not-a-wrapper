@@ -50,15 +50,21 @@ const countsResultFile = z.object({
   buildId: z.string(),
   browser: z.string(),
   typedCharacters: count,
-  interactions: z.array(
-    z.object({
-      id: interactionId,
-      cpuThrottle: z.number().positive(),
-      samples: z.array(countSample),
-      /** Top component types by hook renders in the first sample (minified names carry a DOM hint). */
-      topComponents: z.array(componentCensus),
-    })
-  ),
+  interactions: z
+    .array(
+      z.object({
+        id: interactionId,
+        cpuThrottle: z.number().positive(),
+        samples: z.array(countSample),
+        /** Top component types by hook renders in the first sample (minified names carry a DOM hint). */
+        topComponents: z.array(componentCensus),
+      })
+    )
+    // compareCounts reads the first match, so a duplicate could hide contradictory data.
+    .refine(
+      (entries) => new Set(entries.map(({ id, cpuThrottle }) => `${id}@${cpuThrottle}`)).size === entries.length,
+      "duplicate interaction id and CPU throttle"
+    ),
 })
 
 export type CountSample = z.infer<typeof countSample>

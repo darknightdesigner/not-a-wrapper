@@ -61,7 +61,12 @@ function log(message: string) {
 let serverGroup: number | null = null
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-const serving = (baseUrl: string) => fetch(baseUrl, { redirect: "manual" }).then(() => true, () => false)
+/** Probes are bounded; a listener that never answers still occupies the port. */
+const serving = (baseUrl: string) =>
+  fetch(baseUrl, { redirect: "manual", signal: AbortSignal.timeout(2_000) }).then(
+    () => true,
+    (error: unknown) => error instanceof Error && error.name === "TimeoutError"
+  )
 
 /** Signals every server process; false once none is left. Signal 0 only probes. */
 function signalServer(signal: NodeJS.Signals | 0) {
@@ -94,7 +99,8 @@ async function startServer(baseUrl: string) {
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     try {
-      if ((await fetch(baseUrl, { redirect: "manual" })).status < 500) return
+      const signal = AbortSignal.timeout(Math.max(1, deadline - Date.now()))
+      if ((await fetch(baseUrl, { redirect: "manual", signal })).status < 500) return
     } catch {
       // Not up yet.
     }
@@ -310,8 +316,11 @@ async function capture(output: string) {
     }
     log(`wrote ${output}`)
   } finally {
-    await browser?.close()
-    await stopServer(baseUrl)
+    try {
+      await browser?.close()
+    } finally {
+      await stopServer(baseUrl)
+    }
   }
 }
 

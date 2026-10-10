@@ -105,6 +105,7 @@ describe("compareCounts", () => {
       [capture(), capture(Array(5).fill({ layoutCount: undefined })), "head capture invalid"],
       [capture(Array(5).fill({ domMutations: Number.NaN })), capture(), "base capture invalid"],
       [{ ...capture(), interactions: capture().interactions.slice(1) }, capture(), "NOT EVALUATED"],
+      [capture(), { ...capture(), interactions: [...capture().interactions, capture().interactions[0]] }, "duplicate interaction"],
     ]
     for (const [base, head, reason] of cases)
       expect(compareCounts(base, head)).toMatchObject({
