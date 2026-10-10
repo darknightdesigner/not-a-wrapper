@@ -2,7 +2,13 @@
 
 import type { Doc } from "@/convex/_generated/dataModel"
 import { SIDEBAR_WINDOW_PAGE_SIZE } from "@/lib/config"
-import { useCallback, useSyncExternalStore } from "react"
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from "react"
 import type { Chats } from "../types"
 
 /**
@@ -280,22 +286,29 @@ function subscribe(
 }
 
 /**
- * The owner's persisted window, read synchronously on the first client render.
- * The server snapshot is null, so hydration matches the server HTML. Pass
- * `active: false` once every live read it stands in for has been delivered:
- * the snapshot is then a stable null and other tabs' writes do not re-render.
+ * The owner's persisted window. Hydration and the first client render return
+ * null like the server, and the window is adopted in a transition after mount:
+ * a synchronous post-hydration render would mount every cached row in the
+ * frame where the composer becomes ready (ADR-0048). Later store changes
+ * update synchronously. Pass `active: false` once every live read it stands
+ * in for has been delivered: the snapshot is then a stable null and other
+ * tabs' writes do not re-render.
  */
 export function usePersistedWindow(
   owner: string | undefined,
   active: boolean
 ): PersistedSidebarWindow | null {
+  const [adopted, setAdopted] = useState(false)
+  useEffect(() => {
+    startTransition(() => setAdopted(true))
+  }, [])
   const subscribeOwner = useCallback(
     (onChange: () => void) => subscribe(owner, active, onChange),
     [owner, active]
   )
   return useSyncExternalStore(
     subscribeOwner,
-    () => getSnapshot(owner, active),
+    () => (adopted ? getSnapshot(owner, active) : null),
     () => null
   )
 }

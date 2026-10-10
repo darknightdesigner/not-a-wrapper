@@ -25,8 +25,7 @@ Options:
 
 1. **localStorage, read synchronously** through `useSyncExternalStore` with a
    null server snapshot, the same hydration-safe shape as the chat
-   organization preference and ADR-0032. Rows paint on the first
-   post-hydration render.
+   organization preference and ADR-0032. Rows paint right after hydration.
 2. **IndexedDB through the guest store** (`lib/chat-store/persist.ts`). Reads
    are async, so rows still arrive after a loading frame, and the store is the
    guest identity's data (ADR-0033): mixing signed-in rows into it blurs the
@@ -57,6 +56,14 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
   that read too (the same Convex subscription the sidebar opens) and exposes
   `persistedProjects` while it is pending. Once nothing is pending the hook
   returns a stable null and ignores other tabs' writes.
+- **Adopted in a transition.** Hydration and the first client render return
+  null like the server; a mount effect adopts the window with
+  `startTransition`, and later store changes update synchronously. The first
+  version let `useSyncExternalStore` adopt it in the synchronous
+  post-hydration render, which mounted every cached row in the frame where the
+  composer becomes ready: in the CI pair, every signed-in scenario that
+  reloads with storage reached composer input 110 to 220 ms later
+  (error-recovery 573 to 795 ms), while cold-storage new-chat did not move.
 - **Live data always wins.** Once the live first page and pinned read have
   arrived, the sidebar renders live data only. Persisted rows are never merged
   into live rows, so a chat deleted or renamed elsewhere is corrected on the
@@ -72,8 +79,8 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
 - **Bound to the live identity.** The window is read and written only while
   the live AuthKit user is the owner, so a tab whose session moved to another
   user neither shows the old owner's rows nor writes the new user's rows
-  under the old owner. AuthKit is seeded from the server session, so a
-  reload still paints on the first render.
+  under the old owner. AuthKit is seeded from the server session, so the
+  check already holds when the window is adopted after hydration.
 - **Write-through on change.** Only delivered live reads (window, pinned, and
   projects) are serialized.
   The write runs in `requestIdleCallback` (2 s timeout; `setTimeout` where

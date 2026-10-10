@@ -120,6 +120,10 @@ about 28.6 s delivered) in both arms, so the receipt tolerance was 30%, not
 
 ## Open follow-ups
 
+- The 474 ms sidebar row is from the first, synchronous adoption. The CI pair
+  showed that adoption delayed composer readiness in signed-in reloads with
+  storage, so the window is now adopted in a transition after hydration
+  (ADR-0048); re-measure the row time.
 - Signed-in journeys (`interact-long-answer`, `interact-constrained`, cold and
   warm sends) need the CI pair. The signed-in sidebar reload was checked once in
   the user's Chrome on the dev server; a production-build number is still open.

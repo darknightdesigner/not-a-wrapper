@@ -309,7 +309,7 @@ export function ChatsProvider({
   // The window is bound to the live AuthKit identity, not only the
   // server-seeded prop: if this tab's session moves to another user, the old
   // owner's rows are neither shown nor written. AuthKit seeds its user from
-  // the server's initialAuth, so a reload still paints on the first render.
+  // the server's initialAuth, so the gate holds when the window is adopted.
   const { user: authUser } = useAuth()
   const isSessionOwner = userId !== undefined && authUser?.id === userId
   const persistedWindow = usePersistedWindow(

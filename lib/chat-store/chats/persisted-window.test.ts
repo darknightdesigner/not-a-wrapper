@@ -5,6 +5,22 @@ import type { Chats } from "../types"
 
 type PersistedWindowModule = typeof import("./persisted-window")
 
+// Lets a test hold the adoption transition to inspect the commits before it.
+const transitions = vi.hoisted(() => ({
+  hold: false,
+  held: [] as Array<() => void>,
+}))
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>()
+  return {
+    ...react,
+    startTransition: (callback: () => void) => {
+      if (transitions.hold) transitions.held.push(callback)
+      else react.startTransition(callback)
+    },
+  }
+})
+
 const values = new Map<string, string>()
 const setItem = vi.fn((key: string, value: string) => values.set(key, value))
 
@@ -40,6 +56,8 @@ describe("persisted sidebar window", () => {
 
   beforeEach(async () => {
     vi.useFakeTimers()
+    transitions.hold = false
+    transitions.held.length = 0
     values.clear()
     setItem.mockClear()
     // Fresh module state: clearing stops writes for the document.
@@ -140,5 +158,37 @@ describe("persisted sidebar window", () => {
     act(() => root.unmount())
 
     expect(setItem).not.toHaveBeenCalled()
+  })
+
+  it("adopts the window in a transition after hydration, never in a sync render", async () => {
+    const { act, createElement, startTransition } = await import("react")
+    const { hydrateRoot } = await import("react-dom/client")
+    ;(
+      globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+    ).IS_REACT_ACT_ENVIRONMENT = true
+    values.set(
+      store.PERSISTED_WINDOW_STORAGE_KEY,
+      store.serializePersistedWindow("user-1", [chat("a")], [])
+    )
+    function Rows() {
+      const persisted = store.usePersistedWindow("user-1", true)
+      const ids = persisted?.chats.map((row) => row.id).join()
+      return createElement("p", null, ids ?? "none")
+    }
+    const container = document.createElement("div")
+    container.innerHTML = "<p>none</p>"
+
+    // CI: a sync post-hydration adoption delayed composer readiness (ADR-0048).
+    transitions.hold = true
+    let root: ReturnType<typeof hydrateRoot> | undefined
+    await act(async () => {
+      root = hydrateRoot(container, createElement(Rows))
+    })
+    expect(container.textContent).toBe("none")
+
+    transitions.hold = false
+    act(() => transitions.held.splice(0).forEach(startTransition))
+    expect(container.textContent).toBe("a")
+    act(() => root?.unmount())
   })
 })
