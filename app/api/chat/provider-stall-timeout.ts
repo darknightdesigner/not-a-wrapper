@@ -6,9 +6,9 @@ import { wrapLanguageModel } from "ai"
 
 /**
  * Longest provider silence tolerated while a model call is writing its answer
- * (text or tool input). Reasoning, provider-run tools (hosted web search), and
- * the wait before the answer starts are legitimately silent, so they pause the
- * clock and stay bounded by the provider deadline (ADR-0039).
+ * (text or tool input). Reasoning, provider-run tools (hosted search, code
+ * interpreter), and the wait before the answer starts are legitimately silent,
+ * so they pause the clock and stay bounded by the provider deadline (ADR-0039).
  */
 export const ANSWER_STALL_TIMEOUT_MS = 60_000
 
@@ -44,17 +44,28 @@ export function withAnswerStallTimeout(
   })
 }
 
-/** Answer output arms the clock; reasoning and provider-run tools pause it. */
+/**
+ * Answer output arms the clock; reasoning, provider-run tools and `finish`
+ * pause it. A provider-run tool can stream input (hosted code interpreter)
+ * before it runs, so its input deltas never arm the clock.
+ */
 function isAnswering(
   part: LanguageModelV4StreamPart,
-  answering: boolean
+  answering: boolean,
+  hostedInputs: Set<string>
 ): boolean {
   switch (part.type) {
     case "text-delta":
-    case "tool-input-delta":
       return true
+    case "tool-input-start":
+      if (!part.providerExecuted) return answering
+      hostedInputs.add(part.id)
+      return false
+    case "tool-input-delta":
+      return !hostedInputs.has(part.id)
     case "reasoning-start":
     case "reasoning-delta":
+    case "finish":
       return false
     case "tool-call":
       return part.providerExecuted ? false : answering
@@ -68,6 +79,7 @@ function guardAnswerStall(
   timeoutMs: number
 ): ReadableStream<LanguageModelV4StreamPart> {
   const reader = source.getReader()
+  const hostedInputs = new Set<string>()
   let answering = false
   let closed = false
 
@@ -97,7 +109,7 @@ function guardAnswerStall(
         controller.close()
         return
       }
-      answering = isAnswering(next.value, answering)
+      answering = isAnswering(next.value, answering, hostedInputs)
       controller.enqueue(next.value)
     },
     cancel(reason) {

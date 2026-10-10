@@ -8,8 +8,8 @@ Related: ADR-0039 (retained stream), ADR-0011 (settlement), ADR-0008 (`lastSnaps
 
 Stamp every Convex checkpoint with the retained-stream position it contains, so a
 refreshed client knows exactly when its replay covers the checkpoint it is showing.
-This replaces the text-prefix guess (`hasVisiblePrefix`) and the 2-second
-`CHECKPOINT_HANDOFF_MS` fallback with a cursor comparison.
+This replaces the text-prefix guess (`hasVisiblePrefix`) with a cursor comparison.
+The 2-second `CHECKPOINT_HANDOFF_MS` timer stays only as a degraded-Redis safety net.
 
 User-visible problem: after a refresh, the answer can freeze for 2 s (or until the
 run ends, before 2026-09-27) when the replayed message differs from the checkpoint
@@ -153,9 +153,10 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
   observedResponseStream = responseBranch.pipeThrough(/* map ({chunk}) => chunk */)
   // retainedBranch → retained.consume(retainedBranch) | consumeStream
   ```
-  Ordering: the tracker sees chunk `n` before the tee hands it to Redis. A checkpoint
-  can lead the log by one Redis batch (≤20 ms plus round trip), never by a chunk
-  that has no `seq`. The browser's direct response carries the same chunk order,
+  Ordering: the tracker sees chunk `n` before the tee hands it to Redis, and a
+  checkpoint never names a chunk that has no `seq`. The lead is not bounded: `tee()`
+  buffers without limit, so slow Redis appends let checkpoints run ahead of the log
+  by many batches. The gate therefore keeps a timer (Step 5). The browser's direct response carries the same chunk order,
   so the n-th chunk the browser receives is `seq n`.
 - `app/api/chat/durable-turn-runtime.ts`, `createDurableSnapshotTracker` (~L687):
   - Replace the `TextStreamPart` input and its private `toUIMessageStream` with
@@ -194,9 +195,9 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
 ### Step 5. Client adoption by cursor (`lib/chat-stream/resumable-chat.ts`)
 
 - `RetainedReplay`:
-  - In `consume`, set `this.cursor = frame.id` **before** `await this.input.write(chunk)`.
-    `this.cursor` is then always an upper bound of what the reducer has seen. It
-    stays the reconnect `after`.
+  - Keep `this.cursor = frame.id` **after** `await this.input.write(chunk)`, as today.
+    Writes are awaited, so it is exact at every probe and publish point, and a
+    rejected write never advances the reconnect `after` past an unapplied chunk.
   - **Lower-bound probe:** while the gate is closed, after each network read's
     frames and at `caught-up`, write
     `{ type: "message-metadata", messageMetadata: { replayedThrough: this.cursor } }`
@@ -208,7 +209,7 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
     writes. Mark the connection live and let the next gated yield publish.
   - On publish: strip `replayedThrough` and set `metadata.streamCursor = this.cursor`
     (the upper bound) on the published message.
-- `ResumableChat.receive` publish callback: replace `hasVisiblePrefix` and the handoff timer with:
+- `ResumableChat.receive` publish callback: replace `hasVisiblePrefix` with:
   ```ts
   const proof = displayedCursor(previous, run.runId) // string | null
   if (proof === null) { disconnectObserver(); return } // no proof: checkpoints drive now
@@ -224,6 +225,10 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
      `runId`: `0-${direct.delivered}`.
   5. Otherwise `null`.
 
+  Keep the `CHECKPOINT_HANDOFF_MS` timer: a gate still closed after 2 s means the
+  log is lagging (slow Redis appends), so disconnect and let checkpoints drive, as
+  today. With healthy Redis the gate opens within milliseconds and the timer never fires.
+
   Re-check the gate on each connection's first publication. Projection can install a newer
   checkpoint during retry backoff (status `ready`).
 - Direct transport wrapper (constructor ~L268): count delivered chunks as
@@ -234,9 +239,9 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
 ## 5. Deleted or simplified
 
 - `lib/chat-stream/resumable-chat.ts`:
-  - Delete `containsValue`, `toolProgress`, `hasVisiblePrefix` (L29-113),
-    `CHECKPOINT_HANDOFF_MS` (L23-25), the `handoff` timer (L446, L455-464, L566)
-    and the per-connection `adopted` flag (replaced by `gateOpen`).
+  - Delete `containsValue`, `toolProgress`, `hasVisiblePrefix` (L29-113) and the
+    per-connection `adopted` flag (replaced by `gateOpen`). Keep
+    `CHECKPOINT_HANDOFF_MS` and the `handoff` timer, now armed on a closed gate.
   - Remove the `isToolUIPart` and `readTextPhase` imports.
 - `app/api/chat/durable-turn-runtime.ts`: delete the tracker's private
   `toUIMessageStream` conversion and the `TextStreamPart` writer chain (~L762-835),
@@ -260,7 +265,7 @@ producer half of `server.ts` (`APPEND`, `consume`) and the tee block of `chat-tu
 | Redis not configured or unreachable at init | Unchanged: the route returns 503 for live runs, the client gives up after 5 failures, and checkpoints drive. Cursors are still written; they are cheap and unused. |
 | Redis fails mid-run, or the log is oversized (>16 MiB total or a >1 MiB record) | Unchanged: the producer marks the log `unavailable`, the reader sends `unavailable`, and the client falls back after its failure budget. The gate is not involved. |
 | Log expired (1 h active, 10 min completed) or missing | The reader returns null, so checkpoints drive. A cursor never forces a read. (HuggingChat equivalent: `end: gone`.) |
-| Checkpoint ahead of the log (Redis batch lag) | The gate waits. The next live chunk reaches the cursor within milliseconds. There is no timer: the tracker is upstream of the Redis tee, so a log that cannot reach C has failed and will send `unavailable`. |
+| Checkpoint ahead of the log (Redis batch lag) | The gate waits; with healthy Redis the next live chunk reaches the cursor within milliseconds. Slow appends let the tee backlog grow without failing, so the 2 s handoff timer hands the turn to checkpoints. |
 | Producer process dies after a checkpoint | The display holds the checkpoint, which is the best content anyway, until the lease reaper ends the run and `syncRun` detaches the observer. |
 | Approval continuation (new run, reused message) | Prepare resets the cursor to `0-0` in the same patch that relinks `generationRunId`. The Redis key is per run. The client compares cursors only within the same run; an older run's content counts as `0-0`. |
 | Legacy checkpoint without a cursor (runs in flight across the deploy) | `proof === null`: the observer disconnects at once and checkpoints drive, the same as today's fallback without the 2 s wait. The DB is disposable, so there is no backfill. |
@@ -291,7 +296,7 @@ Use the optimized local build on localhost:3002 with local Redis running. Read
 `docs/convex-access.md` before inspecting Convex.
 
 1. **Long answer** (GPT-5.6 Luna/Low): reload during output at least twice and sample DOM text every 50 ms. No sample may be shorter than the text before the reload. Granular updates resume. The final answer matches exactly after another reload.
-2. **Tool turn** (web search) and a **reasoning turn with phase changes**: reload while the tool or reasoning parts are streaming. These are the shapes the old guard mis-modeled. Expect no freeze, and in DevTools the `/stream` request should stay open past 2 s, because there is no handoff.
+2. **Tool turn** (web search) and a **reasoning turn with phase changes**: reload while the tool or reasoning parts are streaming. These are the shapes the old guard mis-modeled. Expect no freeze, and in DevTools the `/stream` request should stay open past 2 s, because the gate opens before the handoff timer fires.
 3. **Approval continuation:** reload after approving and confirm that the replay is adopted.
 4. **Direct handoff:** with DevTools offline for more than 10 s and then `online`, the answer continues from replay, not at the 750 ms checkpoint cadence.
 5. **Redis stopped:** refresh during output shows the answer advancing in 750 ms checkpoint steps, with no errors.
