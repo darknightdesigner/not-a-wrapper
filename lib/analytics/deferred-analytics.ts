@@ -34,8 +34,10 @@ function afterComposerHandoff(run: () => void) {
       if (composerHandedOff()) finish()
     })
     const cap = setTimeout(finish, COMPOSER_WAIT_LIMIT_MS)
+    // childList too: removing the fallback is also a handoff.
     observer.observe(document.documentElement, {
       subtree: true,
+      childList: true,
       attributeFilter: ["hidden"],
     })
   }

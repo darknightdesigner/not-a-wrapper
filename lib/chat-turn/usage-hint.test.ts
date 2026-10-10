@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import {
+  loadGuestUsageHint,
   readGuestUsageHint,
   recordGuestUsageHint,
   spendGuestUsageHint,
 } from "./usage-hint"
+
+const fetchGuestUsage = vi.hoisted(() => vi.fn<() => Promise<number>>())
+vi.mock("@/lib/api", () => ({ fetchGuestUsage }))
 
 const at = (iso: string) => Date.parse(iso)
 
@@ -18,5 +22,19 @@ describe("guest usage hint", () => {
     recordGuestUsageHint(0, at("2027-01-15T23:58:00Z"))
     expect(readGuestUsageHint(at("2027-01-15T23:59:59Z"))).toBe(0)
     expect(readGuestUsageHint(at("2027-01-16T00:00:00Z"))).toBeNull()
+  })
+
+  it("keeps a zero recorded while an older read is in flight", async () => {
+    let resolveRead: (remaining: number) => void = () => {}
+    fetchGuestUsage.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveRead = resolve
+      })
+    )
+    const read = loadGuestUsageHint()
+    recordGuestUsageHint(0)
+    resolveRead(3)
+    expect(await read).toBe(0)
+    expect(readGuestUsageHint()).toBe(0)
   })
 })

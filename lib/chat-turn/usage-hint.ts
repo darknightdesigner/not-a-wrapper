@@ -14,6 +14,8 @@ const HINT_TTL_MS = 5 * 60_000
 const DAY_MS = 86_400_000
 
 let hint: { remaining: number; observedAt: number } | null = null
+// Bumped on every write, so a read that started earlier never overwrites it.
+let revision = 0
 let pendingRead: Promise<number | null> | null = null
 let lastPrefetchAt = Number.NEGATIVE_INFINITY
 
@@ -30,19 +32,24 @@ export function recordGuestUsageHint(
   now = Date.now()
 ): void {
   hint = { remaining, observedAt: now }
+  revision++
 }
 
 /** One admitted turn spent. The expiry stays tied to the server read. */
 export function spendGuestUsageHint(): void {
   if (!hint) return
   hint = { ...hint, remaining: Math.max(0, hint.remaining - 1) }
+  revision++
 }
 
 /** Reads the guest's usage now, sharing one in-flight read. Null on failure:
  * a failed read never blocks a send. */
 export function loadGuestUsageHint(): Promise<number | null> {
+  const startedAt = revision
   pendingRead ??= fetchGuestUsage()
     .then((remaining) => {
+      // A refusal or spend recorded meanwhile is newer than this read.
+      if (revision !== startedAt) return readGuestUsageHint()
       recordGuestUsageHint(remaining)
       return remaining
     })
