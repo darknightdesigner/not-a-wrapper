@@ -288,6 +288,7 @@ export async function readRetainedChatStream(
   signal?.addEventListener("abort", close, { once: true })
   let base: UIMessage | undefined
   let highWater = "0-0"
+  let status: z.infer<typeof metadataSchema>["status"] = "active"
   try {
     await client.connect()
     const metadata = metadataSchema.safeParse(
@@ -301,6 +302,7 @@ export async function readRetainedChatStream(
       close()
       return null
     }
+    status = metadata.data.status
     const parsed: unknown = JSON.parse(metadata.data.base)
     if (parsed !== null)
       [base] = await validateUIMessages({ messages: [parsed] })
@@ -339,22 +341,29 @@ export async function readRetainedChatStream(
             queued.push({ type: "caught-up" })
             break
           }
-          const metadata = metadataSchema.safeParse(
-            await client.hGetAll(key.metadata)
-          )
-          if (!metadata.success || metadata.data.status === "unavailable") {
-            queued.push({ type: "unavailable" })
-            ended = true
-            break
-          }
-          // Completed logs never block. Active readers periodically check expiry.
+          // Completed logs never block. Active reads wake at least every second.
+          const readStatus = status
           const result = await client.xRead(
             { key: key.events, id: cursor },
-            metadata.data.status === "active"
+            readStatus === "active"
               ? { COUNT: READ_COUNT, BLOCK: 1000 }
               : { COUNT: READ_COUNT }
           )
           const messages = result?.[0]?.messages ?? []
+          if (messages.length === 0 && readStatus === "active") {
+            // Status is re-read only on an idle read, halving commands while
+            // output flows. The producer finishes after its last append, so a
+            // newly finished log gets one more non-blocking read before ending.
+            const metadata = metadataSchema.safeParse(
+              await client.hGetAll(key.metadata)
+            )
+            if (!metadata.success || metadata.data.status === "unavailable") {
+              queued.push({ type: "unavailable" })
+              ended = true
+              break
+            }
+            status = metadata.data.status
+          }
           for (const message of messages) {
             const chunk = await validateTypes({
               value: JSON.parse(message.message.chunk),
@@ -367,7 +376,7 @@ export async function readRetainedChatStream(
               queued.push({ type: "caught-up" })
             }
           }
-          if (messages.length === 0 && metadata.data.status === "finished") {
+          if (messages.length === 0 && readStatus === "finished") {
             queued.push({ type: "end" })
             ended = true
           } else if (
