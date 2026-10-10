@@ -130,6 +130,9 @@ describe("persisted sidebar window", () => {
         newValue: null,
       })
     )
+    // A failed sign-out here does not undo the other tab's stop.
+    store.clearPersistedWindow()
+    store.resumePersistedWindowWrites()
     store.schedulePersistedWindowWrite(
       store.serializePersistedWindow("user-1", [chat("a")], [])
     )

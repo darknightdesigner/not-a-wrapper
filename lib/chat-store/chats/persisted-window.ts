@@ -206,7 +206,11 @@ let parsedCache: {
   value: PersistedSidebarWindow | null
 } = { raw: null, owner: "", value: null }
 const listeners = new Set<() => void>()
-let writesStopped = false
+/**
+ * Why writes are off: this document's sign-out (undone if it fails) or
+ * another tab's removal, which stays in force for the document.
+ */
+let writesStopped: false | "sign-out" | "other-tab" = false
 /**
  * The window the mounted provider currently asks to persist (its identity
  * gate already passed); released when that request is cancelled.
@@ -239,7 +243,7 @@ function handleStorage(event: StorageEvent) {
   // Another tab removed the window (sign-out, or a load by an identity that
   // could not use it): stop this document's writes too, so it cannot write
   // the departing owner's rows back.
-  if (event.newValue === null) writesStopped = true
+  if (event.newValue === null) writesStopped = "other-tab"
   invalidate()
 }
 
@@ -339,7 +343,7 @@ export function schedulePersistedWindowWrite(serialized: string): () => void {
  * persist the departing user's rows again.
  */
 export function clearPersistedWindow() {
-  writesStopped = true
+  writesStopped ||= "sign-out"
   removeRaw()
   invalidate()
 }
@@ -350,6 +354,7 @@ export function clearPersistedWindow() {
  * data is unchanged, so the provider would not request it again.
  */
 export function resumePersistedWindowWrites() {
+  if (writesStopped !== "sign-out") return
   writesStopped = false
   if (requestedWrite !== null) schedulePersistedWindowWrite(requestedWrite)
 }
