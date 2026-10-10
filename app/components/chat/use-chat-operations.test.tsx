@@ -155,6 +155,7 @@ describe("useChatOperations", () => {
       selectedModel: "openai/gpt-5-mini",
       systemPrompt: "system",
       createFirstTurnChat: vi.fn(),
+      deleteChat: vi.fn(async () => true),
       commitChatIdentity: vi.fn(),
       resetChatIdentity: vi.fn(),
       setHasDialogAuth: vi.fn(),
@@ -205,9 +206,11 @@ describe("useChatOperations", () => {
       attachmentIds: [],
     })
     expect(localStorage.getItem(GUEST_CHAT_STORAGE_KEY)).toBe("chat-minted")
-    // Committed: a later rollback is a no-op (ADR-0012 keeps the chat).
+    // A local creation still rolls back (a guest sign-in refusal, ADR-0045):
+    // origin route restored and the empty local chat discarded.
     operations().rollbackFirstTurn()
-    expect(props.resetChatIdentity).not.toHaveBeenCalled()
+    expect(props.resetChatIdentity).toHaveBeenCalledOnce()
+    expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
   })
 
   it("creates a durable first turn under the committed id even after the chatId prop caught up", async () => {
@@ -253,6 +256,9 @@ describe("useChatOperations", () => {
       },
       confirmDispatched: expect.any(Function),
     })
+    // A durable creation never rolls back (ADR-0012).
+    operations().rollbackFirstTurn()
+    expect(props.resetChatIdentity).not.toHaveBeenCalled()
     expect(createFirstTurnChat).toHaveBeenCalledWith({
       publicId: "chat-minted",
       model: "openai/gpt-5-mini",

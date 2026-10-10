@@ -18,7 +18,7 @@ import { modules } from "./test.setup"
 // Regenerate: run `bunx vitest run convex/payloadBudgets.seam.test.ts` and
 // paste the `PAYLOAD_BUDGETS` object printed in the failure.
 const PAYLOAD_BUDGETS = {
-  selectedPathSettled: 424_814,
+  selectedPathSettled: 424_867,
   selectedPathDuringRun: 422_258,
   liveMessage: 2_585,
   selectedRunStateLive: 175,
@@ -264,9 +264,6 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
     await seedSidebar(t, userId)
     const owner = t.withIdentity({ subject: OWNER })
 
-    const path = await owner.query(api.messages.getSelectedPath, {
-      chatId: CHAT,
-    })
     // The live tail as prepare stamps it: while the answer streams, history
     // stops before it and each checkpoint re-sends the live message alone.
     await t.run(async (ctx) =>
@@ -287,6 +284,8 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
     const live = await owner.query(api.messages.getSelectedRunState, {
       chatId: CHAT,
     })
+    // Settlement: the run goes terminal and the chat's terminal projection
+    // clears the live tail, so the subscribed path is whole again.
     await t.run(async (ctx) => {
       await ctx.db.patch(runId, {
         status: "completed",
@@ -295,10 +294,20 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
         leaseExpiresAt: undefined,
         completedAt: TURNS + 1,
       })
+      await ctx.db.patch(chatId, {
+        liveRunStatus: undefined,
+        liveTail: undefined,
+        lastRunEndedAt: TURNS + 1,
+        lastRunStatus: "completed",
+      })
       await ctx.db.patch(assistantMessageId, { generationRunId: runId })
     })
     const settled = await owner.query(api.messages.getSelectedRunState, {
       chatId: CHAT,
+    })
+    const path = await owner.query(api.messages.getSelectedPath, {
+      chatId: CHAT,
+      splitLiveTail: true,
     })
     const recent = await owner.query(api.chats.getRecentWindowForCurrentUser, {
       paginationOpts: { numItems: SIDEBAR_WINDOW_PAGE_SIZE, cursor: null },
@@ -307,7 +316,9 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
     const currentUser = await owner.query(api.users.getCurrent, {})
 
     // Shape guards: a budget only means something over the intended fixture.
+    expect(path.liveMessageId).toBeNull()
     expect(path.selectedMessages).toHaveLength(TURNS * 2)
+    expect(path.selectedMessages.at(-1)?.generationRunId).toBe(runId)
     expect(history.liveMessageId).toBe(assistantMessageId)
     expect(history.selectedMessages).toHaveLength(TURNS * 2 - 1)
     expect(liveMessage?._id).toBe(assistantMessageId)

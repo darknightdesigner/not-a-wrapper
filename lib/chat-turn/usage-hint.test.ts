@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest"
 import {
   loadGuestUsageHint,
+  prefetchGuestUsageHint,
   readGuestUsageHint,
   recordGuestUsageHint,
   spendGuestUsageHint,
@@ -22,6 +23,17 @@ describe("guest usage hint", () => {
     recordGuestUsageHint(0, at("2027-01-15T23:58:00Z"))
     expect(readGuestUsageHint(at("2027-01-15T23:59:59Z"))).toBe(0)
     expect(readGuestUsageHint(at("2027-01-16T00:00:00Z"))).toBeNull()
+  })
+
+  it("skips the typing read while a Send-time read is still fresh", () => {
+    fetchGuestUsage.mockClear()
+    fetchGuestUsage.mockResolvedValueOnce(4)
+    recordGuestUsageHint(5, at("2027-01-15T12:00:00Z"))
+    prefetchGuestUsageHint(at("2027-01-15T12:00:01Z"))
+    expect(fetchGuestUsage).not.toHaveBeenCalled()
+
+    prefetchGuestUsageHint(at("2027-01-15T12:05:00Z"))
+    expect(fetchGuestUsage).toHaveBeenCalledOnce()
   })
 
   it("keeps a zero recorded while an older read is in flight", async () => {

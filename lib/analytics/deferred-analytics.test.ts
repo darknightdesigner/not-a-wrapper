@@ -48,12 +48,53 @@ it("loads after the composer handoff and keeps queued pageview properties and ti
   })
   expect(posthog.init).toHaveBeenCalledWith("test-key", expect.objectContaining({
     capture_pageview: false,
-    session_recording: { maskTextSelector: "*", maskAllInputs: true },
+    session_recording: expect.objectContaining({
+      maskTextSelector: "*",
+      maskAllInputs: true,
+    }),
   }))
   expect(vi.mocked(posthog.init).mock.calls[0][1]).not.toHaveProperty("disable_session_recording")
   expect(posthog.capture).toHaveBeenCalledWith("$pageview", properties, {
     timestamp: new Date(1_000),
   })
+})
+
+it("drops the query string from same-origin auth URLs on events and recordings", async () => {
+  await start(false)
+  document.querySelector("textarea")!.hidden = true
+  await vi.waitFor(() => expect(posthog.init).toHaveBeenCalled())
+  const options = vi.mocked(posthog.init).mock.calls[0][1]
+  const sanitize = options?.before_send
+  if (typeof sanitize !== "function") throw new Error("before_send missing")
+  const origin = window.location.origin
+  const kept = {
+    $session_entry_url: `${origin}/c/1?q=1`,
+    $initial_referrer: "https://example.com/auth/login?q=1",
+  }
+  expect(sanitize({
+    uuid: "1",
+    event: "$autocapture",
+    properties: {
+      $current_url: `${origin}/email-verification?email=a%40b.co#x`,
+      $referrer: `${origin}/auth/reset-password?token=t`,
+      ...kept,
+    },
+    $set_once: { $initial_current_url: `${origin}/auth?email=a%40b.co` },
+  })).toEqual({
+    uuid: "1",
+    event: "$autocapture",
+    properties: {
+      $current_url: `${origin}/email-verification#x`,
+      $referrer: `${origin}/auth/reset-password`,
+      ...kept,
+    },
+    $set_once: { $initial_current_url: `${origin}/auth` },
+  })
+  const request = { entryType: "navigation", startTime: 0, duration: 0 }
+  expect(options?.session_recording?.maskCapturedNetworkRequestFn?.({
+    ...request,
+    name: `${origin}/auth/callback?code=c`,
+  })).toEqual({ ...request, name: `${origin}/auth/callback` })
 })
 
 it("loads at the 20 s cap without a handoff, recorders off in benchmark builds", async () => {

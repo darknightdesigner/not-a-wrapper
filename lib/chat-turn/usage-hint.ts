@@ -63,9 +63,11 @@ export function loadGuestUsageHint(): Promise<number | null> {
   return pendingRead
 }
 
-/** The typing-time read: at most one per TTL whatever its outcome, so a
- * failing route is never retried per keystroke. */
+/** The typing-time read: none while a fresh hint exists (a Send-time read
+ * counts), and at most one per TTL whatever its outcome, so a failing route
+ * is never retried per keystroke. */
 export function prefetchGuestUsageHint(now = Date.now()): void {
+  if (readGuestUsageHint(now) !== null) return
   if (now - lastPrefetchAt < HINT_TTL_MS) return
   lastPrefetchAt = now
   void loadGuestUsageHint()

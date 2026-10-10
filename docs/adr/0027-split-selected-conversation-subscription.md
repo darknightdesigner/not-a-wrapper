@@ -35,9 +35,15 @@ remain the branch-context collect.
 Split the subscription into two queries on the same `readableChatQuery`
 builder, both keyed by `chatId` alone:
 
+> Superseded in part by the 2026-10-10 amendment below: while a run streams,
+> the path is itself split (history plus `getLiveMessage`), so the client
+> holds three queries, all keyed by `chatId` (history adds a constant
+> `splitLiveTail` flag), and `pathVersion` is gone. The rest of this section
+> stands.
+
 1. **`getSelectedPath`** — the selected visible path, derived by the shared
-   collect + `createBranchContext` code, plus a derived `pathVersion`
-   fingerprint. Read set:
+   collect + `createBranchContext` code (originally plus a derived
+   `pathVersion` fingerprint, since removed). Read set:
    chats/projects/users/messages only — run-doc writes no longer touch it.
 2. **`getSelectedRunState`** — the tiny per-beat run facts
    (`SelectedRunProjection`, ~177 B measured). Owner-only. Its read set
@@ -201,6 +207,8 @@ server-only pointer on the chat, `chats.liveTail`
   checkpoint the merged path equals the whole path, the write set is exactly
   the live message and the run, and neither version of either falls in
   history's recorded read set. A property loop over 120 seeded branch trees
-  with legacy rows and stale flags (35 refused at stamp, 78 bounded, 7
-  self-check fallbacks) finds the merged path equal to the whole path in all.
-  Both check that the flag-free read is that whole path.
+  with legacy rows and stale flags (seed 7 as shipped in PR #213: 35 refused
+  at stamp, 78 bounded, 7 self-check fallbacks) finds the merged path equal
+  to the whole path in all. Both check that the flag-free read is that whole
+  path. The investigation record's 7, 96 and 17 came from its prototype
+  generator, which had no legacy rows.

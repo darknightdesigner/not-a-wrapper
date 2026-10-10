@@ -5,13 +5,18 @@ win. This document is the investigation record from before implementation.
 "Needs the user", "Recommended order" and "Decisions for the user" below are
 historical; the decisions taken were:
 
-- **PostHog privacy:** recordings mask all text in client code
-  (`lib/analytics/deferred-analytics.ts`), not as a project setting
-  (ADR-0050).
+- **PostHog privacy:** recordings mask text nodes and input values in client
+  code (`lib/analytics/deferred-analytics.ts`), not as a project setting
+  (ADR-0050). Attribute values, such as `title`s and `aria-label`s, stay in
+  clear.
 - **Recorders:** both Sentry Replay and PostHog session recording stay
   (ADR-0050).
 - **Win 2:** the chosen guest-at-limit design shipped and the signed-in
-  998th-message toast was dropped (ADR-0045 amendment).
+  998th-message toast was dropped (ADR-0045 amendment). Rollout caveat: a
+  signed-in tab opened before the deploy still runs the old pre-check,
+  `/api/rate-limits` now answers it 400, and the old client treats that as a
+  failed check and drops every send and edit (console only) until the tab
+  reloads.
 - **Win 5:** visible code first with no fade (ADR-0016, "Visible code
   first"). Its browser count ratchet (PR 2 below) is deferred: it needs a
   perf-only fixture page the paired base build does not have.
@@ -41,8 +46,9 @@ end.
 recording is on for 100% of production sessions with no text masking. In a
 scratch build using the live production remote config, streamed chat text
 appeared in clear in the recording payload in 5 of 5 runs, and in 0 of 5 with
-`maskTextSelector: "*"`. Masking is a PostHog project setting and costs no
-measurable CPU. See win 4.
+`maskTextSelector: "*"`. Masking costs no measurable CPU. It shipped in client
+code, which masks text nodes and input values but not attribute values (status
+note above). See win 4.
 
 ## Method and conditions
 
@@ -143,9 +149,9 @@ React render not included):
 | Live message only | 2,698 to 4,305 | under 0.1 ms | under 0.1 ms |
 
 At 4x, 34 checkpoints cost about 160 ms of parse and map at 120 turns, against
-under 4 ms after the split. The dev-build, hidden-tab task time from the capture
-(8.9 ms median per delivery, n=36) is an upper bound only. React render cost on
-the signed-in production tree is **unverified**.
+under 4 ms after the split. The frame capture ran in a hidden tab, so only its
+frame sizes are used; it gives no timing. React render cost on the signed-in
+production tree is **unverified**.
 
 **Network.** About 545 KB every 750 ms is about 727 KB/s, against the 200 KB/s
 constrained profile, so on slow networks the socket cannot keep up. Arithmetic
@@ -266,9 +272,12 @@ Its result changes only at prepare and terminal transitions.
     path equals the unbounded path, the write set is exactly {live message,
     run}, and neither version of those docs falls inside the history read set.
   - Property loop over 120 seeded random branch trees with legacy and stale
-    flags: 113 stamped (96 stayed bounded, 17 fell back), 7 refused at stamp
-    time, merged equals unbounded in all 120. This is the prefix-derivability
-    property test ADR-0027 asked for.
+    flags, merged equals unbounded in all 120. As shipped in PR #213 (seed 7):
+    35 refused at stamp time, 78 bounded, 7 self-check fallbacks, the figures
+    ADR-0027 cites. The prototype's generator gave 7 refused, 96 bounded and
+    17 fallbacks. It had no legacy rows; the shipped one sends some legacy
+    answers, whose inferred parent stamping refuses. This is the
+    prefix-derivability property test ADR-0027 asked for.
   - The tests catch real breakage: removing the fallback, widening the range to
     include the live message, or stamping on highest `orderId` alone each fails
     at least one test. The prototype file is 401 lines; trim it in the PR.
@@ -398,9 +407,10 @@ the limit (server-driven); its exact UI and T3 Chat's are **unverified**.
 **Chosen: a guest-only usage hint read synchronously at Send.**
 
 1. **Hint module** (new `lib/chat-turn/usage-hint.ts`): a plain module value
-   `{ ownerKey, remaining, observedAt }`, not React state and not a store, so
-   nothing re-renders and there is no SyncLane work. Keyed by owner so a guest
-   value can never gate a signed-in user.
+   `{ remaining, observedAt }`, not React state and not a store, so nothing
+   re-renders and there is no SyncLane work. Guest-only, with no owner key:
+   `runSendTurn` never reads it for a signed-in send, so a guest value can
+   never gate a signed-in user.
 2. **Guest prefetch** of `GET /api/rate-limits` on the first trusted typed input
    (keydown or beforeinput), never on focus: `PromptInput` autofocuses on load
    (`components/ui/prompt-input.tsx:612`), so a focus prefetch would mint guest
@@ -977,24 +987,26 @@ stay plain until scrolled near (0 seen plain in a 9,000 px reading scroll).
    as-is from `app/components/chat/thread-scroll.tsx:83-168,195-197`:
 
    ```ts
+   export type ScrollRootIntersectionObserver = {
+     observe: (target: Element, onChange: (intersecting: boolean) => void) => () => void
+     disconnect: () => void
+   }
    export function createScrollRootIntersectionObserver(options: {
      rootMargin: string
      threshold: number
      /** No [data-scroll-root] ancestor: "intersecting" reports true once
       * (today's turn behavior); "viewport" observes against the viewport. */
-     withoutScrollRoot?: "intersecting" | "viewport"
-   }): {
-     observe: (target: Element, onChange: (intersecting: boolean) => void) => () => void
-     disconnect: () => void
-   }
+     withoutScrollRoot: "intersecting" | "viewport"
+   }): ScrollRootIntersectionObserver
    export function closestScrollRoot(el: Element | null): HTMLElement | null
    ```
 
+   `withoutScrollRoot` is required, so every caller picks the no-root behavior.
    One observer per root, today's stale-callback guard, and no-op `true` when
    `IntersectionObserver` is missing (jsdom). Migrate thread-scroll in the same
-   PR (`TurnIntersectionObserver` stays as a type alias, so `conversation.tsx`
-   needs no edit). Shipping a second helper would be the parallel system
-   AGENTS.md forbids.
+   PR (`conversation.tsx` imports `ScrollRootIntersectionObserver` in place of
+   `TurnIntersectionObserver`). Shipping a second helper would be the parallel
+   system AGENTS.md forbids.
 2. **Gate** (`components/ui/code-block.tsx`): `CodeBlock` (the content-visibility
    box) provides its element through a small context. On a cache miss,
    `CodeBlockCode` observes that box (or itself when used standalone) with one
@@ -1117,8 +1129,9 @@ Independent of wins 1 to 4 in product files.
 
 ## Recommended order (historical)
 
-1. **PostHog text masking (no code, today).** A PostHog project setting; fixes
-   the privacy exposure at no measurable cost. The user decides (below).
+1. **PostHog text masking.** Fixes the chat-text exposure at no measurable
+   cost. Recommended as a project setting; it shipped in client code instead
+   (status note above). The user decides (below).
 2. **Win 3.** Small, root cause, cleans the baselines for wins 1 and 2.
 3. **Win 4.** Independent; the largest cold-load win.
 4. **Win 1.** The largest streaming win; after win 3, and after or together with
@@ -1131,17 +1144,20 @@ Independent of wins 1 to 4 in product files.
 
 Decided as listed in the status note at the top.
 
-1. **PostHog privacy.** Production records chat text in clear. Options, all
-   PostHog project settings: turn on text masking (recommended minimum; no
-   performance cost), sample recordings (cuts quota and exposure, not CPU), or
-   turn PostHog recording off (the only option that also removes its CPU cost,
-   about +570 ms per 6 s of streaming at 4x in the synthetic probe).
+1. **PostHog privacy.** Production recorded chat text in clear. Options: turn
+   on text masking (recommended minimum; no performance cost), sample
+   recordings (cuts quota and exposure, not CPU), or turn PostHog recording off
+   (the only option that also removes its CPU cost, about +570 ms per 6 s of
+   streaming at 4x in the synthetic probe). Shipped: masking in client code,
+   which covers text nodes and input values; attribute values (`title`s,
+   `aria-label`s) stay in clear.
 2. **Keep one recorder or both.** Data only, no recommendation:
 
    | | Sentry Replay | PostHog session recording |
    | --- | --- | --- |
    | Gives | Error-linked replays (60 s buffer in every session) plus 10% full sessions, next to stack traces | Every session, with console logs, network timing and canvas, next to product events and funnels |
-   | Masking today | All text, inputs, media | Inputs only; chat text in clear |
+   | Masking at investigation | All text, inputs, media | Inputs only; chat text in clear |
+   | Masking shipped | Unchanged | Text nodes and input values; attribute values (`title`s, `aria-label`s) in clear |
    | Bytes | 39.8 KB gz (async after win 4) | 68.8 KB gz SDK (async after win 4) plus 50.6 KB gz recorder from PostHog's CDN |
    | Steady state, synthetic stream at 4x | +90 ms per 6 s | about +570 ms per 6 s |
    | Quota | About 10% of sessions plus error replays | 100% of sessions |

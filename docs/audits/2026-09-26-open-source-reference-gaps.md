@@ -1668,7 +1668,9 @@ receives the WorkOS reset `token` in its URL, which leaks the same way.
 1. In `lib/analytics/deferred-analytics.ts`, give `posthog.init` one sanitizer
    that covers every event: a `get_current_url` plus `before_send` hook that
    drops the query string on `/auth/*` and `/email-verification`. This alone
-   closes the live leak.
+   closes the live leak. Done 2026-10-10 (ADR-0050, #213): `before_send` covers
+   every event and `maskCapturedNetworkRequestFn` covers recording URLs
+   (`get_current_url` only steers URL targeting, so it is not used).
 2. Delete `app/providers/posthog-pageview.tsx` (and its mount in
    `app/providers/index.tsx`) and set `capture_pageview: "history_change"`, so
    pageviews pass through the same sanitizer.

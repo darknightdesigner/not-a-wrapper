@@ -6,7 +6,8 @@ import {
 
 /** The guest's remaining daily turns (ADR-0045): a hint, never the gate. */
 export async function fetchGuestUsage(): Promise<number> {
-  const res = await fetch("/api/rate-limits")
+  // Per-guest and changing: never replay a cached answer.
+  const res = await fetch("/api/rate-limits", { cache: "no-store" })
   const { remaining }: { remaining?: unknown } = await res.json()
   if (!res.ok || typeof remaining !== "number") {
     throw new Error(`Guest usage read failed: ${res.status}`)

@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
 import React, {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -37,19 +38,49 @@ const nearViewObserver = createScrollRootIntersectionObserver({
   withoutScrollRoot: "viewport",
 })
 
+/** Sets a callback or object ref; returns a callback ref's cleanup, if any. */
+function setRef<T>(ref: React.Ref<T> | undefined, node: T | null) {
+  if (typeof ref === "function") return ref(node)
+  if (ref) ref.current = node
+}
+
+/**
+ * One callback ref for the internal ref plus the caller's ref (React 19 ref as
+ * a prop), so a caller ref never replaces the near-view observer target.
+ * Cleanup follows Radix `composeRefs`: run the caller's cleanup, else clear it.
+ */
+function useComposedRef<T>(
+  ownRef: React.RefObject<T | null>,
+  callerRef: React.Ref<T> | undefined
+): React.RefCallback<T> {
+  return useCallback(
+    (node: T | null) => {
+      ownRef.current = node
+      const cleanup = setRef(callerRef, node)
+      return () => {
+        ownRef.current = null
+        if (typeof cleanup === "function") cleanup()
+        else setRef(callerRef, null)
+      }
+    },
+    [ownRef, callerRef]
+  )
+}
+
 export type CodeBlockProps = {
   children?: React.ReactNode
   className?: string
 } & React.HTMLProps<HTMLDivElement>
 
-function CodeBlock({ children, className, ...props }: CodeBlockProps) {
+function CodeBlock({ children, className, ref, ...props }: CodeBlockProps) {
   const boxRef = useRef<HTMLDivElement>(null)
+  const composedRef = useComposedRef(boxRef, ref)
   // Source-fidelity box: 24px radius and asymmetric flow margins. The derived
   // 3xl token is 22px, so the literal radius is intentional.
   return (
     <CodeBlockBoxContext.Provider value={boxRef}>
       <div
-        ref={boxRef}
+        ref={composedRef}
         className={cn(
           "not-prose relative mt-4 mb-1 flex w-full flex-col overflow-clip border",
           "border-border bg-card text-card-foreground rounded-[24px]",
@@ -94,6 +125,7 @@ function CodeBlockCode({
   language = "tsx",
   className,
   growing = false,
+  ref,
   ...props
 }: CodeBlockCodeProps) {
   const { resolvedTheme: appTheme } = useTheme()
@@ -102,6 +134,7 @@ function CodeBlockCode({
   const [highlighted, setHighlighted] = useState<HighlightedCode | null>(null)
   const boxRef = useContext(CodeBlockBoxContext)
   const ownRef = useRef<HTMLDivElement>(null)
+  const composedRef = useComposedRef(ownRef, ref)
   // The server never has cached HTML, so hydration renders the plain path
   // and only client renders read the cache.
   const canReadCache = useSyncExternalStore(
@@ -181,13 +214,13 @@ function CodeBlockCode({
   // in the same wrapper, so `<script>`-like content renders as text.
   return html !== null ? (
     <div
-      ref={ownRef}
+      ref={composedRef}
       className={classNames}
       dangerouslySetInnerHTML={{ __html: html }}
       {...props}
     />
   ) : (
-    <div ref={ownRef} className={classNames} {...props}>
+    <div ref={composedRef} className={classNames} {...props}>
       <pre>
         <code>{code ?? ""}</code>
       </pre>

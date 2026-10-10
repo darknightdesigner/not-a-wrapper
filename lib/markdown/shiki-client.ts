@@ -237,6 +237,8 @@ type QueuedHighlight = {
   signal: AbortSignal | undefined
   /** Tokenizes and settles the caller, or rejects when aborted. */
   run: () => void
+  /** Settles the caller without tokenizing. */
+  reject: (reason: unknown) => void
 }
 
 let highlightSequence = 0
@@ -248,13 +250,13 @@ function nextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
 
-/** Rejects aborted entries in place; their `run` throws before tokenizing. */
+/** Rejects aborted entries in place without tokenizing them. */
 function dropAbortedHighlights(): void {
   for (let i = queuedHighlights.length - 1; i >= 0; i--) {
     const entry = queuedHighlights[i]
     if (entry?.signal?.aborted) {
       queuedHighlights.splice(i, 1)
-      entry.run()
+      entry.reject(entry.signal.reason)
     }
   }
 }
@@ -303,6 +305,7 @@ function enqueueHighlight<T>(
           reject(error)
         }
       },
+      reject,
     }
     // Loads finish out of call order, so order by the call's sequence.
     const after = queuedHighlights.findIndex(
@@ -369,12 +372,17 @@ export async function highlightCode(
   })
 }
 
-/** Test-only: drop every cached instance, load promise, and cached HTML. */
+/**
+ * Test-only: drop every cached instance, load promise, and cached HTML.
+ * Queued requests reject as aborted so no caller is left pending.
+ */
 export function resetShikiClientForTests(): void {
   corePromise = null
   loadedLanguages.clear()
   languageLoadPromises.clear()
   clearHighlightCacheForTests()
-  queuedHighlights.length = 0
+  for (const entry of queuedHighlights.splice(0)) {
+    entry.reject(new DOMException("Shiki client reset", "AbortError"))
+  }
   highlightSequence = 0
 }

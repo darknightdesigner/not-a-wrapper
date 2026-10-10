@@ -104,7 +104,7 @@ returns the bytes a client receives, so a core-level fake cannot hold a budget.
 
 | Read | Bytes |
 | --- | --- |
-| `messages.getSelectedPath` settled (240 messages) | 424,814 |
+| `messages.getSelectedPath` settled (240 messages) | 424,867 |
 | `messages.getSelectedPath` during a run (history, 239) | 422,258 |
 | `messages.getLiveMessage` (each checkpoint) | 2,585 |
 | `messages.getSelectedRunState` live / settled | 175 / 173 |

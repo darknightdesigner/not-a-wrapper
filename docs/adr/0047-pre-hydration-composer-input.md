@@ -128,7 +128,8 @@ Option 2, in `components/ui/prompt-input.tsx`.
 - On iOS the keyboard may close at the handoff if programmatic focus cannot
   move it; not verified on a device.
 - The fallback's `hidden` attribute is also the analytics readiness signal:
-  Sentry Replay and PostHog load once no visible fallback remains (ADR-0050).
+  Sentry Replay and PostHog normally load once no visible fallback remains,
+  and a 20 s cap loads them if the composer never hydrates (ADR-0050).
   Renaming `composer-fallback-textarea` or hiding the field another way must
   update `lib/analytics/deferred-analytics.ts`.
 - Not adopted: Anthropic's separate jsdom-rendered markup and its 14-viewport

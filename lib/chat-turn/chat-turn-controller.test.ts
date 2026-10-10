@@ -137,6 +137,7 @@ function createHarness() {
       events.push(`toastError:${title}`)
     }),
     isPresentedRefusal: vi.fn(() => false),
+    isGuestSignInRefusal: vi.fn(() => false),
     bumpChat: vi.fn(() => {
       events.push("bumpChat")
     }),
@@ -625,16 +626,26 @@ describe("chat turn controller", () => {
     expect(adapters.toastError).toHaveBeenCalledWith("Failed to send message")
   })
 
-  it("leaves a refusal with a public code to the stream's error handler", async () => {
-    const { adapters, controller } = createHarness()
+  it("rolls a guest first turn back on a sign-in refusal and leaves presenting it to the stream", async () => {
+    const { adapters, controller, getMessages, setCurrentChatId } =
+      createHarness()
+    setCurrentChatId(null)
     const refusal = new Error(JSON.stringify({ code: "DAILY_LIMIT_REACHED" }))
     adapters.sendMessageAndWaitForAcceptance = vi.fn(async () => {
       throw refusal
     })
     adapters.isPresentedRefusal = vi.fn(() => true)
+    adapters.isGuestSignInRefusal = vi.fn(() => true)
+    const onSuccess = vi.fn()
 
-    await controller.runSendTurn({ text: "Hello" })
+    await controller.runSendTurn({ text: "Hello", onSuccess })
 
+    // The local chat was created, yet the turn rolls back like a pre-creation
+    // refusal: no row, origin route, and a not-accepted turn keeps the draft.
+    expect(adapters.ensureChatExists).toHaveBeenCalledOnce()
+    expect(adapters.firstTurn.rollback).toHaveBeenCalledOnce()
+    expect(getMessages()).toEqual([])
+    expect(onSuccess).not.toHaveBeenCalled()
     expect(adapters.isPresentedRefusal).toHaveBeenCalledWith(refusal)
     expect(adapters.toastError).not.toHaveBeenCalled()
     expect(adapters.guestUsage.spend).not.toHaveBeenCalled()

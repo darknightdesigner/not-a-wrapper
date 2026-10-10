@@ -34,6 +34,9 @@ import { useEffect, useMemo, useRef } from "react"
 type FirstTurnAllocation = {
   chatId: string
   committed: boolean
+  /** A guest's local creation: client-only, so a guest sign-in refusal can
+   * still roll it back (ADR-0045). A durable creation never rolls back. */
+  local?: true
   committedTurn?: {
     userMessageId: string
     clientMessageId: string
@@ -61,6 +64,8 @@ type UseChatOperationsProps = {
   createFirstTurnChat: (
     input: CreateFirstTurnChatInput
   ) => Promise<FirstTurnChatResult>
+  /** Discards a rolled-back guest first turn's local chat. */
+  deleteChat: (chatId: string) => Promise<unknown>
   /** Session identity commands (the only History API owner). */
   commitChatIdentity: (chatId: string) => void
   resetChatIdentity: () => void
@@ -76,6 +81,7 @@ export function useChatOperations({
   systemPrompt,
   projectId,
   createFirstTurnChat,
+  deleteChat,
   commitChatIdentity,
   resetChatIdentity,
   setHasDialogAuth,
@@ -112,13 +118,20 @@ export function useChatOperations({
 
   /**
    * The one pre-commit rollback: identity cleared (origin route restored)
-   * and the allocation dropped. Never called once creation has landed — a
-   * later dispatch failure keeps the chat at its route (ADR-0012).
+   * and the allocation dropped. A no-op once a durable creation has landed:
+   * a later dispatch failure keeps the chat at its route (ADR-0012). A
+   * guest's local chat is discarded instead, since the turn runner rolls it
+   * back only on a guest sign-in refusal, which committed nothing (ADR-0045).
    */
   const rollbackFirstTurn = () => {
     const current = allocationRef.current
-    if (!current || current.committed) return
+    if (!current || (current.committed && !current.local)) return
     allocationRef.current = null
+    if (current.local) {
+      void deleteChat(current.chatId).catch((error: unknown) => {
+        console.error("Failed to discard a refused guest chat:", error)
+      })
+    }
     resetChatIdentity()
   }
 
@@ -211,7 +224,11 @@ export function useChatOperations({
     if (!created) return null
     const activeChatId = active.chatId
     if (created.kind === "local") {
-      allocationRef.current = { chatId: activeChatId, committed: true }
+      allocationRef.current = {
+        chatId: activeChatId,
+        committed: true,
+        local: true,
+      }
       localStorage.setItem(GUEST_CHAT_STORAGE_KEY, activeChatId)
       return { chatId: activeChatId }
     }

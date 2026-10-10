@@ -12,7 +12,8 @@ function PostHogPageViewTracker() {
     if (!pathname) return
     const query = searchParams.toString()
     // PostHog loads after the composer handoff (ADR-0050), so the view's own
-    // URL is passed rather than read when the queued event sends.
+    // URL is passed rather than read when the queued event sends. Its
+    // `before_send` drops the query string on auth routes.
     captureAnalyticsEvent("$pageview", {
       $current_url: window.origin + pathname + (query ? `?${query}` : ""),
       $host: window.location.host,

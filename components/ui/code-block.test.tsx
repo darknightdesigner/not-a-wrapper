@@ -443,4 +443,30 @@ describe("CodeBlockCode streaming rendering", () => {
       new Set([box("const far = 1")])
     )
   })
+
+  it("keeps near-view gating when callers pass their own refs", () => {
+    nearView.capture = true
+    nearView.targets.clear()
+    const boxRef = React.createRef<HTMLDivElement>()
+    const codeRef = React.createRef<HTMLDivElement>()
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(
+        <>
+          <CodeBlock ref={boxRef}>
+            <CodeBlockCode code="const boxed = 1" language="ts" />
+          </CodeBlock>
+          <CodeBlockCode ref={codeRef} code="const bare = 1" language="ts" />
+        </>
+      )
+    })
+    expect(boxRef.current).toBeInstanceOf(HTMLDivElement)
+    expect(codeRef.current).toBeInstanceOf(HTMLDivElement)
+    expect(new Set(nearView.targets.keys())).toEqual(
+      new Set([boxRef.current, codeRef.current])
+    )
+    expect(shikiClientMock.highlightCode).not.toHaveBeenCalled()
+  })
 })

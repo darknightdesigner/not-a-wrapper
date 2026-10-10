@@ -1010,6 +1010,7 @@ describe("Conversation optimistic-to-durable timestamp lifecycle", () => {
           regenerate: chat.regenerate,
           toastError: vi.fn(),
           isPresentedRefusal: () => false,
+          isGuestSignInRefusal: () => false,
           bumpChat: vi.fn(),
           setLastFinishReason: vi.fn(),
           reportError: vi.fn(),

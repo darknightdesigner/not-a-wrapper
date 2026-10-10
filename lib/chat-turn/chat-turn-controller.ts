@@ -145,7 +145,8 @@ export type ChatTurnAdapters = {
    * First-turn identity seam (ADR-0033). `begin` mints the client chat id and
    * commits its route synchronously — before the optimistic row paints and
    * before any request leaves; `rollback` restores the origin route when a
-   * refusal lands before the atomic creation (which `ensureChatExists` owns).
+   * refusal lands before the atomic creation (which `ensureChatExists` owns),
+   * or discards a guest's local chat on a guest sign-in refusal (ADR-0045).
    */
   firstTurn: {
     begin: () => string
@@ -181,6 +182,9 @@ export type ChatTurnAdapters = {
   /** True when the stream's error handler already presented this refusal
    * (it carries a public error code), so the runner adds no generic toast. */
   isPresentedRefusal: (error: unknown) => boolean
+  /** True when admission refused a guest outright (daily limit or guest
+   * capacity), which the stream's error handler answers with sign-in. */
+  isGuestSignInRefusal: (error: unknown) => boolean
   bumpChat: (chatId: string) => void
   setLastFinishReason: (finishReason: string | undefined) => void
   reportError: (message: string, error: unknown) => void
@@ -354,7 +358,8 @@ async function runSendTurn(
   let finalizeAcceptedTurn: (() => void) | null = null
   // A first turn's chat exists (locally or durably) once ensureChatExists
   // returns it; until then every refusal below rolls the committed identity
-  // back (ADR-0033). After it, nothing rolls back (ADR-0012).
+  // back (ADR-0033). After it, nothing rolls back (ADR-0012) except a guest
+  // sign-in refusal, which leaves nothing but the guest's local chat.
   let chatCommitted = false
 
   const removeOptimistic = () => {
@@ -584,6 +589,12 @@ async function runSendTurn(
     ) {
       finalizeAcceptedTurn()
       return
+    }
+    // A guest refusal the usage hint missed (ADR-0045): roll the first turn
+    // back like a pre-creation refusal while the stream's error handler opens
+    // sign-in.
+    if (!snapshot.isAuthenticated && adapters.isGuestSignInRefusal(error)) {
+      chatCommitted = false
     }
     // The stream's error handler already showed this refusal; a second,
     // generic toast would only repeat it.

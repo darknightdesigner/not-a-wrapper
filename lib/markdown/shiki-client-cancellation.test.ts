@@ -143,4 +143,20 @@ describe("highlight queue order", () => {
       "oldest",
     ])
   })
+
+  it("rejects queued requests on reset without tokenizing them", async () => {
+    // The first tokenization resets the client while another request waits.
+    loader.codeToHtml.mockImplementationOnce(() => {
+      resetShikiClientForTests()
+      return "highlighted"
+    })
+    const queued = highlightCode({ ...input, code: "queued" })
+    const rejected = expect(queued).rejects.toMatchObject({
+      name: "AbortError",
+    })
+
+    await expect(highlightCode(input)).resolves.toBe("highlighted")
+    await rejected
+    expect(loader.codeToHtml).toHaveBeenCalledOnce()
+  })
 })

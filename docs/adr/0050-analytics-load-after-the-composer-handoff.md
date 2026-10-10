@@ -47,10 +47,11 @@ clear (no production recording was viewed).
 - **Trigger** (`lib/analytics/deferred-analytics.ts`). After the document is
   parsed, analytics wait until no visible `textarea.composer-fallback-textarea`
   remains: the editor hides it at mount (ADR-0047). A `MutationObserver` watches
-  the `hidden` attribute across the document, since a client re-render can
-  replace the fallback. Routes without the fallback are ready at parse. A 20 s
-  cap loads analytics if the composer never hydrates. Loading then waits for
-  `requestIdleCallback` (2 s timeout; `setTimeout` where it is missing).
+  `hidden` attributes and child-list changes across the document, since a
+  client re-render can replace or remove the fallback. Routes without the
+  fallback are ready at parse. A 20 s cap loads analytics if the composer never
+  hydrates. Loading then waits for `requestIdleCallback` (2 s timeout;
+  `setTimeout` where it is missing).
 - **Replay.** `Sentry.addIntegration(replayIntegration({ maskAllText,
   maskAllInputs, blockAllMedia }))`, imported through the one-line split point
   `lib/analytics/sentry-replay.ts` (39.8 KB gzip async; a dynamic
@@ -65,6 +66,15 @@ clear (no production recording was viewed).
   `$current_url`, `$pathname` and `$host`, because PostHog fills unset
   properties at send time. It always sets `title` and `$prev_pageview_*` then,
   so a view queued across a client navigation gets the newer title. Accepted.
+  If the posthog-js chunk fails to load, the error goes to Sentry and queued
+  and later events are dropped.
+- **URL privacy.** Auth routes carry emails, reset tokens and OAuth codes in
+  the query string. One sanitizer drops the query from same-origin `/auth` and
+  `/email-verification` URLs: `before_send` applies it to every string property
+  of every event, queued pageviews included (`$current_url`, `$referrer` and
+  their session-entry and initial copies), and
+  `session_recording.maskCapturedNetworkRequestFn` applies it to the page URLs
+  recordings store.
 - **Recording privacy.** PostHog session recording masks all text and inputs
   on the client: `session_recording: { maskTextSelector: "*", maskAllInputs:
   true }`. posthog-js prefers client masking over the remote config, so this
@@ -79,9 +89,11 @@ clear (no production recording was viewed).
   root-layout client component also fails. Lower the budget as other changes
   shrink the set (ADR-0049).
 - **Paired gate.** `measurementBootstrap` in
-  `benchmarks/chat-performance/browser/measurement-overlay.ts` removes only the
-  exact analytics hunks of `instrumentation-client.ts` before comparing base
-  and head; observer installation and reporting still compare byte for byte.
+  `benchmarks/chat-performance/browser/measurement-overlay.ts` rewrites only
+  exact, audited analytics revisions of `instrumentation-client.ts` to the
+  current text before comparing base and head. A revision applies whole or not
+  at all, and a partial match fails closed. Observer installation and reporting
+  still compare byte for byte.
 
 ## Consequences
 

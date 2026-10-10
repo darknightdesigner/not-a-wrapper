@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
-import type { PostHog, Properties } from "posthog-js"
+import type { CaptureResult, PostHog, Properties } from "posthog-js"
 
 const chatUiBenchmark =
   process.env.NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION === "true"
@@ -8,11 +8,38 @@ const COMPOSER_FALLBACK = "textarea.composer-fallback-textarea"
 /** Analytics still load if the composer never hydrates. */
 const COMPOSER_WAIT_LIMIT_MS = 20_000
 const IDLE_TIMEOUT_MS = 2_000
+/** Auth routes carry emails, reset tokens and OAuth codes in the query. */
+const AUTH_PATH = /^\/(?:auth|email-verification)(?:\/|$)/
 
-let resolvePostHog: (posthog: PostHog) => void = () => {}
-const posthogReady = new Promise<PostHog>((resolve) => {
+/** Null when posthog-js failed to load: queued events are dropped. */
+let resolvePostHog: (posthog: PostHog | null) => void = () => {}
+const posthogReady = new Promise<PostHog | null>((resolve) => {
   resolvePostHog = resolve
 })
+
+function stripAuthQuery(value: string) {
+  if (!value.startsWith(`${window.location.origin}/`)) return value
+  const url = new URL(value)
+  if (!AUTH_PATH.test(url.pathname)) return value
+  url.search = ""
+  return url.href
+}
+
+/**
+ * The one URL sanitizer for every event, queued pageviews included. Checks
+ * values, not names, so `$current_url`, `$referrer` and their session-entry
+ * and initial copies are all covered.
+ */
+function stripAuthQueries(event: CaptureResult | null) {
+  if (!event) return null
+  const bags = [event.properties, event.$set ?? {}, event.$set_once ?? {}]
+  for (const bag of bags) {
+    for (const [key, value] of Object.entries(bag)) {
+      if (typeof value === "string") bag[key] = stripAuthQuery(value)
+    }
+  }
+  return event
+}
 
 /** ADR-0047 handoff: the editor hides the server fallback when it mounts. */
 function composerHandedOff() {
@@ -77,15 +104,27 @@ function loadAnalytics() {
           capture_pageview: false,
           // Document scroll-depth analytics force layout during nested chat scrolling.
           disable_scroll_properties: true,
+          before_send: stripAuthQueries,
           // Chat text is user content: recordings mask text nodes and input
           // values. Attribute values (an `aria-label` with a chat title) are not.
-          session_recording: { maskTextSelector: "*", maskAllInputs: true },
+          session_recording: {
+            maskTextSelector: "*",
+            maskAllInputs: true,
+            // Recording URLs (pages and requests) use this hook, not `before_send`.
+            maskCapturedNetworkRequestFn: (request) => ({
+              ...request,
+              name: stripAuthQuery(request.name),
+            }),
+          },
           ...(chatUiBenchmark ? { disable_session_recording: true } : {}),
         })
       }
       resolvePostHog(posthog)
     })
-    .catch((error) => Sentry.captureException(error))
+    .catch((error) => {
+      Sentry.captureException(error)
+      resolvePostHog(null)
+    })
 }
 
 /**
@@ -104,6 +143,6 @@ export function captureAnalyticsEvent(event: string, properties: Properties) {
   if (!posthogKey) return
   const timestamp = new Date()
   void posthogReady.then((posthog) =>
-    posthog.capture(event, properties, { timestamp })
+    posthog?.capture(event, properties, { timestamp })
   )
 }

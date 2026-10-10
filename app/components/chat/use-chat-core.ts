@@ -562,6 +562,10 @@ export function useChatCore({
     consumeLocalStopIntent,
     toastError: (title) => toast({ title, status: "error" }),
     isPresentedRefusal: hasPublicChatErrorCode,
+    isGuestSignInRefusal: (error) =>
+      error instanceof Error &&
+      presentChatStreamError(error, { isAuthenticated: false }).kind ===
+        "sign-in",
     bumpChat,
     setLastFinishReason,
     reportError: (message, error) => console.error(message, error),

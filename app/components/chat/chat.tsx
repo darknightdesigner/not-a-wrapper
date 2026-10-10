@@ -109,6 +109,7 @@ const ChatInner = memo(function ChatInner({
   const { commitChatIdentity, resetChatIdentity } = useChatSession()
   const {
     createFirstTurnChat,
+    deleteChat,
     bumpChat,
     isLoading: isChatsLoading,
   } = useChats()
@@ -152,6 +153,7 @@ const ChatInner = memo(function ChatInner({
       systemPrompt,
       projectId: project?.id,
       createFirstTurnChat,
+      deleteChat,
       commitChatIdentity,
       resetChatIdentity,
       setHasDialogAuth,
