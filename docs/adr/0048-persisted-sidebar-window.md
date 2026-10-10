@@ -88,7 +88,8 @@ Option 1, in `lib/chat-store/chats/persisted-window.ts`.
   stops further writes for the document, so a late live update cannot write
   the departing user's rows back. Every other open tab sees the removal as a
   storage event and stops its writes too. A sign-out that fails without
-  navigating resumes this document's writes. There is no client account-deletion path
+  navigating resumes this document's writes and re-persists the provider's
+  current window. There is no client account-deletion path
   that clears local data; deletion ends the session and the next signed-out
   load deletes the key.
 

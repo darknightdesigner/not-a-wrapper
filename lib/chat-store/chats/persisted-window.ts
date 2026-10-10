@@ -207,6 +207,11 @@ let parsedCache: {
 } = { raw: null, owner: "", value: null }
 const listeners = new Set<() => void>()
 let writesStopped = false
+/**
+ * The window the mounted provider currently asks to persist (its identity
+ * gate already passed); released when that request is cancelled.
+ */
+let requestedWrite: string | null = null
 
 function invalidate() {
   rawCache = undefined
@@ -293,10 +298,14 @@ export function usePersistedWindow(
 
 /**
  * Write a serialized window off the critical path, and only when it differs
- * from what is stored. Returns a cancel for the pending write.
+ * from what is stored. Returns a cancel that also withdraws the request.
  */
 export function schedulePersistedWindowWrite(serialized: string): () => void {
-  if (writesStopped) return () => undefined
+  requestedWrite = serialized
+  const release = () => {
+    if (requestedWrite === serialized) requestedWrite = null
+  }
+  if (writesStopped) return release
   const write = () => {
     if (writesStopped || readRaw() === serialized) return
     try {
@@ -312,10 +321,16 @@ export function schedulePersistedWindowWrite(serialized: string): () => void {
     const handle = requestIdleCallback(write, {
       timeout: IDLE_WRITE_TIMEOUT_MS,
     })
-    return () => cancelIdleCallback(handle)
+    return () => {
+      cancelIdleCallback(handle)
+      release()
+    }
   }
   const handle = setTimeout(write, 0)
-  return () => clearTimeout(handle)
+  return () => {
+    clearTimeout(handle)
+    release()
+  }
 }
 
 /**
@@ -329,7 +344,12 @@ export function clearPersistedWindow() {
   invalidate()
 }
 
-/** A sign-out that failed without navigating leaves this session in place. */
+/**
+ * A sign-out that failed without navigating leaves this session in place:
+ * re-persist the provider's current window, which sign-out deleted. Its live
+ * data is unchanged, so the provider would not request it again.
+ */
 export function resumePersistedWindowWrites() {
   writesStopped = false
+  if (requestedWrite !== null) schedulePersistedWindowWrite(requestedWrite)
 }

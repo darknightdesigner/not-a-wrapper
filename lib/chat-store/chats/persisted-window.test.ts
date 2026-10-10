@@ -87,17 +87,26 @@ describe("persisted sidebar window", () => {
     expect(setItem).toHaveBeenCalledOnce()
   })
 
-  it("clears the window and blocks later writes on sign-out", () => {
+  it("clears the window on sign-out and restores it if sign-out fails", () => {
     const serialized = store.serializePersistedWindow("user-1", [chat("a")], [])
     store.schedulePersistedWindowWrite(serialized)
     vi.runAllTimers()
 
-    store.schedulePersistedWindowWrite(
-      store.serializePersistedWindow("user-1", [chat("b")], [])
-    )
+    const current = store.serializePersistedWindow("user-1", [chat("b")], [])
+    store.schedulePersistedWindowWrite(current)
     store.clearPersistedWindow()
     vi.runAllTimers()
+    expect(values.has(store.PERSISTED_WINDOW_STORAGE_KEY)).toBe(false)
 
+    store.resumePersistedWindowWrites()
+    vi.runAllTimers()
+    expect(values.get(store.PERSISTED_WINDOW_STORAGE_KEY)).toBe(current)
+
+    // A withdrawn request (owner gate closed, provider unmounted) stays gone.
+    store.schedulePersistedWindowWrite(current)()
+    store.clearPersistedWindow()
+    store.resumePersistedWindowWrites()
+    vi.runAllTimers()
     expect(values.has(store.PERSISTED_WINDOW_STORAGE_KEY)).toBe(false)
   })
 
