@@ -13,8 +13,8 @@
  * Env: RUNS (default 5), WARMUPS (default 1), PERF_PORT (default 3122),
  *      COUNTS_OUT (capture path), PW_CHANNEL.
  */
-import { execFileSync, spawn } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { execFileSync } from "node:child_process"
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { chromium, type Browser, type CDPSession, type Page } from "playwright"
 import {
@@ -27,6 +27,7 @@ import {
   type InteractionCounts,
   type InteractionId,
 } from "./count-probe"
+import { startPerfServer, type PerfServer } from "./perf-server"
 
 const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..")
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
@@ -55,79 +56,6 @@ type ProbeWindow = Window & {
 
 function log(message: string) {
   console.log(`[bench:counts] ${message}`)
-}
-
-/** Process group of the spawned server: bunx plus the `next start` behind it. */
-let serverGroup: number | null = null
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-/** Probes are bounded; a listener that never answers still occupies the port. */
-const serving = (baseUrl: string) =>
-  fetch(baseUrl, { redirect: "manual", signal: AbortSignal.timeout(2_000) }).then(
-    () => true,
-    (error: unknown) => error instanceof Error && error.name === "TimeoutError"
-  )
-
-/** Signals every server process; false once none is left. Signal 0 only probes. */
-function signalServer(signal: NodeJS.Signals | 0) {
-  if (serverGroup === null) return false
-  try {
-    process.kill(-serverGroup, signal)
-    return true
-  } catch {
-    return false
-  }
-}
-
-// The detached group never sees the terminal's Ctrl+C: it must not outlive us.
-process.once("exit", () => signalServer("SIGKILL"))
-for (const signal of ["SIGINT", "SIGTERM"] as const) process.once(signal, () => process.exit(1))
-
-async function startServer(baseUrl: string) {
-  if (!existsSync(path.join(REPO_ROOT, DIST_DIR, "BUILD_ID")))
-    throw new Error(`no production build at ${DIST_DIR}; see the usage header`)
-  // Base and head captures reuse one port: a leftover server would silently
-  // serve the other build.
-  if (await serving(baseUrl)) throw new Error(`${baseUrl} is already serving; stop it first`)
-  // Own process group so stopServer() reaches `next start`, not just bunx.
-  serverGroup = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
-    cwd: REPO_ROOT,
-    env: { ...process.env, NEXT_DIST_DIR: DIST_DIR, CHAT_PERF_DETERMINISTIC_PROVIDER: "1" },
-    stdio: ["ignore", "ignore", "inherit"],
-    detached: true,
-  }).pid ?? null
-  const deadline = Date.now() + 60_000
-  while (Date.now() < deadline) {
-    try {
-      const signal = AbortSignal.timeout(Math.max(1, deadline - Date.now()))
-      if ((await fetch(baseUrl, { redirect: "manual", signal })).status < 500) return
-    } catch {
-      // Not up yet.
-    }
-    await sleep(300)
-  }
-  throw new Error(`server at ${baseUrl} did not become ready`)
-}
-
-/**
- * SIGTERM the server group, then SIGKILL, each with a bounded wait until every
- * member has exited and the port refuses connections, so the next capture on
- * this port can never measure a stale build.
- */
-async function stopServer(baseUrl: string) {
-  if (serverGroup === null) return
-  for (const [signal, waitMs] of [["SIGTERM", 10_000], ["SIGKILL", 5_000]] as const) {
-    signalServer(signal)
-    const deadline = Date.now() + waitMs
-    while (Date.now() < deadline) {
-      if (!signalServer(0) && !(await serving(baseUrl))) {
-        serverGroup = null
-        return
-      }
-      await sleep(200)
-    }
-  }
-  throw new Error(`server group ${serverGroup} or ${baseUrl} still alive after SIGKILL`)
 }
 
 /** Resolves once no commit or DOM mutation has happened for `quietMs`. */
@@ -278,8 +206,9 @@ async function capture(output: string) {
   if (process.env.BASE_URL) throw new Error("BASE_URL is unsupported: counts need an owned production server")
   const baseUrl = `http://localhost:${PERF_PORT}`
   let browser: Browser | undefined
+  let server: PerfServer | undefined
   try {
-    await startServer(baseUrl)
+    server = await startPerfServer({ port: PERF_PORT, distDir: DIST_DIR, env: { CHAT_PERF_DETERMINISTIC_PROVIDER: "1" } })
     browser = await chromium.launch({ channel: process.env.PW_CHANNEL })
     const interactions: InteractionCounts[] = []
     for (const cpuThrottle of COUNT_THROTTLES) {
@@ -319,7 +248,7 @@ async function capture(output: string) {
     try {
       await browser?.close()
     } finally {
-      await stopServer(baseUrl)
+      await server?.stop()
     }
   }
 }

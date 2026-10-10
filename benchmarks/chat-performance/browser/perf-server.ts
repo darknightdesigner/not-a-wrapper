@@ -1,0 +1,145 @@
+/**
+ * The owned production server behind the browser benchmarks. `bunx next start`
+ * runs in its own process group so stop() reaches `next start`, not just bunx:
+ * a survivor keeps serving the port and a later capture on it would silently
+ * measure a stale build.
+ */
+import { spawn, type ChildProcess, type StdioOptions } from "node:child_process"
+import { existsSync } from "node:fs"
+import path from "node:path"
+
+const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..")
+
+export type PerfServer = {
+  /** The group leader (bunx); its pipes and exit event belong to the caller. */
+  readonly child: ChildProcess
+  /** SIGTERM then SIGKILL the group; resolves once it is gone and the port refuses. */
+  stop: () => Promise<void>
+}
+
+type GroupOptions = {
+  cwd?: string
+  env?: NodeJS.ProcessEnv
+  /** Default: stdout ignored, stderr inherited. */
+  stdio?: StdioOptions
+  /** Runs right after spawn, before the readiness wait, to attach to the pipes. */
+  onSpawn?: (child: ChildProcess) => void
+  readyTimeoutMs?: number
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/** Probes are bounded; a listener that never answers still occupies the port. */
+const isServing = (baseUrl: string) =>
+  fetch(baseUrl, { redirect: "manual", signal: AbortSignal.timeout(2_000) }).then(
+    () => true,
+    (error: unknown) => error instanceof Error && error.name === "TimeoutError"
+  )
+
+/** Signals every process in the group; false once none is left. Signal 0 only probes. */
+function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
+  try {
+    process.kill(-pgid, signal)
+    return true
+  } catch {
+    return false
+  }
+}
+
+const liveGroups = new Set<number>()
+let exitHookInstalled = false
+
+// The detached group sees neither the terminal's Ctrl+C nor its hangup: it must not outlive us.
+function installExitHook() {
+  if (exitHookInstalled) return
+  exitHookInstalled = true
+  process.once("exit", () => {
+    for (const pgid of liveGroups) signalGroup(pgid, "SIGKILL")
+  })
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.once(signal, () => process.exit(1))
+  }
+}
+
+/** Resolves once `baseUrl` answers below 500; fails early if `child` exits first. */
+export async function waitForServer(baseUrl: string, timeoutMs: number, child?: ChildProcess) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (child && (child.exitCode !== null || child.signalCode !== null))
+      throw new Error(`server exited (${child.exitCode ?? child.signalCode}) before ${baseUrl} became ready`)
+    try {
+      const signal = AbortSignal.timeout(Math.max(1, deadline - Date.now()))
+      if ((await fetch(baseUrl, { redirect: "manual", signal })).status < 500) return
+    } catch {
+      // Not up yet.
+    }
+    await sleep(300)
+  }
+  throw new Error(`server at ${baseUrl} did not become ready in ${timeoutMs}ms`)
+}
+
+async function stopGroup(pgid: number, baseUrl: string) {
+  if (!liveGroups.has(pgid)) return
+  for (const [signal, waitMs] of [["SIGTERM", 10_000], ["SIGKILL", 5_000]] as const) {
+    signalGroup(pgid, signal)
+    const deadline = Date.now() + waitMs
+    while (Date.now() < deadline) {
+      if (!signalGroup(pgid, 0) && !(await isServing(baseUrl))) {
+        liveGroups.delete(pgid)
+        return
+      }
+      await sleep(200)
+    }
+  }
+  throw new Error(`server group ${pgid} or ${baseUrl} still alive after SIGKILL`)
+}
+
+/** Spawns `command` as a process group serving `baseUrl` and waits until it is ready. */
+export async function startServerGroup(
+  command: readonly [string, ...string[]],
+  baseUrl: string,
+  options: GroupOptions = {}
+): Promise<PerfServer> {
+  // Base and head captures reuse one port: a leftover server would silently
+  // serve the other build.
+  if (await isServing(baseUrl)) throw new Error(`${baseUrl} is already serving; stop it first`)
+  installExitHook()
+  const [file, ...args] = command
+  const child = spawn(file, args, {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: options.stdio ?? ["ignore", "ignore", "inherit"],
+    detached: true,
+  })
+  if (child.pid === undefined) throw new Error(`could not spawn ${file}`)
+  const pgid = child.pid
+  liveGroups.add(pgid)
+  const server: PerfServer = { child, stop: () => stopGroup(pgid, baseUrl) }
+  options.onSpawn?.(child)
+  try {
+    await waitForServer(baseUrl, options.readyTimeoutMs ?? 60_000, child)
+  } catch (error) {
+    await server.stop()
+    throw error
+  }
+  return server
+}
+
+/** `next start` for the production build in `distDir` on `localhost:port`. */
+export async function startPerfServer({
+  port,
+  distDir,
+  env,
+  ...options
+}: Omit<GroupOptions, "cwd" | "env"> & { port: number; distDir: string; env?: Record<string, string> }) {
+  if (!existsSync(path.join(REPO_ROOT, distDir, "BUILD_ID")))
+    throw new Error(
+      `no production build at ${distDir}; build one with ` +
+        `NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true NEXT_DIST_DIR=${distDir} bun run build:next`
+    )
+  return startServerGroup(["bunx", "next", "start", "-p", String(port)], `http://localhost:${port}`, {
+    ...options,
+    cwd: REPO_ROOT,
+    env: { ...process.env, NEXT_DIST_DIR: distDir, ...env },
+  })
+}

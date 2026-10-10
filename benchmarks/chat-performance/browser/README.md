@@ -15,6 +15,9 @@ isolated production server on `PERF_PORT` (default 3111) with the deterministic
 provider enabled. `BASE_URL` and port 3000 are rejected, preventing accidental
 real-provider requests to an ordinary app server. A Chrome extension alone supports manual validation, not this terminal
 harness. Do not restart the user's browser to obtain CDP access.
+Every script that owns its server starts it through `perf-server.ts`: it refuses a
+port that already serves, and stopping waits until the whole `next start` process
+group is gone and the port is free.
 
 CI uses `ci-isolated-v1`: one newly provisioned WorkOS identity per harness
 process, with a UUID suffix even when `PERF_AUTH_EMAIL` supplies the email base.

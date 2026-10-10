@@ -27,12 +27,13 @@
  */
 import { deterministicScenarioText } from "@/app/api/chat/deterministic-provider"
 import { installChatUiObserver, type ChatUiWindow } from "@/lib/observability/chat-ui-observer"
-import { execFileSync, spawn, type ChildProcess } from "node:child_process"
+import { execFileSync } from "node:child_process"
 import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import os from "node:os"
 import { chromium, type Browser, type Page } from "playwright"
+import { startPerfServer, waitForServer, type PerfServer } from "./perf-server"
 import { BENCHMARK_TYPING_DELAY_MS } from "./scenarios"
 
 const REPO_ROOT = path.resolve(
@@ -120,40 +121,7 @@ function log(message: string): void {
   process.stdout.write(`[trace-attribution] ${message}\n`)
 }
 
-let serverProcess: ChildProcess | null = null
-
-async function ensureServer(baseUrl: string, external: boolean): Promise<void> {
-  if (!external) {
-    const buildIdPath = path.join(REPO_ROOT, DIST_DIR, "BUILD_ID")
-    if (!existsSync(buildIdPath)) {
-      throw new Error(
-        `no production build at ${DIST_DIR}; build with NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true NEXT_DIST_DIR=${DIST_DIR} bun run build:next`
-      )
-    }
-    log(`starting perf server on :${PERF_PORT} (dist: ${DIST_DIR})`)
-    serverProcess = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
-      cwd: REPO_ROOT,
-      env: {
-        ...process.env,
-        NEXT_DIST_DIR: DIST_DIR,
-        CHAT_PERF_DETERMINISTIC_PROVIDER: "1",
-        CHAT_PERF_SAMPLE_RATE: "1",
-      },
-      stdio: ["ignore", "ignore", "inherit"],
-    })
-  }
-  const deadline = Date.now() + 60_000
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(baseUrl, { redirect: "manual" })
-      if (response.status < 500) return
-    } catch {
-      // Not up yet.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300))
-  }
-  throw new Error(`server at ${baseUrl} did not become ready`)
-}
+let server: PerfServer | undefined
 
 async function waitForMark(
   page: Page,
@@ -662,7 +630,15 @@ async function main() {
   mkdirSync(OUT_DIR, { recursive: true })
   const externalBaseUrl = process.env.BASE_URL
   const baseUrl = externalBaseUrl ?? `http://localhost:${PERF_PORT}`
-  await ensureServer(baseUrl, Boolean(externalBaseUrl))
+  if (externalBaseUrl) await waitForServer(baseUrl, 60_000)
+  else {
+    log(`starting perf server on :${PERF_PORT} (dist: ${DIST_DIR})`)
+    server = await startPerfServer({
+      port: PERF_PORT,
+      distDir: DIST_DIR,
+      env: { CHAT_PERF_DETERMINISTIC_PROVIDER: "1", CHAT_PERF_SAMPLE_RATE: "1" },
+    })
+  }
   const browser = await chromium.launch({ channel: process.env.PW_CHANNEL })
   try {
     for (const traceCase of selected) {
@@ -720,15 +696,15 @@ async function main() {
     }
   } finally {
     await browser.close()
-    serverProcess?.kill()
+    await server?.stop()
   }
 }
 
 main().then(
   () => process.exit(0),
-  (error) => {
+  async (error) => {
     console.error(error)
-    serverProcess?.kill()
+    await server?.stop().catch(console.error)
     process.exit(1)
   }
 )

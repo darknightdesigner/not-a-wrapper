@@ -22,20 +22,16 @@
  *   NEXT_DIST_DIR=.next-perf bun run build:next && bun run benchmarks/chat-performance/browser/composer-handoff.ts
  *
  * Env: BASE_URL (reuse a running server), NEXT_DIST_DIR / PERF_PORT (spawned
- * `next start`, see composer-shell.ts), RUNS (default 5), WIDTHS (default
+ * `next start`, default .next-perf / 3112), RUNS (default 5), WIDTHS (default
  * 375,768,1280,1920), KEY_DELAY_MS (default 35), PW_CHANNEL, OUT (json path).
  * Exits 1 when a handoff case fails a guardrail.
  */
 import { writeFileSync } from "node:fs"
 import { chromium, type Browser, type Page } from "playwright"
-import {
-  assertPortFree,
-  spawnServer,
-  stopServer,
-  waitForServer,
-} from "./composer-shell"
+import { startPerfServer, type PerfServer } from "./perf-server"
 
 const PERF_PORT = Number(process.env.PERF_PORT ?? 3112)
+const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const RUNS = Number(process.env.RUNS ?? 5)
 const WIDTHS = (process.env.WIDTHS ?? "375,768,1280,1920")
   .split(",")
@@ -446,13 +442,14 @@ async function runHandoffCase(
   }
 }
 
+let server: PerfServer | undefined
+
 async function main() {
   const externalBaseUrl = process.env.BASE_URL
   const baseUrl = externalBaseUrl ?? `http://localhost:${PERF_PORT}`
   if (!externalBaseUrl) {
-    await assertPortFree(baseUrl)
-    spawnServer()
-    await waitForServer(baseUrl, 60000)
+    log(`starting server on :${PERF_PORT} (dist: ${DIST_DIR})`)
+    server = await startPerfServer({ port: PERF_PORT, distDir: DIST_DIR })
   }
   const browser = await chromium.launch({
     ...(process.env.PW_CHANNEL ? { channel: process.env.PW_CHANNEL } : {}),
@@ -511,12 +508,12 @@ async function main() {
     if (!summary.handoffPass) process.exitCode = 1
   } finally {
     await browser.close()
-    stopServer()
+    await server?.stop()
   }
 }
 
-main().catch((error) => {
-  stopServer()
+main().catch(async (error) => {
   console.error(error)
+  await server?.stop().catch(console.error)
   process.exit(1)
 })
