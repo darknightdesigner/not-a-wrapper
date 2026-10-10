@@ -90,22 +90,41 @@ export function partitionSidebarChats(chats: Chats[]): {
   return { pinned, nonPinned }
 }
 
+type SidebarLiveParams = {
+  isConvexAuthLoading: boolean
+  isConvexAuthenticated: boolean
+  /** The live read(s) in question not yet ready (first page + pinned, or
+   * the project list). */
+  firstPagePending: boolean
+}
+
+/**
+ * The live window has not been delivered yet but may still arrive (auth is
+ * resolving, or the first page + pinned reads are in flight). Only in this
+ * state may the persisted window stand in for it (ADR-0048).
+ */
+export function isLiveWindowPending(params: SidebarLiveParams): boolean {
+  return (
+    params.isConvexAuthLoading ||
+    (params.isConvexAuthenticated && params.firstPagePending)
+  )
+}
+
 /**
  * The sidebar's loading state: **"the first window page is ready"** (not "all
  * chats loaded") — the sidebar paints as soon as the first page + pinned
- * arrive, and load-more streams the rest.
+ * arrive, and load-more streams the rest. A persisted window for this owner
+ * paints in its place while the live one is pending (ADR-0048).
  */
-export function deriveSidebarLoading(params: {
-  isConvexAuthLoading: boolean
-  isConvexAuthenticated: boolean
-  /** First window page or pinned read not yet ready. */
-  firstPagePending: boolean
-  shouldUseLocalChats: boolean
-  cachedChatsHydrated: boolean
-}): boolean {
+export function deriveSidebarLoading(
+  params: SidebarLiveParams & {
+    shouldUseLocalChats: boolean
+    cachedChatsHydrated: boolean
+    hasPersistedWindow: boolean
+  }
+): boolean {
   return (
-    params.isConvexAuthLoading ||
-    (params.isConvexAuthenticated && params.firstPagePending) ||
+    (isLiveWindowPending(params) && !params.hasPersistedWindow) ||
     (params.shouldUseLocalChats && !params.cachedChatsHydrated)
   )
 }

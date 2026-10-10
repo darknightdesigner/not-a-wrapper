@@ -307,7 +307,14 @@ function MobileAppSidebarDrawer() {
 
 function useAppSidebarData() {
   const { isHistoryOpen, openHistory } = useHistorySearch()
-  const { chats, isLoading, isLoadingMore, loadMore, canLoadMore } = useChats()
+  const {
+    chats,
+    isLoading,
+    isLoadingMore,
+    loadMore,
+    canLoadMore,
+    persistedProjects,
+  } = useChats()
   const { chatId, isNewChatSurface } = useChatSession()
   const { user } = useUser()
   const isLoggedIn = !!user
@@ -317,7 +324,12 @@ function useAppSidebarData() {
   })
   const [chatOrganization, setChatOrganization, isOrganizationHydrated] =
     useChatOrganization()
-  const { data: projectDocs } = usePerUserQuery(api.projects.getForCurrentUser)
+  const { data: liveProjectDocs } = usePerUserQuery(
+    api.projects.getForCurrentUser
+  )
+  // A reload paints the owner's persisted projects until the live read lands,
+  // then live data replaces them wholesale (ADR-0048).
+  const projectDocs = liveProjectDocs ?? persistedProjects ?? undefined
   const { isPinned, isPinPending, togglePinned } = useProjectPinning()
   const projects = useMemo(
     () =>

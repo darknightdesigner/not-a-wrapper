@@ -10,9 +10,15 @@ import { MainContentErrorBoundary } from "@/app/components/layout/route-error-fa
 import { AppSidebar } from "@/app/components/layout/sidebar/app-sidebar"
 import { ProjectPinningProvider } from "@/app/components/projects/use-project-pinning"
 import { MainContent } from "@/components/ui/main-content"
-import { ScrollRoot } from "@/components/ui/scroll-root"
+import {
+  ScrollRoot,
+  ScrollRootFixedHeaderProvider,
+  type HeaderFixedMode,
+} from "@/components/ui/scroll-root"
 import { useUserPreferences } from "@/lib/user-preference-store/provider"
 import { Fragment } from "react"
+
+const DEFAULT_HEADER_FIXED_MODE: HeaderFixedMode = "less-than-xl"
 
 export function LayoutApp({
   children,
@@ -36,6 +42,27 @@ export function LayoutApp({
   const { preferences } = useUserPreferences()
   const hasSidebar = preferences.layout === "sidebar"
 
+  const scrollRoot = (
+    <ScrollRoot>
+      <Fragment key="app-header">
+        {header === undefined ? (
+          <Header
+            hasSidebar={hasSidebar}
+            fixedHeader={DEFAULT_HEADER_FIXED_MODE}
+          />
+        ) : (
+          header
+        )}
+      </Fragment>
+      <MainContent
+        id="main"
+        className="@container/main min-h-0 min-w-0 flex-1 self-stretch"
+      >
+        <MainContentErrorBoundary>{children}</MainContentErrorBoundary>
+      </MainContent>
+    </ScrollRoot>
+  )
+
   return (
     <HistorySearchProvider>
       <ProjectPinningProvider>
@@ -46,26 +73,17 @@ export function LayoutApp({
                 {hasSidebar && <AppSidebar />}
                 <div className="side-pane-shell-host relative flex min-h-0 min-w-0 flex-1">
                   <div className="@container/main relative flex min-w-0 flex-1 -translate-y-[calc(env(safe-area-inset-bottom,0px)/2)] flex-col pt-[calc(env(safe-area-inset-bottom,0px)/2)]">
-                    <ScrollRoot>
-                      <Fragment key="app-header">
-                        {header === undefined ? (
-                          <Header
-                            hasSidebar={hasSidebar}
-                            fixedHeader="less-than-xl"
-                          />
-                        ) : (
-                          header
-                        )}
-                      </Fragment>
-                      <MainContent
-                        id="main"
-                        className="@container/main min-h-0 min-w-0 flex-1 self-stretch"
+                    {header === undefined ? (
+                      // The default header publishes its own mode; chat routes
+                      // publish theirs through ChatChromeProvider (ADR-0017).
+                      <ScrollRootFixedHeaderProvider
+                        value={DEFAULT_HEADER_FIXED_MODE}
                       >
-                        <MainContentErrorBoundary>
-                          {children}
-                        </MainContentErrorBoundary>
-                      </MainContent>
-                    </ScrollRoot>
+                        {scrollRoot}
+                      </ScrollRootFixedHeaderProvider>
+                    ) : (
+                      scrollRoot
+                    )}
                   </div>
                   <ActivityPanelDockSlot />
                 </div>

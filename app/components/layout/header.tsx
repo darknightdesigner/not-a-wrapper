@@ -5,6 +5,7 @@ import { HistoryTrigger } from "@/app/components/history/history-trigger"
 import { ButtonNewChat } from "@/app/components/layout/button-new-chat"
 import { UserMenu } from "@/app/components/layout/user-menu"
 import { NawIcon } from "@/components/icons/naw"
+import type { HeaderFixedMode } from "@/components/ui/scroll-root"
 import { useBreakpoint } from "@/hooks/use-breakpoint"
 import { APP_NAME } from "@/lib/config"
 import { useUser } from "@/lib/user-store/provider"
@@ -13,8 +14,6 @@ import Link from "next/link"
 import { DialogPublish } from "./dialog-publish"
 import { HeaderSidebarTrigger } from "./header-sidebar-trigger"
 
-export type HeaderFixedMode =
-  "always" | "less-than-md" | "less-than-xl" | "less-than-xxl" | "never"
 
 export function Header({
   hasSidebar,

@@ -2,7 +2,7 @@
 
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
-import type { Id } from "@/convex/_generated/dataModel"
+import type { Doc, Id } from "@/convex/_generated/dataModel"
 import {
   CHAT_TITLE_PLACEHOLDER,
   INITIAL_CHAT_TITLE_GENERATION,
@@ -13,18 +13,24 @@ import {
 } from "@/lib/convex/use-per-user-query"
 import type { Attachment } from "@/lib/file-handling"
 import { resolveModelId } from "@/lib/models/model-id-migration"
+import { useAuth } from "@workos-inc/authkit-nextjs/components"
 import { useConvexAuth, useMutation } from "convex/react"
 import { ConvexError } from "convex/values"
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useState,
   useSyncExternalStore,
 } from "react"
-import { getDefaultModelForUser, SYSTEM_PROMPT_DEFAULT } from "../../config"
+import {
+  getDefaultModelForUser,
+  SIDEBAR_WINDOW_PAGE_SIZE,
+  SYSTEM_PROMPT_DEFAULT,
+} from "../../config"
 import { CHAT_PUBLIC_ID_CONFLICT_CODE } from "../identity"
 import { clearMessagesCache } from "../messages/api"
 import { convexChatToChat, type Chats } from "../types"
@@ -39,9 +45,15 @@ import {
   updateCachedChat,
 } from "./api"
 import {
+  schedulePersistedWindowWrite,
+  serializePersistedWindow,
+  usePersistedWindow,
+} from "./persisted-window"
+import {
   applyOptimisticOps,
   dedupeById,
   deriveSidebarLoading,
+  isLiveWindowPending,
   partitionSidebarChats,
   type OptimisticOperation,
 } from "./sidebar-window"
@@ -56,7 +68,6 @@ if (!api.chats.searchByTitle) {
   )
 }
 
-const SIDEBAR_WINDOW_PAGE_SIZE = 25
 const CONVEX_AUTH_READY_TIMEOUT_MS = 5_000
 
 function createConvexAuthReadinessGate() {
@@ -187,6 +198,9 @@ type ChatsContextType = {
   bumpChat: (id: string) => Promise<void>
   togglePinned: (id: string, pinned: boolean) => Promise<void>
   pinnedChats: Chats[]
+  /** The owner's persisted project list while the live project read is
+   * pending (ADR-0048); null otherwise. Sidebar display only. */
+  persistedProjects: Doc<"projects">[] | null
 }
 const ChatsContext = createContext<ChatsContextType | null>(null)
 const ChatActionsContext = createContext<Pick<
@@ -274,25 +288,91 @@ export function ChatsProvider({
   const shouldUseLocalChats =
     !userId && !isConvexAuthenticated && !isConvexAuthLoading
 
-  const isLoading = deriveSidebarLoading({
+  // Signed-in reloads paint the owner's persisted window until the live reads
+  // are delivered, then live data replaces each part wholesale (ADR-0048).
+  // The project read is shared with the sidebar (one Convex subscription);
+  // it is here so the persisted window holds a consistent rows+projects pair.
+  const { data: projectDocs } = usePerUserQuery(api.projects.getForCurrentUser)
+  const liveParams = {
     isConvexAuthLoading,
     isConvexAuthenticated,
     firstPagePending:
       recentWindow.status === "LoadingFirstPage" ||
       pinnedServerChats === undefined,
+  }
+  const isLivePending = isLiveWindowPending(liveParams)
+  const areProjectsPending = isLiveWindowPending({
+    isConvexAuthLoading,
+    isConvexAuthenticated,
+    firstPagePending: projectDocs === undefined,
+  })
+  // The window is bound to the live AuthKit identity, not only the
+  // server-seeded prop: if this tab's session moves to another user, the old
+  // owner's rows are neither shown nor written. AuthKit seeds its user from
+  // the server's initialAuth, so the gate holds when the window is adopted.
+  const { user: authUser } = useAuth()
+  const isSessionOwner = userId !== undefined && authUser?.id === userId
+  const persistedWindow = usePersistedWindow(
+    userId,
+    isSessionOwner && (isLivePending || areProjectsPending)
+  )
+  const displayedPersistedWindow = isLivePending
+    ? (persistedWindow?.chats ?? null)
+    : null
+  const persistedProjects = areProjectsPending
+    ? (persistedWindow?.projects ?? null)
+    : null
+
+  const isLoading = deriveSidebarLoading({
+    ...liveParams,
     shouldUseLocalChats,
     cachedChatsHydrated,
+    hasPersistedWindow: displayedPersistedWindow !== null,
   })
+
+  // Write-through on change: only delivered live reads are persisted, and the
+  // serialized string drops run status, so status-only updates write nothing.
+  const persistableWindow = useMemo(
+    () =>
+      userId &&
+      isSessionOwner &&
+      isConvexAuthenticated &&
+      !isLivePending &&
+      projectDocs !== undefined
+        ? serializePersistedWindow(userId, serverChats, projectDocs)
+        : null,
+    [
+      userId,
+      isSessionOwner,
+      isConvexAuthenticated,
+      isLivePending,
+      serverChats,
+      projectDocs,
+    ]
+  )
+  useEffect(() => {
+    if (persistableWindow === null) return
+    return schedulePersistedWindowWrite(persistableWindow)
+  }, [persistableWindow])
 
   const [optimisticOps, setOptimisticOps] = useState<OptimisticOperation[]>([])
 
   // Derive displayed chats from server data + the id-keyed optimistic overlay.
   // When the sidebar is bounded, serverChats is the window+pinned union, so ops
   // targeting out-of-window chats are no-ops here by design (see applyOptimisticOps).
-  const chats = useMemo(() => {
+  const liveChats = useMemo(() => {
     const localChats = shouldUseLocalChats ? cachedLocalChats : []
     return applyOptimisticOps([...localChats, ...serverChats], optimisticOps)
   }, [cachedLocalChats, serverChats, optimisticOps, shouldUseLocalChats])
+  // The overlay applies to persisted rows the same way, so a row action taken
+  // before live data shows immediately and carries over once it arrives.
+  const chats = useMemo(
+    () =>
+      displayedPersistedWindow
+        ? applyOptimisticOps(displayedPersistedWindow, optimisticOps)
+        : liveChats,
+    [displayedPersistedWindow, optimisticOps, liveChats]
+  )
 
   const removeOp = useCallback(
     (predicate: (op: OptimisticOperation) => boolean) => {
@@ -300,6 +380,14 @@ export function ChatsProvider({
     },
     []
   )
+
+  // Persisted rows are actionable before Convex confirms the JWT (ADR-0048),
+  // so durable row commands wait for auth readiness like first-turn creation.
+  const awaitConvexAuth = useCallback(async () => {
+    if (!(await authReadinessGate.wait())) {
+      throw new Error("Convex auth was not ready")
+    }
+  }, [authReadinessGate])
 
   const updateTitle = useCallback(
     async (id: string, title: string) => {
@@ -317,6 +405,7 @@ export function ChatsProvider({
       setOptimisticOps((prev) => [...prev, { type: "update", id, changes }])
 
       try {
+        await awaitConvexAuth()
         await updateTitleMutation({ chatId: id, title })
         removeOp(
           (op) =>
@@ -330,7 +419,7 @@ export function ChatsProvider({
         toast({ title: "Failed to update title", status: "error" })
       }
     },
-    [updateTitleMutation, removeOp, userId]
+    [updateTitleMutation, removeOp, awaitConvexAuth, userId]
   )
 
   const applyGeneratedTitle = useCallback(
@@ -380,6 +469,7 @@ export function ChatsProvider({
       setOptimisticOps((prev) => [...prev, { type: "delete", id }])
 
       try {
+        await awaitConvexAuth()
         await deleteChatMutation({ chatId: id })
         if (id === currentChatId && redirect) redirect()
         return true
@@ -392,7 +482,7 @@ export function ChatsProvider({
         return false
       }
     },
-    [deleteChatMutation, removeOp, userId]
+    [deleteChatMutation, removeOp, awaitConvexAuth, userId]
   )
 
   const createFirstTurnChat = useCallback(
@@ -530,11 +620,13 @@ export function ChatsProvider({
     resetCachedChatsSnapshot()
   }, [])
 
+  // Live rows only: a persisted row is display data, so chat surfaces fall
+  // back to their own authoritative read until the live window arrives.
   const getChatById = useCallback(
     (id: string) => {
-      return chats.find((c) => c.id === id)
+      return liveChats.find((c) => c.id === id)
     },
-    [chats]
+    [liveChats]
   )
 
   const updateChatModel = useCallback(
@@ -615,6 +707,7 @@ export function ChatsProvider({
       setOptimisticOps((prev) => [...prev, { type: "update", id, changes }])
 
       try {
+        await awaitConvexAuth()
         await togglePinMutation({ chatId: id, pinned })
         removeOp(
           (op) =>
@@ -628,7 +721,7 @@ export function ChatsProvider({
         toast({ title: "Failed to update pin", status: "error" })
       }
     },
-    [togglePinMutation, removeOp, userId]
+    [togglePinMutation, removeOp, awaitConvexAuth, userId]
   )
 
   const pinnedChats = useMemo(
@@ -668,6 +761,7 @@ export function ChatsProvider({
           isLoading,
           togglePinned,
           pinnedChats,
+          persistedProjects,
           isLoadingMore,
           loadMore,
           canLoadMore,

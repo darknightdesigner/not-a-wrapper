@@ -139,3 +139,32 @@ Sentry and compare release/device cohorts alongside native LCP/INP and the exist
 server run receipts. Never pool provider routes, reasoning settings, or tool states
 in a real-provider first-output comparison. Treat timeouts/errors as outcomes,
 not missing observations to discard.
+
+## Deterministic counts and payload budgets (ADR-0049)
+
+Counts answer "how much work did this interaction do", independent of machine
+speed. Metric dictionary group 15 defines them.
+
+```sh
+# Build only; this command does not deploy Convex.
+NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true NEXT_DIST_DIR=.next-perf bun run build:next
+RUNS=5 bun run bench:counts       # owned server on PERF_PORT (default 3122), fresh guests
+bun run bench:counts --compare base.json head.json
+```
+
+Captures land in `benchmarks/chat-performance/browser/results/counts/` and print
+each count per run with `stable` when all runs agree. The result's
+`topComponents` lists the component types with the most hook renders; production
+names are minified, so each carries its first DOM element as a hint
+(`<span data-slot=tooltip-trigger>`). The responsiveness pair in CI captures
+both builds and fails on any gated increase or unstable gated count.
+
+Payload budgets run with the unit tests:
+
+```sh
+bunx vitest run convex/payloadBudgets.seam.test.ts
+```
+
+When a change is intended, paste the `PAYLOAD_BUDGETS` object printed by the
+failure into the test. Bytes are exact, so any growth fails; a failure for
+being more than 1% below budget means the win should be locked in the same way.

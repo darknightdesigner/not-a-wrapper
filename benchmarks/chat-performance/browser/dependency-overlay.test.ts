@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest"
-import { validateDependencyOverlay } from "./dependency-overlay"
+import { isDeepStrictEqual } from "node:util"
+import { pairedBuildManifest, validateDependencyOverlay } from "./dependency-overlay"
 
 const base = {
   dependencies: { react: "19" },
   devDependencies: { vitest: "4" },
-  scripts: { build: "next build" },
+  scripts: { "build:next": "next build" },
 }
 const head = { ...base, dependencies: { ...base.dependencies, redis: "6" } }
 const lock = (
@@ -81,13 +82,22 @@ describe("paired dependency overlay", () => {
   })
 
   it.each([
-    { headManifest: JSON.stringify({ ...head, scripts: { build: "different build" } }) },
+    { headManifest: JSON.stringify({ ...head, scripts: { "build:next": "different build" } }) },
+    { headManifest: JSON.stringify({ ...head, scripts: { ...base.scripts, postinstall: "patch-package" } }) },
     { headLock: JSON.stringify(baseLock) },
     { headLock: JSON.stringify({ ...headLock, packages: baseLock.packages }) },
     { headLock: JSON.stringify({ ...headLock, lockfileVersion: 2 }) },
     { headLock: JSON.stringify({ ...headLock, workspaces: { "": { ...headLock.workspaces[""], name: "different" } } }) },
   ])("rejects changes outside the dependency sets instead of hiding them in the overlay", (change) => {
     expect(() => validateDependencyOverlay({ ...input(), ...change })).toThrow()
+  })
+
+  it("ignores scripts the paired builds never run", () => {
+    const tooling = { ...base, scripts: { ...base.scripts, "bench:counts": "bun run counts.ts" } }
+    expect(isDeepStrictEqual(
+      pairedBuildManifest(JSON.stringify(base)),
+      pairedBuildManifest(JSON.stringify(tooling))
+    )).toBe(true)
   })
 
   it("rejects identical dependencies as a no-op overlay", () => {

@@ -82,9 +82,14 @@ not copy that default: every production chat route (`chat-chrome.ts` resolver,
 the 80rem main-container breakpoint, the header is opaque and shows its bottom
 edge after scrolling; at or above that breakpoint, it is transparent and
 shadowless. `ScrollRoot` uses the same mode to remove the sticky header inset at
-the wide breakpoint. An explicitly transparent surface still uses
-`data-fixed-header="never"`. The scroll root owns the scroll attribute, so the
-header does not copy scroll state into React.
+the wide breakpoint. `ChatChromeProvider` publishes that mode onto the scroll
+root itself (`ScrollRootFixedHeaderProvider`, omitted when no app header
+renders), so the inset variants are plain `data-[fixed-header=...]` selectors.
+A descendant `:has()` on the transcript's scroll container was re-checked on
+every streamed DOM insertion (2026-10-10 measurement in ADR-0049). An
+explicitly transparent surface still uses `data-fixed-header="never"`. The
+scroll root owns the scroll attribute, so the header does not copy scroll state
+into React.
 
 The resolved `ChatSurface` now also drives `ThreadBottomContainer` posture
 directly. The previous `variant` plus `isOnboarding` pair could express invalid

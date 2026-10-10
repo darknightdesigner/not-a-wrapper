@@ -106,6 +106,77 @@ The shared service skips stale work while loading, and current plain text never
 waits for highlighting. Measurement limitations and validation are in the
 [shared streaming audit](../performance/2026-09-07-shared-streaming-audit.md).
 
+**One-byte input, HTML cache, yielding queue (2026-10-09).** From Anthropic's
+"How we made claude.ai 3x faster" (em dash finding). V8 stores a string as
+two-byte UTF-16 when any character is outside Latin-1, and slices inherit that
+width. One em dash or curly quote in a reply's prose makes the fence value our
+remark pipeline passes to `CodeBlockCode` two-byte (verified through the real
+`Markdown` component), and the JS regex engine then runs every grammar regex on
+V8's slower path. The service now:
+
+- Tokenizes `toOneByteString(code)`: a JSON round trip that V8 allocates as a
+  flat one-byte copy whenever every code unit fits (~45 us per 20 KB; fastest
+  correct copy measured vs split/join, chunked `fromCharCode`, concat loop).
+  Code containing non-Latin-1 characters stays two-byte.
+- Keeps finished HTML in a Shiki-free module LRU
+  (`lib/markdown/highlight-cache.ts`) keyed by the exact (code, fenced
+  language, theme) tuple, capped at 200 variants and 2M characters counted
+  over code, variant keys and HTML. Records
+  hold their own flat key copy so a cached block never retains the message it
+  was sliced from. A degraded `text` render after a failed grammar load is not
+  cached. `CodeBlockCode` reads the cache synchronously during render, gated by
+  a `useSyncExternalStore` server snapshot so hydration always matches the
+  plain server HTML; the async completion pins the HTML in state so eviction
+  cannot revert a mounted block.
+- Serializes tokenization through a queue that yields two plain
+  `MessageChannel` macrotasks before each block. Not `scheduler.yield()`:
+  Chrome runs its continuations ahead of ordinary tasks, so React's Scheduler
+  (a `MessageChannel` task) and timers starved until the queue drained and all
+  blocks committed at once. The second hop queues behind the render task the
+  previous block's `setState` posted, so each block commits before the next
+  tokenizes. Aborted entries skip tokenization.
+- Emits the `shiki_highlight` mark from the service for real Shiki runs only
+  (lazy loads + tokenization, queue wait excluded); cache hits emit nothing.
+
+Measured in Node 25 / vitest jsdom: the 400-line fixture block sliced from
+an em-dash reply highlights in 42.6 ms vs 17.4 ms after the copy
+(`render-stream.bench.tsx`); a 16 KB TS block 68-72 ms vs 29-31 ms (ASCII
+reply: 29-32 ms).
+
+Measured in headless Chromium (Playwright) with the real `CodeBlockCode`,
+service, and React 19 production build:
+
+- Twelve blocks settling together: the longest main-thread gap (setTimeout
+  heartbeat) is 16-18 ms for 7.6 KB blocks and 30-32 ms for 16 KB blocks,
+  with one React commit per block. With `scheduler.yield()` it was 103-129 ms
+  and 218-247 ms, with a single commit of all twelve. Total time is unchanged
+  (~180 ms / ~320 ms).
+- Remount of eight highlighted 16 KB blocks (1.24M characters of HTML): the
+  cached first commit plus layout takes 37-40 ms and is final; the plain
+  first commit takes 11.5-12.5 ms and reaches fully highlighted after
+  213-243 ms of re-highlighting. Cached HTML therefore adds ~3 ms per 16 KB
+  block to the navigation commit while removing the re-highlight. Typical
+  blocks are a few KB, so the synchronous read stays unbudgeted; revisit with
+  a per-commit character budget if `nav_to_thread_painted` regresses on
+  code-heavy threads.
+
+Dual themes (`themes: { light, dark }`) were evaluated and rejected. Visual
+parity is reachable (zero visible per-character differences across 131,573
+characters in 34 grammars, with `mergeWhitespaces: false` plus four CSS
+variable rules), but Shiki tokenizes once per theme: a 24.5 KB TS block took
+124 ms vs 63 ms and produced 1.7x the HTML. Doubling every highlight to avoid
+re-highlighting on a rare theme toggle is a net loss; theme stays in the cache
+key, so toggling back is a cache hit.
+
+A Web Worker was evaluated and deferred. After the copy, the remaining cost is
+one main-thread task per block (17 ms for the 400-line fixture, ~30 ms per
+16 KB of TS), and transferring 123 KB of HTML costs ~0.01 ms. Moving Shiki into
+a worker would need a second core and grammar set inside the worker, a
+request-id and abort protocol, a main-thread fallback for jsdom and failed
+worker construction, and Turbopack bundling of the grammar `import()` calls
+from a worker entry (unverified without a production build). Revisit when
+Chrome traces show single-block highlight tasks above 50 ms on typical replies.
+
 ### Notification cadence
 
 The accepted target is one frame-aligned message publication, implemented by
@@ -127,6 +198,31 @@ current architecture.
 Production-browser selection evidence is recorded separately from this
 architectural decision. A candidate build is not release-validated until the
 normal and 4× CPU frame gates in the results document pass.
+
+### Interaction priority over streaming paint (amendment, 2026-10-10)
+
+A publication runs in `requestAnimationFrame` and notifies a
+`useSyncExternalStore`, so it renders synchronously inside the frame. A Base UI
+popup mounts at opacity 0 and turns visible through a `setState` from its own
+animation-frame batcher: a default-priority update that React renders in a
+later Scheduler task, behind any publication in that frame. Cheaper frames from
+the 2026-10-09 work raised publications over the same constrained stream
+(471/425/309/352 to 645/481/406/466 across four CI runs, 13% to 37% more),
+and in the signed-in `interact-constrained` plus-menu journey the pooled late
+menu open p50 rose from 171 to 324 ms (4 paired runs, 20 samples per side). In the head trace
+the popup mounted 78 ms after pointerdown (base 144 ms), but the next frame
+carried a 99.7 ms publication render, so the visible state committed at about
+296 ms and the menu frame landed at about 420 ms; in base that frame had no
+publication and the popup committed at 288 ms.
+
+Click-opened popups therefore win: the shared `Popover` and `DropdownMenu`
+wrappers hold streaming paint from open intent until Base UI reports the open
+complete (after the starting style clears), the popup closes, or the root
+unmounts (`lib/chat-performance/interaction-priority.ts`). While held, the
+frame's publication moves to a later frame. The one-per-frame invariant and
+the synchronous terminal, Stop, error, and non-streaming publications are
+unchanged, and every hold expires after 300 ms, so a stream never stalls.
+Hover opens and tooltips never hold.
 
 ### Provider smoothing
 

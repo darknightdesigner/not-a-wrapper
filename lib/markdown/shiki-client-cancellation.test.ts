@@ -1,4 +1,6 @@
+import { serialize } from "node:v8"
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import { readCachedHighlight } from "./highlight-cache"
 import { highlightCode, resetShikiClientForTests } from "./shiki-client"
 
 const loader = vi.hoisted(() => {
@@ -91,5 +93,27 @@ describe("highlight cancellation before tokenization", () => {
       lang: fails ? "text" : "typescript",
       theme: input.theme,
     })
+  })
+})
+
+describe("highlight input and cache", () => {
+  it("tokenizes a one-byte copy of code sliced from an em-dash message", async () => {
+    // V8 serialization tags one-byte strings with '"' and two-byte with 'c'.
+    const isOneByte = (value: string) => serialize(value)[2] === 0x22
+    const message = `Intro \u2014 \u201cquoted\u201d\n${input.code}`
+    const sliced = message.slice(message.indexOf(input.code))
+    expect(isOneByte(sliced)).toBe(false)
+
+    await highlightCode({ ...input, code: sliced })
+    const tokenized = loader.codeToHtml.mock.calls[0]?.at(0)
+    expect(tokenized).toBe(input.code)
+    expect(isOneByte(String(tokenized))).toBe(true)
+  })
+
+  it("serves a repeated tuple from the cache without running Shiki", async () => {
+    await expect(highlightCode(input)).resolves.toBe("highlighted")
+    expect(readCachedHighlight(input)).toBe("highlighted")
+    await expect(highlightCode(input)).resolves.toBe("highlighted")
+    expect(loader.codeToHtml).toHaveBeenCalledTimes(1)
   })
 })

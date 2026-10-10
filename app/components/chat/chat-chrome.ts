@@ -1,4 +1,4 @@
-import type { HeaderFixedMode } from "@/app/components/layout/header"
+import type { HeaderFixedMode } from "@/components/ui/scroll-root"
 
 /**
  * The single decision site for chat-surface chrome (ADR-0017).

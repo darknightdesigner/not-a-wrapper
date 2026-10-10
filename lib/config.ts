@@ -43,6 +43,13 @@ export function getDefaultModelForUser(isAuthenticated: boolean): string {
   return isAuthenticated ? MODEL_DEFAULT_AUTHENTICATED : MODEL_DEFAULT_ANONYMOUS
 }
 
+/**
+ * Rows per sidebar window page; also bounds the persisted window (ADR-0048)
+ * and sizes the payload budget fixture (ADR-0049). Lives here because Convex
+ * code may only import import-free `lib/` modules.
+ */
+export const SIDEBAR_WINDOW_PAGE_SIZE = 25
+
 export const APP_NAME = "Not A Wrapper"
 export const APP_DOMAIN = "https://not-a-wrapper.com"
 

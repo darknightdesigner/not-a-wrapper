@@ -2,7 +2,8 @@
 
 import { RI_GLOBAL_LINE_PATH } from "@/lib/icons/composer"
 import React, { act, StrictMode } from "react"
-import { createRoot, type Root } from "react-dom/client"
+import { createRoot, hydrateRoot, type Root } from "react-dom/client"
+import { renderToString } from "react-dom/server"
 import {
   afterAll,
   afterEach,
@@ -223,6 +224,29 @@ describe("PromptInput responsive expansion", () => {
     expect(form?.hasAttribute("data-expanded")).toBe(true)
   })
 
+  it("measures the stacked layout inside a /main container under 520px", () => {
+    surfaceWidth = 480
+    const renderComposer = (mainId?: string) => {
+      act(() => {
+        root.render(
+          <div id={mainId}>
+            <PromptInput value={"a".repeat(40)} onValueChange={() => {}}>
+              <PromptInputActions data-composer-leading="true" />
+              <PromptInputTextarea aria-label="Ask anything" />
+              <PromptInputActions data-composer-trailing="true" />
+            </PromptInput>
+          </div>
+        )
+      })
+      return container.querySelector("form")?.hasAttribute("data-expanded")
+    }
+
+    // Beside its actions the line wraps; stacked (mocked #main is 0px) it fits.
+    expect(renderComposer()).toBe(true)
+    act(() => root.render(null))
+    expect(renderComposer("main")).toBe(false)
+  })
+
   it("measures the visible link label rather than its destination", () => {
     act(() => {
       root.render(
@@ -279,7 +303,11 @@ describe("PromptInput responsive expansion", () => {
     const render = (value: string, draftKey: string) =>
       act(() => {
         root.render(
-          <PromptInput value={value} draftKey={draftKey} onValueChange={() => {}}>
+          <PromptInput
+            value={value}
+            draftKey={draftKey}
+            onValueChange={() => {}}
+          >
             <PromptInputActions data-composer-leading="true" />
             <PromptInputTextarea aria-label="Ask anything" />
             <PromptInputActions data-composer-trailing="true" />
@@ -386,7 +414,7 @@ describe("PromptInput responsive expansion", () => {
     expect(fallback.getAttribute("tabindex")).toBeNull()
     expect(fallback.getAttribute("readonly")).toBeNull()
     expect(fallback.name).toBe("prompt-textarea")
-    expect(fallback.style.display).toBe("none")
+    expect(fallback.hidden).toBe(true)
 
     renderDraft("second line\nthird line")
 
@@ -397,6 +425,65 @@ describe("PromptInput responsive expansion", () => {
         (paragraph) => paragraph.textContent
       )
     ).toEqual(["second line", "third line"])
+  })
+
+  it("hands text typed into the server fallback to the editor at hydration", async () => {
+    function Draft() {
+      const [value, setValue] = React.useState("")
+      return (
+        <PromptInput value={value} onValueChange={setValue}>
+          <PromptInputTextarea
+            aria-label="Ask anything"
+            placeholder="Ask anything"
+          />
+        </PromptInput>
+      )
+    }
+    const host = document.createElement("div")
+    host.innerHTML = renderToString(<Draft />)
+    document.body.appendChild(host)
+    const fallback = host.querySelector(
+      ".composer-fallback-textarea"
+    ) as HTMLTextAreaElement
+    expect(fallback.hidden).toBe(false)
+    expect(fallback.autofocus).toBe(true)
+    expect(host.querySelector("#prompt-textarea")).toBeNull()
+    // Native submission must not navigate with the typed prompt.
+    const form = host.querySelector("form") as HTMLFormElement
+    expect(form.getAttribute("method")).toBe("dialog")
+
+    // Enter before hydration is a newline (no submit handler exists yet).
+    fallback.focus()
+    fallback.value = "typed before\nhydration"
+    fallback.setSelectionRange(5, 5)
+
+    let hydrated: Root | undefined
+    await act(async () => {
+      hydrated = hydrateRoot(host, <Draft />)
+    })
+
+    const editor = host.querySelector("#prompt-textarea") as HTMLElement
+    expect(fallback.hidden).toBe(true)
+    expect(document.activeElement).toBe(editor)
+    expect(
+      Array.from(editor.querySelectorAll("p"), (p) => p.textContent)
+    ).toEqual(["typed before", "hydration"])
+    expect(fallback.value).toBe("typed before\nhydration")
+    // The handoff keeps the painted compact layout; the next edit expands it.
+    expect(form.hasAttribute("data-expanded")).toBe(false)
+    act(() => {
+      editor.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          shiftKey: true,
+        })
+      )
+    })
+    expect(form.hasAttribute("data-expanded")).toBe(true)
+
+    act(() => hydrated?.unmount())
+    host.remove()
   })
 
   it("keeps one empty paragraph through the Strict Mode callback-ref remount", () => {

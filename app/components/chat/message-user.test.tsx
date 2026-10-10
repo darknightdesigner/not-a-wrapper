@@ -327,7 +327,7 @@ describe("MessageUser edits", () => {
       container?.querySelector('[aria-label="Your message actions"]')
     ).toBeNull()
     expect(textarea?.getAttribute("aria-label")).toBe("Edit message")
-    expect(textarea?.style.display).toBe("none")
+    expect(textarea?.hidden).toBe(true)
     expect(richEditor?.getAttribute("aria-label")).toBe("Edit message")
     expect(richEditor?.id).toBe("message-edit-msg-client-123")
     expect(richEditor?.textContent).toBe("Original text")

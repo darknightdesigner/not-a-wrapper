@@ -75,7 +75,10 @@ import {
   restoreLargePasteText,
   type PendingAttachment,
 } from "./pending-attachment"
-import { resolveComposerPrimaryActionState } from "./primary-action-state"
+import {
+  resolveComposerPrimaryActionState,
+  type ComposerPrimaryActionState,
+} from "./primary-action-state"
 import { useComposerConnectors } from "./use-composer-connectors"
 import { WebSearchControl } from "./web-search-control"
 
@@ -124,6 +127,8 @@ type ComposerProps = {
 }
 
 const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
+
+const stopPropagation = (event: MouseEvent) => event.stopPropagation()
 
 // Shared across mounts and retained only while a send can settle.
 const pendingDraftSends = new Map<string | null, Set<{ edited: boolean }>>()
@@ -213,6 +218,54 @@ function useComposerDraftDisplay(
   return { localValue, valueRef, applyValue, isCurrentDraft }
 }
 
+type ComposerPrimaryActionProps = {
+  action: ComposerPrimaryActionState
+  tooltipDisabled: boolean
+  onStopClick: (event: MouseEvent<HTMLButtonElement>) => void
+}
+
+/** Send/Stop. Memoized on the resolved state, so typing re-renders it only
+ * when Send availability flips. */
+const ComposerPrimaryAction = memo(function ComposerPrimaryAction({
+  action,
+  tooltipDisabled,
+  onStopClick,
+}: ComposerPrimaryActionProps) {
+  return (
+    <PromptInputAction
+      disabled={tooltipDisabled || undefined}
+      tooltip={
+        action.mode === "send" && !action.disabled ? (
+          <TooltipShortcut label={action.tooltip}>
+            <Kbd label="Enter">↵</Kbd>
+          </TooltipShortcut>
+        ) : (
+          action.tooltip
+        )
+      }
+    >
+      <Button
+        size="sm"
+        className="composer-submit-btn composer-submit-button-color can-hover:relative can-hover:after:absolute can-hover:after:-inset-x-1 can-hover:after:inset-y-0 can-hover:after:content-[''] size-9 rounded-full p-0 transition-colors duration-150 ease-out [view-transition-name:var(--vt-composer-speech-button)]"
+        disabled={action.mode === "stop" && action.disabled}
+        visuallyDisabled={action.mode === "send" && action.disabled}
+        type="submit"
+        id="composer-submit-button"
+        data-testid="send-button"
+        onClick={action.mode === "stop" ? onStopClick : undefined}
+        aria-label={action.ariaLabel}
+        aria-disabled={action.disabled}
+      >
+        {action.mode === "stop" ? (
+          <StopBulkRoundedIcon slotSize={22} glyphSize={22} />
+        ) : (
+          <Icon icon={RiArrowUpLine} slotSize={22} />
+        )}
+      </Button>
+    </PromptInputAction>
+  )
+})
+
 export const Composer = memo(
   forwardRef<ComposerHandle, ComposerProps>(function Composer(
     {
@@ -292,10 +345,13 @@ export const Composer = memo(
     const handleCloseActionQuery = useCallback(() => {
       editorRef.current?.endActionQuery()
     }, [])
-    const handleActionQueryChange = (query: PromptInputActionQuery | null) => {
-      setActionQuery(query)
-      setIsActionMenuOpen(query !== null)
-    }
+    const handleActionQueryChange = useCallback(
+      (query: PromptInputActionQuery | null) => {
+        setActionQuery(query)
+        setIsActionMenuOpen(query !== null)
+      },
+      []
+    )
 
     // Anonymous chat cannot use authenticated storage, so guests' generated
     // pastes cross the turn seam as ordinary turn text.
@@ -434,6 +490,9 @@ export const Composer = memo(
       valueRef,
     ])
 
+    // Send availability reads only whether the draft has text, so the
+    // primary action keeps its identity while the user types.
+    const hasDraftText = !isOnlyWhitespace(localValue)
     const primaryAction = useMemo(() => {
       // When supplied, the resolver owns the complete Stop policy — including
       // a local transport that is still streaming while an exact durable Stop
@@ -447,7 +506,7 @@ export const Composer = memo(
       const isMessageEmpty =
         !isSubmitting &&
         attachmentsReady &&
-        isOnlyWhitespace(localValue) &&
+        !hasDraftText &&
         attachments.length === 0
       return resolveComposerPrimaryActionState({
         // Durable Stop is a mutation, so local transport cannot gate it.
@@ -457,15 +516,15 @@ export const Composer = memo(
           isSendReady &&
           !isSubmitting &&
           attachmentsReady &&
-          (!isOnlyWhitespace(localValue) || attachments.length > 0),
+          (hasDraftText || attachments.length > 0),
         isMessageEmpty,
       })
     }, [
       attachments,
       attachmentsReady,
+      hasDraftText,
       isSubmitting,
       isSendReady,
-      localValue,
       status,
       stop,
       stoppable,
@@ -664,7 +723,7 @@ export const Composer = memo(
                 className="h-9 justify-start gap-1.5 self-center [grid-area:leading]"
                 data-composer-leading="true"
                 data-composer-transition-slot="leading"
-                onClick={(e) => e.stopPropagation()}
+                onClick={stopPropagation}
               >
                 <ButtonPlusMenu
                   actionQuery={actionQuery}
@@ -702,7 +761,7 @@ export const Composer = memo(
                 className="h-9 max-w-full min-w-0 gap-1 self-center [grid-area:trailing]"
                 data-composer-trailing="true"
                 data-composer-transition-slot="trailing"
-                onClick={(e) => e.stopPropagation()}
+                onClick={stopPropagation}
               >
                 <div
                   className={cn(
@@ -761,46 +820,11 @@ export const Composer = memo(
                   />
                 </div>
                 <div className="ms-auto flex shrink-0 items-center gap-2">
-                  <PromptInputAction
-                    disabled={isComposerOverlayOpen || undefined}
-                    tooltip={
-                      primaryAction.mode === "send" &&
-                      !primaryAction.disabled ? (
-                        <TooltipShortcut label={primaryAction.tooltip}>
-                          <Kbd label="Enter">↵</Kbd>
-                        </TooltipShortcut>
-                      ) : (
-                        primaryAction.tooltip
-                      )
-                    }
-                  >
-                    <Button
-                      size="sm"
-                      className="composer-submit-btn composer-submit-button-color can-hover:relative can-hover:after:absolute can-hover:after:-inset-x-1 can-hover:after:inset-y-0 can-hover:after:content-[''] size-9 rounded-full p-0 transition-colors duration-150 ease-out [view-transition-name:var(--vt-composer-speech-button)]"
-                      disabled={
-                        primaryAction.mode === "stop" && primaryAction.disabled
-                      }
-                      visuallyDisabled={
-                        primaryAction.mode === "send" && primaryAction.disabled
-                      }
-                      type="submit"
-                      id="composer-submit-button"
-                      data-testid="send-button"
-                      onClick={
-                        primaryAction.mode === "stop"
-                          ? handlePrimaryActionClick
-                          : undefined
-                      }
-                      aria-label={primaryAction.ariaLabel}
-                      aria-disabled={primaryAction.disabled}
-                    >
-                      {primaryAction.mode === "stop" ? (
-                        <StopBulkRoundedIcon slotSize={22} glyphSize={22} />
-                      ) : (
-                        <Icon icon={RiArrowUpLine} slotSize={22} />
-                      )}
-                    </Button>
-                  </PromptInputAction>
+                  <ComposerPrimaryAction
+                    action={primaryAction}
+                    tooltipDisabled={isComposerOverlayOpen}
+                    onStopClick={handlePrimaryActionClick}
+                  />
                 </div>
               </PromptInputActions>
             </PromptInput>

@@ -92,6 +92,10 @@ const composerMocks = vi.hoisted(() => ({
   searchMode: "optional" as "optional" | "always-on" | "unsupported",
   effortLevels: [] as EffortControlProps["levels"],
   setEnableSearch: vi.fn(),
+  // Stable like the real Turn context callbacks and Convex mutations.
+  handleModelChange: vi.fn(),
+  setReasoningEffort: vi.fn(),
+  mutation: vi.fn(),
   replaceActionQuery: vi.fn(() => true),
   toggleSyntheticActionQuery: vi.fn(),
   endActionQuery: vi.fn(),
@@ -107,13 +111,13 @@ beforeAll(async () => {
 vi.mock("@/app/components/chat/turn-context", () => ({
   useTurnContext: () => ({
     selectedModel: composerMocks.selectedModel,
-    handleModelChange: vi.fn(),
+    handleModelChange: composerMocks.handleModelChange,
     enableSearch: composerMocks.enableSearch,
     searchMode: composerMocks.searchMode,
     setEnableSearch: composerMocks.setEnableSearch,
     effortLevels: composerMocks.effortLevels,
     reasoningEffort: undefined,
-    setReasoningEffort: vi.fn(),
+    setReasoningEffort: composerMocks.setReasoningEffort,
     reportLastTurnEffort: vi.fn(),
     isAuthenticated: true,
     systemPrompt: "system",
@@ -135,7 +139,7 @@ vi.mock("@/lib/user-store/provider", () => ({
 vi.mock("convex/react", () => ({
   useConvex: () => ({}),
   useConvexAuth: () => ({ isAuthenticated: false, isLoading: false }),
-  useMutation: () => vi.fn(),
+  useMutation: () => composerMocks.mutation,
 }))
 vi.mock("convex-helpers/react/cache", () => ({
   useQuery: () => undefined,
@@ -223,11 +227,13 @@ vi.mock("@/app/components/chat/use-file-upload", async (importOriginal) => {
   }
 })
 
-vi.mock("@/components/common/model-selector/base", () => ({
-  ModelSelector: (props: ModelSelectorProps) => {
+// Memoized like the real exports, so render counts pin Composer's prop
+// stability. Dropping memo from the real exports is caught by bench:counts.
+vi.mock("@/components/common/model-selector/base", async () => ({
+  ModelSelector: (await import("react")).memo((props: ModelSelectorProps) => {
     modelSelectorMockCalls.push(props)
     return null
-  },
+  }),
 }))
 
 vi.mock("./effort-control", () => ({
@@ -352,11 +358,11 @@ vi.mock("@/components/ui/prompt-input", () => ({
   }),
 }))
 
-vi.mock("./button-plus-menu", () => ({
-  ButtonPlusMenu: (props: ButtonPlusMenuProps) => {
+vi.mock("./button-plus-menu", async () => ({
+  ButtonPlusMenu: (await import("react")).memo((props: ButtonPlusMenuProps) => {
     buttonPlusMenuMockCalls.push(props)
     return null
-  },
+  }),
 }))
 
 vi.mock("./file-list", () => ({
@@ -444,17 +450,21 @@ describe("Composer primary action", () => {
     })
   }
 
-  it("skips unchanged parent renders while keeping draft and status updates live", () => {
+  it("skips unchanged parent renders and keystrokes while keeping draft and status updates live", () => {
     const props = { onTurn: vi.fn(() => true), stop: vi.fn(), status: "ready" as const }
     const mounted = renderComposer(props)
     const initialRenders = modelSelectorMockCalls.length
+    const initialMenuRenders = buttonPlusMenuMockCalls.length
 
     rerenderComposer(props)
     expect(modelSelectorMockCalls).toHaveLength(initialRenders)
 
+    // Typing must not re-render the toolbar (ADR-0049 hook census).
     changeComposerValue("new draft")
-    expect(promptInputMockCalls.at(-1)?.value).toBe("new draft")
-    expect(modelSelectorMockCalls.length).toBeGreaterThan(initialRenders)
+    changeComposerValue("new draft!")
+    expect(promptInputMockCalls.at(-1)?.value).toBe("new draft!")
+    expect(modelSelectorMockCalls).toHaveLength(initialRenders)
+    expect(buttonPlusMenuMockCalls).toHaveLength(initialMenuRenders)
 
     rerenderComposer({ ...props, status: "streaming" })
     expect(mounted.querySelector('[data-testid="send-button"]')?.getAttribute("aria-label")).toBe("Stop")

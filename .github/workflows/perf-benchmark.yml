@@ -9,18 +9,16 @@ on:
       - "app/components/layout/sidebar/**"
       - "app/api/chat/**"
       - "app/globals.css"
-      - "components/ui/prompt-input.tsx"
-      - "components/ui/calendar.tsx"
-      - "components/ui/tooltip.tsx"
-      - "components/ui/focus-mode.tsx"
-      - "components/ui/message.tsx"
-      - "components/ui/lazy-markdown.ts"
-      - "components/ui/markdown.tsx"
-      - "components/ui/markdown-link.tsx"
-      - "components/ui/code-block.tsx"
-      - "components/ui/intent-prefetch.ts"
-      - "components/ui/reasoning.tsx"
-      - "components/ui/view-transition.ts"
+      # Count-gate coverage (ADR-0049): the typing and popover paths render
+      # these primitives, hooks, and stores, so a change there must be paired.
+      - "components/ui/**"
+      - "components/common/model-selector/**"
+      - "hooks/**"
+      - "app/hooks/**"
+      - "lib/models/**"
+      - "lib/model-store/**"
+      - "lib/user-store/**"
+      - "lib/user-preference-store/**"
       - "package.json"
       - "bun.lock"
       - "lib/markdown/**"
@@ -173,6 +171,7 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
+      # Responsiveness pairs also gate deterministic interaction counts (ADR-0049).
       - name: Compare base and head on the same runner
         if: ${{ !inputs.diagnose && !inputs.collect_baseline }}
         run: bun run benchmarks/chat-performance/browser/run-paired.ts

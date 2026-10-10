@@ -82,6 +82,7 @@ describe("deriveSidebarLoading", () => {
         firstPagePending: true,
         shouldUseLocalChats: false,
         cachedChatsHydrated: true,
+        hasPersistedWindow: false,
       })
     ).toBe(true)
 
@@ -92,6 +93,7 @@ describe("deriveSidebarLoading", () => {
         firstPagePending: false,
         shouldUseLocalChats: false,
         cachedChatsHydrated: true,
+        hasPersistedWindow: false,
       })
     ).toBe(false)
   })

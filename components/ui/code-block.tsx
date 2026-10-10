@@ -5,14 +5,14 @@
  */
 "use client"
 
-import { highlightCode } from "@/lib/markdown/shiki-client"
+import { peekCachedHighlight } from "@/lib/markdown/highlight-cache"
 import {
-  isChatPerfClientEnabled,
-  markChatPerf,
-} from "@/lib/observability/chat-performance"
+  highlightCode,
+  type ShikiClientTheme,
+} from "@/lib/markdown/shiki-client"
 import { cn } from "@/lib/utils"
 import { useTheme } from "next-themes"
-import React, { useEffect, useRef, useState } from "react"
+import React, { useEffect, useState, useSyncExternalStore } from "react"
 
 export type CodeBlockProps = {
   children?: React.ReactNode
@@ -49,6 +49,19 @@ export type CodeBlockCodeProps = {
   growing?: boolean
 } & React.HTMLProps<HTMLDivElement>
 
+type HighlightedCode = {
+  code: string
+  language: string
+  theme: ShikiClientTheme
+  html: string
+}
+
+// Snapshots for a store that never changes: React uses the server snapshot
+// while hydrating and the client snapshot for every other render.
+const subscribeToNothing = () => () => {}
+const getClientSnapshot = () => true
+const getServerSnapshot = () => false
+
 function CodeBlockCode({
   code,
   language = "tsx",
@@ -57,60 +70,40 @@ function CodeBlockCode({
   ...props
 }: CodeBlockCodeProps) {
   const { resolvedTheme: appTheme } = useTheme()
-  const theme = appTheme === "dark" ? "github-dark" : "github-light"
-  const [highlighted, setHighlighted] = useState<{
-    code: string
-    language: string
-    theme: "github-dark" | "github-light"
-    html: string
-  } | null>(null)
-
-  // Stale async completions are invalidated by generation token in addition
-  // to the exact tuple carried by `highlighted`; unmount and every input
-  // change cancel obsolete work waiting on shared module loads.
-  const generationRef = useRef(0)
+  const theme: ShikiClientTheme =
+    appTheme === "dark" ? "github-dark" : "github-light"
+  const [highlighted, setHighlighted] = useState<HighlightedCode | null>(null)
+  // The server never has cached HTML, so hydration renders the plain path
+  // and only client renders read the cache.
+  const canReadCache = useSyncExternalStore(
+    subscribeToNothing,
+    getClientSnapshot,
+    getServerSnapshot
+  )
 
   useEffect(() => {
-    const generation = ++generationRef.current
-    let cancelled = false
     // Provider pauses do not make an unfinished block stable.
     if (!code || growing) return
+    // Every input change and unmount aborts obsolete work waiting on shared
+    // module loads or in the highlight queue; an aborted completion never
+    // publishes, and render shows HTML only for the exact current tuple. A
+    // cache hit resolves without running Shiki and pins the HTML in state so
+    // LRU eviction cannot revert a mounted block.
     const controller = new AbortController()
-
-    const runHighlight = async () => {
-      try {
-        // Lazy service (ADR-0016 "Lazy Shiki"): Shiki core, themes, and the
-        // grammar for this language load on first demand; unknown/plain ids
-        // resolve to the grammar-less `text` language inside the service.
-        // Includes first-use grammar/theme loading; records duration only.
-        const highlightStartedAt = isChatPerfClientEnabled()
-          ? performance.now()
-          : null
-        const html = await highlightCode({
-          code,
-          language,
-          theme,
-          signal: controller.signal,
-        })
-        if (highlightStartedAt !== null) {
-          markChatPerf("shiki_highlight", {
-            durationMs: performance.now() - highlightStartedAt,
-          })
-        }
-        if (cancelled || generation !== generationRef.current) return
+    // Lazy service (ADR-0016 "Lazy Shiki"): Shiki core, themes, and the
+    // grammar load on first demand; unknown/plain ids resolve to `text`. The
+    // service emits the `shiki_highlight` mark for real Shiki runs only.
+    highlightCode({ code, language, theme, signal: controller.signal }).then(
+      (html) => {
+        if (controller.signal.aborted) return
         setHighlighted({ code, language, theme, html })
-      } catch {
+      },
+      () => {
         // Module or grammar loading failed: keep the React-escaped plain
         // fallback for this tuple; a later input change retries.
       }
-    }
-
-    void runHighlight()
-
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
+    )
+    return () => controller.abort()
   }, [code, language, theme, growing])
 
   // Captured code text metrics: 14px / 24px (0.875em at 1.71429), 20px inline
@@ -120,24 +113,29 @@ function CodeBlockCode({
     className
   )
 
-  // Render highlighted HTML only for the exact current tuple. A code,
-  // language, or theme change therefore exposes the new canonical code
-  // immediately through the escaped plain fallback while older async work
-  // becomes obsolete.
-  const showHighlighted =
-    !growing &&
-    highlighted !== null &&
-    highlighted.code === code &&
-    highlighted.language === language &&
-    highlighted.theme === theme &&
-    Boolean(code)
+  // Render highlighted HTML only for the exact current tuple: pinned state,
+  // else a synchronous cache hit (no plain flash on remount). A code,
+  // language, or theme change therefore never shows older HTML: the new
+  // tuple renders cached HTML or the escaped plain fallback immediately while
+  // older async work becomes obsolete. Render only peeks; the effect's
+  // `highlightCode` call refreshes the entry's recency after commit.
+  const html =
+    growing || !code
+      ? null
+      : highlighted?.code === code &&
+          highlighted.language === language &&
+          highlighted.theme === theme
+        ? highlighted.html
+        : canReadCache
+          ? peekCachedHighlight({ code, language, theme })
+          : null
 
   // Plain path doubles as the SSR/pre-highlight fallback: React-escaped text
   // in the same wrapper, so `<script>`-like content renders as text.
-  return showHighlighted ? (
+  return html !== null ? (
     <div
       className={classNames}
-      dangerouslySetInnerHTML={{ __html: highlighted.html }}
+      dangerouslySetInnerHTML={{ __html: html }}
       {...props}
     />
   ) : (

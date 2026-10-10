@@ -52,7 +52,7 @@ function log(message: string) {
   console.log(`[composer-shell] ${message}`)
 }
 
-async function waitForServer(baseUrl: string, timeoutMs: number) {
+export async function waitForServer(baseUrl: string, timeoutMs: number) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
@@ -66,7 +66,7 @@ async function waitForServer(baseUrl: string, timeoutMs: number) {
   throw new Error(`server at ${baseUrl} did not become ready in ${timeoutMs}ms`)
 }
 
-async function assertPortFree(baseUrl: string): Promise<void> {
+export async function assertPortFree(baseUrl: string): Promise<void> {
   try {
     await fetch(baseUrl, { redirect: "manual" })
   } catch {
@@ -76,7 +76,7 @@ async function assertPortFree(baseUrl: string): Promise<void> {
   throw new Error(`${baseUrl} is already serving; stop it (or pass BASE_URL)`)
 }
 
-function spawnServer(): void {
+export function spawnServer(): void {
   if (!existsSync(path.join(REPO_ROOT, DIST_DIR, "BUILD_ID"))) {
     throw new Error(
       `no production build at ${DIST_DIR}: NEXT_DIST_DIR=${DIST_DIR} bun run build:next`
@@ -92,7 +92,7 @@ function spawnServer(): void {
   })
 }
 
-function stopServer() {
+export function stopServer() {
   if (serverProcess?.pid) {
     try {
       process.kill(-serverProcess.pid, "SIGTERM")
@@ -414,8 +414,10 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  stopServer()
-  console.error(error)
-  process.exit(1)
-})
+if (import.meta.main) {
+  main().catch((error) => {
+    stopServer()
+    console.error(error)
+    process.exit(1)
+  })
+}

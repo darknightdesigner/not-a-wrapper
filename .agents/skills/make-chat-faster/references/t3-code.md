@@ -12,4 +12,6 @@ Paths below are relative to the T3 Code checkout. Read its current files directl
 | CI workflow | `.github/workflows/ci.yml` | [Workflow](https://github.com/pingdotgg/t3code/blob/main/.github/workflows/ci.yml) | How checks run in CI. |
 | Package commands | `package.json` | [Commands](https://github.com/pingdotgg/t3code/blob/main/package.json) | Current benchmark and validation entry points. |
 
+This repo's equivalent of the payload checks is `convex/payloadBudgets.seam.test.ts` (ADR-0049). The selected-path read has a budget but no bound yet; T3 Code's bounded recent-history window is the reference for bounding it.
+
 Connection to the video: Theo discusses payload baselines and CI at [29:04](https://www.youtube.com/watch?v=FsDUOUV9Vs8&t=1744); search for `[29:04]` in the [local transcript](theo-transcript.md).

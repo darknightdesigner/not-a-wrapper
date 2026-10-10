@@ -14,13 +14,23 @@
  * - Unknown or unsupported languages resolve to Shiki's built-in `text`
  *   (grammar-less) language — never a throw. Callers render React-escaped
  *   plain code until the returned promise resolves, and must discard stale
- *   completions by generation key (`components/ui/code-block.tsx`).
+ *   completions (`components/ui/code-block.tsx`).
+ * - Code is tokenized as a one-byte string when it fits Latin-1, finished
+ *   HTML is kept in a bounded LRU (`./highlight-cache.ts`), and tokenization
+ *   runs through a queue that yields to the main thread between blocks.
  *
  * Consumers must not import `shiki` directly: `components/ui/code-block.tsx`
  * carries no runtime Shiki import (type-only imports here are erased at
  * build time), so no-code conversations ship zero Shiki bytes.
  */
+import { markChatPerf } from "@/lib/observability/chat-performance"
 import type { HighlighterCore } from "shiki/core"
+import {
+  clearHighlightCacheForTests,
+  readCachedHighlight,
+  storeHighlight,
+  type HighlightTuple,
+} from "./highlight-cache"
 
 export type ShikiClientTheme = "github-dark" | "github-light"
 
@@ -180,19 +190,85 @@ function loadLanguage(
 }
 
 /**
+ * V8 stores a string as two-byte UTF-16 when ANY character is outside
+ * Latin-1, and slices inherit their parent's width: one em dash or curly
+ * quote in a reply's prose makes the extracted fence value two-byte, which
+ * puts every grammar regex on V8's slower two-byte path (16 KB TS block:
+ * 30 ms one-byte vs 68 ms two-byte). A JSON round trip returns a flat copy
+ * that V8 allocates as one-byte whenever every code unit fits, while code
+ * that itself contains non-Latin-1 characters correctly stays two-byte. It
+ * was the fastest correct copy measured (vs split/join, chunked
+ * `String.fromCharCode`, concat loop): ~45 us per 20 KB.
+ */
+export function toOneByteString(code: string): string {
+  const copy: unknown = JSON.parse(JSON.stringify(code))
+  return typeof copy === "string" ? copy : code
+}
+
+function postMessageTask(): Promise<void> {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel()
+    channel.port1.onmessage = () => {
+      channel.port1.close()
+      resolve()
+    }
+    channel.port2.postMessage(null)
+  })
+}
+
+/**
+ * Two plain macrotask hops, deliberately not `scheduler.yield()`: Chrome runs
+ * yield continuations ahead of ordinary tasks, so React's Scheduler (also a
+ * MessageChannel task) and timers starved until the whole queue drained and
+ * every block committed at once. The previous block's `setState` posts
+ * React's render task during the same microtask checkpoint as the first hop,
+ * so the second hop queues behind it and each block commits before the next
+ * one tokenizes.
+ */
+async function yieldToMain(): Promise<void> {
+  await postMessageTask()
+  await postMessageTask()
+}
+
+let highlightQueue: Promise<unknown> = Promise.resolve()
+
+/**
+ * Tokenization is synchronous, so blocks that become stable together
+ * (opening a long thread, a message settling) used to chain into one long
+ * task. Serialize them and yield before each, so every block is its own task
+ * and input, paint, and React commits run in between. Aborted entries skip
+ * both the yield and tokenization, so they never delay live blocks.
+ */
+function enqueueHighlight<T>(
+  signal: AbortSignal | undefined,
+  run: () => T
+): Promise<T> {
+  const task = highlightQueue.then(async () => {
+    signal?.throwIfAborted()
+    await yieldToMain()
+    signal?.throwIfAborted()
+    return run()
+  })
+  highlightQueue = task.catch(() => undefined)
+  return task
+}
+
+/**
  * Highlight `code` with the resolved grammar and theme, loading whatever is
  * missing on demand. Unknown languages take the `text` path. Rejects on
  * cancellation or loading/highlighting failure. Callers can abort obsolete
- * work while shared resources load. The loads stay
+ * work while shared resources load or wait in the queue. The loads stay
  * reusable; cancellation skips tokenization rather than cancelling shared work.
+ * Cached tuples resolve without running Shiki.
  */
-export async function highlightCode(args: {
-  code: string
-  language: string | undefined
-  theme: ShikiClientTheme
-  signal?: AbortSignal
-}): Promise<string> {
+export async function highlightCode(
+  args: HighlightTuple & { signal?: AbortSignal }
+): Promise<string> {
   args.signal?.throwIfAborted()
+  const cached = readCachedHighlight(args)
+  if (cached !== null) return cached
+
+  const startedAt = performance.now()
   const resolved = resolveShikiLanguage(args.language)
   const highlighter = await loadHighlighterCore()
   args.signal?.throwIfAborted()
@@ -204,15 +280,35 @@ export async function highlightCode(args: {
     }
   }
   args.signal?.throwIfAborted()
-  return highlighter.codeToHtml(args.code, {
-    lang: resolved !== "text" && loadedLanguages.has(resolved) ? resolved : "text",
-    theme: args.theme,
+  const loadMs = performance.now() - startedAt
+
+  return enqueueHighlight(args.signal, () => {
+    // An identical block queued earlier may have filled the cache.
+    const queuedHit = readCachedHighlight(args)
+    if (queuedHit !== null) return queuedHit
+    const lang =
+      resolved !== "text" && loadedLanguages.has(resolved) ? resolved : "text"
+    const tokenizeStartedAt = performance.now()
+    const code = toOneByteString(args.code)
+    const html = highlighter.codeToHtml(code, { lang, theme: args.theme })
+    // Real Shiki runs only: lazy loads + tokenization, queue wait excluded.
+    markChatPerf("shiki_highlight", {
+      durationMs: loadMs + performance.now() - tokenizeStartedAt,
+    })
+    // A degraded `text` render after a failed grammar load is not cached, so
+    // a later mount retries the grammar. The flat copy is the stored key.
+    if (lang === resolved) {
+      storeHighlight({ code, language: args.language, theme: args.theme }, html)
+    }
+    return html
   })
 }
 
-/** Test-only: drop every cached instance and load promise. */
+/** Test-only: drop every cached instance, load promise, and cached HTML. */
 export function resetShikiClientForTests(): void {
   corePromise = null
   loadedLanguages.clear()
   languageLoadPromises.clear()
+  clearHighlightCacheForTests()
+  highlightQueue = Promise.resolve()
 }

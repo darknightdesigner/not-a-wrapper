@@ -1,6 +1,7 @@
 "use client"
 
 import { Icon } from "@/components/ui/icon"
+import { useHydrated } from "@/hooks/use-hydrated"
 import useClickOutside from "@/hooks/useClickOutside"
 import { cn } from "@/lib/utils"
 import { RiCloseLargeLine } from "@remixicon/react"
@@ -19,18 +20,8 @@ import React, {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
 } from "react"
 import { createPortal } from "react-dom"
-
-// Hydration-safe hook using useSyncExternalStore (React 19 pattern)
-const subscribe = () => () => {}
-const getSnapshot = () => true
-const getServerSnapshot = () => false
-
-function useHydrated() {
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
-}
 
 export type MorphingDialogContextType = {
   isOpen: boolean

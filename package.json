@@ -29,11 +29,12 @@
     "catalog:openrouter:refresh": "bun scripts/generate-openrouter-catalog.ts --fetch",
     "catalog:openrouter:check": "bun scripts/generate-openrouter-catalog.ts --check",
     "catalog:models:audit": "bun scripts/audit-model-catalog.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p convex && tsc --noEmit",
     "test": "vitest run",
     "bench": "vitest bench --run",
     "bench:chat": "vitest bench --run benchmarks/chat-performance",
-    "bench:browser": "bun run benchmarks/chat-performance/browser/harness.ts"
+    "bench:browser": "bun run benchmarks/chat-performance/browser/harness.ts",
+    "bench:counts": "bun run benchmarks/chat-performance/browser/counts.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",
