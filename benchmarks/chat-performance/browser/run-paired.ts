@@ -5,12 +5,13 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import os from "node:os"
 import path from "node:path"
 import { isDeepStrictEqual } from "node:util"
+import { fileURLToPath } from "node:url"
 import { pairedBuildManifest, validateDependencyOverlay } from "./dependency-overlay"
 import { validateDirectiveOverlay } from "./directive-overlay"
 import { applySseCharsetOverlay } from "./sse-charset-overlay"
 import { LEGACY_MEASUREMENT_BASE, MEASUREMENT_FILES, MEASUREMENT_HOOK_FILES, measurementBootstrap } from "./measurement-overlay"
 
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..")
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..")
 const harnessDirectory = "benchmarks/chat-performance/browser"
 const resultsDirectory = `${harnessDirectory}/results`
 

@@ -19,10 +19,11 @@
  *      thread-switch knobs: THREAD_SWITCH_CHATS (8), THREAD_SWITCH_COUNT (50),
  *      THREAD_SWITCH_DOCUMENTS (5), THREAD_SWITCH_HOVER_MS (250).
  */
-import { execSync, spawn, type ChildProcess } from "node:child_process"
+import { execSync, type ChildProcess } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import {
   buildDeterministicPartScript,
   deterministicScenarioText,
@@ -44,6 +45,7 @@ import { classifyChatError } from "@/lib/observability/chat-error-taxonomy"
 import { hashValue } from "../fixtures"
 import { waitForTraceCompletion } from "./diagnostic-trace"
 import { parseNativeScroll } from "./native-scroll"
+import { startPerfServer, type PerfServer } from "./perf-server"
 import {
   ensurePerfAuthUser,
   getPerfAuthPassword,
@@ -86,7 +88,7 @@ const SUITE_NAME = process.env.SUITE ?? "standard"
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const PROFILE_LATE_MENU = process.env.PERF_PROFILE_LATE_MENU === "true"
 const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../.."
 )
 
@@ -102,7 +104,7 @@ const serverRouteErrors: Array<{
   errorName: string
   category: ReturnType<typeof classifyChatError>
 }> = []
-let serverProcess: ChildProcess | null = null
+let perfServer: PerfServer | undefined
 
 function log(message: string) {
   console.log(`[bench:browser] ${message}`)
@@ -113,39 +115,8 @@ function fail(message: string): never {
   process.exit(1)
 }
 
-async function waitForServer(baseUrl: string, timeoutMs: number) {
-  const deadline = Date.now() + timeoutMs
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(baseUrl, { redirect: "manual" })
-      if (response.status < 500) return
-    } catch {
-      // Not up yet.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300))
-  }
-  fail(`server at ${baseUrl} did not become ready in ${timeoutMs}ms`)
-}
-
-function spawnPerfServer(baseUrl: string): void {
-  const buildIdPath = path.join(REPO_ROOT, DIST_DIR, "BUILD_ID")
-  if (!existsSync(buildIdPath)) {
-    fail(
-      `no production build at ${DIST_DIR}. Build one first:\n` +
-        `  NEXT_PUBLIC_CHAT_PERF_INSTRUMENTATION=true NEXT_DIST_DIR=${DIST_DIR} bun run build:next`
-    )
-  }
-  log(`starting perf server on :${PERF_PORT} (dist: ${DIST_DIR})`)
-  serverProcess = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
-    cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      NEXT_DIST_DIR: DIST_DIR,
-      CHAT_PERF_DETERMINISTIC_PROVIDER: "1",
-      CHAT_PERF_SAMPLE_RATE: "1",
-    },
-    stdio: ["ignore", "pipe", "pipe"],
-  })
+/** Reads `chat_perf` spans and route errors from the server's piped output. */
+function captureServerOutput(server: ChildProcess): void {
   const capture = () => {
     let pending = ""
     return (chunk: Buffer) => {
@@ -178,16 +149,11 @@ function spawnPerfServer(baseUrl: string): void {
       }
     }
   }
-  serverProcess.stdout?.on("data", capture())
-  serverProcess.stderr?.on("data", capture())
-  serverProcess.on("exit", (code) => {
+  server.stdout?.on("data", capture())
+  server.stderr?.on("data", capture())
+  server.on("exit", (code) => {
     if (code !== null && code !== 0) log(`perf server exited with code ${code}`)
   })
-}
-
-function stopPerfServer() {
-  serverProcess?.kill("SIGTERM")
-  serverProcess = null
 }
 
 /** The send's correlation id, carried by the `chat_send_intent` mark detail. */
@@ -1445,8 +1411,14 @@ async function main() {
   if (PERF_PORT === 3000)
     fail("PERF_PORT must not use the developer server port 3000")
   const baseUrl = `http://localhost:${PERF_PORT}`
-  spawnPerfServer(baseUrl)
-  await waitForServer(baseUrl, 60_000)
+  log(`starting perf server on :${PERF_PORT} (dist: ${DIST_DIR})`)
+  perfServer = await startPerfServer({
+    port: PERF_PORT,
+    distDir: DIST_DIR,
+    env: { CHAT_PERF_DETERMINISTIC_PROVIDER: "1", CHAT_PERF_SAMPLE_RATE: "1" },
+    stdio: ["ignore", "pipe", "pipe"],
+    onSpawn: captureServerOutput,
+  })
 
   let browser: Browser
   try {
@@ -1751,7 +1723,7 @@ async function main() {
   }
 
   const resultsDir = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(fileURLToPath(import.meta.url)),
     "results"
   )
   mkdirSync(resultsDir, { recursive: true })
@@ -1764,14 +1736,14 @@ async function main() {
 
   // Playwright closes its CDP transport here; attached Chrome is not terminated.
   await browser.close()
-  stopPerfServer()
+  await perfServer.stop()
   if (anyCorrectnessFailure) {
     fail("one or more scenarios failed correctness — timings are invalid")
   }
 }
 
-main().catch((error) => {
-  stopPerfServer()
+main().catch(async (error) => {
   console.error(error)
+  await perfServer?.stop().catch(console.error)
   process.exit(1)
 })

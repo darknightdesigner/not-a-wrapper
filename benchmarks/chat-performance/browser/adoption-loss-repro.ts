@@ -20,20 +20,14 @@
  * the UI) instead of home — the project first send crosses the /p → (chat)
  * LAYOUT boundary, the remount class the shared-owner readopt must survive.
  */
-import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync } from "node:fs"
-import path from "node:path"
 import { chromium, type Page } from "playwright"
 import {
   ensurePerfAuthUser,
   getPerfAuthPassword,
   PERF_AUTH_EMAIL,
 } from "./ensure-auth-user"
+import { startPerfServer, waitForServer, type PerfServer } from "./perf-server"
 
-const REPO_ROOT = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "../../.."
-)
 const DIST_DIR = process.env.NEXT_DIST_DIR ?? ".next-perf"
 const PERF_PORT = Number(process.env.PERF_PORT ?? 3111)
 const RUNS = Number(process.env.RUNS ?? 30)
@@ -44,36 +38,7 @@ function log(message: string): void {
   process.stdout.write(`[adoption-repro] ${message}\n`)
 }
 
-let serverProcess: ChildProcess | null = null
-
-async function ensureServer(baseUrl: string, external: boolean): Promise<void> {
-  if (!external) {
-    if (!existsSync(path.join(REPO_ROOT, DIST_DIR, "BUILD_ID"))) {
-      throw new Error(`no production build at ${DIST_DIR}`)
-    }
-    serverProcess = spawn("bunx", ["next", "start", "-p", String(PERF_PORT)], {
-      cwd: REPO_ROOT,
-      env: {
-        ...process.env,
-        NEXT_DIST_DIR: DIST_DIR,
-        CHAT_PERF_DETERMINISTIC_PROVIDER: "1",
-        CHAT_PERF_SAMPLE_RATE: "0",
-      },
-      stdio: ["ignore", "ignore", "inherit"],
-    })
-  }
-  const deadline = Date.now() + 60_000
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(baseUrl, { redirect: "manual" })
-      if (response.status < 500) return
-    } catch {
-      // Not up yet.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 300))
-  }
-  throw new Error(`server at ${baseUrl} did not become ready`)
-}
+let server: PerfServer | undefined
 
 type Mark = { name: string; t: number; detail: Record<string, unknown> | null }
 
@@ -118,7 +83,13 @@ async function main() {
   const externalBaseUrl = process.env.BASE_URL
   const baseUrl = externalBaseUrl ?? `http://localhost:${PERF_PORT}`
   const password = getPerfAuthPassword()
-  await ensureServer(baseUrl, Boolean(externalBaseUrl))
+  if (externalBaseUrl) await waitForServer(baseUrl, 60_000)
+  else
+    server = await startPerfServer({
+      port: PERF_PORT,
+      distDir: DIST_DIR,
+      env: { CHAT_PERF_DETERMINISTIC_PROVIDER: "1", CHAT_PERF_SAMPLE_RATE: "0" },
+    })
   await ensurePerfAuthUser()
 
   const browser = await chromium.launch({ channel: process.env.PW_CHANNEL })
@@ -284,12 +255,12 @@ async function main() {
 
   log(`done: ${adopted} adopted, ${lost} lost of ${RUNS}`)
   await browser.close()
-  serverProcess?.kill()
+  await server?.stop()
   process.exit(0)
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
   console.error(error)
-  serverProcess?.kill()
+  await server?.stop().catch(console.error)
   process.exit(1)
 })
