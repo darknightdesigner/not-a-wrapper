@@ -50,7 +50,7 @@ function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
 /**
  * Zombies keep their group id and still accept signal 0, so where nothing reaps
  * orphans (a container without an init) a dead `next start` would look alive.
- * Live means a member that is not a zombie; without `ps`, trust the probe.
+ * Live means a member that is not a zombie; without `ps`, the port probe decides.
  */
 function groupHasLiveMember(pgid: number) {
   if (!signalGroup(pgid, 0)) return false
@@ -62,7 +62,7 @@ function groupHasLiveMember(pgid: number) {
         return Number(group) === pgid && !stat?.startsWith("Z")
       })
   } catch {
-    return true
+    return false
   }
 }
 
@@ -82,9 +82,16 @@ function installExitHook() {
 }
 
 /** Resolves once `baseUrl` answers below 500; fails early if `child` exits first. */
-export async function waitForServer(baseUrl: string, timeoutMs: number, child?: ChildProcess) {
+export async function waitForServer(
+  baseUrl: string,
+  timeoutMs: number,
+  child?: ChildProcess,
+  spawnError?: () => Error | undefined
+) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
+    const failure = spawnError?.()
+    if (failure) throw new Error(`server failed to start: ${failure.message}`)
     if (child && (child.exitCode !== null || child.signalCode !== null))
       throw new Error(`server exited (${child.exitCode ?? child.signalCode}) before ${baseUrl} became ready`)
     try {
@@ -131,13 +138,21 @@ export async function startServerGroup(
     stdio: options.stdio ?? ["ignore", "ignore", "inherit"],
     detached: true,
   })
-  if (child.pid === undefined) throw new Error(`could not spawn ${file}`)
+  // Spawn failures (missing binary, EACCES) arrive as an 'error' event; unhandled, it crashes the caller.
+  let spawnError: Error | undefined
+  child.once("error", (error) => {
+    spawnError = error
+  })
+  if (child.pid === undefined) {
+    await new Promise((resolve) => setImmediate(resolve))
+    throw new Error(`could not spawn ${file}: ${spawnError?.message ?? "no pid"}`)
+  }
   const pgid = child.pid
   liveGroups.add(pgid)
   const server: PerfServer = { child, stop: () => stopGroup(pgid, baseUrl) }
   options.onSpawn?.(child)
   try {
-    await waitForServer(baseUrl, options.readyTimeoutMs ?? 60_000, child)
+    await waitForServer(baseUrl, options.readyTimeoutMs ?? 60_000, child, () => spawnError)
   } catch (error) {
     await server.stop()
     throw error
@@ -152,6 +167,9 @@ export async function startPerfServer({
   env,
   ...options
 }: Omit<GroupOptions, "cwd" | "env"> & { port: number; distDir: string; env?: Record<string, string> }) {
+  // :3000 belongs to the developer's own server; never bind or probe it from a benchmark.
+  if (!Number.isInteger(port) || port < 1 || port > 65_535 || port === 3000)
+    throw new Error(`PERF_PORT must be an integer in 1-65535 other than 3000 (got ${port})`)
   if (!existsSync(path.join(REPO_ROOT, distDir, "BUILD_ID")))
     throw new Error(
       `no production build at ${distDir}; build one with ` +

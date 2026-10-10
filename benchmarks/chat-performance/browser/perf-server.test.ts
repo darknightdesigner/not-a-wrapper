@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process"
 import { createServer } from "node:net"
 import { describe, expect, it } from "vitest"
 import { startServerGroup } from "./perf-server"
@@ -10,10 +11,15 @@ const freePort = () =>
     })
   })
 
+// Same rule as stop(): an unreaped zombie is not alive.
 const alive = (pid: number) => {
   try {
     process.kill(pid, 0)
-    return true
+  } catch {
+    return false
+  }
+  try {
+    return !execFileSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" }).trim().startsWith("Z")
   } catch {
     return false
   }

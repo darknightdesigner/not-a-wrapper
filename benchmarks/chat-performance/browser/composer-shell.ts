@@ -357,8 +357,10 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  console.error(error)
-  await server?.stop().catch(console.error)
-  process.exit(1)
-})
+if (import.meta.main) {
+  main().catch(async (error) => {
+    console.error(error)
+    await server?.stop().catch(console.error)
+    process.exit(1)
+  })
+}
