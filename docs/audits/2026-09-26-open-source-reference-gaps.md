@@ -61,7 +61,7 @@ References (sibling checkouts):
 | [Chats cannot move between projects](#chats-cannot-move-between-projects) | Medium | Product basics |
 | [Large profile photos fail on Vercel](#large-profile-photos-fail-on-vercel) | Medium | Web security and platform limits |
 | [Dependency alerts cannot see the lockfile](#dependency-alerts-cannot-see-the-lockfile) | Medium | Dependencies and tooling |
-| [Local test and lint runs scan agent worktrees](#local-test-and-lint-runs-scan-agent-worktrees) | Medium | Dependencies and tooling |
+| [Local test and lint runs scan agent worktrees](#local-test-and-lint-runs-scan-agent-worktrees) (fixed) | Medium | Dependencies and tooling |
 | [PDF cost is estimated at about 20 tokens](#pdf-cost-is-estimated-at-about-20-tokens) (fixed) | Low | Attachments and model input |
 | [The model is never told the date](#the-model-is-never-told-the-date) (fixed) | Low | Turn runtime and provider requests |
 | [Follow-up user messages are saved as the browser sends them](#follow-up-user-messages-are-saved-as-the-browser-sends-them) | Low | Turn runtime and provider requests |
@@ -3978,9 +3978,9 @@ since our rules forbid weakening checks to make them pass. Then remove the lefto
 `persist.ts`), fix the `prefer-const` hits, and change the lint script in
 `package.json:24` to `eslint . --max-warnings=0`.
 
-**Notes.** `--max-warnings=0` fails locally while a Claude Code worktree sits
-under `.claude/`, until `.claude/**` is ignored. That ignore belongs to the
-next entry, "Local test and lint runs scan agent worktrees". This differs from
+**Notes.** `--max-warnings=0` is safe locally now that ESLint ignores
+`.claude/**` worktrees (next entry, "Local test and lint runs scan agent
+worktrees", fixed in #208). This differs from
 the TODO.md item "Remove dead client state and unused indexes", which removes
 specific dead code by hand. This adds the check that catches it automatically.
 
@@ -3988,14 +3988,19 @@ specific dead code by hand. This adds the check that catches it automatically.
 
 Severity: Medium.
 
+Status: fixed 2026-10-09 (#208), as described under Fix below. The diagnosis
+and line numbers below describe the code before #208. Before the fix, one
+worktree caused about 1,500 false test failures (React loaded from the
+worktree's own `node_modules`) and about 880 lint errors.
+
 **What is wrong.** Claude Code keeps spare copies of the repo, called
 worktrees, inside `.claude/worktrees/`. Vitest and ESLint do not skip that
 folder, so `bun run test` and `bun run lint` in the main checkout also run
-every copy: right now 300 extra test files from another commit (`4defcd3c`,
-while this checkout is at `ac026463`), mixed with main-tree code. Runs take
-about twice as long and can fail on another branch's unfinished work. If a
-worktree holds a build or a Playwright capture, lint can also run out of
-memory.
+every copy: at audit time, 300 extra test files from another commit
+(`4defcd3c`, while this checkout is at `ac026463`), mixed with main-tree code.
+Runs take about twice as long and can fail on another branch's unfinished
+work. If a worktree holds a build or a Playwright capture, lint can also run
+out of memory.
 
 **Our code.**
 - `vitest.config.ts:5-13`: sets no `exclude`. Vitest 4's default skips only
@@ -4035,8 +4040,8 @@ worktrees. `tsc` needs no change.
 **Notes.** CI is not affected, because a fresh checkout has no worktrees, and
 `tsc` already includes 0 files under `.claude/`. The extra files can add false
 failures, but they cannot hide a failure in our own tests. The worktree also
-has its own `node_modules`, so one run may load two copies of Vitest or React.
-That part is not confirmed.
+has its own `node_modules`, so one run can load two copies of Vitest or React,
+as the 2026-10-09 failures under Status showed.
 
 ### Node versions differ across environments
 
