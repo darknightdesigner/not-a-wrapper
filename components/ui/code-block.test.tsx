@@ -52,11 +52,11 @@ const shikiClientMock = vi.hoisted(() => {
       return Promise.resolve(html)
     }
   )
-  const readCachedHighlight = vi.fn(
+  const peekCachedHighlight = vi.fn(
     (args: { code: string; language?: string; theme: string }) =>
       state.cache.get(`${args.theme}:${args.language}:${args.code}`) ?? null
   )
-  return { state, render, highlightCode, readCachedHighlight }
+  return { state, render, highlightCode, peekCachedHighlight }
 })
 
 vi.mock("@/lib/markdown/shiki-client", () => ({
@@ -64,7 +64,7 @@ vi.mock("@/lib/markdown/shiki-client", () => ({
 }))
 
 vi.mock("@/lib/markdown/highlight-cache", () => ({
-  readCachedHighlight: shikiClientMock.readCachedHighlight,
+  peekCachedHighlight: shikiClientMock.peekCachedHighlight,
 }))
 
 const themeMock = vi.hoisted(() => ({ resolvedTheme: "light" as string }))
@@ -331,8 +331,27 @@ describe("CodeBlockCode streaming rendering", () => {
       `github-light:ts:${code}`,
       shikiClientMock.render(code, "ts", "github-light")
     )
-    mount({ code, language: "ts", growing: false })
-    expect(highlightedEl()?.textContent).toBe(code)
+    // A sibling layout effect sees the first commit's DOM, before any
+    // passive effect could replace a plain render.
+    let firstCommit: string | undefined
+    function FirstCommitProbe() {
+      React.useLayoutEffect(() => {
+        firstCommit = highlightedEl()?.textContent ?? undefined
+      }, [])
+      return null
+    }
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(
+        <>
+          <CodeBlockCode code={code} language="ts" growing={false} />
+          <FirstCommitProbe />
+        </>
+      )
+    })
+    expect(firstCommit).toBe(code)
   })
 
   it("hydrates server plain markup even when the client cache already has the tuple", async () => {

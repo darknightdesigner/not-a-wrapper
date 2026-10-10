@@ -5,7 +5,7 @@
  */
 "use client"
 
-import { readCachedHighlight } from "@/lib/markdown/highlight-cache"
+import { peekCachedHighlight } from "@/lib/markdown/highlight-cache"
 import {
   highlightCode,
   type ShikiClientTheme,
@@ -117,7 +117,8 @@ function CodeBlockCode({
   // else a synchronous cache hit (no plain flash on remount). A code,
   // language, or theme change therefore never shows older HTML: the new
   // tuple renders cached HTML or the escaped plain fallback immediately while
-  // older async work becomes obsolete.
+  // older async work becomes obsolete. Render only peeks; the effect's
+  // `highlightCode` call refreshes the entry's recency after commit.
   const html =
     growing || !code
       ? null
@@ -126,7 +127,7 @@ function CodeBlockCode({
           highlighted.theme === theme
         ? highlighted.html
         : canReadCache
-          ? readCachedHighlight({ code, language, theme })
+          ? peekCachedHighlight({ code, language, theme })
           : null
 
   // Plain path doubles as the SSR/pre-highlight fallback: React-escaped text

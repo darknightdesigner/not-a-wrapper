@@ -38,6 +38,14 @@ function touch<K, V>(map: Map<K, V>, key: K, value: V): void {
   map.set(key, value)
 }
 
+/**
+ * Exact-tuple read with no LRU side effect, so renders (including abandoned
+ * concurrent ones) never reorder the cache.
+ */
+export function peekCachedHighlight(tuple: HighlightTuple): string | null {
+  return records.get(tuple.code)?.variants.get(variantKey(tuple)) ?? null
+}
+
 /** Exact-tuple read; never runs Shiki. Refreshes the entry's LRU position. */
 export function readCachedHighlight(tuple: HighlightTuple): string | null {
   const record = records.get(tuple.code)

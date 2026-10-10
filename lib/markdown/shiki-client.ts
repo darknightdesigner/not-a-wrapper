@@ -237,13 +237,14 @@ let highlightQueue: Promise<unknown> = Promise.resolve()
  * (opening a long thread, a message settling) used to chain into one long
  * task. Serialize them and yield before each, so every block is its own task
  * and input, paint, and React commits run in between. Aborted entries skip
- * tokenization.
+ * both the yield and tokenization, so they never delay live blocks.
  */
 function enqueueHighlight<T>(
   signal: AbortSignal | undefined,
   run: () => T
 ): Promise<T> {
   const task = highlightQueue.then(async () => {
+    signal?.throwIfAborted()
     await yieldToMain()
     signal?.throwIfAborted()
     return run()
