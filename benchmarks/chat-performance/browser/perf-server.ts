@@ -50,19 +50,21 @@ function signalGroup(pgid: number, signal: NodeJS.Signals | 0) {
 /**
  * Zombies keep their group id and still accept signal 0, so where nothing reaps
  * orphans (a container without an init) a dead `next start` would look alive.
- * Live means a member that is not a zombie; without `ps`, the port probe decides.
+ * Live means a member that is not a zombie. Without `ps` the answer is unknown:
+ * stop() then trusts the port probe but keeps the group for the exit hook.
  */
-function groupHasLiveMember(pgid: number) {
-  if (!signalGroup(pgid, 0)) return false
+function groupState(pgid: number): "gone" | "live" | "unknown" {
+  if (!signalGroup(pgid, 0)) return "gone"
   try {
-    return execFileSync("ps", ["-A", "-o", "pgid=,stat="], { encoding: "utf8" })
+    const live = execFileSync("ps", ["-A", "-o", "pgid=,stat="], { encoding: "utf8" })
       .split("\n")
       .some((line) => {
         const [group, stat] = line.trim().split(/\s+/)
         return Number(group) === pgid && !stat?.startsWith("Z")
       })
+    return live ? "live" : "gone"
   } catch {
-    return false
+    return "unknown"
   }
 }
 
@@ -111,8 +113,10 @@ async function stopGroup(pgid: number, baseUrl: string) {
     signalGroup(pgid, signal)
     const deadline = Date.now() + waitMs
     while (Date.now() < deadline) {
-      if (!groupHasLiveMember(pgid) && !(await isServing(baseUrl))) {
-        liveGroups.delete(pgid)
+      const state = groupState(pgid)
+      if (state !== "live" && !(await isServing(baseUrl))) {
+        // Unconfirmed groups stay tracked so the exit hook still kills any survivor.
+        if (state === "gone") liveGroups.delete(pgid)
         return
       }
       await sleep(200)
