@@ -62,17 +62,22 @@ describe("createScrollRootIntersectionObserver", () => {
     vi.unstubAllGlobals()
   })
 
-  it("gates the shared observer by threshold and tears down per scroll root", () => {
+  it("shares one observer per scroll root, gates by threshold, and disconnects after the last cleanup", () => {
     const target = document.createElement("div")
-    scrollRoot.appendChild(target)
+    const sibling = document.createElement("div")
+    scrollRoot.append(target, sibling)
     const onChange = vi.fn()
+    const onSiblingChange = vi.fn()
     const observer = createScrollRootIntersectionObserver({
       rootMargin: "10px",
       threshold: 0.5,
       withoutScrollRoot: "intersecting",
     })
 
+    const staleCleanup = observer.observe(target, onChange)
     const cleanup = observer.observe(target, onChange)
+    const siblingCleanup = observer.observe(sibling, onSiblingChange)
+    expect(IntersectionObserverStub.instances).toHaveLength(1)
     const instance = IntersectionObserverStub.instances[0]
     expect(instance?.root).toBe(scrollRoot)
     expect(instance?.rootMargin).toBe("10px")
@@ -82,9 +87,18 @@ describe("createScrollRootIntersectionObserver", () => {
     expect(onChange.mock.calls.at(-1)?.[0]).toBe(false)
     instance?.trigger(target, true, 0.5)
     expect(onChange.mock.calls.at(-1)?.[0]).toBe(true)
+    instance?.trigger(sibling, true, 0.5)
+    expect(onSiblingChange).toHaveBeenCalledExactlyOnceWith(true)
+
+    // A stale cleanup never removes a newer registration, same callback or not.
+    staleCleanup()
+    expect(instance?.unobserve).not.toHaveBeenCalled()
 
     cleanup()
     expect(instance?.unobserve).toHaveBeenCalledWith(target)
+    expect(instance?.disconnect).not.toHaveBeenCalled()
+    siblingCleanup()
+    expect(instance?.unobserve).toHaveBeenCalledWith(sibling)
     expect(instance?.disconnect).toHaveBeenCalledOnce()
   })
 

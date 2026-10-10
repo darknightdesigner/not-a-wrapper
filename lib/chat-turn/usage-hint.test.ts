@@ -37,4 +37,24 @@ describe("guest usage hint", () => {
     expect(await read).toBe(0)
     expect(readGuestUsageHint()).toBe(0)
   })
+
+  it("expires a zero read before UTC midnight that lands after it", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    try {
+      let resolveRead: (remaining: number) => void = () => {}
+      fetchGuestUsage.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRead = resolve
+        })
+      )
+      vi.setSystemTime(at("2027-01-15T23:59:59.900Z"))
+      const read = loadGuestUsageHint()
+      vi.setSystemTime(at("2027-01-16T00:00:00.100Z"))
+      resolveRead(0)
+      expect(await read).toBeNull()
+      expect(readGuestUsageHint()).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

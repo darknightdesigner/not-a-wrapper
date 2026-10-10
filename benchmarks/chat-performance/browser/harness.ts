@@ -39,6 +39,7 @@ import {
   type BrowserContext,
   type CDPSession,
   type Page,
+  type Request,
   type Response,
 } from "playwright"
 import { classifyChatError } from "@/lib/observability/chat-error-taxonomy"
@@ -461,11 +462,17 @@ async function runScenarioOnce(
   // A response can fail before the first-visible waiter attaches.
   void failedPost.catch(() => undefined)
   let chatRequestCount = 0
-  // Same-origin `/api/*` requests between the measured Send click and its
-  // `/api/chat` POST (ADR-0049): each is awaited before dispatch, so the count
-  // is the round trips added to click-to-request.
+  // Same-origin `/api/*` requests that start after the measured Send click and
+  // answer (or fail) before its `/api/chat` POST starts (ADR-0049). Only those
+  // can have been awaited before dispatch, so the count is the round trips
+  // added to click-to-request; one still in flight at dispatch is not counted.
   let preDispatchWindowOpen = false
   let preDispatchApiRequests = 0
+  const preDispatchPending = new Set<Request>()
+  const settlePreDispatch = (request: Request) => {
+    if (preDispatchWindowOpen && preDispatchPending.delete(request))
+      preDispatchApiRequests++
+  }
   let routeErrorStart = serverRouteErrors.length
   page.on("request", (request) => {
     const url = new URL(request.url())
@@ -476,9 +483,11 @@ async function runScenarioOnce(
       preDispatchWindowOpen &&
       url.origin === new URL(baseUrl).origin &&
       url.pathname.startsWith("/api/")
-    ) preDispatchApiRequests++
+    ) preDispatchPending.add(request)
   })
+  page.on("requestfailed", settlePreDispatch)
   page.on("response", (response) => {
+    settlePreDispatch(response.request())
     if (
       new URL(response.url()).pathname === "/api/chat" &&
       response.request().method() === "POST"

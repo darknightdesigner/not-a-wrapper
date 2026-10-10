@@ -33,7 +33,7 @@ The single client seam — a `usePerUserQuery` hook — every per-user Convex li
 _Avoid_: skip gate, auth ternary, guarded query
 
 **Warm query cache**:
-The convex-helpers query cache mounted at the Convex client boundary (ADR-0031) with a bounded idle TTL and idle-entry cap, so a revisited chat renders its delivered selected-conversation queries (path, run state, **Live tail**) on the first commit instead of a loading state. Warming (`useWarmSelectedConversation`, wired to sidebar row hover and click) is a momentary start/end through the cache registry (the same state a consumer leaves on unmount), never a second delivery path: values still flow through the one `ConvexReactClient`, so the ADR-0027 same-transition guarantee holds. It is in-memory only; nothing survives a reload.
+The convex-helpers query cache mounted at the Convex client boundary (ADR-0031) with a bounded idle TTL and idle-entry cap, both applied per query entry. A revisited chat whose selected-conversation queries (path, run state, **Live tail**) are all still parked renders them on the first commit instead of a loading state; one that lost any of them to the cap or the TTL loads like any miss. Warming (`useWarmSelectedConversation`, wired to sidebar row hover and click) is a momentary start/end through the cache registry (the same state a consumer leaves on unmount), never a second delivery path: values still flow through the one `ConvexReactClient`, so the ADR-0027 same-transition guarantee holds. It is in-memory only; nothing survives a reload.
 _Avoid_: preloadQuery (the server seam), local-first store, persisted cache
 
 **Client directive**:

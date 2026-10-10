@@ -45,13 +45,16 @@ export function spendGuestUsageHint(): void {
 /** Reads the guest's usage now, sharing one in-flight read. Null on failure:
  * a failed read never blocks a send. */
 export function loadGuestUsageHint(): Promise<number | null> {
-  const startedAt = revision
+  const startRevision = revision
+  // The server answered no earlier than this, so a zero read before UTC
+  // midnight that lands after it is already expired.
+  const startedAt = Date.now()
   pendingRead ??= fetchGuestUsage()
     .then((remaining) => {
       // A refusal or spend recorded meanwhile is newer than this read.
-      if (revision !== startedAt) return readGuestUsageHint()
-      recordGuestUsageHint(remaining)
-      return remaining
+      if (revision !== startRevision) return readGuestUsageHint()
+      recordGuestUsageHint(remaining, startedAt)
+      return readGuestUsageHint()
     })
     .catch(() => null)
     .finally(() => {

@@ -1,28 +1,35 @@
 # Clear wins investigation, 2026-10-10
 
-Five candidate chat performance wins, investigated before any implementation.
-Each one got a benchmark that shows the problem, a scratch prototype, and an
-adversarial review. No product code was changed. This document is the hand-off
-to implementation agents: one PR per win, in the order at the end.
+**Status: shipped.** All five wins shipped together in PR #213, not one PR per
+win. This document is the investigation record from before implementation.
+"Needs the user", "Recommended order" and "Decisions for the user" below are
+historical; the decisions taken were:
 
-**Outcome (2026-10-10).** All five wins shipped together in one PR, and the
-decisions below were made. Where each one is recorded:
-
-- **PostHog privacy and recorders:** recordings mask all text in client code
-  (`lib/analytics/deferred-analytics.ts`), not as a project setting, and both
-  recorders stay (ADR-0050).
+- **PostHog privacy:** recordings mask all text in client code
+  (`lib/analytics/deferred-analytics.ts`), not as a project setting
+  (ADR-0050).
+- **Recorders:** both Sentry Replay and PostHog session recording stay
+  (ADR-0050).
 - **Win 2:** the chosen guest-at-limit design shipped and the signed-in
-  998th-message toast is gone (ADR-0045 amendment).
-- **Win 5:** visible code first with no fade (ADR-0016, "Visible code first").
+  998th-message toast was dropped (ADR-0045 amendment).
+- **Win 5:** visible code first with no fade (ADR-0016, "Visible code
+  first"). Its browser count ratchet (PR 2 below) is deferred: it needs a
+  perf-only fixture page the paired base build does not have.
+- **Win 3:** the signed-in browser census is deferred; the seam test is the
+  ratchet (ADR-0049).
 - **Win 1:** the live-tail split is opt-in (`getSelectedPath` with
   `splitLiveTail`), so clients from before it keep the whole path (ADR-0027
   amendment).
-- **Win 3:** the signed-in browser census is deferred; the seam test is the
-  ratchet (ADR-0049).
+
+Five candidate chat performance wins, investigated before any implementation.
+Each one got a benchmark that shows the problem, a scratch prototype, and an
+adversarial review. The investigation changed no product code. It was written
+as the hand-off to implementation agents: one PR per win, in the order at the
+end.
 
 ## Summary
 
-| Win | Verdict | Headline evidence | Needs the user |
+| Win | Verdict | Headline evidence | Needs the user (historical) |
 | --- | --- | --- | --- |
 | 1. Stop re-sending the whole conversation on every checkpoint | Go with changes | A 45 s answer in an 18-message chat pushed 36 full-path frames of 509 to 597 KB (19.6 MB). After the split, each checkpoint carries only the live message (0.7 to 75 KB). | No |
 | 2. Remove the pre-send `/api/rate-limits` round trip | Go with changes | The round trip is 65 to 68% of click-to-request (guest). Removing it cut click-to-first-text by 28 to 34 ms, and by 134 ms on the constrained profile. | Yes: guest-at-limit flow, the 998th-message toast |
@@ -30,10 +37,10 @@ decisions below were made. Where each one is recorded:
 | 4. Get analytics off the critical path | Go with changes | Initial JS drops 327.6 to 224.4 KB gz. Hydration and first live data arrive 716 ms sooner at 4x CPU on the constrained network. | Yes: PostHog privacy and which recorder to keep |
 | 5. Highlight visible code first | Go with changes | On a realistic chat (8 code blocks) visible code is colored about 2x sooner (1,284 to 582 ms at 4x). On a 135-block chat, 4 blocks are highlighted at open instead of 133. | Yes: the far-jump flash and the fade |
 
-**Urgent, independent of performance.** PostHog session recording is on for
-100% of production sessions with no text masking. In a scratch build using the
-live production remote config, streamed chat text appeared in clear in the
-recording payload in 5 of 5 runs, and in 0 of 5 with
+**Urgent at investigation time, independent of performance.** PostHog session
+recording is on for 100% of production sessions with no text masking. In a
+scratch build using the live production remote config, streamed chat text
+appeared in clear in the recording payload in 5 of 5 runs, and in 0 of 5 with
 `maskTextSelector: "*"`. Masking is a PostHog project setting and costs no
 measurable CPU. See win 4.
 
@@ -1108,7 +1115,7 @@ Independent of wins 1 to 4 in product files.
 - **Signed-in evidence.** Every wall-clock number for wins 2 to 5 is guest or
   synthetic. Each PR's paired signed-in CI run is its acceptance gate.
 
-## Recommended order
+## Recommended order (historical)
 
 1. **PostHog text masking (no code, today).** A PostHog project setting; fixes
    the privacy exposure at no measurable cost. The user decides (below).
@@ -1120,7 +1127,9 @@ Independent of wins 1 to 4 in product files.
 6. **Win 5.** After the user's taste call on the flash and the fade. Independent
    of wins 1 to 4, so it can run in parallel with any of them.
 
-## Decisions for the user
+## Decisions for the user (historical)
+
+Decided as listed in the status note at the top.
 
 1. **PostHog privacy.** Production records chat text in clear. Options, all
    PostHog project settings: turn on text masking (recommended minimum; no

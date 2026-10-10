@@ -24,6 +24,7 @@ beforeEach(() => {
   chatCoreMocks.historyLoading = false
   chatCoreMocks.chatAdmissionReady = true
   chatCoreMocks.useBindingMessages = false
+  chatCoreMocks.isAuthenticated = true
 })
 
 let useChatCore: (typeof import("./use-chat-core"))["useChatCore"]
@@ -55,10 +56,15 @@ const chatCoreMocks = vi.hoisted(() => ({
   // Controllable useChat state for the selected-path projection effect tests.
   useChatState: { messages: [] as unknown[], status: "ready" as string },
   useBindingMessages: false,
+  isAuthenticated: true,
   // Every constructed mock Chat instance in creation order, plus the instance
   // the hook currently renders through — the re-adoption tests assert which
   // binding survives a mounted A→B→A transition.
-  chatInstances: [] as Array<{ status: string; messages: UIMessage[] }>,
+  chatInstances: [] as Array<{
+    status: string
+    messages: UIMessage[]
+    options: { onError?: (error: Error) => void }
+  }>,
   lastUseChatInstance: null as unknown,
   // Controllable Turn context hydration for the auto-submit gate tests.
   turnContextHydrated: true,
@@ -74,14 +80,14 @@ vi.mock("./turn-context", () => ({
     handleModelChange: vi.fn(),
     enableSearch: false,
     setEnableSearch: chatCoreMocks.setWebSearchEnabled,
-    isAuthenticated: true,
+    isAuthenticated: chatCoreMocks.isAuthenticated,
     systemPrompt: "system prompt",
     isHydrated: chatCoreMocks.turnContextHydrated,
     getTurnSnapshot: () => ({
       selectedModel: "openai/gpt-4.1-mini",
       systemPrompt: "system prompt",
       enableSearch: false,
-      isAuthenticated: true,
+      isAuthenticated: chatCoreMocks.isAuthenticated,
       isHydrated: chatCoreMocks.turnContextHydrated,
     }),
   }),
@@ -127,6 +133,7 @@ vi.mock("@ai-sdk/react", () => ({
     constructor(
       readonly options: {
         messages?: UIMessage[]
+        onError?: (error: Error) => void
         transport: {
           sendMessages: (options: {
             messageId?: string
@@ -837,6 +844,29 @@ describe("useChatCore selected-path projection", () => {
       expect(chatCoreMocks.bindingStop).toHaveBeenCalledTimes(1)
     } finally {
       vi.useRealTimers()
+    }
+  })
+
+  it("presents a guest limit refusal that lands on a detached binding", () => {
+    chatCoreMocks.isAuthenticated = false
+    const limitReached = vi.spyOn(guestUsage, "limitReached")
+    try {
+      mount()
+      render([], "chat_projection")
+      const binding = chatCoreMocks.chatInstances[0]
+      render([], null) // Back before the refusal lands → detach
+
+      act(() => {
+        binding.options.onError?.(
+          new Error(JSON.stringify({ error: "Limit", code: "DAILY_LIMIT_REACHED" }))
+        )
+      })
+
+      // Sign-in and a zero hint, and no toast (the turn runner adds none).
+      expect(limitReached).toHaveBeenCalledTimes(1)
+      expect(chatCoreMocks.toast).not.toHaveBeenCalled()
+    } finally {
+      limitReached.mockRestore()
     }
   })
 

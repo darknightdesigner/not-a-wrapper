@@ -676,8 +676,15 @@ export function useChatCore({
         handleError(streamError)
       },
       onDetachedError: (_originChatId, streamError) => {
-        // No toast: a detached stream's error has no visible surface here;
-        // durable chats surface it through the run's terminal projection.
+        // A coded refusal is the route's answer to this tab's own request,
+        // and the turn runner leaves presenting it to the stream's handler:
+        // present it here too (a guest limit opens sign-in, zeroing the hint).
+        if (hasPublicChatErrorCode(streamError)) {
+          handleError(streamError)
+          return
+        }
+        // No toast otherwise: a detached stream's error has no visible surface
+        // here; durable chats surface it through the run's terminal projection.
         console.error("Detached chat stream error:", streamError)
       },
     },

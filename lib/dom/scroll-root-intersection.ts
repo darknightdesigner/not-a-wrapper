@@ -5,6 +5,8 @@
  */
 
 type IntersectionChange = (intersecting: boolean) => void
+/** A fresh object per observe() call: the token its cleanup must still own. */
+type Registration = { onChange: IntersectionChange }
 
 export type ScrollRootIntersectionObserver = {
   observe: (target: Element, onChange: IntersectionChange) => () => void
@@ -30,7 +32,7 @@ export function createScrollRootIntersectionObserver({
   const roots = new Map<
     HTMLElement | null,
     {
-      callbacks: Map<Element, IntersectionChange>
+      registrations: Map<Element, Registration>
       observer: IntersectionObserver
     }
   >()
@@ -49,38 +51,42 @@ export function createScrollRootIntersectionObserver({
 
       let observation = roots.get(root)
       if (!observation) {
-        const callbacks = new Map<Element, IntersectionChange>()
+        const registrations = new Map<Element, Registration>()
         const observer = new IntersectionObserver(
           (entries) => {
             for (const entry of entries) {
-              callbacks.get(entry.target)?.(
-                entry.isIntersecting && entry.intersectionRatio >= threshold
-              )
+              registrations
+                .get(entry.target)
+                ?.onChange(
+                  entry.isIntersecting && entry.intersectionRatio >= threshold
+                )
             }
           },
           { root, rootMargin, threshold }
         )
-        observation = { callbacks, observer }
+        observation = { registrations, observer }
         roots.set(root, observation)
       }
 
-      observation.callbacks.set(target, onChange)
+      const registration: Registration = { onChange }
+      observation.registrations.set(target, registration)
       observation.observer.observe(target)
       return () => {
-        // A newer observe() of the same target owns it now.
+        // A newer observe() of the same target owns it now, even with the
+        // same callback.
         const current = roots.get(root)
-        if (!current || current.callbacks.get(target) !== onChange) return
-        current.callbacks.delete(target)
+        if (current?.registrations.get(target) !== registration) return
+        current.registrations.delete(target)
         current.observer.unobserve(target)
-        if (current.callbacks.size === 0) {
+        if (current.registrations.size === 0) {
           current.observer.disconnect()
           roots.delete(root)
         }
       }
     },
     disconnect() {
-      for (const { callbacks, observer } of roots.values()) {
-        callbacks.clear()
+      for (const { registrations, observer } of roots.values()) {
+        registrations.clear()
         observer.disconnect()
       }
       roots.clear()

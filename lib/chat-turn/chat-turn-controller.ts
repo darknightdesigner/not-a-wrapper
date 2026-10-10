@@ -364,8 +364,9 @@ async function runSendTurn(
   }
 
   // The route commits at Send, in the same batch as the optimistic row and
-  // the pending state below — before any guest usage read, creation, or
-  // transport dispatch. Rejected payloads above never reach this point.
+  // the pending state below: before awaiting the guest usage read (the gate
+  // above may already have started it), creation, or transport dispatch.
+  // Rejected payloads above never reach this point.
   if (startedWithoutChat) {
     adapters.firstTurn.begin()
   }

@@ -193,8 +193,10 @@ block top first. Investigation and raw data:
   `threshold: 0`), stops observing on the first intersecting report, and only
   then calls `highlightCode`. Cache hits stay synchronous through
   `peekCachedHighlight` and are never observed, so remounts never flash. An
-  input change or unmount aborts and unobserves, so unmounted blocks never
-  load grammars. In the thread the root is the `[data-scroll-root]` scroller;
+  input change or unmount aborts and unobserves. A block that unmounts before
+  it nears the view never requests a grammar; one that unmounts mid-load
+  cannot cancel the shared load (later blocks reuse it) but skips
+  tokenization. In the thread the root is the `[data-scroll-root]` scroller;
   elsewhere (activity panel, share page, design-system previews) it is the
   viewport, so a block inside a nested scroller highlights on entry.
 - **Observe the box, not the code.** In Markdown the box is the
@@ -205,16 +207,19 @@ block top first. Investigation and raw data:
   showed 10 plain blocks against 6 for two screens (n=5). Code nested inside
   another contained block (a blockquote) still gets the shorter lookahead.
 - **Newest-first queue.** `highlightCode` takes a sequence number when it is
-  called, so order follows calls, not grammar arrival. The drain still yields
-  two `MessageChannel` hops per block, waits a frame while
-  `isStreamingPaintHeld()` (popups first, as in the interaction-priority
-  amendment), then tokenizes the highest sequence: the block that just came
-  near the view or just settled, ahead of any backlog. Aborted entries are
-  dropped without a yield or tokenization. This supersedes the first-in,
-  first-out order of the 2026-10-09 queue.
+  called, and queued entries sort by it, so a late grammar cannot move an
+  older block ahead of newer ones. A request joins the queue only after its
+  core and grammar load, so an older ready block can tokenize while a newer
+  one is still loading. The drain still yields two `MessageChannel` hops per
+  block, waits a frame while `isStreamingPaintHeld()` (popups first, as in
+  the interaction-priority amendment), then tokenizes the highest queued
+  sequence: the block that just came near the view or just settled, ahead of
+  any backlog. Aborted entries are dropped without a yield or tokenization.
+  This supersedes the first-in, first-out order of the 2026-10-09 queue.
 - **One observer helper.** `lib/dom/scroll-root-intersection.ts` (one
-  observer per scroll root, one callback per target, stale-callback guard)
-  moved out of `thread-scroll.tsx`. Turn observation keeps
+  observer per scroll root, one callback per target, a per-observation token
+  so a stale cleanup never removes a newer registration) moved out of
+  `thread-scroll.tsx`. Turn observation keeps
   `withoutScrollRoot: "intersecting"`; code blocks use `"viewport"`.
 
 Measured on a scratch route that renders fixed chats through the real
@@ -239,11 +244,11 @@ highlights after the same scroll and a jump to the top.
 |                                           | Jump to top: blocks seen plain                     |                   0 |              3 |
 |                                           | Theme toggle: highlights / visible block plain, 4x |      133 / 1,332 ms |     1 / 102 ms |
 
-- Each block is highlighted once, at first view. Revisits and remounts are
-  cache hits as before while the session fits the 2M-character cache (the
-  worst case uses 1.69M). No block was seen plain at reading speed. Once a
-  reader visits everything, total work equals the old order; the saving is
-  the blocks never viewed.
+- Each block is highlighted once per theme, when it first nears the view.
+  Revisits and remounts are cache hits as before while the session fits the
+  2M-character cache (the worst case uses 1.69M). No block was seen plain at
+  reading speed. Once a reader visits everything, total work equals the old
+  order; the saving is the blocks never viewed.
 - Accepted costs: a far jump shows up to 3 blocks plain for about 0.15 s (1x)
   to 0.6 s (4x); after a theme toggle, offscreen blocks stay plain until
   scrolled near (toggling back is a cache hit); never-viewed blocks print

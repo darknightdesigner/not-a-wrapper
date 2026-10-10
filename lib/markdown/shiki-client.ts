@@ -280,7 +280,8 @@ async function drainHighlights(): Promise<void> {
  * Tokenization is synchronous, so blocks that become stable together
  * (opening a long thread, a message settling) used to chain into one long
  * task. Run them one per task, yielding before each, so input, paint, and
- * React commits run in between. Newest request first: with the code-block
+ * React commits run in between. Newest queued request first, by call
+ * sequence; a request joins only after its loads finish. With the code-block
  * visibility gate that is the block that just came into view or just settled,
  * ahead of any backlog. Aborted entries skip both the yield and tokenization,
  * so they never delay live blocks.

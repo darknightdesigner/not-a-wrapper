@@ -33,7 +33,7 @@ describe("presentChatStreamError", () => {
     })
   })
 
-  it("offers a guest at the daily limit sign-in instead of a toast", () => {
+  it("offers a guest at the daily limit or guest capacity sign-in, not a toast", () => {
     const error = new Error(
       JSON.stringify({
         error: "Daily message limit reached (5). Sign in to keep chatting.",
@@ -44,6 +44,15 @@ describe("presentChatStreamError", () => {
     expect(
       presentChatStreamError(error, { isAuthenticated: true })
     ).toMatchObject({ kind: "toast" })
+    const atCapacity = new Error(
+      JSON.stringify({
+        error: "Guest messages are at capacity for today. Sign in to keep chatting.",
+        code: "GUEST_CAPACITY_REACHED",
+      })
+    )
+    expect(presentChatStreamError(atCapacity, guest)).toEqual({
+      kind: "sign-in",
+    })
     // Presented here, so the turn runner adds no second, generic toast.
     expect(hasPublicChatErrorCode(error)).toBe(true)
     expect(hasPublicChatErrorCode(new Error("fetch failed"))).toBe(false)

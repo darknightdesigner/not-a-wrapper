@@ -31,6 +31,9 @@ on:
       - "lib/chat-turn/**"
       - "lib/convex/**"
       - "lib/dom/**"
+      # Convex functions serve the signed-in send and thread-open paths; the
+      # job warns that the shared deployment needs this branch's functions.
+      - "convex/**"
       - "benchmarks/chat-performance/**"
       - "instrumentation-client.ts"
       - ".github/workflows/perf-benchmark.yml"

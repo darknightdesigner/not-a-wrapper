@@ -94,8 +94,10 @@ classification stays client-side.
   ~23 KB path re-collect + re-delivery. Content beats still re-execute the
   path query — per-execution read cost is untouched by this ADR (that is
   Experiment 2b, range-bounded settled-history pagination, gated on
-  prefix-derivability property tests). Done: see the live-tail amendment
-  below.
+  prefix-derivability property tests). The live-tail amendment below shipped
+  Experiment 2b as a narrower cut: checkpoints under a stamped tail no longer
+  re-execute history, but each history execution still reads every message
+  before the tail, so paginating settled history remains separate work.
 - Tests pin owner and non-owner projection rules, server-side points-back
   validation, client-side on-path validation, and the live run query's narrow
   read set.

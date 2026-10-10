@@ -15,6 +15,12 @@ const GENERIC_MESSAGES = new Set([
   "failed to fetch",
 ])
 const GENERIC_FALLBACK = "Something went wrong. Please try again."
+// Guest refusals that ask the guest to sign in: their own daily limit, or the
+// all-guest daily ceiling. The guest usage read reports both as zero left.
+const GUEST_SIGN_IN_CODES = new Set([
+  "DAILY_LIMIT_REACHED",
+  "GUEST_CAPACITY_REACHED",
+])
 
 function parsePublicBody(message: string): { error?: string; code?: string } {
   try {
@@ -57,9 +63,8 @@ export function presentChatStreamError(
     return { kind: "swallow", reason: "approval-continuation-lost-race" }
   }
 
-  // A guest past the daily limit the usage hint missed: sign-in, not a toast
-  // (ADR-0045).
-  if (!isAuthenticated && body.code === "DAILY_LIMIT_REACHED") {
+  // A guest refusal the usage hint missed: sign-in, not a toast (ADR-0045).
+  if (!isAuthenticated && body.code && GUEST_SIGN_IN_CODES.has(body.code)) {
     return { kind: "sign-in" }
   }
 

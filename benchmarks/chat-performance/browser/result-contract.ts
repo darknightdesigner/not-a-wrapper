@@ -242,8 +242,9 @@ const GATES: Record<string, { relative: number; floor: number }> = {
 }
 
 // Deterministic counts (ADR-0049): the candidate may never exceed the base.
-// Compared only when both captures recorded one, so older captures still
-// compare; a capture that records one must record it in every run.
+// A base from before the count existed compares on time alone; a candidate
+// that drops a count the base recorded is a measurement error, and a capture
+// that records one must record it in every run.
 const COUNT_GATES = new Set(["preDispatchApiRequests"])
 
 type RawRun = ComparableResult["scenarios"][number]["runs"][number]
@@ -575,7 +576,9 @@ export function assessComparison(
     for (const metric of COUNT_GATES) {
       const before = a.metrics[metric]
       const after = b.metrics[metric]
-      if (before?.n && after?.n && after.max > before.max)
+      if (!before?.n) continue
+      if (!after?.n) errors.push(`${key}: ${metric} missing samples`)
+      else if (after.max > before.max)
         regressions.push(`${key} ${metric}: ${before.max} → ${after.max}`)
     }
   }

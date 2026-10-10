@@ -157,8 +157,9 @@ export function useChatOperations({
           : admit(remaining)
       },
       spend: spendGuestUsageHint,
-      // A daily-limit refusal the hint missed (another tab, a shared
-      // network): the next Send gates locally, and sign-in opens now.
+      // A daily-limit or guest-capacity refusal the hint missed (another
+      // tab, a shared network): the next Send gates locally, and sign-in
+      // opens now.
       limitReached: () => {
         recordGuestUsageHint(0)
         setHasDialogAuth(true)

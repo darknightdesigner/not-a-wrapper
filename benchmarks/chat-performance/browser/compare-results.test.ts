@@ -343,6 +343,10 @@ describe("performance evidence contract", () => {
     )
     // A capture from before the count existed compares on time alone.
     expect(compareResults(result("responsiveness"), counted(1))).toEqual([])
+    // A candidate cannot skip the gate by dropping a count the base recorded.
+    expect(compareResults(counted(0), result("responsiveness"))).toContain(
+      `${scenarioKey(counted(0).scenarios[0])}: preDispatchApiRequests missing samples`
+    )
     const partial = counted(0)
     delete partial.scenarios[0].runs[0].preDispatchApiRequests
     partial.scenarios[0].metrics.preDispatchApiRequests = summarize(Array(4).fill(0))
