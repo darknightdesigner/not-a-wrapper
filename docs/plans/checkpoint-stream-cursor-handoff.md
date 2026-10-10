@@ -310,9 +310,9 @@ Record timestamped samples under `output/` and summarize the numbers in the ADR 
 - `CONTEXT.md` L341 (**Retained generation stream**): replace "A replay that cannot extend the displayed checkpoint within 2 s hands that turn to checkpoints" with the cursor rule.
 - Convention: dated amendments inside the existing ADR, as 0011 and 0039 already do. If a reviewer prefers a separate record, the next free number is 0050.
 
-## 10. Open questions for a human
+## 10. Decisions (approved 2026-10-10)
 
-1. Accept that the first reconnect still replays the log from its base? A true resume from the cursor would need a forked AI SDK reducer. Recommended: accept.
-2. Keep the `ms-seq` wire format with explicit `0-n` ids, which is compatible with loaded tabs (recommended)? The alternative is switching cursors to plain integers everywhere, which is cleaner but breaks cursors held by tabs across the deploy.
-3. Legacy checkpoints without a cursor: fall back to checkpoints at once (recommended, pre-launch)? The alternative is publishing at `caught-up` unguarded.
-4. Amend ADR-0039 (recommended) or write ADR-0050?
+1. The first reconnect still replays the log from its base. No forked AI SDK reducer.
+2. Keep the `ms-seq` wire format with explicit `0-n` ids, so tabs loaded before the deploy keep working.
+3. A legacy checkpoint without a cursor hands the turn to checkpoints at once.
+4. Record the change as a dated amendment to ADR-0039, not a new ADR.
