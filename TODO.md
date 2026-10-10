@@ -310,11 +310,9 @@ Dependabot to Bun, run `bun audit` weekly, and install with
 - **Pin Node 24 everywhere:** Production runs Node 24, CI runs 22, and the
 Convex profile-image action runs on end-of-life Node 20.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#node-versions-differ-across-environments))
-- **Lint and test hygiene:** Restore Next's TypeScript lint rules so the
-AGENTS.md bans on `any`, `@ts-ignore`, and unused code are enforced, and make
-test and lint skip `.claude/**` worktrees.
-([lint rules](docs/audits/2026-09-26-open-source-reference-gaps.md#lint-lost-the-typescript-rules),
-[worktrees](docs/audits/2026-09-26-open-source-reference-gaps.md#local-test-and-lint-runs-scan-agent-worktrees))
+- **Lint rules:** Restore Next's TypeScript lint rules so the AGENTS.md bans
+on `any`, `@ts-ignore`, and unused code are enforced.
+([details](docs/audits/2026-09-26-open-source-reference-gaps.md#lint-lost-the-typescript-rules))
 - **Formatting check:** Prettier never runs and 208 files have drifted. Format
 once in a blame-ignored commit, then check in CI, excluding Markdown.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#formatting-is-never-checked))

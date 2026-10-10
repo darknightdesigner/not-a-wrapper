@@ -4,7 +4,13 @@ const eslintConfig = [
   ...nextConfig,
   {
     // output/ holds local QA captures (see .gitignore); their bundles OOM ESLint.
-    ignores: ["convex/_generated/**", ".next-perf/**", "output/**"],
+    // .claude/ holds agent worktrees (full repo copies, see .git/info/exclude).
+    ignores: [
+      "convex/_generated/**",
+      ".next-perf/**",
+      "output/**",
+      ".claude/**",
+    ],
   },
   {
     // Icon system enforcement: use Remix Icons React components for UI icons.
