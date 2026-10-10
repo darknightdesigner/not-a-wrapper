@@ -130,6 +130,10 @@ export function useChatOperations({
     const refusedLocalChat = unacceptedLocalChatRef.current
     unacceptedLocalChatRef.current = null
     if (refusedLocalChat) {
+      // No fallback may still point at the discarded chat.
+      if (localStorage.getItem(GUEST_CHAT_STORAGE_KEY) === refusedLocalChat) {
+        localStorage.removeItem(GUEST_CHAT_STORAGE_KEY)
+      }
       void deleteChat(refusedLocalChat).catch((error: unknown) => {
         console.error("Failed to discard a refused guest chat:", error)
       })

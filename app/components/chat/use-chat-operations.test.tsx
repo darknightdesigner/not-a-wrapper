@@ -212,6 +212,7 @@ describe("useChatOperations", () => {
     operations().rollbackFirstTurn()
     expect(props.resetChatIdentity).toHaveBeenCalledOnce()
     expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
+    expect(localStorage.getItem(GUEST_CHAT_STORAGE_KEY)).toBeNull()
   })
 
   it("discards a refused guest chat even after Back cleared the allocation", async () => {
