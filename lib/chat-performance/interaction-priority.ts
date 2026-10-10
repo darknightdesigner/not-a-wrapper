@@ -32,9 +32,10 @@ export function isStreamingPaintHeld(): boolean {
 
 /**
  * Root callbacks for a click-opened popup primitive: open intent holds
- * streaming paint until the open completes (Base UI waits for the starting
- * style to clear), the popup closes, or the root unmounts. Hover opens never
- * hold, so hovering cannot stutter a stream.
+ * streaming paint until a transition completes (Base UI waits for the
+ * starting style to clear; a controlled close only reports completion), the
+ * popup closes, or the root unmounts. Hover opens never hold, so hovering
+ * cannot stutter a stream.
  */
 export function useOpenIntentPriority<Details extends { reason: string }>(
   onOpenChange: ((open: boolean, details: Details) => void) | undefined,
@@ -55,7 +56,7 @@ export function useOpenIntentPriority<Details extends { reason: string }>(
       onOpenChange?.(open, details)
     },
     onOpenChangeComplete: (open: boolean) => {
-      if (open) releaseHold()
+      releaseHold()
       onOpenChangeComplete?.(open)
     },
   }

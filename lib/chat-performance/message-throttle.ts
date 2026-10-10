@@ -75,7 +75,8 @@ export function subscribeToFrameAlignedMessages<UI_MESSAGE extends UIMessage>(
 
     if (typeof requestAnimationFrame === "function") {
       const onFrame = () => {
-        if (isStreamingPaintHeld()) {
+        // Only a still-pending publication waits; a cleared one never re-requests.
+        if (pending && isStreamingPaintHeld()) {
           scheduled = { kind: "frame", id: requestAnimationFrame(onFrame) }
           return
         }
