@@ -1,5 +1,6 @@
 import { subscribeToConnectionWake } from "@/lib/browser/connection-wake"
 import {
+  getGenerationRunId,
   getStreamCursor,
   isRecord,
   mergeStreamMetadata,
@@ -48,7 +49,6 @@ type Reduction = {
 
 /** What this tab's last direct request displayed when it ended. */
 type DirectHandoff = {
-  runId: string | null
   parts: UIMessage["parts"] | undefined
   delivered: number
 }
@@ -65,19 +65,16 @@ function displayedCursor(
 ): string | null {
   if (!previous || previous.parts.every((part) => part.type === "step-start"))
     return "0-0"
-  const generationRunId = isRecord(previous.metadata)
-    ? previous.metadata.generationRunId
-    : undefined
+  // This tab's own direct request left these parts: its n-th chunk is entry
+  // 0-n. Checked first: a direct stream stamps no run or cursor metadata, so
+  // both can still describe the run an approval continuation resumed. A later
+  // run on this message starts from a base that already holds these parts.
+  if (direct?.parts === previous.parts) return `0-${direct.delivered}`
   // An approval continuation reuses the message: the earlier run's content
   // is this run's retained base.
-  if (typeof generationRunId === "string" && generationRunId !== runId)
-    return "0-0"
-  const cursor = getStreamCursor(previous.metadata)
-  if (cursor !== undefined) return cursor
-  // This tab's own direct request: its n-th chunk is entry 0-n.
-  if (direct && direct.runId === runId && direct.parts === previous.parts)
-    return `0-${direct.delivered}`
-  return null
+  const generationRunId = getGenerationRunId(previous.metadata)
+  if (generationRunId !== undefined && generationRunId !== runId) return "0-0"
+  return getStreamCursor(previous.metadata) ?? null
 }
 
 /**
@@ -354,7 +351,6 @@ export class ResumableChat extends Chat<UIMessage> {
     ) {
       this.direct.active = false
       this.lastDirect = {
-        runId: this.nativeRunId,
         parts: this.lastMessage?.parts,
         delivered: this.direct.delivered,
       }

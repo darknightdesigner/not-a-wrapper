@@ -29,6 +29,7 @@ import { isTerminalMessageStatus } from "@/lib/chat-messages/lifecycle"
 import {
   adoptServerOwned,
   adoptStreamCursor,
+  getGenerationRunId,
   getServerMessageId,
 } from "@/lib/chat-messages/metadata"
 import type { ChatTurnMessage } from "@/lib/chat-turn/turn-plans"
@@ -167,10 +168,17 @@ export function reconcileSelectedPath(
       localMessage.metadata,
       match.metadata
     )
-    // The stream cursor describes the parts: it moves only with them.
-    const mergedMetadata = partsChanged
-      ? adoptStreamCursor(ownedMetadata, match.metadata)
-      : ownedMetadata
+    // The stream cursor names a position in one run's log: it moves with the
+    // parts it describes, or with a relink to another run (an approval
+    // continuation reuses the message; the new log starts at its content).
+    const localRunId = getGenerationRunId(localMessage.metadata)
+    const relinked =
+      localRunId !== undefined &&
+      localRunId !== getGenerationRunId(match.metadata)
+    const mergedMetadata =
+      partsChanged || relinked
+        ? adoptStreamCursor(ownedMetadata, match.metadata)
+        : ownedMetadata
     const metadataChanged = mergedMetadata !== localMessage.metadata
 
     // Adopt the server's canonical createdAt. A streamed message's client-side

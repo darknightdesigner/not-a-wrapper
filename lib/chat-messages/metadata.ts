@@ -113,14 +113,21 @@ export function getMessageProvider(metadata: unknown): string | undefined {
   return typeof metadata.provider === "string" ? metadata.provider : undefined
 }
 
+/** The generation run whose durable copy this is (server-owned). */
+export function getGenerationRunId(metadata: unknown): string | undefined {
+  if (!isRecord(metadata)) return undefined
+  const value = metadata.generationRunId
+  return typeof value === "string" ? value : undefined
+}
+
 const STREAM_CURSOR = /^\d+-\d+$/
 
 /**
  * The retained-stream entry a displayed message's parts are contained in
  * (ADR-0039 cursor). Client display metadata: it is stamped from the doc in
- * `extended` mode and moves only together with the parts it describes, so it
- * is deliberately outside the server-owned key-set {@link adoptServerOwned}
- * adopts on its own.
+ * `extended` mode and moves only together with the parts it describes (or a
+ * relink to another run's log), so it is deliberately outside the
+ * server-owned key-set {@link adoptServerOwned} adopts on its own.
  */
 export function getStreamCursor(metadata: unknown): string | undefined {
   if (!isRecord(metadata)) return undefined

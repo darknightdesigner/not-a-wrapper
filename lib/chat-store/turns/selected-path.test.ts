@@ -443,7 +443,7 @@ describe("durable content adoption", () => {
     expect(result[1].parts).toBe(live[1].parts)
   })
 
-  it("moves the stream cursor only together with adopted parts", () => {
+  it("moves the stream cursor only with adopted parts or a run relink", () => {
     const cursor = (text: string, streamCursor?: string) =>
       message("s2", "assistant", text, {
         serverMessageId: "s2",
@@ -460,6 +460,19 @@ describe("durable content adoption", () => {
     expect(
       reconcileSelectedPath(live, [cursor("partial answer grew")])[0].metadata
     ).not.toHaveProperty("streamCursor")
+    // An approval continuation relinks the same content to a new run's log.
+    const relink = (generationRunId: string, streamCursor: string) =>
+      message("s2", "assistant", "partial answer", {
+        serverMessageId: "s2",
+        generationRunId,
+        streamCursor,
+      })
+    expect(
+      reconcileSelectedPath(
+        [relink("paused", "0-9")],
+        [relink("continued", "0-0")]
+      )[0].metadata
+    ).toMatchObject({ generationRunId: "continued", streamCursor: "0-0" })
   })
 
   it("adopts terminal server content even when it differs without being longer", () => {

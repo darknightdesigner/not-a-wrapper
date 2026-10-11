@@ -179,11 +179,12 @@ caught-up fence write a metadata probe into the reducer. The SDK merges message
 metadata and yields after every non-null `message-metadata` chunk, so each
 yield carries a lower bound of what it has applied. A yield replaces the
 displayed copy only when that bound reaches the copy's cursor: no visible parts
-or a previous run's content counts as `0-0`, a stamped cursor counts as itself,
-and this tab's own direct request counts as `0-<delivered chunks>` while its
-parts are still displayed. Anything else hands the turn to checkpoints at once.
-Published replay states carry their own cursor, and the selected-path
-projection moves a cursor only together with the parts it adopts.
+count as `0-0`; this tab's own direct request counts as `0-<delivered chunks>`
+while its parts are still displayed; a previous run's content counts as `0-0`;
+a stamped cursor counts as itself. Anything else hands the turn to checkpoints
+at once. Published replay states carry their own cursor, and the selected-path
+projection moves a cursor only together with the parts it adopts or with a
+relink to another run.
 
 SDK deviation: AI SDK 7's reducer cannot start from a saved message partway
 through a part. `readUIMessageStream` throws `UIMessageStreamError` on a
@@ -204,20 +205,47 @@ Deviations from the implementation plan:
   Flush writes a metadata barrier into the tracker's own reducer and waits
   (bounded) for it, so it persists every chunk already observed. Chunks still
   in transit before the sequencing transform when a server abort or provider
-  failure flushes are not included; settlement's final full-parts snapshot is
-  unaffected.
+  failure flushes are not included. Those paths write the run terminal before
+  settlement, which then rejects the final full-parts snapshot, so the stored
+  message can end a few chunks short of what the browser received.
 - The completion write also clears the cursor. Its parts come from the response
   message; a cursor left by a failed final snapshot would understate them for a
   connection retrying in backoff.
 - The direct-request rule matches the parts array the request left displayed,
   captured when the SDK settles its status, so parts a later projection
-  replaced cannot borrow the delivered count.
+  replaced cannot borrow the delivered count. It runs before the previous-run
+  and stamped-cursor rules and does not compare run ids: a direct stream stamps
+  neither, so both can still describe the run an approval continuation resumed,
+  and a later run on the same message starts from a base that already holds
+  those parts.
+- The selected-path projection also adopts the server's cursor when a
+  message's `generationRunId` changes (an approval continuation relink), since
+  the parts did not change. Otherwise an observer in a second tab compared the
+  relinked run's log against no cursor and fell back to checkpoints.
 
 Focused tests cover the gate (a checkpoint ahead of the log, no cursor, a
 previous run's content, the direct-request count), the tracker cursor and final
 clear, explicit Redis ids with `after` resume, the Convex pairing and
-continuation reset, and the projection pairing. Live browser verification is a
-separate step.
+continuation reset, and the projection pairing.
+
+Local verification (2026-10-11): authenticated Chrome on the localhost:3000 dev
+server with local Redis. The tab was hidden, which freezes the paced DOM reveal,
+so samples read the chat's message state through its messages callback from
+about 0.4 s after each full navigation. GPT-5 Mini/Low: a reload at 16,658
+answer characters first showed 16,714 at 503 ms (replay cursor `0-3099`), then
+2,315 updates of a median 6 characters, none shorter than before the reload,
+while the retained request stayed open past 12 s. Another reload at 10,728
+characters resumed at 13,700. Completed answers matched the stored content
+exactly after another reload. Haiku 4.5 web search: a reload during three
+running searches resumed at 621 ms with the searches completing, and a reload at
+1,222 characters resumed at 1,240 after 571 ms. GPT-5 Mini/Medium: two reloads
+during reasoning resumed without a freeze (1,725 reasoning characters resumed as
+1,753 after 586 ms). Ending the direct request as the wake handoff does, after
+1,385 delivered chunks (7,699 characters), published the replay 188 ms later at
+7,837 characters (`0-1406`). Convex cursors advanced as `0-n` during every run
+and were cleared at completion; all 11 runs ended terminal (10 completed, one
+Stop). No console errors. Approval continuation and stopped Redis were not run
+live; unit tests and the existing fallback cover them.
 
 ## References
 

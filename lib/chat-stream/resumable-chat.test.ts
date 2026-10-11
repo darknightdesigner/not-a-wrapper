@@ -472,6 +472,13 @@ it("recovers a failed original transport from its delivered count but respects e
   expect(fetchMock).not.toHaveBeenCalled()
   direct.error(new TypeError("network error"))
   await vi.waitFor(() => expect(chat.status).toBe("error"))
+  // A continued message can still name the run it resumed: the parts are
+  // this request's, so its delivered count still bounds them.
+  chat.messages = chat.messages.map((message) =>
+    message.role === "assistant"
+      ? { ...message, metadata: { generationRunId: "paused-run" } }
+      : message
+  )
   published.length = 0
   chat.syncRun(run, [])
   await vi.waitFor(() => expect(text()).toBe("Hello world"))
