@@ -117,7 +117,10 @@ export class RetainedReplay {
       onActivity?: () => void
       onSelection?: (selection: Selection) => void
       onCaughtUp?: () => void
-      /** While true, each network read probes how far the reducer has applied. */
+      /**
+       * While true after the caught-up fence, each network read that advanced
+       * the cursor probes how far the reducer has applied.
+       */
       probing?: () => boolean
     } = {}
   ) {

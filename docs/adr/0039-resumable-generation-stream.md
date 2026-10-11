@@ -171,11 +171,15 @@ deduplicated write keeps the stored cursor, and the `lastSnapshotSequence`
 guard rejects stale pairs. A new placeholder and an approval continuation's
 relinked message start at `0-0` (that content is the new run's base). The final
 full-parts snapshot, the completion write and a Stop observed-text prefix clear
-it: their content can lead the log or is not a reduction of it. The wire format
-is unchanged, so tabs loaded earlier keep working.
+it: their content can lead the log or is not a reduction of it. Other terminal
+writes (failure, abort, the lease reaper, Stop without observed text) change
+only status and error, so the kept cursor still bounds the unchanged parts; no
+client gates a terminal run, and a later run on the message starts at `0-0`.
+The wire format is unchanged, so tabs loaded earlier keep working.
 
-Client: while a connection's gate is closed, each network read and the
-caught-up fence write a metadata probe into the reducer. The SDK merges message
+Client: the caught-up fence writes a metadata probe into the reducer, covering
+every chunk replayed before it. After the fence, while the gate stays closed,
+each network read that advanced the cursor writes another. The SDK merges message
 metadata and yields after every non-null `message-metadata` chunk, so each
 yield carries a lower bound of what it has applied. A yield replaces the
 displayed copy only when that bound reaches the copy's cursor: no visible parts
