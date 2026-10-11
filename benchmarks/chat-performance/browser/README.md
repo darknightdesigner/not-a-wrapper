@@ -27,11 +27,34 @@ only within that capture's configured scenario/warmup order. Local attached
 Chrome keeps the person's existing identity and history (`attached-session-v1`).
 Comparisons require the same identity protocol.
 
-Each CI capture user is recorded in `PERF_CAPTURE_USERS_FILE` and deleted by
-the workflow's final always-run step, however the job ends. The WorkOS
-deletion webhook then drains the user's chats and other owned data from the
-dev deployment (ADR-0044); accounting records stay, as ADR-0021 keeps them.
-Local runs keep their account.
+Each CI capture user is recorded in `PERF_CAPTURE_USERS_FILE` and deleted from
+WorkOS by the workflow's final always-run step, however the job ends. Its chats
+and other app data live only in the run's own Convex preview (below), which
+Convex deletes when it expires. Local runs keep their account.
+
+## Isolated backend
+
+CI never measures against a shared Convex deployment (ADR-0051). Before any
+build, `isolated-backend.ts` deploys the checked-out `convex/` to a fresh
+preview deployment named `perf-<pr-N|run-ID>-<suite>` (recreated each run) and
+points `.env.local` at it. The preview gets `WORKOS_CLIENT_ID` and
+`WORKOS_API_KEY` from `PERF_ENV_FILE`, so it accepts the harness's real login,
+and a random per-run `CHAT_ADMISSION_SECRET` shared with both builds. Both arms
+run against this one backend: the head's functions. `run-paired.ts` refuses to
+start unless `.env.local` targets it, and records it in the manifest.
+
+The step then compares the preview's function spec with every
+`api.<module>.<function>` reference in each measured client (app sources,
+excluding `convex/`, scripts, benchmarks and tests). A function the preview
+does not serve fails the job within about a minute, naming the function and
+the file that calls it. The merge-base client runs against the head backend,
+so change public functions additively: a new function or an opt-in argument
+(ADR-0027's `splitLiveTail`), and remove the old one only after main stops
+calling it. Argument shapes are not checked.
+
+Each preview counts toward the Convex team's deployment limit until Convex
+deletes it (5 days, 14 on paid plans): one per active PR, plus one per
+scheduled or manual suite run.
 
 ## Suites
 
@@ -217,20 +240,19 @@ workflow needs no previously stored CPU baseline. Changes to measurement sources
 require a reviewed overlay before comparing. Paired artifacts retain `base.json`,
 `head.json`, the provenance manifest, instrumentation diff, and comparison report.
 Fork PRs receive no credentials. Setup requires the
-existing `PERF_ENV_FILE` and `PERF_AUTH_PASSWORD` GitHub secrets and valid reference
-captures under the selected policy. Results upload even on failure.
+`PERF_ENV_FILE`, `PERF_AUTH_PASSWORD` and `PERF_CONVEX_PREVIEW_DEPLOY_KEY` (a
+Convex preview deploy key) GitHub secrets and valid reference captures under
+the selected policy. Results upload even on failure.
 
-Both arms run against the one Convex deployment in `PERF_ENV_FILE`, and the
-workflow deploys no functions, so it runs whatever was last pushed there
-(normally main). When a PR changes `convex/`, the workflow warns: the signed-in
-pair is valid only after the branch's `convex/` is pushed to that deployment
-(`convex dev --once` from a clean checkout of the branch). The workflow never
-restores main: if the PR does not merge, the owner pushes main's `convex/` back
-the same way, or later pairs run against the branch's functions. After a merge
-main's functions are the branch's, so nothing needs restoring unless main
-gained other `convex/` changes meanwhile. The new
-backend must still serve the merge-base client, so change public functions
-additively: a new function, or an opt-in argument (ADR-0027's `splitLiveTail`).
+A failed warmup stops its scenario: warmups prove the journey can run, and the
+measured attempts would only repeat the failure, each to its full timeout. When
+a second scenario's warmup fails with the same cause, the suite stops and the
+remaining scenarios are recorded as failed (`stopReason`). The cause is the
+first Convex function error the browser or server reported, otherwise the
+error message; ids, URLs and durations do not distinguish causes. Failure
+details carry `convexErrors` and `browserErrors` (console errors and uncaught
+page errors), and CI annotates the run with the cause. A warmup correctness
+failure therefore fails the capture; measured runs are never dropped.
 
 ## Diagnostics outside the core gate
 
@@ -251,15 +273,13 @@ provider route, reasoning setting, tool configuration, and outcome.
 Production sampling discards interrupted turns on tab return and resumes for new
 turns; benchmark documents retain the stricter permanent visibility invalidation.
 
-Anonymous standard/smoke dispatches have a separate concurrency lane from
-credentialed journey runs. Their suite definitions are checked to reject any
-authenticated scenario. Each paired comparison still runs sequentially on one
-isolated CI machine; authenticated suites remain serialized. This avoids blocking
-an authenticated PR comparison behind an unrelated guest rendering capture.
-Guest usage admission still reaches the shared deployment under a fresh anonymous
-identity; these lanes isolate browser CPU, not backend capacity. Fresh guests do
-not reset the per-network guest cap (ADR-0045): locally, five guest sends a day
-from one network exhaust it for every guest-send harness and trace.
+Pull request runs share a per-PR concurrency group, so a push cancels the
+superseded run. Scheduled and manual runs each get their own group, and the
+weekly suites run in parallel. Nothing else needs serializing: every run has
+its own Convex preview, admission secret and WorkOS capture users, and each
+pair stays sequential on one isolated runner. Fresh guests do not reset the
+per-network guest cap (ADR-0045): locally, five guest sends a day from one
+network exhaust it for every guest-send harness and trace.
 The legacy overlay also accepts descendants of its original reference only when
 their existing measurement modules and hook files remain byte-identical to that
 reference. After checking and applying the hook patch, the runner copies the

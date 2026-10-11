@@ -45,6 +45,13 @@ import {
 import { classifyChatError } from "@/lib/observability/chat-error-taxonomy"
 import { hashValue } from "../fixtures"
 import { waitForTraceCompletion } from "./diagnostic-trace"
+import {
+  compactError,
+  CONVEX_ERROR,
+  failureCause,
+  failureSignature,
+  RunFailure,
+} from "./run-failure"
 import { parseNativeScroll } from "./native-scroll"
 import { startPerfServer, type PerfServer } from "./perf-server"
 import {
@@ -105,10 +112,23 @@ const serverRouteErrors: Array<{
   errorName: string
   category: ReturnType<typeof classifyChatError>
 }> = []
+/** Convex function errors in the server's output, for failure messages. */
+const serverConvexErrors: Array<{ receivedAt: number; text: string }> = []
 let perfServer: PerfServer | undefined
 
 function log(message: string) {
   console.log(`[bench:browser] ${message}`)
+}
+
+/** A GitHub error annotation, so the run page names the cause. */
+function annotate(title: string, message: string) {
+  if (process.env.GITHUB_ACTIONS === "true")
+    console.log(`::error title=${title}::${message.replaceAll("%", "%25")}`)
+}
+
+function recordServerConvexError(text: string) {
+  serverConvexErrors.push({ receivedAt: Date.now(), text: compactError(text) })
+  if (serverConvexErrors.length > 50) serverConvexErrors.shift()
 }
 
 function fail(message: string): never {
@@ -125,9 +145,17 @@ function captureServerOutput(server: ChildProcess): void {
       pending = lines.pop() ?? ""
       for (const line of lines) {
         const trimmed = line.trim()
-        if (!trimmed.startsWith("{")) continue
+        if (!trimmed.startsWith("{")) {
+          if (CONVEX_ERROR.test(trimmed)) recordServerConvexError(trimmed)
+          continue
+        }
         try {
           const parsed = JSON.parse(trimmed) as Record<string, unknown>
+          if (
+            typeof parsed.errorMessage === "string" &&
+            CONVEX_ERROR.test(parsed.errorMessage)
+          )
+            recordServerConvexError(parsed.errorMessage)
           if (parsed._tag === "chat_perf") {
             serverPerfLines.push({ ...parsed, receivedAt: Date.now() })
           } else if (
@@ -387,6 +415,18 @@ async function runScenarioOnce(
   timeoutMs: number
 ): Promise<RunMetrics> {
   const page = await context.newPage()
+  const runStartedAt = Date.now()
+  // Console and page errors explain a stalled journey; only failures report them.
+  const browserErrors: string[] = []
+  const recordBrowserError = (text: string) => {
+    if (browserErrors.length < 20) browserErrors.push(compactError(text))
+  }
+  page.on("console", (message) => {
+    if (message.type() === "error") recordBrowserError(message.text())
+  })
+  page.on("pageerror", (error) =>
+    recordBrowserError(`Uncaught ${error.name}: ${error.message}`)
+  )
   await page.addInitScript(installChatUiObserver, { observeWheel: false })
   await page.setViewportSize(
     config.viewport === "mobile"
@@ -503,6 +543,15 @@ async function runScenarioOnce(
   const failureEvidence = async () => {
     const marks = await readMarks(page).catch(() => [])
     return {
+      convexErrors: [
+        ...browserErrors.filter((text) => CONVEX_ERROR.test(text)),
+        ...serverConvexErrors
+          .filter((entry) => entry.receivedAt >= runStartedAt)
+          .map((entry) => entry.text),
+      ].slice(0, 5),
+      browserErrors: browserErrors
+        .filter((text) => !CONVEX_ERROR.test(text))
+        .slice(0, 5),
       postRequests: chatRequestCount,
       postStatuses: chatResponseStatuses,
       terminalOutcomes: marks
@@ -1227,8 +1276,9 @@ async function runScenarioOnce(
     const stage = config.interact
       ? interactionProbeStage
       : config.followup ? "follow-up" : "turn"
-    throw new Error(
+    throw new RunFailure(
       `${config.id}: ${stage}: ${message}; evidence=${JSON.stringify(evidence)}; probe=${JSON.stringify(probe)}`,
+      failureCause(message, evidence.convexErrors),
       { cause: error }
     )
   } finally {
@@ -1457,6 +1507,11 @@ async function main() {
 
   const results: ScenarioResult[] = []
   let anyCorrectnessFailure = false
+  const commit = execSync("git rev-parse --short HEAD", {
+    cwd: REPO_ROOT,
+  })
+    .toString()
+    .trim()
 
   const authState =
     isThreadSwitch || suite.some((config) => config.auth)
@@ -1482,72 +1537,98 @@ async function main() {
     if (!threadSwitch.correctnessOk) anyCorrectnessFailure = true
   }
 
+  // Warmup failure signatures (ADR-0051): a repeat in another scenario stops the suite.
+  const warmupFailures = new Map<string, string>()
+  let suiteStop: string | undefined
   for (const config of suite) {
-    const viewport =
-      config.viewport === "mobile"
-        ? { width: 390, height: 844 }
-        : { width: 1440, height: 900 }
-    const contextOptions = {
-      viewport,
-      ...(config.auth && authState ? { storageState: authState } : {}),
-    }
-    const context = process.env.PERF_CDP_URL
-      ? browser.contexts()[0]
-      : await browser.newContext(contextOptions)
-    const timeoutMs = scenarioTimeoutMs(config)
-    log(
-      `scenario ${config.id}: ${WARMUPS} warmups + ${RUNS} runs (timeout ${Math.round(timeoutMs / 1000)}s)`
-    )
     const runs: RunMetrics[] = []
-    try {
-      for (let index = 0; index < WARMUPS + RUNS; index++) {
-        const kind = index < WARMUPS ? "warmup" : "run"
-        let run: RunMetrics
-        const runContext =
-          config.cache === "cold" && !process.env.PERF_CDP_URL
-            ? await browser.newContext(contextOptions)
-            : context
-        try {
-          run = await runScenarioOnce(runContext, baseUrl, config, timeoutMs)
-        } catch (error) {
-          // A crashed run (timeout, navigation failure, admission rejection)
-          // fails the scenario's correctness but must not abort the suite —
-          // the other scenarios' samples and the result file still land.
-          run = {
-            longTaskCount: 0,
-            longTaskMaxMs: 0,
-            totalBlockingTimeMs: 0,
-            rafGapCount: 0,
-            rafGapMaxMs: 0,
-            markdownProjectionCount: 0,
-            markdownProjectionMaxMs: 0,
-            shikiHighlightCount: 0,
-            shikiHighlightTotalMs: 0,
-            domNodesBefore: 0,
-            domNodesAfter: 0,
-            correctness: {
-              ok: false,
-              foldedTextHash: hashValue(""),
-              expectedTextHash: hashValue(""),
-              terminalOutcome: null,
-              settleMismatchCount: 0,
-              detail: `run crashed: ${String(error).split("\n")[0]}`,
-            },
-          }
-        } finally {
-          if (runContext !== context) await runContext.close()
-        }
-        log(
-          `  ${kind} ${index + 1}/${WARMUPS + RUNS}: ` +
-            `${run.correctness.ok ? "ok" : `CORRECTNESS FAILED (${run.correctness.detail ?? "unknown"})`}`
-        )
-        if (index >= WARMUPS) runs.push(run)
+    let stopReason = suiteStop && `not run: ${suiteStop}`
+    if (!stopReason) {
+      const viewport =
+        config.viewport === "mobile"
+          ? { width: 390, height: 844 }
+          : { width: 1440, height: 900 }
+      const contextOptions = {
+        viewport,
+        ...(config.auth && authState ? { storageState: authState } : {}),
       }
-    } finally {
-      if (!process.env.PERF_CDP_URL) await context.close()
+      const context = process.env.PERF_CDP_URL
+        ? browser.contexts()[0]
+        : await browser.newContext(contextOptions)
+      const timeoutMs = scenarioTimeoutMs(config)
+      log(
+        `scenario ${config.id}: ${WARMUPS} warmups + ${RUNS} runs (timeout ${Math.round(timeoutMs / 1000)}s)`
+      )
+      try {
+        for (let index = 0; index < WARMUPS + RUNS; index++) {
+          const kind = index < WARMUPS ? "warmup" : "run"
+          let run: RunMetrics
+          let cause: string | undefined
+          const runContext =
+            config.cache === "cold" && !process.env.PERF_CDP_URL
+              ? await browser.newContext(contextOptions)
+              : context
+          try {
+            run = await runScenarioOnce(runContext, baseUrl, config, timeoutMs)
+            if (!run.correctness.ok)
+              cause = failureCause(run.correctness.detail ?? "correctness failed", [])
+          } catch (error) {
+            // A crashed run (timeout, navigation failure, admission rejection)
+            // fails the scenario's correctness but must not abort the suite —
+            // the other scenarios' samples and the result file still land.
+            cause =
+              error instanceof RunFailure
+                ? error.rootCause
+                : failureCause(String(error), [])
+            run = {
+              longTaskCount: 0,
+              longTaskMaxMs: 0,
+              totalBlockingTimeMs: 0,
+              rafGapCount: 0,
+              rafGapMaxMs: 0,
+              markdownProjectionCount: 0,
+              markdownProjectionMaxMs: 0,
+              shikiHighlightCount: 0,
+              shikiHighlightTotalMs: 0,
+              domNodesBefore: 0,
+              domNodesAfter: 0,
+              correctness: {
+                ok: false,
+                foldedTextHash: hashValue(""),
+                expectedTextHash: hashValue(""),
+                terminalOutcome: null,
+                settleMismatchCount: 0,
+                detail: `run crashed: ${String(error).split("\n")[0]}`,
+              },
+            }
+          } finally {
+            if (runContext !== context) await runContext.close()
+          }
+          log(
+            `  ${kind} ${index + 1}/${WARMUPS + RUNS}: ` +
+              `${run.correctness.ok ? "ok" : `CORRECTNESS FAILED (${run.correctness.detail ?? "unknown"})`}`
+          )
+          if (index >= WARMUPS) runs.push(run)
+          else if (cause) {
+            // A warmup proves the journey can run here; the measured attempts
+            // would only repeat its failure, each to its full timeout.
+            stopReason = `warmup ${index + 1} failed: ${cause}`
+            annotate(`Benchmark scenario stopped (${commit})`, `${config.id}: ${stopReason}`)
+            const signature = failureSignature(cause)
+            const earlier = warmupFailures.get(signature)
+            if (earlier)
+              suiteStop = `${earlier} and ${config.id} failed their warmups with the same cause: ${cause}`
+            else warmupFailures.set(signature, config.id)
+            break
+          }
+        }
+      } finally {
+        if (!process.env.PERF_CDP_URL) await context.close()
+      }
     }
+    if (stopReason) log(`  ${config.id}: stopped (${stopReason})`)
 
-    let correctnessOk = runs.every((run) => run.correctness.ok)
+    let correctnessOk = !stopReason && runs.every((run) => run.correctness.ok)
     const liveStreamNotAdoptedRuns = runs.filter(
       (run) => run.liveStreamNotAdopted
     ).length
@@ -1581,6 +1662,7 @@ async function main() {
       interactionProtocol: config.interact ? "late-typing-native-wheel-menu-v2" : undefined,
       contentFrameProtocol: "publisher-frame-v1",
       correctnessOk,
+      ...(stopReason ? { stopReason } : {}),
       ...(liveStreamNotAdoptedRuns > 0 ? { liveStreamNotAdoptedRuns } : {}),
       metrics: {
         ...(config.interact ? {
@@ -1698,11 +1780,6 @@ async function main() {
   const buildId = existsSync(buildIdPath)
     ? readFileSync(buildIdPath, "utf8").trim()
     : "unknown"
-  const commit = execSync("git rev-parse --short HEAD", {
-    cwd: REPO_ROOT,
-  })
-    .toString()
-    .trim()
   const file: BenchmarkResultFile = {
     schemaVersion: 3,
     measurementVersion: "dom-frame-v3",
@@ -1761,6 +1838,10 @@ async function main() {
   // Playwright closes its CDP transport here; attached Chrome is not terminated.
   await browser.close()
   await perfServer.stop()
+  if (suiteStop) {
+    annotate(`Benchmark suite stopped (${commit})`, suiteStop)
+    fail(`suite stopped early: ${suiteStop}`)
+  }
   if (anyCorrectnessFailure) {
     fail("one or more scenarios failed correctness — timings are invalid")
   }

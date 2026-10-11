@@ -8,6 +8,7 @@ import { isDeepStrictEqual } from "node:util"
 import { fileURLToPath } from "node:url"
 import { pairedBuildManifest, validateDependencyOverlay } from "./dependency-overlay"
 import { validateDirectiveOverlay } from "./directive-overlay"
+import { ENV_FILE, envFileValue } from "./isolated-backend"
 import { applySseCharsetOverlay } from "./sse-charset-overlay"
 import { LEGACY_MEASUREMENT_BASE, MEASUREMENT_FILES, MEASUREMENT_HOOK_FILES, measurementBootstrap } from "./measurement-overlay"
 
@@ -78,6 +79,11 @@ function main() {
   const base = command(root, "git", ["rev-parse", "--verify", "--end-of-options", `${baseRef}^{commit}`], true)
   if (head === base) throw new Error("A self-comparison cannot certify branch regression protection")
   command(root, "git", ["merge-base", "--is-ancestor", base, head])
+  // Both arms use the run's own backend, deployed from the head (ADR-0051).
+  const convexUrl = process.env.PERF_CONVEX_URL
+  if (!convexUrl || process.env.PERF_CONVEX_COMMIT !== head ||
+      envFileValue(readFileSync(path.join(root, ENV_FILE), "utf8"), "NEXT_PUBLIC_CONVEX_URL") !== convexUrl)
+    throw new Error("Pairs run only against the head's own Convex preview; run isolated-backend.ts first (ADR-0051)")
   const suite = process.env.SUITE ?? "responsiveness"
   if (!["responsiveness", "smoke", "standard", "durable", "thread-switch"].includes(suite))
     throw new Error(`Unsupported suite: ${suite}`)
@@ -155,6 +161,7 @@ function main() {
   writeFileSync(path.join(output, "manifest.json"), JSON.stringify({
     protocol: "same-runner-pair-v1", baseCommit: base, headCommit: head,
     measurementCommit: head, suite, order: ["base", "head"],
+    backend: { convexUrl, functionsCommit: head },
     legacyOverlay: legacy,
     legacyHookLayoutCommit: legacy ? LEGACY_MEASUREMENT_BASE : null,
     overlaySha256: legacy ? digest(path.join(root, harnessDirectory, "measurement-overlay.patch")) : null,
