@@ -169,6 +169,15 @@ also support content-free console evidence in authenticated Chrome. Sentry's nat
 INP remains the general interaction metric; individual Event Timing samples are
 not mislabeled as INP.
 
+### Isolated backend, 2026-10-10
+
+Both arms of a pair also share one backend: a Convex preview deployed from the
+head for that run, never the shared dev deployment (ADR-0051). A preflight
+fails the job when either client's `api.<module>.<function>` references name a
+public function the preview does not serve; references built another way
+escape this source check. A failed warmup now fails its scenario, and a second scenario
+failing its warmup with the same cause stops the suite.
+
 ## Alternatives considered
 
 A larger provider/model/viewport Cartesian matrix would multiply runtime and noise

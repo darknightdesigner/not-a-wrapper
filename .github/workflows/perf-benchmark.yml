@@ -31,8 +31,8 @@ on:
       - "lib/chat-turn/**"
       - "lib/convex/**"
       - "lib/dom/**"
-      # Convex functions serve the signed-in send and thread-open paths; the
-      # job warns that the shared deployment needs this branch's functions.
+      # Convex functions serve the signed-in send and thread-open paths; each
+      # run deploys this branch's functions to its own preview (ADR-0051).
       - "convex/**"
       - "benchmarks/chat-performance/**"
       - "instrumentation-client.ts"
@@ -80,10 +80,11 @@ permissions:
   contents: read
 
 concurrency:
-  # Guest rendering runs use separate identities; credentialed runs stay serialized.
-  # Each before/after pair remains sequential on one isolated runner.
-  group: perf-benchmark-${{ github.event_name == 'workflow_dispatch' && (inputs.suite == 'standard' || inputs.suite == 'smoke') && 'guest' || 'authenticated' }}
-  cancel-in-progress: false
+  # Each run deploys its own Convex preview and creates its own WorkOS users
+  # (ADR-0051), so runs share no backend state and need no queue. A push
+  # cancels the PR's superseded run; each pair stays sequential on one runner.
+  group: perf-benchmark-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   benchmark:
@@ -91,7 +92,6 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         suite: ${{ fromJSON(github.event_name == 'schedule' && '["standard","durable","thread-switch"]' || format('["{0}"]', inputs.suite || 'responsiveness')) }}
     name: Browser benchmark (${{ matrix.suite }})
@@ -112,6 +112,8 @@ jobs:
       COLLECT_BASELINE: ${{ github.event_name == 'workflow_dispatch' && inputs.collect_baseline || false }}
       # Each CI harness process records the WorkOS user it creates here.
       PERF_CAPTURE_USERS_FILE: ${{ github.workspace }}/perf-capture-users.txt
+      # Reused per PR and recreated each run; Convex deletes idle previews.
+      PERF_PREVIEW_NAME: perf-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}-${{ matrix.suite }}
     steps:
       - name: Validate diagnostic suite
         if: ${{ inputs.diagnose || inputs.observer_overhead || inputs.rendering_probe || inputs.late_menu_trace }}
@@ -149,10 +151,6 @@ jobs:
         run: |
           COMMON_BASE=$(git merge-base "$PR_BASE_SHA" HEAD)
           echo "PERF_COMPARE_REF=$COMMON_BASE" >> "$GITHUB_ENV"
-          # Both arms share the PERF_ENV_FILE deployment, which this job never deploys.
-          if ! git diff --quiet "$COMMON_BASE" HEAD -- convex ':(exclude)*.test.ts'; then
-            echo "::warning title=Convex functions changed::Both arms run against the PERF_ENV_FILE deployment's current functions, not this branch's. The signed-in pair is valid only after the owner deploys this branch's convex/ there (see benchmarks/chat-performance/browser/README.md)."
-          fi
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -162,24 +160,28 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Validate anonymous lane isolation
-        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.suite == 'standard' || inputs.suite == 'smoke') }}
-        run: |
-          bun -e 'import { STANDARD_SUITE, SMOKE_SUITE } from "./benchmarks/chat-performance/browser/scenarios"; if ([...STANDARD_SUITE, ...SMOKE_SUITE].some(scenario => scenario.auth)) throw new Error("The guest lane must not contain authenticated scenarios")'
-
-      # Branch timing runs only in this controlled lane, never ordinary CI.
-      - name: Micro-benchmark timing gates
-        run: CHAT_PERF_GATES=true bunx vitest run benchmarks/chat-performance/branch-projection-gate.test.ts benchmarks/chat-performance/markdown-projection-gate.test.ts
-
       - name: Write server env
         run: |
           if [ -z "${PERF_ENV_FILE:-}" ]; then
-            echo "::error title=Missing PERF_ENV_FILE::Set the GitHub Actions secret PERF_ENV_FILE to the perf server's .env.local contents (see the header of this workflow)."
+            echo "::error title=Missing PERF_ENV_FILE::Set the GitHub Actions secret PERF_ENV_FILE to the perf server's .env.local contents (see benchmarks/chat-performance/browser/README.md)."
             exit 1
           fi
           printf '%s' "$PERF_ENV_FILE" > .env.local
         env:
           PERF_ENV_FILE: ${{ secrets.PERF_ENV_FILE }}
+
+      # Deploys this checkout's convex/ to the run's own preview, points
+      # .env.local at it, and fails within a minute when a measured client
+      # calls a public function the preview does not serve (ADR-0051).
+      - name: Deploy isolated Convex backend
+        run: bun run benchmarks/chat-performance/browser/isolated-backend.ts
+        env:
+          CONVEX_DEPLOY_KEY: ${{ secrets.PERF_CONVEX_PREVIEW_DEPLOY_KEY }}
+          PERF_PAIRED: ${{ !inputs.diagnose && !inputs.collect_baseline }}
+
+      # Branch timing runs only in this controlled lane, never ordinary CI.
+      - name: Micro-benchmark timing gates
+        run: CHAT_PERF_GATES=true bunx vitest run benchmarks/chat-performance/branch-projection-gate.test.ts benchmarks/chat-performance/markdown-projection-gate.test.ts
 
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium

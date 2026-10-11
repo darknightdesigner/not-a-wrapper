@@ -126,6 +126,8 @@ export type ScenarioResult = {
   sampleCount: number
   warmupRuns: number
   correctnessOk: boolean
+  /** Why collection stopped before the measured runs (ADR-0051); the scenario failed. */
+  stopReason?: string
   /** Runs whose live stream was never adopted (durable adoption-loss count). */
   liveStreamNotAdoptedRuns?: number
   metrics: Record<string, MetricSummary>
