@@ -113,6 +113,8 @@ export function useChatOperations({
   const beginFirstTurn = (): string => {
     const current = allocationRef.current
     if (current) return current.chatId
+    // A new first turn may only ever discard its own local chat.
+    unacceptedLocalChatRef.current = null
     const nextChatId = createChatId()
     allocationRef.current = { chatId: nextChatId, committed: false }
     commitChatIdentity(nextChatId)
@@ -126,6 +128,13 @@ export function useChatOperations({
    * guest's local chat is discarded instead, since the turn runner rolls it
    * back only on a guest sign-in refusal, which committed nothing (ADR-0045).
    */
+  // Any accepted send on the local chat (first try or retry) keeps it.
+  const releaseLocalChat = (acceptedChatId: string) => {
+    if (unacceptedLocalChatRef.current === acceptedChatId) {
+      unacceptedLocalChatRef.current = null
+    }
+  }
+
   const rollbackFirstTurn = () => {
     const refusedLocalChat = unacceptedLocalChatRef.current
     unacceptedLocalChatRef.current = null
@@ -242,11 +251,7 @@ export function useChatOperations({
       unacceptedLocalChatRef.current = activeChatId
       return {
         chatId: activeChatId,
-        confirmDispatched: () => {
-          if (unacceptedLocalChatRef.current === activeChatId) {
-            unacceptedLocalChatRef.current = null
-          }
-        },
+        confirmDispatched: () => releaseLocalChat(activeChatId),
       }
     }
 
@@ -335,9 +340,13 @@ export function useChatOperations({
       }
     }
 
-    if (chatId) return { chatId }
-    // The prop still lags the committed identity.
-    if (allocation) return { chatId: allocation.chatId }
+    const existingChatId = chatId ?? allocation?.chatId
+    if (existingChatId) {
+      return {
+        chatId: existingChatId,
+        confirmDispatched: () => releaseLocalChat(existingChatId),
+      }
+    }
 
     // No identity was committed for this send (the surface returned to
     // onboarding mid-flight): refuse rather than mint outside Send.

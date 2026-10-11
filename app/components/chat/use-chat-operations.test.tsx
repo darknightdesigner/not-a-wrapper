@@ -215,6 +215,24 @@ describe("useChatOperations", () => {
     expect(localStorage.getItem(GUEST_CHAT_STORAGE_KEY)).toBeNull()
   })
 
+  it("keeps a guest chat once a retry in it is accepted", async () => {
+    const createFirstTurnChat = vi
+      .fn<(input: unknown) => Promise<FirstTurnChatResult>>()
+      .mockResolvedValue(localFirstTurn("chat-minted"))
+    const props = baseProps({ isAuthenticated: false, createFirstTurnChat })
+    const { operations, rerender } = renderOperations(props)
+
+    operations().beginFirstTurn()
+    await operations().ensureChatExists(turnArgs())
+    // The first dispatch failed in place; a retry from the chat is accepted.
+    rerender({ ...props, chatId: "chat-minted" })
+    const retry = await operations().ensureChatExists(turnArgs())
+    retry?.confirmDispatched?.()
+    operations().rollbackFirstTurn()
+
+    expect(props.deleteChat).not.toHaveBeenCalled()
+  })
+
   it("discards a refused guest chat even after Back cleared the allocation", async () => {
     const createFirstTurnChat = vi
       .fn<(input: unknown) => Promise<FirstTurnChatResult>>()
@@ -370,7 +388,10 @@ describe("useChatOperations", () => {
       operations().ensureChatExists(
         turnArgs({ userId: "user-1", clientMessageId: "optimistic-3" })
       )
-    ).resolves.toEqual({ chatId: "chat-minted" })
+    ).resolves.toEqual({
+      chatId: "chat-minted",
+      confirmDispatched: expect.any(Function),
+    })
   })
 
   it("retires the first-turn retry token only once a different payload is accepted", async () => {
@@ -408,7 +429,10 @@ describe("useChatOperations", () => {
       operations().ensureChatExists(
         turnArgs({ userId: "user-1", clientMessageId: "optimistic-4" })
       )
-    ).resolves.toEqual({ chatId: "chat-minted" })
+    ).resolves.toEqual({
+      chatId: "chat-minted",
+      confirmDispatched: expect.any(Function),
+    })
   })
 
   it("neither resurrects nor dispatches an allocation that Back invalidated while creation was in flight", async () => {
@@ -474,7 +498,10 @@ describe("useChatOperations", () => {
 
     await expect(
       operations().ensureChatExists(turnArgs())
-    ).resolves.toEqual({ chatId: "chat-active" })
+    ).resolves.toEqual({
+      chatId: "chat-active",
+      confirmDispatched: expect.any(Function),
+    })
     expect(props.createFirstTurnChat).not.toHaveBeenCalled()
     expect(props.commitChatIdentity).not.toHaveBeenCalled()
   })
