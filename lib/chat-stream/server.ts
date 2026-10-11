@@ -11,7 +11,9 @@ import {
   compareRetainedCursors,
   RETAINED_STREAM_HEARTBEAT_MS,
   retainedChatStreamCursorSchema,
+  retainedCursorForSeq,
   type RetainedChatStreamFrame,
+  type SequencedUIMessageChunk,
 } from "./protocol"
 
 const MAX_LOG_BYTES = 16 * 1024 * 1024
@@ -98,7 +100,7 @@ if bytes > tonumber(ARGV[3]) then
   redis.call('DEL', KEYS[2])
   return 0
 end
-for i = 6, #ARGV do redis.call('XADD', KEYS[2], '*', 'chunk', ARGV[i]) end
+for i = 6, #ARGV, 2 do redis.call('XADD', KEYS[2], ARGV[i], 'chunk', ARGV[i + 1]) end
 redis.call('HSET', KEYS[1], 'bytes', bytes)
 redis.call('EXPIRE', KEYS[1], ARGV[4])
 redis.call('EXPIRE', KEYS[2], ARGV[4])
@@ -116,6 +118,27 @@ else
 end
 return 1
 `
+
+/**
+ * Numbers the final UI chunk stream once, from 1. The browser's n-th chunk,
+ * retained entry `0-n` and the checkpoint cursor all name the same chunk.
+ * `onChunk` runs before the chunk moves on, so a checkpoint never names a
+ * chunk without a sequence.
+ */
+export function sequenceUIMessageChunks(
+  onChunk: (chunk: UIMessageChunk, seq: number) => void,
+  onEnd: () => void
+) {
+  let seq = 0
+  return new TransformStream<UIMessageChunk, SequencedUIMessageChunk>({
+    transform(chunk, controller) {
+      seq += 1
+      onChunk(chunk, seq)
+      controller.enqueue({ seq, chunk })
+    },
+    flush: onEnd,
+  })
+}
 
 /** A null writer leaves the existing Convex checkpoint path in charge. */
 export async function initializeRetainedChatStream({
@@ -152,17 +175,21 @@ export async function initializeRetainedChatStream({
 
   let consumed = false
   return {
-    async consume(stream: ReadableStream<UIMessageChunk>): Promise<void> {
+    /** Entry ids are explicit (`0-seq`), so a checkpoint cursor names an entry. */
+    async consume(
+      stream: ReadableStream<SequencedUIMessageChunk>
+    ): Promise<void> {
       if (consumed) throw new Error("Retained stream already has a producer")
       consumed = true
       const reader = stream.getReader()
       let available = true
       let logBytes = baseBytes
+      let lastSeq = 0
       let pending: ReturnType<typeof reader.read> | undefined
-      async function append(batch: string[]) {
+      async function append(batch: [id: string, chunk: string][]) {
         if (!available || batch.length === 0) return
         const batchBytes = batch.reduce(
-          (sum, chunk) => sum + Buffer.byteLength(chunk),
+          (sum, [, chunk]) => sum + Buffer.byteLength(chunk),
           0
         )
         if (logBytes + batchBytes > MAX_LOG_BYTES) {
@@ -180,7 +207,7 @@ export async function initializeRetainedChatStream({
                 String(MAX_LOG_BYTES),
                 String(activeTtl),
                 String(COMPLETED_TTL_SECONDS),
-                ...batch,
+                ...batch.flat(),
               ],
             })) === 1
           logBytes += batchBytes
@@ -202,7 +229,7 @@ export async function initializeRetainedChatStream({
       try {
         let done = false
         while (!done) {
-          const batch: string[] = []
+          const batch: [id: string, chunk: string][] = []
           let bytes = 0
           let timer: ReturnType<typeof setTimeout> | undefined
           const deadline = new Promise<null>((resolve) => {
@@ -222,15 +249,16 @@ export async function initializeRetainedChatStream({
                 done = true
                 break
               }
+              lastSeq = result.value.seq
               if (available) {
-                const encoded = JSON.stringify(result.value)
+                const encoded = JSON.stringify(result.value.chunk)
                 const encodedBytes = Buffer.byteLength(encoded)
                 if (encodedBytes > MAX_RECORD_BYTES) {
                   available = false
                   await finish("unavailable")
                   continue
                 }
-                batch.push(encoded)
+                batch.push([retainedCursorForSeq(lastSeq), encoded])
                 bytes += encodedBytes
               }
             }
@@ -246,10 +274,13 @@ export async function initializeRetainedChatStream({
       } catch {
         if (available) {
           await append([
-            JSON.stringify({
-              type: "error",
-              errorText: "The response stream was interrupted.",
-            }),
+            [
+              retainedCursorForSeq(lastSeq + 1),
+              JSON.stringify({
+                type: "error",
+                errorText: "The response stream was interrupted.",
+              }),
+            ],
           ])
           await finish("finished")
         }

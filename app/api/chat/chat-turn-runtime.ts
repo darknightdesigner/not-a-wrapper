@@ -14,7 +14,11 @@ import {
   getWorkDurationMs,
 } from "@/lib/chat-messages/metadata"
 import { extractTextFromMessageParts } from "@/lib/chat-messages/parts"
-import { initializeRetainedChatStream } from "@/lib/chat-stream/server"
+import type { SequencedUIMessageChunk } from "@/lib/chat-stream/protocol"
+import {
+  initializeRetainedChatStream,
+  sequenceUIMessageChunks,
+} from "@/lib/chat-stream/server"
 import {
   fallbackChatTitle,
   generateChatTitle,
@@ -1700,7 +1704,7 @@ export function createChatTurnRuntime(args: {
           : {}),
 
         onChunk: ({ chunk }) => {
-          // Release time, read before the durable snapshot bookkeeping below.
+          // Release time, read before the durable bookkeeping below.
           const releasedAtMs = Date.now()
           liveness.chunkReleased()
           // The ONE observer: this callback precedes the UI-stream
@@ -1722,7 +1726,7 @@ export function createChatTurnRuntime(args: {
           ) {
             workSummaryDuration.resolveAtEnd()
           }
-          const snapshotWrite = lifecycle.stream.onChunk(chunk, {
+          lifecycle.stream.noteWorkSummary({
             durationMs: workSummaryDuration.getDurationMs(),
             candidateMs: workSummaryDuration.getCandidateMs(),
           })
@@ -1737,7 +1741,6 @@ export function createChatTurnRuntime(args: {
           } else if (chunk.type === "reasoning-end") {
             reasoningActivity.end(chunk.id)
           }
-          return snapshotWrite
         },
 
         onError: (err: unknown) => {
@@ -2416,8 +2419,23 @@ export function createChatTurnRuntime(args: {
       const original = lifecycle.envelope
         .identity(validatedMessages)
         .originalMessages.at(-1)
-      const [responseBranch, retainedBranch] = observedResponseStream.tee()
-      observedResponseStream = responseBranch
+      // One numbering for checkpoints, Redis and the browser (ADR-0039):
+      // chunk n is retained entry 0-n and the browser's n-th chunk.
+      const [responseBranch, retainedBranch] = observedResponseStream
+        .pipeThrough(
+          sequenceUIMessageChunks(
+            (chunk, seq) => lifecycle.envelope.observe(chunk, seq),
+            () => lifecycle.envelope.observeEnd()
+          )
+        )
+        .tee()
+      observedResponseStream = responseBranch.pipeThrough(
+        new TransformStream<SequencedUIMessageChunk, UIMessageChunk>({
+          transform({ chunk }, controller) {
+            controller.enqueue(chunk)
+          },
+        })
+      )
       // Connect independently so Redis availability never delays the response.
       const persistence = (async () => {
         const retained = await initializeRetainedChatStream({

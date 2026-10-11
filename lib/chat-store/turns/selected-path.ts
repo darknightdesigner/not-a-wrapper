@@ -12,7 +12,8 @@
  *     descriptor, durable status, and — for assistant messages — durable
  *     content that has moved past the local copy (a generation surviving in
  *     the background keeps writing snapshots and its completion after this
- *     client detached; see shouldAdoptServerParts) onto matching live
+ *     client detached; see shouldAdoptServerParts), together with its
+ *     retained-stream cursor, onto matching live
  *     messages — including ones several turns back, so deep edits no longer
  *     keep a stale optimistic id;
  *   - never drops in-flight messages the server has not persisted yet (the
@@ -27,6 +28,8 @@
 import { isTerminalMessageStatus } from "@/lib/chat-messages/lifecycle"
 import {
   adoptServerOwned,
+  adoptStreamCursor,
+  getGenerationRunId,
   getServerMessageId,
 } from "@/lib/chat-messages/metadata"
 import type { ChatTurnMessage } from "@/lib/chat-turn/turn-plans"
@@ -158,10 +161,24 @@ export function reconcileSelectedPath(
     }
     if (!match || match.role !== localMessage.role) return localMessage
 
-    const mergedMetadata = adoptServerOwned(
+    const partsChanged =
+      localMessage.role === "assistant" &&
+      shouldAdoptServerParts(localMessage, match)
+    const ownedMetadata = adoptServerOwned(
       localMessage.metadata,
       match.metadata
     )
+    // The stream cursor names a position in one run's log: it moves with the
+    // parts it describes, or with a relink to another run (an approval
+    // continuation reuses the message; the new log starts at its content).
+    const localRunId = getGenerationRunId(localMessage.metadata)
+    const relinked =
+      localRunId !== undefined &&
+      localRunId !== getGenerationRunId(match.metadata)
+    const mergedMetadata =
+      partsChanged || relinked
+        ? adoptStreamCursor(ownedMetadata, match.metadata)
+        : ownedMetadata
     const metadataChanged = mergedMetadata !== localMessage.metadata
 
     // Adopt the server's canonical createdAt. A streamed message's client-side
@@ -173,9 +190,6 @@ export function reconcileSelectedPath(
       serverCreatedAt instanceof Date &&
       createdAtMs(localMessage.createdAt) !== serverCreatedAt.getTime()
     const statusChanged = localMessage.status !== match.status
-    const partsChanged =
-      localMessage.role === "assistant" &&
-      shouldAdoptServerParts(localMessage, match)
 
     if (
       !metadataChanged &&

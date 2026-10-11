@@ -15,12 +15,7 @@ A refreshed browser starts an authenticated reconnect before its Convex WebSocke
 
 The refreshed document restores the selected saved messages immediately, without clearing the assistant's parts. The retained stream reconstructs the SDK state silently from its immutable starting state; the caught-up fence publishes the restored answer once, then live chunks publish at their arrival cadence. Historical output has no pacing or typewriter animation. A subscription checkpoint already displayed, or a transient reconnect's visible prefix, is never replaced with a shorter prefix. Replay does not execute client tools, auto-submit approvals, or call initiating-turn finish handlers.
 
-Checkpoint adoption compares visible content in the representation the checkpoint preserves. Legacy Convex checkpoints aggregate reasoning and text and omit SDK step boundaries; those checkpoints require cumulative reasoning and text prefixes independently. Invisible `step-start` parts do not participate in comparison. Checkpoints containing structured parts retain ordered per-part guards for text, tools, data, sources and files. ADR-0040 extends new checkpoints to preserve SDK structure and text phase for inline work history; legacy aggregate checkpoints remain readable.
-
-Text and reasoning adoption guards compare text prefixes, with explicit text phase
-preserved. Opaque provider metadata is allowed to change: OpenAI can replace null
-encrypted reasoning metadata at completion without changing visible content.
-Requiring that metadata to remain identical would block otherwise valid replay.
+Checkpoint adoption compares log positions, not content (see "Checkpoint stream cursor (2026-10-11)"). The route numbers the final UI chunk stream once: chunk `n` is Redis entry `0-n`, the browser's n-th chunk, and the position the durable checkpoint reducer stamps on each Convex checkpoint as `streamCursor`. A cursor is an upper bound: the checkpoint's parts are contained in the log's reduction through it, and an absent cursor means the position is unknown. Replay may replace a displayed message only once it has applied at least that entry of the same run's log. Step boundaries, opaque provider metadata, text phase, tool states and data parts therefore need no comparison rules. ADR-0040 extends new checkpoints to preserve SDK structure and text phase for inline work history; legacy aggregate checkpoints remain readable.
 
 An ephemeral exact assistant identity bypasses Markdown decay during reconstruction. It never enters message metadata or persistence. Incremental parsing and the existing live-stream paint treatment remain in place.
 
@@ -28,7 +23,7 @@ Conversation scroll placement is armed by local submission or preflight, never b
 
 The Markdown offscreen-layout optimization excludes semantic list roots and blocks containing lists, including blockquotes. A partial next item can briefly parse as a sibling paragraph, which previously switched a long list into first-time containment with a 3rem fallback. Chrome then clamped the scroll position as the apparent content height collapsed. The exclusion persists after settlement so a concluding paragraph cannot trigger the same transition. Blocks without lists retain containment; offscreen lists trade that optimization for correct geometry.
 
-If replay cannot extend the displayed checkpoint and no update is adopted within 2 seconds, the observer disconnects but keeps the run marked as seen. Convex checkpoints then drive the rest of that turn instead of a frozen answer; they only ever replace a checkpoint, so the prefix rule holds.
+A displayed copy without a known position (a checkpoint written before cursors, the final full-parts snapshot, a Stop prefix) hands the turn to Convex checkpoints at once: the observer disconnects but keeps the run marked as seen. A log still behind the displayed cursor after 2 seconds (slow Redis appends let checkpoints run ahead) does the same. Checkpoints then drive the rest of that turn instead of a frozen answer; they only ever replace a checkpoint, so the prefix rule holds.
 
 Each observer keeps one ordered SDK reducer across connections. A reconnect sends its last applied entry id as `after`, together with its `runId`; the route rejects a cursor without one. The server resends the immutable base, sends only newer entries, and sends a new caught-up fence. The client ignores the repeated base and any entry at or before its cursor. Idle readers send a `heartbeat` frame after 2.5 seconds without a frame (about every 3 seconds) and write nothing to Redis. Heartbeats are opt-in (`heartbeat=1`), because tabs loaded before they existed reject unknown frames. A connection that delivers nothing for 10 seconds, response headers included, is replaced from its cursor. That stall counts toward the same five-failure budget as other transport failures, with checkpoints shown while it retries, so a route that never delivers falls back to checkpoints instead of polling all turn. A visible tab, `online`, or a back/forward-cache `pageshow` replaces at once a connection that has delivered nothing for 5 seconds (two missed heartbeats), and ends a retry backoff early (the shared Connection wake Module, ADR-0024). A connection still receiving heartbeats is healthy and is kept.
 
@@ -153,6 +148,108 @@ answer keeps growing; a response body that stops delivering reconnects with
 `after` within about 10 seconds and resumes; after 5 seconds of silence, `online`,
 `visibilitychange` and `pageshow` reconnect at once, while a connection still
 receiving heartbeats is kept.
+
+### Checkpoint stream cursor (2026-10-11)
+
+This answers the 2026-09-27 deferral. The prefix guard needed a new rule for
+every part shape it mis-modeled (`step-start` parts, opaque provider metadata,
+text phase changes), and tools and data still relied on heuristics. Following
+HuggingChat's `materializedSeq` (`huggingface/chat-ui@8e696f8`, `Message.ts`
+L24-30, `writer.ts` L207-294), every checkpoint now records the log position it
+contains. LibreChat pairs its resume snapshot with an emission frontier the
+same way.
+
+Server: `sequenceUIMessageChunks` numbers the final response stream (after
+metadata, the title merge and the perf observer) before the Redis tee, and
+Redis entries use explicit ids `0-n` instead of `*`. The checkpoint tracker now
+reduces those same sequenced UI chunks from the same starting message; it used
+to convert `streamText` parts itself, without message metadata, so no shared
+position existed. Each throttled checkpoint carries `streamCursor`, the last
+sequence observed when the write is issued, which is at or ahead of the reduced
+parts. Convex writes the cursor in the same patch as `content`/`parts`; a
+deduplicated write keeps the stored cursor, and the `lastSnapshotSequence`
+guard rejects stale pairs. A new placeholder and an approval continuation's
+relinked message start at `0-0` (that content is the new run's base). The final
+full-parts snapshot, the completion write and a Stop observed-text prefix clear
+it: their content can lead the log or is not a reduction of it. Other terminal
+writes (failure, abort, the lease reaper, Stop without observed text) change
+only status and error, so the kept cursor still bounds the unchanged parts; no
+client gates a terminal run, and a later run on the message starts at `0-0`.
+The wire format is unchanged, so tabs loaded earlier keep working.
+
+Client: the caught-up fence writes a metadata probe into the reducer, covering
+every chunk replayed before it. After the fence, while the gate stays closed,
+each network read that advanced the cursor writes another. The SDK merges message
+metadata and yields after every non-null `message-metadata` chunk, so each
+yield carries a lower bound of what it has applied. A yield replaces the
+displayed copy only when that bound reaches the copy's cursor: no visible parts
+count as `0-0`; this tab's own direct request counts as `0-<delivered chunks>`
+while its parts are still displayed; a previous run's content counts as `0-0`;
+a stamped cursor counts as itself. Anything else hands the turn to checkpoints
+at once. Published replay states carry their own cursor, and the selected-path
+projection moves a cursor only together with the parts it adopts or with a
+relink to another run.
+
+SDK deviation: AI SDK 7's reducer cannot start from a saved message partway
+through a part. `readUIMessageStream` throws `UIMessageStreamError` on a
+`text-delta`, `text-end` or `tool-input-delta` whose start it has not seen
+(verified in `ai@7.0.73`, `dist/index.js` text cases near L7006). Replay
+therefore still starts from the immutable base; the cursor decides when replay
+may replace the checkpoint, not where it starts. First-connection bandwidth is
+unchanged.
+
+Deviations from the implementation plan:
+
+- At the caught-up fence, the probe waits for its own yield and then publishes
+  the exact restored state before reconstruction ends, instead of deferring to
+  the next live yield. This keeps restored text out of the live paint treatment
+  and never publishes lagging intermediate snapshots.
+- The tracker no longer closes or drains its input on flush: the sequenced
+  stream closes only after settlement returns, so that wait would deadlock.
+  Flush writes a metadata barrier into the tracker's own reducer and waits
+  (bounded) for it, so it persists every chunk already observed. Chunks still
+  in transit before the sequencing transform when a server abort or provider
+  failure flushes are not included. Those paths write the run terminal before
+  settlement, which then rejects the final full-parts snapshot, so the stored
+  message can end a few chunks short of what the browser received.
+- The completion write also clears the cursor. Its parts come from the response
+  message; a cursor left by a failed final snapshot would understate them for a
+  connection retrying in backoff.
+- The direct-request rule matches the parts array the request left displayed,
+  captured when the SDK settles its status, so parts a later projection
+  replaced cannot borrow the delivered count. It runs before the previous-run
+  and stamped-cursor rules and does not compare run ids: a direct stream stamps
+  neither, so both can still describe the run an approval continuation resumed,
+  and a later run on the same message starts from a base that already holds
+  those parts.
+- The selected-path projection also adopts the server's cursor when a
+  message's `generationRunId` changes (an approval continuation relink), since
+  the parts did not change. Otherwise an observer in a second tab compared the
+  relinked run's log against no cursor and fell back to checkpoints.
+
+Focused tests cover the gate (a checkpoint ahead of the log, no cursor, a
+previous run's content, the direct-request count), the tracker cursor and final
+clear, explicit Redis ids with `after` resume, the Convex pairing and
+continuation reset, and the projection pairing.
+
+Local verification (2026-10-11): authenticated Chrome on the localhost:3000 dev
+server with local Redis. The tab was hidden, which freezes the paced DOM reveal,
+so samples read the chat's message state through its messages callback from
+about 0.4 s after each full navigation. GPT-5 Mini/Low: a reload at 16,658
+answer characters first showed 16,714 at 503 ms (replay cursor `0-3099`), then
+2,315 updates of a median 6 characters, none shorter than before the reload,
+while the retained request stayed open past 12 s. Another reload at 10,728
+characters resumed at 13,700. Completed answers matched the stored content
+exactly after another reload. Haiku 4.5 web search: a reload during three
+running searches resumed at 621 ms with the searches completing, and a reload at
+1,222 characters resumed at 1,240 after 571 ms. GPT-5 Mini/Medium: two reloads
+during reasoning resumed without a freeze (1,725 reasoning characters resumed as
+1,753 after 586 ms). Ending the direct request as the wake handoff does, after
+1,385 delivered chunks (7,699 characters), published the replay 188 ms later at
+7,837 characters (`0-1406`). Convex cursors advanced as `0-n` during every run
+and were cleared at completion; all 11 runs ended terminal (10 completed, one
+Stop). No console errors. Approval continuation and stopped Redis were not run
+live; unit tests and the existing fallback cover them.
 
 ## References
 

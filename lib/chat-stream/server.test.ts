@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 import {
   retainedChatStreamFrameSchema,
   type RetainedChatStreamFrame,
+  type SequencedUIMessageChunk,
 } from "./protocol"
 import { initializeRetainedChatStream, readRetainedChatStream } from "./server"
 
@@ -15,6 +16,9 @@ const client = createClient({
   socket: { connectTimeout: 3000, reconnectStrategy: false },
 })
 client.on("error", () => undefined)
+
+const sequenced = (chunks: UIMessageChunk[]): SequencedUIMessageChunk[] =>
+  chunks.map((chunk, index) => ({ seq: index + 1, chunk }))
 
 function newRun() {
   const run = `test-${crypto.randomUUID()}`
@@ -72,7 +76,7 @@ describe.runIf(Boolean(url))(
       expect(writer).not.toBeNull()
       // A duplicate start must never overwrite the immutable base or own the producer.
       expect(await initializeRetainedChatStream({ runId })).toBeNull()
-      let source!: ReadableStreamDefaultController<UIMessageChunk>
+      let source!: ReadableStreamDefaultController<SequencedUIMessageChunk>
       const consuming = writer!.consume(
         new ReadableStream({
           start(controller) {
@@ -97,16 +101,29 @@ describe.runIf(Boolean(url))(
         { type: "text-end", id: "text" },
         { type: "finish" },
       ]
-      for (const chunk of chunks) source.enqueue(chunk)
+      for (const entry of sequenced(chunks)) source.enqueue(entry)
       source.close()
       await consuming
-      const live: UIMessageChunk[] = []
+      const live: RetainedChatStreamFrame[] = []
       for (;;) {
         const frame = await nextFrame(reader)
         if (!frame) break
-        if (frame.type === "chunk") live.push(frame.chunk)
+        if (frame.type === "chunk") live.push(frame)
       }
-      expect(live).toEqual(chunks)
+      // Entry ids are the sequence: a checkpoint cursor names an entry.
+      expect(live).toEqual(
+        chunks.map((chunk, index) => ({
+          type: "chunk",
+          id: `0-${index + 1}`,
+          chunk,
+        }))
+      )
+      const after = await collect(
+        await readRetainedChatStream(runId, { after: "0-3" })
+      )
+      expect(
+        after.filter((frame) => frame.type === "chunk").map((frame) => frame.id)
+      ).toEqual(["0-4", "0-5", "0-6"])
 
       const resumed = await collect(await readRetainedChatStream(runId))
       expect(
@@ -123,7 +140,7 @@ describe.runIf(Boolean(url))(
     it("disconnecting a blocked reader does not cancel the producer", async () => {
       const runId = newRun()
       const writer = await initializeRetainedChatStream({ runId })
-      let source!: ReadableStreamDefaultController<UIMessageChunk>
+      let source!: ReadableStreamDefaultController<SequencedUIMessageChunk>
       const consuming = writer!.consume(
         new ReadableStream({
           start(controller) {
@@ -140,8 +157,11 @@ describe.runIf(Boolean(url))(
       const pendingRead = reader.read()
       abort.abort()
       expect((await pendingRead).done).toBe(true)
-      source.enqueue({ type: "start", messageId: "assistant" })
-      source.enqueue({ type: "finish" })
+      for (const entry of sequenced([
+        { type: "start", messageId: "assistant" },
+        { type: "finish" },
+      ]))
+        source.enqueue(entry)
       source.close()
       await consuming
       const frames = await collect(await readRetainedChatStream(runId))
@@ -156,9 +176,12 @@ describe.runIf(Boolean(url))(
         new ReadableStream({
           start(controller) {
             controller.enqueue({
-              type: "text-delta",
-              id: "text",
-              delta: "x".repeat(16 * 1024 * 1024),
+              seq: 1,
+              chunk: {
+                type: "text-delta",
+                id: "text",
+                delta: "x".repeat(16 * 1024 * 1024),
+              },
             })
             controller.close()
           },
@@ -190,9 +213,12 @@ describe.runIf(Boolean(url))(
           pull(controller) {
             if (emitted++ === 33) return controller.close()
             controller.enqueue({
-              type: "text-delta",
-              id: "text",
-              delta: "x".repeat(512 * 1024),
+              seq: emitted,
+              chunk: {
+                type: "text-delta",
+                id: "text",
+                delta: "x".repeat(512 * 1024),
+              },
             })
           },
         })
@@ -207,7 +233,7 @@ describe.runIf(Boolean(url))(
     it("retains accepted chunks and a sanitized terminal error when the source fails", async () => {
       const runId = newRun()
       const writer = await initializeRetainedChatStream({ runId })
-      let source!: ReadableStreamDefaultController<UIMessageChunk>
+      let source!: ReadableStreamDefaultController<SequencedUIMessageChunk>
       const consuming = writer!.consume(
         new ReadableStream({
           start(controller) {
@@ -218,7 +244,10 @@ describe.runIf(Boolean(url))(
       const reader = (await readRetainedChatStream(runId))!.getReader()
       await nextFrame(reader)
       await nextFrame(reader)
-      source.enqueue({ type: "start", messageId: "assistant" })
+      source.enqueue({
+        seq: 1,
+        chunk: { type: "start", messageId: "assistant" },
+      })
       expect(await nextFrame(reader)).toMatchObject({
         type: "chunk",
         chunk: { type: "start" },

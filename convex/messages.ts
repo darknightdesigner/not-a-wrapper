@@ -52,6 +52,7 @@ export const vSelectedMessage = schema.tables.messages.validator
     "usage",
     "error",
     "errorRecovery",
+    "streamCursor",
     "createdAt"
   )
   .extend({
@@ -87,6 +88,7 @@ function toSelectedMessage(
     usage: message.usage,
     error: message.error,
     errorRecovery: message.errorRecovery,
+    streamCursor: message.streamCursor,
     metadata: branch ? { ...metadata, branch } : metadata,
     createdAt: message.createdAt,
   }

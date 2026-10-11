@@ -162,6 +162,19 @@ closes the observed race with less machinery. It preserves the stopping tab's
 captured prefix; it cannot preserve an unseen prefix from a different tab that
 loses a terminal race, or bypass the explicit size bounds.
 
+### October 11 amendment: checkpoints carry the retained-stream cursor
+
+The snapshot tracker now reduces the sequenced final UI chunk stream, the same
+chunks Redis retains and the browser receives (ADR-0039 "Checkpoint stream
+cursor"). It is fed through `envelope.observe(chunk, seq)`, a
+`toUIMessageStream`-side position; the `streamText` callback keeps only the
+pre-answer duration (`stream.noteWorkSummary`, ADR-0041 C5). Throttled
+snapshots carry `streamCursor`, the last observed sequence, and the final
+full-parts snapshot and the completion write clear it. Settlement never waits
+for the sequenced stream to close, because it closes only after `onEnd`
+returns: the flush waits on a barrier in the tracker's own reducer, and the
+final snapshot waits only for an in-flight write.
+
 ## Supersessions of ADR-0009 (exactly three)
 
 1. **Captured-token worker writes** ("the convex token crosses here, once"):

@@ -111,38 +111,61 @@ it("cancels reconstruction without exposing partial history", async () => {
 })
 
 it("restores an approval baseline and retained output together before live updates", async () => {
-  const updates: string[] = []
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(
-        frame({ type: "base", message: base, highWater: "3-0" })
-      )
-      chunks.forEach((chunk, i) =>
-        controller.enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
-      )
-      controller.enqueue(frame({ type: "caught-up" }))
-      controller.enqueue(
-        frame({
-          type: "chunk",
-          id: "4-0",
-          chunk: { type: "text-delta", id: "new-text", delta: " world" },
-        })
-      )
-      controller.enqueue(frame({ type: "end" }))
-      controller.close()
-    },
-  })
-  await consumeOnce(
-    stream,
-    (message) => {
-      updates.push(
-        message.parts
-          .flatMap((part) => (part.type === "text" ? [part.text] : []))
-          .join("")
-      )
-    },
-    new AbortController().signal
+  // The displayed copy still belongs to the paused run: it is this run's
+  // base, so its cursor names the other run's log and proves nothing here.
+  const displayed: UIMessage = {
+    ...base,
+    metadata: { generationRunId: "paused-run", streamCursor: "0-9" },
+  }
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(
+                frame({ type: "base", message: base, highWater: "0-3" })
+              )
+              chunks.forEach((chunk, i) =>
+                controller.enqueue(
+                  frame({ type: "chunk", id: `0-${i + 1}`, chunk })
+                )
+              )
+              controller.enqueue(frame({ type: "caught-up" }))
+              controller.enqueue(
+                frame({
+                  type: "chunk",
+                  id: "0-4",
+                  chunk: { type: "text-delta", id: "new-text", delta: " world" },
+                })
+              )
+              controller.enqueue(frame({ type: "end" }))
+              controller.close()
+            },
+          })
+        )
+    )
   )
+  const chat = new ResumableChat({ messages: [displayed] })
+  const updates: string[] = []
+  chat["~registerMessagesCallback"](() =>
+    updates.push(
+      chat.messages[0].parts
+        .flatMap((part) => (part.type === "text" ? [part.text] : []))
+        .join("")
+    )
+  )
+  chat.syncRun(
+    {
+      chatId: "chat",
+      runId: "run",
+      assistantMessageId: "assistant",
+      status: "streaming",
+    },
+    [displayed]
+  )
+  await vi.waitFor(() => expect(chat.replayRunId).toBeNull())
   expect(updates).toEqual([
     "Before approval.Hello",
     "Before approval.Hello world",
@@ -157,17 +180,17 @@ it("reconnects by GET without erasing visible text or dispatching another genera
       new Response(
         new ReadableStream({
           start(controller) {
-            controller.enqueue(frame({ type: "base", highWater: "3-0" }))
+            controller.enqueue(frame({ type: "base", highWater: "0-3" }))
             chunks.forEach((chunk, i) =>
               controller.enqueue(
-                frame({ type: "chunk", id: `${i + 1}-0`, chunk })
+                frame({ type: "chunk", id: `0-${i + 1}`, chunk })
               )
             )
             controller.enqueue(frame({ type: "caught-up" }))
             controller.enqueue(
               frame({
                 type: "chunk",
-                id: "4-0",
+                id: "0-4",
                 chunk: { type: "text-delta", id: "new-text", delta: " world" },
               })
             )
@@ -178,10 +201,12 @@ it("reconnects by GET without erasing visible text or dispatching another genera
       )
   )
   vi.stubGlobal("fetch", fetchMock)
+  // A checkpoint of entry 0-4: the replay at caught-up (0-3) is shorter.
   const message: UIMessage = {
     id: "assistant",
     role: "assistant",
     parts: [{ type: "text", text: "Hello world" }],
+    metadata: { streamCursor: "0-4" },
   }
   const chat = new ResumableChat({
     messages: [message],
@@ -303,7 +328,7 @@ it("replaces a silent retained connection after its cursor and falls back when s
   }
 })
 
-it("hands the turn to checkpoints when replay cannot extend the displayed copy", async () => {
+it("hands a checkpoint without a cursor to checkpoints at once", async () => {
   vi.useFakeTimers()
   const checkpoint: UIMessage = {
     id: "assistant",
@@ -340,18 +365,15 @@ it("hands the turn to checkpoints when replay cannot extend the displayed copy",
         messages: [checkpoint],
       })
     )
-    source.enqueue(frame({ type: "base", highWater: "3-0" }))
+    source.enqueue(frame({ type: "base", highWater: "0-3" }))
     chunks.forEach((chunk, i) =>
-      source.enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
+      source.enqueue(frame({ type: "chunk", id: `0-${i + 1}`, chunk }))
     )
     source.enqueue(frame({ type: "caught-up" }))
-    await vi.waitFor(() => expect(chat.status).toBe("streaming"))
-    await vi.waitFor(() => expect(chat.replayingMessageId).toBeNull())
-    // Streaming status pauses checkpoint projection: this is the frozen answer.
-    expect(chat.messages).toEqual([checkpoint])
-    await vi.advanceTimersByTimeAsync(2_000)
+    // No proof the log covers the displayed copy: no 2 s wait.
+    await vi.waitFor(() => expect(chat.replayRunId).toBeNull())
     expect(chat.status).toBe("ready")
-    expect(chat.replayRunId).toBeNull()
+    expect(chat.messages).toEqual([checkpoint])
     chat.syncRun(run, [checkpoint])
     expect(fetchMock).toHaveBeenCalledTimes(1)
   } finally {
@@ -382,13 +404,40 @@ it("keeps checkpoints available during a missing replay and releases a detached 
   expect(chat.status).toBe("ready")
 })
 
-it("recovers a failed original transport but respects explicit Stop", async () => {
+it("recovers a failed original transport from its delivered count but respects explicit Stop", async () => {
   class ControlledChat extends ResumableChat {
     transition(status: ChatStatus) {
       this.setStatus({ status })
     }
   }
-  const fetchMock = vi.fn(async () => new Response(null, { status: 204 }))
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(frame({ type: "base", highWater: "0-2" }))
+            chunks.slice(0, 2).forEach((chunk, i) =>
+              controller.enqueue(
+                frame({ type: "chunk", id: `0-${i + 1}`, chunk })
+              )
+            )
+            controller.enqueue(frame({ type: "caught-up" }))
+            controller.enqueue(
+              frame({ type: "chunk", id: "0-3", chunk: chunks[2] })
+            )
+            controller.enqueue(
+              frame({
+                type: "chunk",
+                id: "0-4",
+                chunk: { type: "text-delta", id: "new-text", delta: " world" },
+              })
+            )
+            controller.enqueue(frame({ type: "end" }))
+            controller.close()
+          },
+        })
+      )
+  )
   vi.stubGlobal("fetch", fetchMock)
   const run = {
     chatId: "chat",
@@ -396,13 +445,48 @@ it("recovers a failed original transport but respects explicit Stop", async () =
     assistantMessageId: "assistant",
     status: "streaming",
   }
-  const chat = new ControlledChat({ messages: [] })
-  chat.transition("streaming")
+  let direct!: ReadableStreamDefaultController<UIMessageChunk>
+  const chat = new ResumableChat({
+    transport: {
+      sendMessages: async () =>
+        new ReadableStream<UIMessageChunk>({
+          start(controller) {
+            direct = controller
+          },
+        }),
+      reconnectToStream: vi.fn(),
+    },
+  })
+  const text = () =>
+    chat.messages
+      .at(-1)
+      ?.parts.flatMap((part) => (part.type === "text" ? [part.text] : []))
+      .join("") ?? ""
+  const published: string[] = []
+  chat["~registerMessagesCallback"](() => published.push(text()))
+  void chat.sendMessage({ text: "Hi" })
+  await vi.waitFor(() => expect(direct).toBeDefined())
+  chunks.forEach((chunk) => direct.enqueue(chunk))
+  await vi.waitFor(() => expect(text()).toBe("Hello"))
   chat.syncRun(run, [])
   expect(fetchMock).not.toHaveBeenCalled()
-  chat.transition("error")
+  direct.error(new TypeError("network error"))
+  await vi.waitFor(() => expect(chat.status).toBe("error"))
+  // A continued message can still name the run it resumed: the parts are
+  // this request's, so its delivered count still bounds them.
+  chat.messages = chat.messages.map((message) =>
+    message.role === "assistant"
+      ? { ...message, metadata: { generationRunId: "paused-run" } }
+      : message
+  )
+  published.length = 0
   chat.syncRun(run, [])
-  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+  await vi.waitFor(() => expect(text()).toBe("Hello world"))
+  // Three chunks were delivered directly: replay at entry 0-2 (an empty text
+  // part) never replaced them.
+  expect(published.every((value) => value.startsWith("Hello"))).toBe(true)
+  expect(fetchMock).toHaveBeenCalledTimes(1)
+
   const stopped = new ControlledChat({ messages: [] })
   stopped.transition("streaming")
   stopped.syncRun(run, [])
@@ -451,18 +535,20 @@ it("restores the checkpoint before subscription hydration and silently catches u
           createdAt: "2026-09-05T12:00:00.000Z",
           content: "x".repeat(800),
           status: "streaming",
+          // Eight 100-character deltas after start and text-start.
+          metadata: { streamCursor: "0-10" },
         },
       ],
     })
   )
-  source.enqueue(frame({ type: "base", highWater: "20-0" }))
-  source.enqueue(frame({ type: "chunk", id: "1-0", chunk: chunks[0] }))
-  source.enqueue(frame({ type: "chunk", id: "2-0", chunk: chunks[1] }))
+  source.enqueue(frame({ type: "base", highWater: "0-14" }))
+  source.enqueue(frame({ type: "chunk", id: "0-1", chunk: chunks[0] }))
+  source.enqueue(frame({ type: "chunk", id: "0-2", chunk: chunks[1] }))
   for (let i = 0; i < 12; i++)
     source.enqueue(
       frame({
         type: "chunk",
-        id: `${i + 3}-0`,
+        id: `0-${i + 3}`,
         chunk: { type: "text-delta", id: "new-text", delta: "x".repeat(100) },
       })
     )
@@ -558,6 +644,7 @@ it("keeps a checkpoint painted while discovery was pending", async () => {
     id: "assistant",
     role: "assistant",
     parts: [{ type: "text", text: "Hello" }],
+    metadata: { streamCursor: "0-3" },
   }
   chat.messages = [checkpoint]
   const published: string[] = []
@@ -580,15 +667,15 @@ it("keeps a checkpoint painted while discovery was pending", async () => {
       messages: [checkpoint],
     })
   )
-  source.enqueue(frame({ type: "base", highWater: "3-0" }))
+  source.enqueue(frame({ type: "base", highWater: "0-3" }))
   chunks.forEach((chunk, i) =>
-    source.enqueue(frame({ type: "chunk", id: `${i + 1}-0`, chunk }))
+    source.enqueue(frame({ type: "chunk", id: `0-${i + 1}`, chunk }))
   )
   source.enqueue(frame({ type: "caught-up" }))
   source.enqueue(
     frame({
       type: "chunk",
-      id: "4-0",
+      id: "0-4",
       chunk: { type: "text-delta", id: "new-text", delta: " world" },
     })
   )
@@ -598,283 +685,6 @@ it("keeps a checkpoint painted while discovery was pending", async () => {
   expect(published.every((text) => text.startsWith("Hello"))).toBe(true)
   expect(chat.replayingMessageId).toBeNull()
 })
-
-it.each([
-  {
-    name: "reasoning encryption completed",
-    checkpointPart: {
-      type: "reasoning",
-      text: "",
-      state: "streaming",
-      providerMetadata: { openai: { itemId: "r", reasoningEncryptedContent: null } },
-    },
-    history: [
-      { type: "reasoning-start", id: "r", providerMetadata: { openai: { itemId: "r", reasoningEncryptedContent: null } } },
-      { type: "reasoning-end", id: "r", providerMetadata: { openai: { itemId: "r", reasoningEncryptedContent: "encrypted-final" } } },
-      { type: "text-start", id: "answer" },
-      { type: "text-delta", id: "answer", delta: "Recovered answer" },
-    ],
-    accepts: true,
-  },
-  {
-    name: "opaque text metadata replaced",
-    checkpointPart: {
-      type: "text",
-      text: "Recovered",
-      state: "streaming",
-      providerMetadata: { openai: { phase: "final_answer", opaque: null } },
-    },
-    history: [
-      { type: "text-start", id: "answer", providerMetadata: { openai: { phase: "final_answer", opaque: "complete" } } },
-      { type: "text-delta", id: "answer", delta: "Recovered answer" },
-    ],
-    accepts: true,
-  },
-  {
-    name: "final answer reclassified as commentary",
-    checkpointPart: {
-      type: "text",
-      text: "Recovered",
-      state: "streaming",
-      providerMetadata: { openai: { phase: "final_answer" } },
-    },
-    history: [
-      { type: "text-start", id: "answer", providerMetadata: { openai: { phase: "commentary" } } },
-      { type: "text-delta", id: "answer", delta: "Recovered answer" },
-    ],
-    accepts: false,
-  },
-  {
-    // Legacy aggregate checkpoints carry no phase; the guard (via readTextPhase)
-    // only compares phases when the checkpoint has one (ADR-0041, Section 8).
-    name: "unphased legacy checkpoint meets a phased candidate",
-    checkpointPart: { type: "text", text: "Recovered", state: "streaming" },
-    history: [
-      { type: "text-start", id: "answer", providerMetadata: { openai: { phase: "final_answer" } } },
-      { type: "text-delta", id: "answer", delta: "Recovered answer" },
-    ],
-    accepts: true,
-  },
-] satisfies {
-  name: string
-  checkpointPart: UIMessage["parts"][number]
-  history: UIMessageChunk[]
-  accepts: boolean
-}[])("guards visible replay content when $name", async ({ checkpointPart, history, accepts }) => {
-  const message: UIMessage = {
-    id: "assistant",
-    role: "assistant",
-    parts: [{ type: "text", text: "Saved" }, checkpointPart],
-  }
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(new ReadableStream({
-    start(controller) {
-      controller.enqueue(frame({ type: "base", highWater: "9-0", message: {
-        ...message, parts: [message.parts[0]],
-      } }))
-      history.forEach((chunk, index) => controller.enqueue(
-        frame({ type: "chunk", id: `${index + 1}-0`, chunk })
-      ))
-      controller.enqueue(frame({ type: "caught-up" }))
-      controller.enqueue(frame({ type: "chunk", id: "10-0", chunk: {
-        type: "text-delta", id: "answer", delta: " keeps streaming",
-      } }))
-      controller.enqueue(frame({ type: "end" }))
-      controller.close()
-    },
-  }))))
-  const chat = new ResumableChat({ messages: [message] })
-  const updates: UIMessage[] = []
-  chat["~registerMessagesCallback"](() => updates.push(chat.messages[0]))
-  chat.syncRun({
-    chatId: "chat", runId: "run", assistantMessageId: "assistant", status: "streaming",
-  }, [message])
-  await vi.waitFor(() => expect(chat.replayRunId).toBeNull())
-  if (!accepts) {
-    expect(updates).toEqual([])
-    expect(chat.messages[0]).toEqual(message)
-    return
-  }
-  const text = (value: UIMessage) => value.parts.flatMap(
-    (part) => part.type === "text" ? [part.text] : []
-  ).join("")
-  expect(updates.map(text)).toEqual([
-    "SavedRecovered answer",
-    "SavedRecovered answer keeps streaming",
-  ])
-})
-
-it.each([
-  {
-    name: "phased final text",
-    checkpoint: {
-      type: "text",
-      text: "Answer",
-      state: "done",
-      providerMetadata: { openai: { phase: "final_answer" } },
-    },
-    history: [],
-    catchUp: [
-      { type: "start-step" },
-      { type: "text-start", id: "final", providerMetadata: { openai: { phase: "final_answer" } } },
-      { type: "text-delta", id: "final", delta: "Answer" },
-      { type: "text-end", id: "final" },
-    ],
-  },
-  {
-    name: "tool result",
-    checkpoint: {
-      type: "tool-search",
-      toolCallId: "tool",
-      state: "output-available",
-      input: { query: "test" },
-      output: { answer: "saved" },
-    },
-    history: [
-      {
-        type: "tool-search",
-        toolCallId: "tool",
-        state: "input-available",
-        input: { query: "test" },
-      },
-    ],
-    catchUp: [
-      {
-        type: "tool-output-available",
-        toolCallId: "tool",
-        output: { answer: "saved" },
-      },
-    ],
-  },
-  {
-    name: "newer tool output",
-    checkpoint: {
-      type: "tool-search",
-      toolCallId: "tool",
-      state: "output-available",
-      input: { query: "test" },
-      output: { answer: "saved" },
-    },
-    history: [
-      {
-        type: "tool-search",
-        toolCallId: "tool",
-        state: "output-available",
-        input: { query: "test" },
-        output: { answer: "old" },
-      },
-    ],
-    catchUp: [
-      {
-        type: "tool-output-available",
-        toolCallId: "tool",
-        output: { answer: "saved" },
-      },
-    ],
-  },
-  {
-    name: "source",
-    checkpoint: {
-      type: "source-url",
-      sourceId: "source",
-      url: "https://example.com",
-      title: "Saved citation",
-    },
-    history: [],
-    catchUp: [
-      {
-        type: "source-url",
-        sourceId: "source",
-        url: "https://example.com",
-        title: "Saved citation",
-      },
-    ],
-  },
-  {
-    name: "file",
-    checkpoint: {
-      type: "file",
-      mediaType: "image/png",
-      url: "https://example.com/image.png",
-    },
-    history: [],
-    catchUp: [
-      {
-        type: "file",
-        mediaType: "image/png",
-        url: "https://example.com/image.png",
-      },
-    ],
-  },
-] satisfies {
-  name: string
-  checkpoint: UIMessage["parts"][number]
-  history: UIMessage["parts"]
-  catchUp: UIMessageChunk[]
-}[])(
-  "keeps the checkpoint's $name until retained structured output catches up",
-  async ({ checkpoint, history, catchUp }) => {
-    const message: UIMessage = {
-      id: "assistant",
-      role: "assistant",
-      parts: [{ type: "text", text: "Saved" }, checkpoint],
-    }
-    let source!: ReadableStreamDefaultController<Uint8Array>
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(
-        async () =>
-          new Response(
-            new ReadableStream({
-              start(controller) {
-                source = controller
-              },
-            })
-          )
-      )
-    )
-    const chat = new ResumableChat({ messages: [message] })
-    const updates: UIMessage[] = []
-    chat["~registerMessagesCallback"](() => updates.push(chat.messages[0]))
-    chat.syncRun(
-      {
-        chatId: "chat",
-        runId: "run",
-        assistantMessageId: "assistant",
-        status: "streaming",
-      },
-      [message]
-    )
-    await vi.waitFor(() => expect(source).toBeDefined())
-    source.enqueue(
-      frame({
-        type: "base",
-        highWater: "0-0",
-        message: { ...message, parts: [message.parts[0], ...history] },
-      })
-    )
-    source.enqueue(frame({ type: "caught-up" }))
-    await vi.waitFor(() => expect(source.desiredSize).toBe(1))
-    expect(chat.messages[0]).toEqual(message)
-    expect(updates).toEqual([])
-    for (const chunk of catchUp)
-      source.enqueue(frame({ type: "chunk", id: "1-0", chunk }))
-    source.enqueue(frame({ type: "end" }))
-    source.close()
-    await vi.waitFor(() => expect(chat.replayRunId).toBeNull())
-    expect(updates.length).toBeGreaterThan(0)
-    for (const update of updates) {
-      if (checkpoint.type === "text") {
-        const visibleParts = update.parts.filter((part) => part.type !== "step-start")
-        expect(visibleParts).toEqual([
-          message.parts[0],
-          { ...checkpoint, state: expect.stringMatching(/^(streaming|done)$/) },
-        ])
-      } else {
-        expect(update.parts).toEqual(message.parts)
-      }
-    }
-  }
-)
 
 it.each([true, false])(
   "a generation error retries only if its transport is incomplete (end=%s)",
@@ -932,13 +742,15 @@ it.each([true, false])(
 )
 
 it("accepts mutable live data after reaching the checkpoint", async () => {
-  const message: UIMessage = {
+  const base: UIMessage = {
     id: "assistant",
     role: "assistant",
     parts: [
       { type: "data-progress", id: "progress", data: { phase: "queued" } },
     ],
   }
+  // The checkpoint is the log's base.
+  const message: UIMessage = { ...base, metadata: { streamCursor: "0-0" } }
   vi.stubGlobal(
     "fetch",
     vi.fn(
@@ -947,13 +759,13 @@ it("accepts mutable live data after reaching the checkpoint", async () => {
           new ReadableStream({
             start(controller) {
               controller.enqueue(
-                frame({ type: "base", highWater: "0-0", message })
+                frame({ type: "base", highWater: "0-0", message: base })
               )
               controller.enqueue(frame({ type: "caught-up" }))
               controller.enqueue(
                 frame({
                   type: "chunk",
-                  id: "1-0",
+                  id: "0-1",
                   chunk: {
                     type: "data-progress",
                     id: "progress",
@@ -1013,9 +825,10 @@ it.each([false, true])(
 )
 
 it.each([false, true])(
-  "adopts an aggregated durable checkpoint through SDK step markers and continues live (multiple steps=%s)",
+  "waits for the entry a checkpoint names, whatever its shape, then continues live (multiple steps=%s)",
   async (multipleSteps) => {
-    // The durable tracker aggregates reasoning/text; the SDK retains step order.
+    // The checkpoint aggregates reasoning/text and leads the log by one
+    // entry; the SDK retains step order. Only the cursor decides adoption.
     const checkpoint: UIMessage = {
       id: "assistant",
       role: "assistant",
@@ -1077,6 +890,7 @@ it.each([false, true])(
           )
       )
     )
+    checkpoint.metadata = { streamCursor: `0-${history.length + 1}` }
     const chat = new ResumableChat({ messages: [checkpoint] })
     const visibleText = () =>
       chat.messages[0].parts
@@ -1103,20 +917,21 @@ it.each([false, true])(
           messages: [checkpoint],
         })
       )
-      source.enqueue(frame({ type: "base", highWater: `${history.length}-0` }))
+      source.enqueue(frame({ type: "base", highWater: `0-${history.length}` }))
       history.forEach((chunk, index) =>
-        source.enqueue(frame({ type: "chunk", id: `${index + 1}-0`, chunk }))
+        source.enqueue(frame({ type: "chunk", id: `0-${index + 1}`, chunk }))
       )
       source.enqueue(frame({ type: "caught-up" }))
       await vi.waitFor(() => {
         expect(source.desiredSize).toBe(1)
         expect(chat.replayingMessageId).toBeNull()
       })
+      // Nothing publishes at caught-up: the replay is one entry behind.
       expect(chat.messages[0].parts).toEqual(checkpoint.parts)
       source.enqueue(
         frame({
           type: "chunk",
-          id: `${history.length + 1}-0`,
+          id: `0-${history.length + 1}`,
           chunk: {
             type: "text-delta",
             id: multipleSteps ? "text-2" : "text-1",

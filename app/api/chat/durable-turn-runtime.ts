@@ -28,6 +28,7 @@ import type {
 import type { DurableMessageStatus } from "@/lib/chat-messages/durable-contract"
 import { extractTextFromMessageParts } from "@/lib/chat-messages/parts"
 import { durableStoredMessageToUiMessage } from "@/lib/chat-messages/ui-message-adapter"
+import { retainedCursorForSeq } from "@/lib/chat-stream/protocol"
 import type { ModelReasoningEffort } from "@/lib/models/types"
 import type { ChatPerfServerSession } from "@/lib/observability/chat-performance"
 import type { ToolSource } from "@/lib/tools/types"
@@ -40,8 +41,9 @@ import type {
   ToolApprovalStatus,
   ToolSet,
   UIMessage,
+  UIMessageChunk,
 } from "ai"
-import { isToolUIPart, readUIMessageStream, toUIMessageStream } from "ai"
+import { isToolUIPart, readUIMessageStream } from "ai"
 import { fetchMutation as defaultFetchMutation } from "convex/nextjs"
 import { extractApprovalResponses } from "./approval-continuation"
 import { PublicChatHttpError } from "./public-http-error"
@@ -332,10 +334,12 @@ export type DurableStreamBinding = {
     recordTitleUsageEvidence(
       evidence: TitleTerminalUsageEvidence
     ): Promise<boolean>
-    onChunk(
-      chunk: TextStreamPart<ToolSet>,
-      workSummary?: WorkSummarySnapshot
-    ): Promise<void> | void
+    /**
+     * The pre-answer duration as the streamText `onChunk` observer resolves
+     * it (ADR-0041, C5). Content reaches checkpoints through
+     * `envelope.observe`, not here.
+     */
+    noteWorkSummary(workSummary: WorkSummarySnapshot): void
     recordStep(step: DurableStepRecord): void
     /**
      * Flush the snapshot, then mark the run failed. The failure verdict
@@ -377,6 +381,14 @@ export type DurableStreamBinding = {
       originalMessages: UIMessage[]
       generateMessageId?: () => string
     }
+    /**
+     * One chunk of the sequenced final UI stream (ADR-0039 cursor): chunk
+     * `seq` is retained entry `0-seq`, so each checkpoint carries the position
+     * it contains. Called before the chunk reaches Redis or the browser.
+     */
+    observe(chunk: UIMessageChunk, seq: number): void
+    /** The sequenced stream ended; settlement never waits for this. */
+    observeEnd(): void
     /**
      * Envelope-onEnd settlement. Internal ordering, load-bearing:
      * allSettled(approval + step writes) → flush → final full-parts snapshot
@@ -661,6 +673,11 @@ export type SnapshotPersistArgs = {
   sequence: number
   textSnapshot: string
   partsSnapshot: unknown
+  /**
+   * Retained-stream entry the parts are contained in (ADR-0039): an upper
+   * bound, never behind them. Null clears it when the position is unknown.
+   */
+  streamCursor: string | null
   workSummaryDurationMs?: number
   /** Tentative tool-order onset; null clears one an earlier checkpoint sent. */
   workSummaryCandidateMs?: number | null
@@ -684,12 +701,16 @@ type DurableSnapshotTrackerOptions = {
   persist: (args: SnapshotPersistArgs) => Promise<unknown>
 }
 
+// Metadata-only marker the tracker writes into its own reducer to learn when
+// every earlier chunk has been applied. Tracker metadata is never persisted.
+const SNAPSHOT_BARRIER = "snapshotBarrier"
+
 export function createDurableSnapshotTracker(
   options: DurableSnapshotTrackerOptions
 ) {
   const persistSnapshot = options.persist
-  let text = ""
-  let parts: UIMessage["parts"] = []
+  let text = extractTextFromMessageParts(options.initialMessage?.parts ?? [])
+  let parts: UIMessage["parts"] = options.initialMessage?.parts ?? []
   let workSummaryDurationMs: number | undefined
   let workSummaryCandidateMs: number | undefined
   // Once a candidate has been sent, every later checkpoint states it
@@ -709,6 +730,11 @@ export function createDurableSnapshotTracker(
   let sequence = 0
   let lastWriteAt = 0
   let writeInFlight: Promise<unknown> | null = null
+  // The last sequenced chunk handed to the reducer: at or ahead of `parts`.
+  let observedSeq = 0
+  // Set by the final full-parts snapshot: later tracker state must not
+  // replace the complete parts it wrote.
+  let finalized = false
   // Dirtiness is content-versioned, not a boolean: a persist loop re-runs only
   // when a chunk advanced the version past what the last completed write
   // captured. A shared `pending` flag let two overlapping flush() calls (the
@@ -721,7 +747,7 @@ export function createDurableSnapshotTracker(
   const getParts = () => parts
 
   const persist = async (force = false) => {
-    while (writtenVersion < contentVersion) {
+    while (!finalized && writtenVersion < contentVersion) {
       if (writeInFlight) {
         await writeInFlight
         continue
@@ -739,6 +765,7 @@ export function createDurableSnapshotTracker(
           sequence: currentSequence,
           textSnapshot: text,
           partsSnapshot: getParts(),
+          streamCursor: retainedCursorForSeq(observedSeq),
           ...workSummaryArgs(),
         }),
         "writing assistant snapshot"
@@ -755,20 +782,18 @@ export function createDurableSnapshotTracker(
     }
   }
 
-  // Use the same SDK projection as the delivered stream: tool states, text
-  // boundaries, and provider phase metadata must survive a live checkpoint.
-  const input = new TransformStream<TextStreamPart<ToolSet>>()
+  // The retained replay's reducer and starting message over the same
+  // sequenced chunks: chunk n here is retained entry 0-n (ADR-0039).
+  const input = new TransformStream<UIMessageChunk, UIMessageChunk>()
   const writer = input.writable.getWriter()
   const reader = readUIMessageStream({
     message: options.initialMessage,
-    stream: toUIMessageStream({
-      stream: input.readable,
-      originalMessages: options.initialMessage ? [options.initialMessage] : undefined,
-      sendSources: true,
-      sendReasoning: true,
-    }),
+    stream: input.readable,
     terminateOnError: true,
   }).getReader()
+  let barriers = 0
+  let reachedBarrier = 0
+  const barrierWaiters = new Map<number, () => void>()
   const reduction = (async () => {
     while (true) {
       const next = await reader.read()
@@ -776,6 +801,16 @@ export function createDurableSnapshotTracker(
       const message = next.value
       parts = message.parts
       text = extractTextFromMessageParts(parts)
+      const barrier = getRecord(message.metadata)?.[SNAPSHOT_BARRIER]
+      if (typeof barrier === "number" && barrier > reachedBarrier) {
+        reachedBarrier = barrier
+        for (const [id, resolve] of barrierWaiters) {
+          if (id > barrier) continue
+          barrierWaiters.delete(id)
+          resolve()
+        }
+        continue
+      }
       // Start chunks alone must not replace a useful durable checkpoint.
       if (workSummaryDurationMs === undefined && !candidateNoted && !parts.some((part) =>
         part.type === "text" || part.type === "reasoning"
@@ -790,7 +825,38 @@ export function createDurableSnapshotTracker(
     void writer.abort(error).catch(() => {})
   })
   let writes = Promise.resolve()
-  let closing: Promise<void> | undefined
+  let inputClosed = false
+  const enqueue = (chunk: UIMessageChunk) => {
+    writes = writes.then(() => withWorkerWriteTimeout(
+      writer.write(chunk), "reducing assistant snapshot chunk"
+    )).catch((error: unknown) => {
+      void writer.abort(error).catch(() => {})
+      void reader.cancel(error).catch(() => {})
+      throw error
+    })
+    // Snapshot failure cannot erase the response being delivered.
+    void writes.catch(() => {})
+  }
+  const reductionSettled = reduction.then(
+    () => {},
+    () => {}
+  )
+  /**
+   * Waits until the reducer has applied every chunk observed so far. Never
+   * waits for the input to close: the sequenced stream closes only after
+   * settlement returns, so that wait would deadlock.
+   */
+  const reduced = () => {
+    if (inputClosed)
+      return withWorkerWriteTimeout(reductionSettled, "reducing assistant snapshot")
+    const id = ++barriers
+    const reached = new Promise<void>((resolve) => barrierWaiters.set(id, resolve))
+    enqueue({ type: "message-metadata", messageMetadata: { [SNAPSHOT_BARRIER]: id } })
+    return withWorkerWriteTimeout(
+      Promise.race([reached, reductionSettled]),
+      "reducing assistant snapshot"
+    )
+  }
   // The pre-answer duration and its candidate are metadata, not content:
   // recording a change advances the content version so the next checkpoint
   // (or a forced flush after a server-side abort) writes it even when text
@@ -807,35 +873,6 @@ export function createDurableSnapshotTracker(
       if (candidateNoted) contentVersion++
     }
   }
-  const onChunk = (chunk: TextStreamPart<ToolSet>, workSummary?: WorkSummarySnapshot) => {
-    noteWorkSummary(workSummary)
-    if (closing) return Promise.resolve()
-    writes = writes.then(() => withWorkerWriteTimeout(
-      writer.write(chunk), "reducing assistant snapshot chunk"
-    )).catch((error: unknown) => {
-      void writer.abort(error).catch(() => {})
-      void reader.cancel(error).catch(() => {})
-      throw error
-    })
-    // Snapshot failure cannot erase the response being delivered.
-    void writes.catch(() => {})
-    return writes.catch(() => {})
-  }
-  const drain = () => {
-    closing ??= withWorkerWriteTimeout(
-      (async () => {
-        await writes
-        await writer.close()
-        await reduction
-      })(),
-      "draining assistant snapshot stream"
-    ).catch(async (error: unknown) => {
-      void writer.abort(error).catch(() => {})
-      await reader.cancel(error).catch(() => {})
-      throw error
-    })
-    return closing
-  }
 
   /**
    * The content-survival write (ADR-0011): an unconditional snapshot carrying
@@ -849,15 +886,17 @@ export function createDurableSnapshotTracker(
    * content+parts itself.
    */
   const flushFinal = async (finalText: string, finalParts: unknown) => {
-    await drain().catch(() => {})
+    finalized = true
     if (writeInFlight) await writeInFlight.catch(() => {})
     const currentSequence = ++sequence
-    writtenVersion = contentVersion
     await withWorkerWriteTimeout(
       persistSnapshot({
         sequence: currentSequence,
         textSnapshot: finalText,
         partsSnapshot: finalParts,
+        // The response message can lead the sequenced stream (`onEnd` runs
+        // upstream of it), so its position is unknown.
+        streamCursor: null,
         ...workSummaryArgs(),
       }),
       "writing assistant snapshot"
@@ -865,15 +904,27 @@ export function createDurableSnapshotTracker(
   }
 
   return {
-    onChunk,
+    /** Feeds one sequenced final UI chunk (`seq` is retained entry `0-seq`). */
+    observe(chunk: UIMessageChunk, seq: number) {
+      if (inputClosed) return
+      observedSeq = seq
+      enqueue(chunk)
+    },
+    /** The sequenced stream ended; the reducer may finish. */
+    close() {
+      if (inputClosed) return
+      inputClosed = true
+      writes = writes.then(() => writer.close())
+      void writes.catch(() => {})
+    },
     noteWorkSummary,
-    // A provider `error` part errors the reducer's reader
-    // (`terminateOnError`), so `drain()` rejects on the failure path. The
-    // reduced text/parts and the noted pre-answer duration are still the last
-    // good state, and the write below is what the failure verdict promotes;
-    // tolerate the rejected drain the same way `flushFinal` does.
+    // A provider `error` chunk errors the reducer's reader
+    // (`terminateOnError`), so it stops applying chunks on the failure path.
+    // The reduced text/parts and the noted pre-answer duration are still the
+    // last good state, and the write below is what the failure verdict
+    // promotes, so a failed or timed-out wait still writes.
     flush: async () => {
-      await drain().catch(() => {})
+      await reduced().catch(() => {})
       await persist(true)
     },
     flushFinal,
@@ -1022,7 +1073,7 @@ export function createGuestDurableTurn(
           async recordTitleUsageEvidence() {
             return true
           },
-          onChunk() {},
+          noteWorkSummary() {},
           recordStep() {},
           noteStreamError() {},
           async onAbort() {},
@@ -1032,6 +1083,8 @@ export function createGuestDurableTurn(
           identity(validatedMessages) {
             return { originalMessages: validatedMessages }
           },
+          observe() {},
+          observeEnd() {},
           async settle() {
             return { status: "guest" as const }
           },
@@ -1866,8 +1919,8 @@ export function createConvexDurableTurn(args: {
             }
           },
 
-          onChunk(chunk, summaryDurationMs) {
-            return tracker.onChunk(chunk, summaryDurationMs)
+          noteWorkSummary(workSummary) {
+            tracker.noteWorkSummary(workSummary)
           },
 
           recordStep({ stepNumber, usage, toolCalls, toolResults }) {
@@ -2003,6 +2056,14 @@ export function createConvexDurableTurn(args: {
               originalMessages,
               generateMessageId: () => currentMessageId,
             }
+          },
+
+          observe(chunk, seq) {
+            tracker.observe(chunk, seq)
+          },
+
+          observeEnd() {
+            tracker.close()
           },
 
           async settle({

@@ -193,7 +193,7 @@ export type TurnEvidenceItem =
  * adapter labels text parts today (`providerMetadata.openai.phase`); every
  * other provider's text is unphased and falls to the C3 tool-order rule.
  * This is the ONE reader — the client projection, the server work-summary
- * tracker, and the replay prefix guard all call it; nothing else spells a
+ * tracker, and the OpenAI history adapter all call it; nothing else spells a
  * provider namespace.
  */
 export type TextPhase = "commentary" | "final_answer"
