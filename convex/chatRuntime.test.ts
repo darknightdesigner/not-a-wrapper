@@ -3688,6 +3688,9 @@ describe("approval-continuation idempotency", () => {
   it("exactly one continuation run: the second prepare gets the typed conflict", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1700000000000)
     const { fixture, chat, tables } = makePausedWorld()
+    // A cursor from the paused run's log names nothing in the new run's.
+    const [message] = fixture.tables.messages
+    message.streamCursor = "0-41"
     const { ctx, tables: world } = createMutationCtx(tables)
 
     const first = await prepareAsOwner(ctx, {
@@ -3706,6 +3709,9 @@ describe("approval-continuation idempotency", () => {
     )
     expect(pausedRun?.continuationRunId).toBe(first.runId)
     expect(continuationRun?.continuedFromRunId).toBe(fixture.run._id)
+    // The relinked message is the new run's retained base.
+    expect(message.generationRunId).toBe(first.runId)
+    expect(message.streamCursor).toBe("0-0")
 
     // The losing tab's auto-send re-prepares with the same (now-resolved)
     // approval state — rejected with the typed conflict, creating nothing.
@@ -4764,14 +4770,30 @@ describe("updateAssistantSnapshotForChat", () => {
         sequence: 1,
         textSnapshot: "partial",
         partsSnapshot: [{ type: "text", text: "partial" }],
+        streamCursor: "0-5",
       }
     )
 
     expect(result).toEqual({ kind: "applied", deduped: false })
     expect(inserts).toEqual([])
     expect(fixture.message.content).toBe("partial")
+    expect(fixture.message.streamCursor).toBe("0-5")
     expect(fixture.message.status).toBe("streaming")
     expect(fixture.run.status).toBe("streaming")
+
+    // Unchanged content still drops a cursor the write explicitly clears.
+    await updateAssistantSnapshotForChat(
+      ctx,
+      await runOwner(ctx, fixture.runId),
+      {
+        messageId: fixture.messageId,
+        sequence: 2,
+        textSnapshot: "partial",
+        partsSnapshot: [{ type: "text", text: "partial" }],
+        streamCursor: null,
+      }
+    )
+    expect(fixture.message.streamCursor).toBeUndefined()
   })
 
   it("rejects late lower-sequence snapshots before persistence", async () => {
@@ -4780,6 +4802,7 @@ describe("updateAssistantSnapshotForChat", () => {
     const fixture = createGenerationRunLinkageFixture()
     fixture.message.content = "newer"
     fixture.message.parts = [{ type: "text", text: "newer" }]
+    fixture.message.streamCursor = "0-9"
     fixture.run.lastSnapshotSequence = 2
     const { ctx, inserts, patches } = createMutationCtx(fixture.tables)
 
@@ -4791,6 +4814,7 @@ describe("updateAssistantSnapshotForChat", () => {
         sequence: 1,
         textSnapshot: "stale",
         partsSnapshot: [{ type: "text", text: "stale" }],
+        streamCursor: "0-4",
       }
     )
 
@@ -4799,6 +4823,7 @@ describe("updateAssistantSnapshotForChat", () => {
     expect(patches).toEqual([])
     expect(fixture.message.content).toBe("newer")
     expect(fixture.message.parts).toEqual([{ type: "text", text: "newer" }])
+    expect(fixture.message.streamCursor).toBe("0-9")
   })
 
   it("rejects an equal-sequence duplicate before insertion", async () => {

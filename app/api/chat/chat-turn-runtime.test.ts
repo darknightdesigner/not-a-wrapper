@@ -1719,17 +1719,6 @@ describe("createChatTurnRuntime — reasoning lifecycle timing", () => {
     const dateNow = vi.spyOn(Date, "now").mockReturnValue(0)
     try {
       const harness = makeStreamHarness()
-      vi.mocked(toUIMessageStream).mockImplementation((opts: any) => {
-        if (opts.messageMetadata) harness.captured.responseOpts = opts
-        // Drain the durable snapshot tracker's reduction input so its chunk
-        // writes never backpressure; this test asserts the abort flush.
-        void opts.stream?.pipeTo(new WritableStream()).catch(() => {})
-        return new ReadableStream({
-          start(controller) {
-            controller.close()
-          },
-        })
-      })
       const wire = makeWorkerWire()
       const runtime = createChatTurnRuntime({
         input: makeInput(),
@@ -1779,15 +1768,6 @@ describe("createChatTurnRuntime — reasoning lifecycle timing", () => {
     const dateNow = vi.spyOn(Date, "now").mockReturnValue(0)
     try {
       const harness = makeStreamHarness()
-      vi.mocked(toUIMessageStream).mockImplementation((opts: any) => {
-        if (opts.messageMetadata) harness.captured.responseOpts = opts
-        void opts.stream?.pipeTo(new WritableStream()).catch(() => {})
-        return new ReadableStream({
-          start(controller) {
-            controller.close()
-          },
-        })
-      })
       const wire = makeWorkerWire()
       const runtime = createChatTurnRuntime({
         input: makeInput(),

@@ -1,4 +1,4 @@
-import type { TextStreamPart, ToolSet, UIMessage } from "ai"
+import type { TextStreamPart, ToolSet, UIMessage, UIMessageChunk } from "ai"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import type { Id } from "@/convex/_generated/dataModel"
 import { extractTextFromMessageParts } from "@/lib/chat-messages/parts"
@@ -10,13 +10,16 @@ import {
   toDurableUiMessage,
 } from "./durable-turn-runtime"
 
-const startedTextStreams = new WeakSet<object>()
-function emitTextChunk(stream: { onChunk: (chunk: TextStreamPart<ToolSet>) => unknown }, text: string) {
-  if (!startedTextStreams.has(stream)) {
-    startedTextStreams.add(stream)
-    stream.onChunk({ type: "text-start", id: "text-1" })
-  }
-  return stream.onChunk({ type: "text-delta", id: "text-1", text })
+// Feeds the sequenced UI stream the way the route does: chunk n is entry 0-n.
+const observedSeqs = new WeakMap<object, number>()
+function emitTextChunk(
+  observer: { observe: (chunk: UIMessageChunk, seq: number) => void },
+  text: string
+) {
+  let seq = observedSeqs.get(observer) ?? 0
+  if (seq === 0) observer.observe({ type: "text-start", id: "text-1" }, ++seq)
+  observer.observe({ type: "text-delta", id: "text-1", delta: text }, ++seq)
+  observedSeqs.set(observer, seq)
 }
 
 afterEach(() => {
@@ -180,6 +183,7 @@ describe("durable turn runtime internals", () => {
       sequence: 1,
       textSnapshot: "A",
       partsSnapshot: [{ type: "text", text: "A", state: "streaming" }],
+      streamCursor: "0-2",
     })
   })
 
@@ -197,19 +201,20 @@ describe("durable turn runtime internals", () => {
   it("checkpoints ordered commentary, tool results, and final text with phase metadata", async () => {
     const persist = vi.fn().mockResolvedValue(undefined)
     const tracker = createDurableSnapshotTracker({ persist, throttleMs: 60_000 })
-    const chunks: TextStreamPart<ToolSet>[] = [
+    const chunks: UIMessageChunk[] = [
       { type: "text-start", id: "c", providerMetadata: { openai: { phase: "commentary" } } },
-      { type: "text-delta", id: "c", text: "Looking up. " },
+      { type: "text-delta", id: "c", delta: "Looking up. " },
       { type: "text-end", id: "c" },
-      { type: "tool-call", toolCallId: "s", toolName: "search", input: { query: "news" } },
-      { type: "tool-result", toolCallId: "s", toolName: "search", input: { query: "news" }, output: { found: true } },
+      { type: "tool-input-available", toolCallId: "s", toolName: "search", input: { query: "news" } },
+      { type: "tool-output-available", toolCallId: "s", output: { found: true } },
       { type: "text-start", id: "f", providerMetadata: { openai: { phase: "final_answer" } } },
-      { type: "text-delta", id: "f", text: "The answer." },
+      { type: "text-delta", id: "f", delta: "The answer." },
     ]
-    for (const chunk of chunks) await tracker.onChunk(chunk)
+    chunks.forEach((chunk, index) => tracker.observe(chunk, index + 1))
     // Abort may flush before text-end. The partial answer must survive too.
     await Promise.all([tracker.flush(), tracker.flush()])
     expect(persist.mock.lastCall?.[0]).toMatchObject({
+      streamCursor: "0-7",
       textSnapshot: "Looking up. The answer.",
       partsSnapshot: [
         { type: "text", text: "Looking up. ", state: "done", providerMetadata: { openai: { phase: "commentary" } } },
@@ -229,8 +234,7 @@ describe("durable turn runtime internals", () => {
         input: { name: "draft" }, approval: { id: "approval", approved: true },
       }],
     } })
-    await tracker.onChunk({ type: "tool-result", toolCallId: "edit", toolName: "edit",
-      input: { name: "draft" }, output: { saved: true } })
+    tracker.observe({ type: "tool-output-available", toolCallId: "edit", output: { saved: true } }, 1)
     await tracker.flush()
     expect(persist.mock.lastCall?.[0]).toMatchObject({
       textSnapshot: commentary.text,
@@ -262,10 +266,13 @@ describe("durable turn runtime internals", () => {
 
     expect(flushed).toBe(false)
     expect(persist).toHaveBeenCalledTimes(1)
+    // The cursor is read when the write is issued: entry 0-3 was already
+    // observed, so it overstates parts that hold only "A" (an upper bound).
     expect(persist.mock.calls[0]?.[0]).toMatchObject({
       sequence: 1,
       textSnapshot: "A",
       partsSnapshot: [{ type: "text", text: "A", state: "streaming" }],
+      streamCursor: "0-3",
     })
 
     firstWrite.resolve()
@@ -276,10 +283,11 @@ describe("durable turn runtime internals", () => {
       sequence: 2,
       textSnapshot: "AB",
       partsSnapshot: [{ type: "text", text: "AB", state: "streaming" }],
+      streamCursor: "0-3",
     })
   })
 
-  it("sequences the final full-parts snapshot after every throttled write", async () => {
+  it("sequences the final full-parts snapshot after every throttled write and clears its cursor", async () => {
     const persist = vi.fn().mockResolvedValue(undefined)
     const tracker = createDurableSnapshotTracker({
       persist,
@@ -305,10 +313,12 @@ describe("durable turn runtime internals", () => {
     // The final snapshot carries the COMPLETE response parts (tool parts
     // included), not the tracker's text/reasoning subset, and a later
     // sequence than the throttled write.
+    // The response message can lead the sequenced stream: cursor cleared.
     expect(persist.mock.calls[1]?.[0]).toEqual({
       sequence: 2,
       textSnapshot: "AB",
       partsSnapshot: finalParts,
+      streamCursor: null,
     })
   })
 

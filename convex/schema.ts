@@ -219,6 +219,10 @@ export default defineSchema({
       v.literal("retry_with_shorter_generation_budget")
     ),
     metadata: v.optional(vToolInvocationStreamMetadata),
+    // Retained-stream entry (`0-n`) of the live run whose log contains these
+    // parts (ADR-0039 cursor). An upper bound: written only together with
+    // content/parts, never behind them. Absent means the position is unknown.
+    streamCursor: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })

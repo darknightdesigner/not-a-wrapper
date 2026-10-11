@@ -186,6 +186,9 @@ export const generationRunWriteArgs = {
     workSummaryDurationMs: v.optional(v.number()),
     // Tentative tool-order onset (ADR-0041, C5); null clears an obsolete one.
     workSummaryCandidateMs: v.optional(v.union(v.number(), v.null())),
+    // Retained-stream entry these parts are contained in (ADR-0039); null
+    // clears it when the position is unknown (the final full-parts snapshot).
+    streamCursor: v.optional(v.union(v.string(), v.null())),
   },
   recordToolInvocations: {
     messageId: v.id("messages"),
@@ -2260,6 +2263,8 @@ export async function prepareGenerationForChat(
       generationRunId: runId,
       requestId: args.requestId,
       status: "streaming",
+      // This content is the new run's retained base: nothing of its log yet.
+      streamCursor: "0-0",
       updatedAt: now,
     })
     // History includes the continued assistant message; read after the
@@ -2551,6 +2556,13 @@ export async function recordTitleUsageEvidenceForChat(
   }
 }
 
+/** A well-formed retained-stream entry id (`<ms>-<seq>`), or undefined. */
+function parseStreamCursor(value: string | null | undefined) {
+  return value && value.length <= 64 && /^\d+-\d+$/.test(value)
+    ? value
+    : undefined
+}
+
 export async function updateAssistantSnapshotForChat(
   ctx: MutationCtx,
   owner: AuthenticatedRunOwner,
@@ -2561,6 +2573,7 @@ export async function updateAssistantSnapshotForChat(
     partsSnapshot: unknown
     workSummaryDurationMs?: number
     workSummaryCandidateMs?: number | null
+    streamCursor?: string | null
   }
 ) {
   const { run } = owner
@@ -2617,6 +2630,14 @@ export async function updateAssistantSnapshotForChat(
     message.content === payload.content &&
     JSON.stringify(message.parts) === JSON.stringify(payload.parts) &&
     nextMetadata === undefined
+  // The cursor lands in the same patch as the parts it describes. New content
+  // without a valid cursor unsets it; unchanged content keeps the stored one
+  // (still an upper bound) unless the write explicitly clears it.
+  const streamCursor = parseStreamCursor(args.streamCursor)
+  const clearsCursor =
+    args.streamCursor !== undefined &&
+    streamCursor === undefined &&
+    message.streamCursor !== undefined
 
   const now = nowMs()
   if (!isTerminalMessageStatus(message.status)) {
@@ -2633,8 +2654,14 @@ export async function updateAssistantSnapshotForChat(
       await ctx.db.patch(args.messageId, {
         content: payload.content,
         parts: payload.parts,
+        streamCursor,
         ...(nextMetadata ? { metadata: nextMetadata } : {}),
         ...(workerExecuting && { status: "streaming" as const }),
+        updatedAt: now,
+      })
+    } else if (clearsCursor) {
+      await ctx.db.patch(args.messageId, {
+        streamCursor: undefined,
         updatedAt: now,
       })
     }
@@ -2775,6 +2802,8 @@ export async function markGenerationRunCompletedForChat(
   await ctx.db.patch(args.messageId, {
     content: payload.content,
     parts: payload.parts,
+    // The response message can lead the retained log: position unknown.
+    streamCursor: undefined,
     metadata: args.metadata,
     status,
     finishReason: args.finishReason,
@@ -3173,7 +3202,12 @@ export async function stopGenerationRunForChat(
     const patch = stoppedMessage
       ? observedStopTextPatch(stoppedMessage, options.observedText)
       : null
-    if (patch) await ctx.db.patch(resolved.message._id, patch)
+    // Client text is not a reduction of the retained log: clear its cursor.
+    if (patch)
+      await ctx.db.patch(resolved.message._id, {
+        ...patch,
+        streamCursor: undefined,
+      })
   }
 
   console.log(

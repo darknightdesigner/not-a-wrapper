@@ -1,7 +1,19 @@
 import { DURABLE_MESSAGE_STATUSES } from "@/lib/chat-messages/durable-contract"
 import { validateTypes } from "@ai-sdk/provider-utils"
-import { uiMessageChunkSchema, validateUIMessages } from "ai"
+import {
+  uiMessageChunkSchema,
+  validateUIMessages,
+  type UIMessageChunk,
+} from "ai"
 import { z } from "zod"
+
+/** One final UI chunk and its position in the run's sequenced stream (from 1). */
+export type SequencedUIMessageChunk = { seq: number; chunk: UIMessageChunk }
+
+/** Chunk `seq` is retained entry `0-seq`: replay and checkpoints share one position. */
+export function retainedCursorForSeq(seq: number) {
+  return `0-${seq}`
+}
 
 const presentationFields = z.object({
   content: z.string().optional(),

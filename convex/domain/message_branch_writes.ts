@@ -589,6 +589,8 @@ export function createMessageBranchWriter(
       generationRunId: input.generationRunId,
       model: input.model,
       provider: input.provider,
+      // Empty parts sit at the start of the run's retained log (ADR-0039).
+      streamCursor: "0-0",
       createdAt: now,
       updatedAt: now,
     }))
