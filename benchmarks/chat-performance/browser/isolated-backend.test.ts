@@ -7,6 +7,7 @@ it("names the client's public function references the backend does not serve", (
     "type Args = FunctionArgs<typeof api.files.deleteFile._args>",
     "await ctx.runQuery(api.domain.runs.latest, {})",
     'telemetry({ functionId: "api.chat.streamText" })',
+    "// Old call: api.messages.retired",
     "const modules = api.messages",
   ].join("\n")
   expect(functionReferences(source).sort()).toEqual(["domain/runs:latest", "files:deleteFile", "messages:getLiveMessage"])

@@ -45,7 +45,9 @@ start unless `.env.local` targets it, and records it in the manifest.
 
 The step then compares the preview's function spec with every
 `api.<module>.<function>` reference in each measured client (app sources,
-excluding `convex/`, scripts, benchmarks and tests). A function the preview
+excluding `convex/`, scripts, benchmarks and tests), read from their syntax so
+comments and strings do not count. A destructured `api` or
+`makeFunctionReference` escapes this check. A function the preview
 does not serve fails the job within about a minute, naming the function and
 the file that calls it. The merge-base client runs against the head backend,
 so change public functions additively: a new function or an opt-in argument
@@ -249,7 +251,8 @@ measured attempts would only repeat the failure, each to its full timeout. When
 a second scenario's warmup fails with the same cause, the suite stops and the
 remaining scenarios are recorded as failed (`stopReason`). The cause is the
 first Convex function error the browser or server reported, otherwise the
-error message; ids, URLs and durations do not distinguish causes. Failure
+error message; request ids, URLs, opaque ids and durations do not distinguish
+causes, while HTTP statuses and other numbers do. Failure
 details carry `convexErrors` and `browserErrors` (console errors and uncaught
 page errors), and CI annotates the run with the cause. A warmup correctness
 failure therefore fails the capture; measured runs are never dropped.

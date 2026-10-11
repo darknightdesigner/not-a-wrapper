@@ -13,6 +13,7 @@ import { randomBytes } from "node:crypto"
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import ts from "typescript"
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..")
 export const ENV_FILE = ".env.local"
@@ -23,19 +24,41 @@ const CLIENT_PATHSPEC = ["*.ts", "*.tsx", ":!convex", ":!scripts", ":!benchmarks
 /** FunctionReference type fields: `typeof api.files.x._args` still names `files:x`. */
 const REFERENCE_TYPE_FIELDS = new Set(["_type", "_visibility", "_args", "_returnType", "_componentPath"])
 
-/** `api.<module path>.<function>`; a word, dot, quote or slash before `api` makes it something else. */
-const API_REFERENCE = /(?<![\w$.'"`/])api((?:\.[A-Za-z_$][\w$]*)+)/g
+/** The property path of an `api.a.b` expression or `typeof api.a.b` type name. */
+function apiPath(node: ts.Node): string[] | undefined {
+  const segments: string[] = []
+  let current = node
+  while (ts.isPropertyAccessExpression(current) || ts.isQualifiedName(current)) {
+    if (ts.isPropertyAccessExpression(current)) {
+      segments.unshift(current.name.text)
+      current = current.expression
+    } else {
+      segments.unshift(current.right.text)
+      current = current.left
+    }
+  }
+  return segments.length > 0 && ts.isIdentifier(current) && current.text === "api" ? segments : undefined
+}
 
-/** Public function names (`dir/module:function`) a source file references through `api`. */
-export function functionReferences(source: string): string[] {
+/**
+ * Public function names (`dir/module:function`) a source file references
+ * through `api`, read from its syntax so comments and strings never count.
+ * A destructured `api` or `makeFunctionReference` call escapes this scan.
+ */
+export function functionReferences(source: string, fileName = "client.ts"): string[] {
   const names = new Set<string>()
-  for (const match of source.matchAll(API_REFERENCE)) {
-    const segments = match[1].slice(1).split(".")
+  const visit = (node: ts.Node): void => {
+    const segments = apiPath(node)
+    if (!segments) {
+      ts.forEachChild(node, visit)
+      return
+    }
     const end = segments.findIndex((segment) => REFERENCE_TYPE_FIELDS.has(segment))
     const reference = end === -1 ? segments : segments.slice(0, end)
     if (reference.length >= 2)
       names.add(`${reference.slice(0, -1).join("/")}:${reference.at(-1)}`)
   }
+  visit(ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest))
   return [...names]
 }
 
@@ -95,7 +118,7 @@ export function clientReferences(revision: string): Map<string, string[]> {
   const files = exec("git", ["grep", "-l", "-F", "_generated/api", revision, "--", ...CLIENT_PATHSPEC], process.env, [0, 1])
   for (const entry of files.split("\n").filter(Boolean)) {
     const file = entry.slice(revision.length + 1)
-    for (const name of functionReferences(exec("git", ["show", `${revision}:${file}`])))
+    for (const name of functionReferences(exec("git", ["show", `${revision}:${file}`]), file))
       references.set(name, [...(references.get(name) ?? []), file])
   }
   return references
@@ -137,7 +160,7 @@ function main() {
     // convex.config.ts requires and auth.config.ts reads exist before the push.
     // --skip-workos-check: AuthKit provisioning wants Vercel-only redirect URLs.
     const configure = `bunx convex env set --preview-name ${name} --from-file '${convexEnv}' --force && ` +
-      `printf '%s\\n%s\\n' "$NEXT_PUBLIC_CONVEX_URL" "$NEXT_PUBLIC_CONVEX_SITE_URL" > '${urls}'`
+      `printf '%s' "$NEXT_PUBLIC_CONVEX_URL" > '${urls}'`
     const deploy = spawnSync("bunx", [
       "convex", "deploy", "--preview-create", name,
       "--codegen", "disable", "--typecheck", "disable", "--skip-workos-check",
@@ -149,9 +172,11 @@ function main() {
   } finally {
     rmSync(convexEnv, { force: true })
   }
-  const [convexUrl, siteUrl] = readFileSync(urls, "utf8").split("\n")
-  if (!/^https:\/\/[a-z0-9.-]+\.convex\.cloud$/.test(convexUrl) || !/^https:\/\/[a-z0-9.-]+\.convex\.site$/.test(siteUrl))
-    throw new Error(`Preview ${name} reported unexpected URLs (${convexUrl}, ${siteUrl})`)
+  const convexUrl = readFileSync(urls, "utf8").trim()
+  if (!/^https:\/\/[a-z0-9.-]+\.convex\.cloud$/.test(convexUrl))
+    throw new Error(`Preview ${name} reported an unexpected URL (${convexUrl})`)
+  // HTTP actions live on the .convex.site twin, as in app/api/_lib/convex-site-url.ts.
+  const siteUrl = convexUrl.replace(/\.convex\.cloud$/, ".convex.site")
   const envFile = path.join(root, ENV_FILE)
   writeFileSync(envFile, retargetEnvFile(readFileSync(envFile, "utf8"), {
     NEXT_PUBLIC_CONVEX_URL: convexUrl,

@@ -173,8 +173,9 @@ not mislabeled as INP.
 
 Both arms of a pair also share one backend: a Convex preview deployed from the
 head for that run, never the shared dev deployment (ADR-0051). A preflight
-fails the job when either client references a public function the preview
-does not serve. A failed warmup now fails its scenario, and a second scenario
+fails the job when either client's `api.<module>.<function>` references name a
+public function the preview does not serve; references built another way
+escape this source check. A failed warmup now fails its scenario, and a second scenario
 failing its warmup with the same cause stops the suite.
 
 ## Alternatives considered

@@ -12,6 +12,7 @@ it("gives one failure the same signature across scenarios and attempts", () => {
     []
   )
   expect(failureSignature(coldTimeout)).toBe(failureSignature(reasoningTimeout))
+  expect(failureSignature("chat POST failed (HTTP 404)")).not.toBe(failureSignature("chat POST failed (HTTP 500)"))
 
   // A reported Convex error is the root cause, whatever the harness timed out on.
   const missing = (requestId: string) =>

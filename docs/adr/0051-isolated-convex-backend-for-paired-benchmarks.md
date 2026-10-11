@@ -58,8 +58,9 @@ at the preview. `run-paired.ts` refuses to run unless `.env.local` targets the
 deployment this step created, and records it in the manifest.
 
 **Compatibility preflight.** The step reads the preview's function spec and
-scans each arm's client sources (outside `convex/`, scripts, benchmarks and
-tests) for `api.<module>.<function>` references. Any reference the preview does
+parses each arm's client sources (outside `convex/`, scripts, benchmarks and
+tests) for `api.<module>.<function>` references, so comments and strings never
+count. Any reference the preview does
 not serve fails the job in about a minute, naming each function and the file
 that uses it. The base arm runs the merge-base client against the head backend,
 so public functions must still change additively (ADR-0027). Names are
@@ -69,8 +70,9 @@ checked; argument shapes are not.
 journey runs, so the remaining attempts would only repeat the timeout. When a
 second scenario's warmup fails with the same signature, the suite stops and
 the remaining scenarios are recorded as failed. The signature is the first
-Convex function error the browser or server reported, else the error message
-without ids, URLs and durations. Failure messages carry browser console errors,
+Convex function error the browser or server reported, else the error message.
+Request ids, URLs, opaque ids and durations are ignored when comparing; other
+numbers such as HTTP statuses still tell causes apart. Failure messages carry browser console errors,
 page errors and Convex errors from the server log.
 
 **Concurrency.** Pull request runs share a per-PR group that cancels superseded
@@ -91,7 +93,7 @@ only for the shared deployment and are removed.
   it (5 days, 14 on paid plans). Names are reused per PR with
   `--preview-create`, so this stays at one per active PR plus one per scheduled
   or manual suite run. Function usage is about a hundred sends per pair.
-- The preflight reads source text, not the bundle. A reference made without
+- The preflight reads source syntax, not the bundle. A reference made without
   the `api.` property path (`makeFunctionReference`, a destructured `api`)
   escapes it; the warmup stop still bounds that failure to a few minutes.
 - The pair cannot see backend execution time changes, as before: both arms use

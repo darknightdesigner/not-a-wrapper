@@ -408,12 +408,13 @@ function prepareNativeWheel(root: Element): number {
   return deltaY
 }
 
+/** One attempt; a failed one also returns its root cause (ADR-0051). */
 async function runScenarioOnce(
   context: BrowserContext,
   baseUrl: string,
   config: BrowserScenarioConfig,
   timeoutMs: number
-): Promise<RunMetrics> {
+): Promise<{ run: RunMetrics; cause?: string }> {
   const page = await context.newPage()
   const runStartedAt = Date.now()
   // Console and page errors explain a stalled journey; only failures report them.
@@ -1237,9 +1238,12 @@ async function runScenarioOnce(
       },
     }
     if (!result.correctness.ok) {
-      result.correctness.detail = `${result.correctness.detail ?? "correctness failed"}; evidence=${JSON.stringify(await failureEvidence())}`
+      const evidence = await failureEvidence()
+      const detail = result.correctness.detail ?? "correctness failed"
+      result.correctness.detail = `${detail}; evidence=${JSON.stringify(evidence)}`
+      return { run: result, cause: failureCause(detail, evidence.convexErrors) }
     }
-    return result
+    return { run: result }
   } catch (error) {
     const evidence = await failureEvidence()
     const probe = await page.evaluate((point) => {
@@ -1569,9 +1573,9 @@ async function main() {
               ? await browser.newContext(contextOptions)
               : context
           try {
-            run = await runScenarioOnce(runContext, baseUrl, config, timeoutMs)
-            if (!run.correctness.ok)
-              cause = failureCause(run.correctness.detail ?? "correctness failed", [])
+            const attempt = await runScenarioOnce(runContext, baseUrl, config, timeoutMs)
+            run = attempt.run
+            cause = attempt.cause
           } catch (error) {
             // A crashed run (timeout, navigation failure, admission rejection)
             // fails the scenario's correctness but must not abort the suite —

@@ -20,13 +20,18 @@ export function failureCause(message: string, convexErrors: readonly string[]): 
   return compactError(convexErrors[0] ?? message.split("; ")[0])
 }
 
-/** The cause without the parts that differ between attempts of one failure. */
+/**
+ * The cause without what differs between attempts of one failure: request
+ * ids, URLs, ids and durations. Other numbers (HTTP statuses, counts) stay.
+ */
 export function failureSignature(cause: string): string {
   return cause
     .replace(/\[Request ID: [^\]]*\]/g, "")
     .replace(/https?:\/\/\S+/g, "<url>")
     .replace(/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}/gi, "<id>")
-    .replace(/\d+(?:\.\d+)?/g, "N")
+    // Convex document ids and similar opaque tokens.
+    .replace(/\b(?=[a-z0-9]*\d)[a-z0-9]{16,}\b/gi, "<id>")
+    .replace(/\d+(?:\.\d+)?\s*ms\b/g, "<ms>")
     .replace(/\s+/g, " ")
     .trim()
 }
