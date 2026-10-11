@@ -1,9 +1,11 @@
 import { subscribeToConnectionWake } from "@/lib/browser/connection-wake"
-import { mergeStreamMetadata } from "@/lib/chat-messages/metadata"
-import { readTextPhase } from "@/lib/chat-messages/turn-evidence"
+import {
+  getStreamCursor,
+  isRecord,
+  mergeStreamMetadata,
+} from "@/lib/chat-messages/metadata"
 import { Chat } from "@ai-sdk/react"
 import {
-  isToolUIPart,
   readUIMessageStream,
   type ChatInit,
   type ChatStatus,
@@ -20,96 +22,62 @@ import {
 
 type Selection = Extract<RetainedChatStreamFrame, { type: "selection" }>
 
-// A replay the displayed checkpoint keeps rejecting gets this long to catch
-// up. After that, Convex checkpoints drive the turn instead of a frozen answer.
+// A replay still behind the displayed checkpoint after this long means the
+// log is lagging (slow Redis appends): Convex checkpoints drive the turn.
 const CHECKPOINT_HANDOFF_MS = 2_000
 // A wake replaces only a connection that has missed two heartbeats.
 const WAKE_REPLACE_QUIET_MS = 2 * RETAINED_STREAM_HEARTBEAT_MS
+// Reducer-only metadata: `through` is a lower bound of the entries a yield
+// has applied; `id` tells the reducer which probe it has reached.
+const REPLAY_PROBE = "replayProbe"
 
-function containsValue(
-  next: unknown,
-  previous: unknown,
-  partialInput = false
-): boolean {
-  if (previous === undefined || Object.is(next, previous)) return true
-  if (partialInput && typeof previous === "string" && typeof next === "string")
-    return next.startsWith(previous)
-  if (
-    !previous ||
-    !next ||
-    typeof previous !== "object" ||
-    typeof next !== "object"
-  )
-    return false
-  if (Array.isArray(previous) !== Array.isArray(next)) return false
-  return Object.entries(previous).every(([key, value]) =>
-    containsValue((next as Record<string, unknown>)[key], value, partialInput)
-  )
+function readProbe(metadata: unknown) {
+  const probe = isRecord(metadata) ? metadata[REPLAY_PROBE] : undefined
+  return isRecord(probe) &&
+    typeof probe.id === "number" &&
+    typeof probe.through === "string"
+    ? { id: probe.id, through: probe.through }
+    : undefined
 }
 
-const toolProgress = {
-  "input-streaming": 0,
-  "input-available": 1,
-  "approval-requested": 2,
-  "approval-responded": 3,
-  "output-available": 4,
-  "output-error": 4,
-  "output-denied": 4,
-} as const
+/** A replay reducer's input and its completion (never rejects). */
+type Reduction = {
+  input: WritableStreamDefaultWriter<UIMessageChunk>
+  done: Promise<void>
+}
 
-function hasVisiblePrefix(next: UIMessage, previous: UIMessage | undefined) {
-  if (!previous) return true
-  const previousParts = previous.parts.filter(
-    (part) => part.type !== "step-start"
-  )
-  const nextParts = next.parts.filter((part) => part.type !== "step-start")
-  // Legacy checkpoints have only aggregated strings. SDK checkpoints retain
-  // state/metadata and require ordered boundaries, including text phase.
-  if (
-    previousParts.length <= 2 &&
-    previousParts.every(
-      (part) => (part.type === "text" || part.type === "reasoning") &&
-        part.state === undefined && part.providerMetadata === undefined
-    ) &&
-    new Set(previousParts.map((part) => part.type)).size === previousParts.length
-  ) {
-    return (["text", "reasoning"] as const).every((type) => {
-      const before = previousParts
-        .flatMap((part) => (part.type === type ? [part.text] : []))
-        .join("")
-      const after = nextParts
-        .flatMap((part) => (part.type === type ? [part.text] : []))
-        .join("")
-      return after.startsWith(before)
-    })
-  }
-  return previousParts.every((part, index) => {
-    const candidate = nextParts[index]
-    if (!candidate || candidate.type !== part.type) return false
-    if (part.type === "text" || part.type === "reasoning") {
-      if (!("text" in candidate) || !candidate.text.startsWith(part.text))
-        return false
-      // Phase changes move text between work and answer. Opaque metadata,
-      // such as encrypted reasoning, can legitimately be replaced at the end.
-      const phase = part.type === "text" ? readTextPhase(part) : undefined
-      return phase === undefined || readTextPhase(candidate) === phase
-    }
-    if (isToolUIPart(part) && isToolUIPart(candidate)) {
-      if (part.toolCallId !== candidate.toolCallId) return false
-      const progress = toolProgress[candidate.state] - toolProgress[part.state]
-      if (progress < 0 || (progress === 0 && candidate.state !== part.state))
-        return false
-      // Partial tool inputs may change shape as their JSON becomes complete.
-      if (part.state === "input-streaming" && progress > 0) return true
-      if (part.state === "output-available" && part.preliminary) {
-        const { output: _output, preliminary: _preliminary, ...stable } = part
-        return containsValue(candidate, stable)
-      }
-      const { state: _state, ...visible } = part
-      return containsValue(candidate, visible, part.state === "input-streaming")
-    }
-    return containsValue(candidate, part)
-  })
+/** What this tab's last direct request displayed when it ended. */
+type DirectHandoff = {
+  runId: string | null
+  parts: UIMessage["parts"] | undefined
+  delivered: number
+}
+
+/**
+ * The retained entry the displayed copy is contained in (ADR-0039 cursor), or
+ * null when its position is unknown. Replay may replace it only once it has
+ * applied at least this far in the same run's log.
+ */
+function displayedCursor(
+  previous: UIMessage | undefined,
+  runId: string | undefined,
+  direct: DirectHandoff | null
+): string | null {
+  if (!previous || previous.parts.every((part) => part.type === "step-start"))
+    return "0-0"
+  const generationRunId = isRecord(previous.metadata)
+    ? previous.metadata.generationRunId
+    : undefined
+  // An approval continuation reuses the message: the earlier run's content
+  // is this run's retained base.
+  if (typeof generationRunId === "string" && generationRunId !== runId)
+    return "0-0"
+  const cursor = getStreamCursor(previous.metadata)
+  if (cursor !== undefined) return cursor
+  // This tab's own direct request: its n-th chunk is entry 0-n.
+  if (direct && direct.runId === runId && direct.parts === previous.parts)
+    return `0-${direct.delivered}`
+  return null
 }
 
 /**
@@ -119,13 +87,23 @@ function hasVisiblePrefix(next: UIMessage, previous: UIMessage | undefined) {
  */
 export class RetainedReplay {
   cursor: string | null = null
-  private input: WritableStreamDefaultWriter<UIMessageChunk> | undefined
-  private reducer: Promise<void> | undefined
+  private reduction: Reduction | undefined
   private restored: UIMessage | undefined
   private live = false
+  private probed: string | null = null
+  private probes = 0
+  private readonly probeWaiters = new Map<number, () => void>()
 
   constructor(
-    private readonly publish: (message: UIMessage) => void,
+    /**
+     * Receives each live yield with the entry it is contained in
+     * (`metadata.streamCursor`, an upper bound) and `replayedThrough`, a lower
+     * bound of what it has applied.
+     */
+    private readonly publish: (
+      message: UIMessage,
+      replayedThrough: string
+    ) => void,
     private readonly signal: AbortSignal
   ) {}
 
@@ -137,10 +115,13 @@ export class RetainedReplay {
       onActivity,
       onSelection,
       onCaughtUp,
+      probing,
     }: {
       onActivity?: () => void
       onSelection?: (selection: Selection) => void
       onCaughtUp?: () => void
+      /** While true, each network read probes how far the reducer has applied. */
+      probing?: () => boolean
     } = {}
   ) {
     const reader = body.getReader()
@@ -174,7 +155,7 @@ export class RetainedReplay {
           } else if (frame.type === "base") {
             this.start(frame.message)
           } else if (frame.type === "chunk") {
-            if (!this.input) throw new Error("Missing stream base")
+            if (!this.reduction) throw new Error("Missing stream base")
             if (
               resumedAfter !== null &&
               compareRetainedCursors(frame.id, resumedAfter) <= 0
@@ -182,12 +163,14 @@ export class RetainedReplay {
               continue
             // Convex owns generation errors; only transport/reducer failures retry.
             if (frame.chunk.type !== "error")
-              await this.input.write(frame.chunk)
+              await this.reduction.input.write(frame.chunk)
             this.cursor = frame.id
           } else if (frame.type === "caught-up") {
-            if (!this.input) throw new Error("Missing stream base")
-            if (this.restored && !this.signal.aborted)
-              this.publish(this.restored)
+            if (!this.reduction) throw new Error("Missing stream base")
+            // `restored` can lag the writes; a probe makes it exact before the
+            // reconstruction it ends is published.
+            if (this.cursor !== null) await this.probe(this.reduction).reached
+            if (this.restored && !this.signal.aborted) this.emit(this.restored)
             this.live = true
             onCaughtUp?.()
           } else if (frame.type === "end") {
@@ -197,6 +180,13 @@ export class RetainedReplay {
           }
           // Heartbeats only prove liveness, through onActivity above.
         }
+        if (
+          this.reduction &&
+          this.live &&
+          probing?.() &&
+          this.cursor !== this.probed
+        )
+          await this.probe(this.reduction).written
       }
       if (!ended && !this.signal.aborted)
         throw new Error("Stream connection interrupted")
@@ -208,17 +198,16 @@ export class RetainedReplay {
 
   /** Lets queued chunks reach the reducer, then ends it. */
   async close() {
-    await this.input?.close().catch(() => {})
-    await this.reducer?.catch(() => {})
+    await this.reduction?.input.close().catch(() => {})
+    await this.reduction?.done
   }
 
   private start(message: UIMessage | undefined) {
     // Every connection resends the immutable base; the first one seeds it.
-    if (this.input) return
+    if (this.reduction) return
     this.restored = message
     const pipe = new TransformStream<UIMessageChunk, UIMessageChunk>()
-    this.input = pipe.writable.getWriter()
-    this.reducer = (async () => {
+    const reducer = (async () => {
       for await (const next of readUIMessageStream({
         message,
         stream: pipe.readable,
@@ -226,11 +215,50 @@ export class RetainedReplay {
       })) {
         if (this.signal.aborted) break
         this.restored = next
-        if (this.live) this.publish(next)
+        if (this.live) this.emit(next)
+        const reached = readProbe(next.metadata)?.id ?? 0
+        for (const [id, resolve] of this.probeWaiters) {
+          if (id > reached) continue
+          this.probeWaiters.delete(id)
+          resolve()
+        }
       }
     })()
     // Attach rejection immediately, including while the reader is waiting.
-    void this.reducer.catch(() => {})
+    this.reduction = {
+      input: pipe.writable.getWriter(),
+      done: reducer.catch(() => {}),
+    }
+  }
+
+  /**
+   * The SDK merges metadata and yields after every non-null
+   * `message-metadata` chunk, so each later yield carries a lower bound of
+   * the entries it has applied.
+   */
+  private probe({ input, done }: Reduction) {
+    const id = ++this.probes
+    this.probed = this.cursor
+    // An ended reducer reaches no probe; `done` releases the wait.
+    const reached = Promise.race([
+      new Promise<void>((resolve) => this.probeWaiters.set(id, resolve)),
+      done,
+    ])
+    const written = input.write({
+      type: "message-metadata",
+      messageMetadata: { [REPLAY_PROBE]: { id, through: this.cursor ?? "0-0" } },
+    })
+    return { written, reached: written.then(() => reached) }
+  }
+
+  private emit(next: UIMessage) {
+    const { [REPLAY_PROBE]: _probe, ...metadata } = isRecord(next.metadata)
+      ? next.metadata
+      : {}
+    this.publish(
+      { ...next, metadata: { ...metadata, streamCursor: this.cursor ?? "0-0" } },
+      readProbe(next.metadata)?.through ?? "0-0"
+    )
   }
 }
 
@@ -261,18 +289,27 @@ export class ResumableChat extends Chat<UIMessage> {
   private discoveredChatId: string | null = null
   private historicalAssistantId: string | null = null
   private stopWakeListener: (() => void) | null = null
+  private lastDirect: DirectHandoff | null = null
   // The latest direct request: chunk arrival is its only liveness signal, and
-  // `end` closes its stream as if the response ended there.
-  private readonly direct: { lastChunkAt: number; end: () => void }
+  // `end` closes its stream as if the response ended there. Its n-th chunk is
+  // retained entry 0-n, so `delivered` bounds what it displayed.
+  private readonly direct: {
+    lastChunkAt: number
+    delivered: number
+    active: boolean
+    end: () => void
+  }
 
   constructor({ transport, ...options }: ChatInit<UIMessage>) {
-    const direct = { lastChunkAt: 0, end: () => {} }
+    const direct = { lastChunkAt: 0, delivered: 0, active: false, end: () => {} }
     super({
       ...options,
       transport: transport && {
         async sendMessages(request) {
           const stream = await transport.sendMessages(request)
           direct.lastChunkAt = Date.now()
+          direct.delivered = 0
+          direct.active = true
           return stream.pipeThrough(
             new TransformStream<UIMessageChunk, UIMessageChunk>({
               start(controller) {
@@ -280,6 +317,7 @@ export class ResumableChat extends Chat<UIMessage> {
               },
               transform(chunk, controller) {
                 direct.lastChunkAt = Date.now()
+                direct.delivered += 1
                 controller.enqueue(chunk)
               },
             })
@@ -308,6 +346,19 @@ export class ResumableChat extends Chat<UIMessage> {
   }
 
   protected override setStatus(update: { status: ChatStatus; error?: Error }) {
+    // The direct request ended: keep what it displayed for the replay gate.
+    // The SDK applies every delivered chunk before it settles the status.
+    if (
+      this.direct.active &&
+      (update.status === "ready" || update.status === "error")
+    ) {
+      this.direct.active = false
+      this.lastDirect = {
+        runId: this.nativeRunId,
+        parts: this.lastMessage?.parts,
+        delivered: this.direct.delivered,
+      }
+    }
     super.setStatus(update)
     this.syncWakeListener()
   }
@@ -441,27 +492,36 @@ export class ResumableChat extends Chat<UIMessage> {
       if (this.observer === controller) this.reconnectObserver = reconnect
     }
     let failures = 0
-    // Per connection: the first update must extend what is displayed.
-    let adopted = false
+    // Per connection: replay replaces the displayed copy only once it has
+    // applied the entry that copy is contained in.
+    let gateOpen = false
     let handoff: ReturnType<typeof setTimeout> | undefined
     this.nativeRunId = null
-    const replay = new RetainedReplay((message) => {
+    const replay = new RetainedReplay((message, replayedThrough) => {
       if (signal.aborted || message.id !== run.assistantMessageId) return
       const index = this.messages.findIndex((item) => item.id === message.id)
       const previous = this.messages[index]
-      if (!adopted && !hasVisiblePrefix(message, previous)) {
-        // Streaming status pauses checkpoint projection. A replay that cannot
-        // extend the displayed checkpoint hands the turn back to checkpoints.
-        handoff ??= setTimeout(() => {
+      if (!gateOpen) {
+        const proof = displayedCursor(previous, run.runId, this.lastDirect)
+        // No proof the log covers the displayed copy: checkpoints drive.
+        if (proof === null) {
           if (this.observer === controller) this.disconnectObserver()
-        }, CHECKPOINT_HANDOFF_MS)
-        return
+          return
+        }
+        if (compareRetainedCursors(replayedThrough, proof) < 0) {
+          // Streaming status pauses checkpoint projection, so a log that
+          // stays behind the checkpoint hands the turn back to checkpoints.
+          handoff ??= setTimeout(() => {
+            if (this.observer === controller) this.disconnectObserver()
+          }, CHECKPOINT_HANDOFF_MS)
+          return
+        }
+        // Its ordered SDK updates now own mutable tool/data parts until the
+        // next reconnect.
+        gateOpen = true
+        clearTimeout(handoff)
+        handoff = undefined
       }
-      // Once this reader reaches the checkpoint, its ordered SDK
-      // updates own mutable tool/data parts until the next reconnect.
-      adopted = true
-      clearTimeout(handoff)
-      handoff = undefined
       failures = 0
       this.setStatus({ status: "streaming" })
       const messages = [...this.messages]
@@ -498,9 +558,11 @@ export class ResumableChat extends Chat<UIMessage> {
           if ([204, 400, 401, 403, 404].includes(response.status)) return
           if (!response.ok || !response.body)
             throw new Error("Stream temporarily unavailable")
-          adopted = false
+          // Projection may install a newer checkpoint between connections.
+          gateOpen = false
           await replay.consume(response.body, connection.signal, {
             onActivity: watchdog.touch,
+            probing: () => !gateOpen,
             onSelection: (selection) => {
               if (signal.aborted) return
               if (

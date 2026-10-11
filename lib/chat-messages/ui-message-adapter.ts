@@ -20,6 +20,7 @@ export type DurableStoredMessageLike = {
   provider?: unknown
   finishReason?: unknown
   usage?: unknown
+  streamCursor?: unknown
   createdAt: number
   updatedAt?: number
 }

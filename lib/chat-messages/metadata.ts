@@ -113,6 +113,45 @@ export function getMessageProvider(metadata: unknown): string | undefined {
   return typeof metadata.provider === "string" ? metadata.provider : undefined
 }
 
+const STREAM_CURSOR = /^\d+-\d+$/
+
+/**
+ * The retained-stream entry a displayed message's parts are contained in
+ * (ADR-0039 cursor). Client display metadata: it is stamped from the doc in
+ * `extended` mode and moves only together with the parts it describes, so it
+ * is deliberately outside the server-owned key-set {@link adoptServerOwned}
+ * adopts on its own.
+ */
+export function getStreamCursor(metadata: unknown): string | undefined {
+  if (!isRecord(metadata)) return undefined
+  const value = metadata.streamCursor
+  return typeof value === "string" &&
+    value.length <= 64 &&
+    STREAM_CURSOR.test(value)
+    ? value
+    : undefined
+}
+
+/**
+ * Pair adopted server parts with the server's cursor, or none. Returns the
+ * original reference when the cursor already matches.
+ */
+export function adoptStreamCursor(
+  localMetadata: unknown,
+  serverMetadata: unknown
+): unknown {
+  const cursor = getStreamCursor(serverMetadata)
+  const local = isRecord(localMetadata) ? localMetadata : {}
+  if (
+    cursor === undefined
+      ? !("streamCursor" in local)
+      : local.streamCursor === cursor
+  )
+    return localMetadata
+  const { streamCursor: _previous, ...rest } = local
+  return cursor === undefined ? rest : { ...rest, streamCursor: cursor }
+}
+
 /** Stream metadata is partial; keep the checkpoint's identity and branch fields. */
 export function mergeStreamMetadata(
   previous: unknown,
@@ -293,6 +332,7 @@ export type DurableMetadataSource = {
   provider?: unknown
   finishReason?: unknown
   usage?: unknown
+  streamCursor?: unknown
 }
 
 function baseRecord(metadata: unknown): Record<string, unknown> {
@@ -345,6 +385,12 @@ export function stampServerFields(
       metadata[metadataKey] = value
     }
   }
+
+  // Paired with these parts; never shown to model history (`runtime`).
+  delete metadata.streamCursor
+  const streamCursor = getStreamCursor(source)
+  if (mode === "extended" && streamCursor !== undefined)
+    metadata.streamCursor = streamCursor
 
   normalizeBranchInPlace(metadata)
   return metadata

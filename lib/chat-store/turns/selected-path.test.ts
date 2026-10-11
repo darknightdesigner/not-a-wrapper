@@ -443,6 +443,25 @@ describe("durable content adoption", () => {
     expect(result[1].parts).toBe(live[1].parts)
   })
 
+  it("moves the stream cursor only together with adopted parts", () => {
+    const cursor = (text: string, streamCursor?: string) =>
+      message("s2", "assistant", text, {
+        serverMessageId: "s2",
+        ...(streamCursor ? { streamCursor } : {}),
+      })
+    const live = [cursor("partial answer", "0-9")]
+    // A lagging snapshot keeps the local parts and their cursor.
+    expect(reconcileSelectedPath(live, [cursor("partial", "0-4")])).toBe(live)
+    // Adopted parts bring their cursor, or drop the local one.
+    expect(
+      reconcileSelectedPath(live, [cursor("partial answer grew", "0-12")])[0]
+        .metadata
+    ).toMatchObject({ streamCursor: "0-12" })
+    expect(
+      reconcileSelectedPath(live, [cursor("partial answer grew")])[0].metadata
+    ).not.toHaveProperty("streamCursor")
+  })
+
   it("adopts terminal server content even when it differs without being longer", () => {
     const live = [
       serverMessage("s1", "user", "q"),
