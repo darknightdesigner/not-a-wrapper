@@ -100,6 +100,10 @@ jobs:
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ vars.NEXT_PUBLIC_CONVEX_URL || 'https://placeholder.convex.cloud' }}
 
+      # Bytes every page loads before hydration (ADR-0049, ADR-0050).
+      - name: Check initial JS budget
+        run: bun scripts/check-initial-js.ts
+
   # Deploy to Convex on main branch merges
   deploy:
     name: Deploy to Convex

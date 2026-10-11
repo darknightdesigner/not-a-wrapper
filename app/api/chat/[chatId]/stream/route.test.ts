@@ -39,17 +39,15 @@ it("never reads Redis without a session or an owned selected run on the selected
       ).status
     ).toBe(400)
   expect(fetchQuery).not.toHaveBeenCalled()
-  for (const [selected, path] of [
-    [null, { selectedMessages: [] }],
-    [
-      { ...run, runId: "different-run" },
-      { selectedMessages: [{ _id: "assistant" }] },
-    ],
-    [run, { selectedMessages: [{ _id: "different-branch" }] }],
+  for (const selection of [
+    { run: null, selectedMessages: [] },
+    {
+      run: { ...run, runId: "different-run" },
+      selectedMessages: [{ _id: "assistant" }],
+    },
+    { run, selectedMessages: [{ _id: "different-branch" }] },
   ]) {
-    vi.mocked(fetchQuery)
-      .mockResolvedValueOnce(selected)
-      .mockResolvedValueOnce(path)
+    vi.mocked(fetchQuery).mockResolvedValueOnce(selection)
     expect((await GET(request(), params)).status).toBe(404)
   }
   expect(readRetainedChatStream).not.toHaveBeenCalled()
@@ -61,14 +59,16 @@ it("retries preparation, settles an expired replay, and serves an authorized str
     ["streaming", 503],
     ["completed", 204],
   ] as const) {
-    vi.mocked(fetchQuery)
-      .mockResolvedValueOnce({ ...run, status })
-      .mockResolvedValueOnce({ selectedMessages: [{ _id: "assistant" }] })
+    vi.mocked(fetchQuery).mockResolvedValueOnce({
+      run: { ...run, status },
+      selectedMessages: [{ _id: "assistant" }],
+    })
     expect((await GET(request(), params)).status).toBe(expected)
   }
-  vi.mocked(fetchQuery)
-    .mockResolvedValueOnce(run)
-    .mockResolvedValueOnce({ selectedMessages: [{ _id: "assistant" }] })
+  vi.mocked(fetchQuery).mockResolvedValueOnce({
+    run,
+    selectedMessages: [{ _id: "assistant" }],
+  })
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.close()

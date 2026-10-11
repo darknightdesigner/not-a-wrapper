@@ -105,8 +105,10 @@ tail budgets, and regression thresholds remain unchanged. This correction can
 increase or decrease a relative difference and applies to both sides of every pair.
 Instrumented benchmark builds disable session replay and declare the required
 `replayPolicy: disabled-v1` dimension. This holds remotely configured and sampled
-recording work out of the controlled chat workload; production replay remains
-unchanged. Earlier replay-enabled captures cannot seed these baselines.
+recording work out of the controlled chat workload. Production replay is
+governed by ADR-0050: Sentry Replay and PostHog load after the composer handoff,
+and benchmark builds still load neither recorder. Earlier replay-enabled
+captures cannot seed these baselines.
 Comparisons reject missing baselines, missing/failed samples, duplicate identities,
 and incompatible conditions. Every named suite must match its existing complete
 scenario list; an `ONLY` subset cannot certify a complete suite. Baseline

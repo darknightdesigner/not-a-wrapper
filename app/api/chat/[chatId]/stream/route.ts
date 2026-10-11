@@ -24,17 +24,17 @@ export async function GET(
     (runId === null || !retainedChatStreamCursorSchema.safeParse(after).success)
   )
     return new Response(null, { status: 400 })
-  const options = { token: session.accessToken }
-  const [run, path] = await Promise.all([
-    fetchQuery(api.messages.getSelectedRunState, { chatId }, options),
-    fetchQuery(api.messages.getSelectedPath, { chatId }, options),
-  ])
+  // One snapshot of run state and the whole path: the subscribed path stops
+  // before a streaming message (ADR-0027 live tail), this read does not.
+  const { run, selectedMessages } = await fetchQuery(
+    api.messages.getResumeSelection,
+    { chatId },
+    { token: session.accessToken }
+  )
   if (
     !run ||
     (runId !== null && run.runId !== runId) ||
-    !path.selectedMessages.some(
-      (message) => message._id === run.assistantMessageId
-    )
+    !selectedMessages.some((message) => message._id === run.assistantMessageId)
   )
     return new Response(null, { status: 404 })
 
@@ -62,7 +62,7 @@ export async function GET(
       type: "selection",
       runId: run.runId,
       assistantMessageId: run.assistantMessageId,
-      messages: path.selectedMessages.map((message) =>
+      messages: selectedMessages.map((message) =>
         durableStoredMessageToUiMessage(message)
       ),
     })}\n`

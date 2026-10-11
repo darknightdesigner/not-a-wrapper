@@ -31,6 +31,9 @@ export type RunMetrics = {
   /** First turns only: Send → `/c/<chatId>` committed by the session (ADR-0033). */
   sendToThreadRouteCommittedMs?: number
   sendToRequestDispatchedMs?: number
+  /** Same-origin `/api/*` requests between the Send click and the `/api/chat`
+   * POST: round trips awaited before dispatch (ADR-0049). */
+  preDispatchApiRequests?: number
   dispatchToFirstStreamChunkMs?: number
   firstTextDeltaToFirstVisibleMs?: number
   sendToFirstVisibleTextMs?: number

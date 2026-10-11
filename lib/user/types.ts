@@ -1,5 +1,7 @@
 import type { UserPreferences } from "../user-preference-store/utils"
 
+// Profile facts only. Usage and other per-send state never live here: every
+// change re-renders each `useUser()` consumer.
 export type UserProfile = {
   id: string
   email: string
@@ -8,12 +10,6 @@ export type UserProfile = {
 
   anonymous: boolean | null
   premium: boolean | null
-
-  message_count: number | null
-  daily_message_count: number | null
-  daily_reset: string | null
-
-  last_active_at: string | null
   created_at: string | null
 
   favorite_models: string[] | null

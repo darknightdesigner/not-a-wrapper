@@ -127,6 +127,11 @@ Option 2, in `components/ui/prompt-input.tsx`.
   window no longer expands a single-line draft.
 - On iOS the keyboard may close at the handoff if programmatic focus cannot
   move it; not verified on a device.
+- The fallback's `hidden` attribute is also the analytics readiness signal:
+  Sentry Replay and PostHog normally load once no visible fallback remains,
+  and a 20 s cap loads them if the composer never hydrates (ADR-0050).
+  Renaming `composer-fallback-textarea` or hiding the field another way must
+  update `lib/analytics/deferred-analytics.ts`.
 - Not adopted: Anthropic's separate jsdom-rendered markup and its 14-viewport
   pixel suite. Our field is the server render of the same component, so
   drift is limited to the textarea/editor metric pair, which the box check

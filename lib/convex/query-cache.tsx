@@ -8,8 +8,8 @@
  * chat, typically — renders its delivered value on the first commit instead
  * of a loading state. Delivery still flows through `convex/react`'s core
  * `useQueries` on the one `ConvexReactClient`, so ADR-0027's same-transition
- * guarantee for the split selected-conversation pair is untouched: the cache
- * only holds subscriptions open, it never re-delivers values.
+ * guarantee for the split selected-conversation queries is untouched: the
+ * cache only holds subscriptions open, it never re-delivers values.
  */
 import {
   ConvexQueryCacheContext,
@@ -34,12 +34,14 @@ import { useCallback, useContext, type ReactNode } from "react"
 export const QUERY_CACHE_IDLE_TTL_MS = 120_000
 
 /**
- * Idle-subscription cap, independent of the TTL: 16 chats × the two
+ * Idle-subscription cap, independent of the TTL: 16 chats × the three
  * selected-conversation queries. At the cap a departing query is dropped
  * instead of parked, so a long switching session retains at most this many
  * idle result sets (a selected path measured ~23 KB, so well under 1 MB).
+ * Eviction is per entry, so a chat can lose one of its three; it then opens
+ * in a loading state like any other miss.
  */
-export const QUERY_CACHE_MAX_IDLE_ENTRIES = 32
+export const QUERY_CACHE_MAX_IDLE_ENTRIES = 48
 
 /** Registry subscription ids for warms; only uniqueness within the tab matters. */
 let nextWarmId = 0

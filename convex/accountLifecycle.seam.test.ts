@@ -378,6 +378,7 @@ describe("account deletion drain", () => {
       ),
     })
     await signedIn.mutation(api.rateLimits.consume, { bucket: "mcp_test" })
+    await signedIn.mutation(api.usage.admit, {})
 
     await t.run((ctx) =>
       softDeleteAppUserFromWorkOS(ctx, {

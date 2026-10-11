@@ -28,11 +28,73 @@ export const MEASUREMENT_HOOK_FILES = [
   "lib/user-store/provider.tsx",
 ] as const
 
-/** Ignore only this audited product setting when comparing measurement bootstrap. */
+const SCROLL_DEPTH_OPT_OUT =
+  "    // Document scroll-depth analytics force layout during nested chat scrolling.\n" +
+  "    disable_scroll_properties: true,\n"
+const BENCHMARK_RECORDING_OFF =
+  "    ...(chatUiBenchmark ? { disable_session_recording: true } : {}),\n"
+
+/** One audited change: exact earlier hunks and their replacements. */
+type AnalyticsRevision = ReadonlyArray<readonly [before: string, after: string]>
+
+/**
+ * Audited product-analytics revisions of instrumentation-client.ts, oldest
+ * first. Only these exact hunks are rewritten to their successors; everything
+ * else, analytics start, observer installation and reporting included, must
+ * match byte for byte.
+ */
+const ANALYTICS_REVISIONS: readonly AnalyticsRevision[] = [
+  // PostHog scroll-depth opt-out.
+  [[
+    "    capture_pageview: false,\n" + BENCHMARK_RECORDING_OFF,
+    "    capture_pageview: false,\n" + SCROLL_DEPTH_OPT_OUT + BENCHMARK_RECORDING_OFF,
+  ]],
+  // ADR-0050: eager Replay and PostHog move behind the composer handoff.
+  [
+    [
+      'import posthog from "posthog-js"\n',
+      'import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"\n',
+    ],
+    [
+      "  // Deterministic captures exclude remotely configured/random replay work.\n" +
+        "  integrations: chatUiBenchmark ? [] : [\n" +
+        "    Sentry.replayIntegration({\n" +
+        "      maskAllText: true,\n" +
+        "      maskAllInputs: true,\n" +
+        "      blockAllMedia: true,\n" +
+        "    }),\n" +
+        "  ],\n",
+      "",
+    ],
+    [
+      "const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY\n\n" +
+        "if (posthogKey && !posthog.__loaded) {\n" +
+        "  posthog.init(posthogKey, {\n" +
+        "    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,\n" +
+        '    person_profiles: "identified_only",\n' +
+        "    capture_pageview: false,\n" +
+        SCROLL_DEPTH_OPT_OUT +
+        BENCHMARK_RECORDING_OFF +
+        "  })\n" +
+        "}\n\n",
+      "// Replay (with the rates above) and PostHog load after the composer handoff (ADR-0050).\n" +
+        "startDeferredAnalytics()\n\n",
+    ],
+  ],
+]
+
+/**
+ * Upgrades an audited older bootstrap to the current text. A revision applies
+ * whole or not at all; a partial or repeated match fails closed.
+ */
 export function measurementBootstrap(source: string): string {
-  return source.replace(
-    "    // Document scroll-depth analytics force layout during nested chat scrolling.\n" +
-      "    disable_scroll_properties: true,\n",
-    "",
-  )
+  return ANALYTICS_REVISIONS.reduce((text, revision, index) => {
+    const matches = revision.map(([before]) => text.split(before).length - 1)
+    if (matches.every((count) => count === 0)) return text
+    if (matches.some((count) => count !== 1))
+      throw new Error(
+        `Measurement bootstrap partially matches audited analytics revision ${index + 1}; review a measurement-only overlay before comparing`,
+      )
+    return revision.reduce((next, [before, after]) => next.replace(before, after), text)
+  }, source)
 }

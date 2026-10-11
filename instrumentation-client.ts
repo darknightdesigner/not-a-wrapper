@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
-import posthog from "posthog-js"
+import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"
 import {
   sentryBeforeBreadcrumb,
   sentryBeforeSend,
@@ -19,30 +19,12 @@ Sentry.init({
   beforeSend: sentryBeforeSend,
   beforeSendSpan: sentryBeforeSendSpan,
   beforeBreadcrumb: sentryBeforeBreadcrumb,
-  // Deterministic captures exclude remotely configured/random replay work.
-  integrations: chatUiBenchmark ? [] : [
-    Sentry.replayIntegration({
-      maskAllText: true,
-      maskAllInputs: true,
-      blockAllMedia: true,
-    }),
-  ],
   replaysSessionSampleRate: chatUiBenchmark ? 0 : 0.1,
   replaysOnErrorSampleRate: chatUiBenchmark ? 0 : 1,
 })
 
-const posthogKey = process.env.NEXT_PUBLIC_POSTHOG_KEY
-
-if (posthogKey && !posthog.__loaded) {
-  posthog.init(posthogKey, {
-    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    person_profiles: "identified_only",
-    capture_pageview: false,
-    // Document scroll-depth analytics force layout during nested chat scrolling.
-    disable_scroll_properties: true,
-    ...(chatUiBenchmark ? { disable_session_recording: true } : {}),
-  })
-}
+// Replay (with the rates above) and PostHog load after the composer handoff (ADR-0050).
+startDeferredAnalytics()
 
 if (chatUiBenchmark) performance.mark("chat-perf:replay_disabled_v1")
 

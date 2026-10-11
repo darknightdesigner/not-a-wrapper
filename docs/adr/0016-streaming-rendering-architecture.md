@@ -1,6 +1,7 @@
 # 16. Streaming rendering: direct HTTP foreground, incremental projection, Convex durability
 
-- Status: accepted (2026-07-27), amended (2026-07-31, 2026-09-07)
+- Status: accepted (2026-07-27), amended (2026-07-31, 2026-09-07, 2026-10-09,
+  2026-10-10)
 - Date: 2026-07-27
 - Extended by ADR-0039: authenticated retained-stream replay feeds the same
   SDK rendering state after refresh. Saved text restores immediately; historical
@@ -89,7 +90,8 @@ languages render as escaped plain text. No-code conversations ship zero
 Shiki bytes. Growing code is always displayed immediately as escaped plain
 code. Every canonical code, language, or theme change invalidates highlighted
 HTML. The terminal block of a streaming message stays plain until it becomes
-non-terminal or the message settles; stable blocks highlight immediately.
+non-terminal or the message settles; stable blocks highlight once near the
+view (Visible code first, below).
 Shiki may publish HTML only for the exact current tuple. Obsolete requests
 abort before tokenization after asynchronous core/grammar loading, without
 cancelling shared resource loads.
@@ -134,7 +136,8 @@ V8's slower path. The service now:
   (a `MessageChannel` task) and timers starved until the queue drained and all
   blocks committed at once. The second hop queues behind the render task the
   previous block's `setState` posted, so each block commits before the next
-  tokenizes. Aborted entries skip tokenization.
+  tokenizes. Aborted entries skip tokenization. Order is newest first since
+  2026-10-10 (Visible code first, below).
 - Emits the `shiki_highlight` mark from the service for real Shiki runs only
   (lazy loads + tokenization, queue wait excluded); cache hits emit nothing.
 
@@ -176,6 +179,93 @@ request-id and abort protocol, a main-thread fallback for jsdom and failed
 worker construction, and Turbopack bundling of the grammar `import()` calls
 from a worker entry (unverified without a production build). Revisit when
 Chrome traces show single-block highlight tasks above 50 ms on typical replies.
+
+**Visible code first (2026-10-10).** Every stable block requested a highlight
+on mount, visible or not, and the queue ran first in, first out (document
+order). Opening a code-heavy chat at the bottom tokenized the blocks above the
+fold before the one in view, and a theme toggle re-highlighted every mounted
+block top first. Investigation and raw data:
+[clear wins investigation, Win 5](../performance/2026-10-10-clear-wins-investigation.md#win-5-highlight-visible-code-first).
+
+- **Gate.** `CodeBlock` shares its box through a ref context. On a cache
+  miss, `CodeBlockCode` observes that box (its own element when used
+  standalone) with one module-level observer (`rootMargin: "200% 0px"`,
+  `threshold: 0`), stops observing on the first intersecting report, and only
+  then calls `highlightCode`. Cache hits stay synchronous through
+  `peekCachedHighlight` and are never observed, so remounts never flash. An
+  input change or unmount aborts and unobserves. A block that unmounts before
+  it nears the view never requests a grammar; one that unmounts mid-load
+  cannot cancel the shared load (later blocks reuse it) but skips
+  tokenization. In the thread the root is the `[data-scroll-root]` scroller;
+  elsewhere (activity panel, share page, design-system previews) it is the
+  viewport, so a block inside a nested scroller highlights on entry.
+- **Observe the box, not the code.** In Markdown the box is the
+  `content-visibility: auto` element. Observing the code inside it caps the
+  lookahead because the skipped subtree has no fresh layout. In a fast fling
+  (2,000 px per 100 ms) the inner target showed 6 blocks plain (longest 42 ms
+  at 1x, 155 ms at 4x); the box showed 1 (5 ms, 40 ms). A one-screen margin
+  showed 10 plain blocks against 6 for two screens (n=5). Code nested inside
+  another contained block (a blockquote) still gets the shorter lookahead.
+- **Newest-first queue.** `highlightCode` takes a sequence number when it is
+  called, and queued entries sort by it, so a late grammar cannot move an
+  older block ahead of newer ones. A request joins the queue only after its
+  core and grammar load, so an older ready block can tokenize while a newer
+  one is still loading. The drain still yields two `MessageChannel` hops per
+  block, waits a frame while `isStreamingPaintHeld()` (popups first, as in
+  the interaction-priority amendment), then tokenizes the highest queued
+  sequence: the block that just came near the view or just settled, ahead of
+  any backlog. Aborted entries are dropped without a yield or tokenization.
+  This supersedes the first-in, first-out order of the 2026-10-09 queue.
+- **One observer helper.** `lib/dom/scroll-root-intersection.ts` (one
+  observer per scroll root, one callback per target, a per-observation token
+  so a stale cleanup never removes a newer registration) moved out of
+  `thread-scroll.tsx`. Turn observation keeps
+  `withoutScrollRoot: "intersecting"`; code blocks use `"viewport"`.
+
+Measured on a scratch route that renders fixed chats through the real
+`MessageContent` to `CodeBlockCode` path (real service, cache, queue and
+content-visibility CSS), headless Chromium, n=10 per arm per throttle. TTVH is
+thread mount to the first frame where every code block in view is highlighted.
+The route lacks the sidebar, composer hydration, and Convex delivery, so times
+are lower bounds; the signed-in CI pair on `/c/[id]` decides the gain. The
+visible-first column is the investigation prototype (observing the code, one
+screen of margin). Re-measured on the shipped gate (the box, two screens, n=6),
+the worst case took 303 / 1,375 ms TTVH and held 11,539 DOM nodes with 27
+highlights after the same scroll and a jump to the top.
+
+| Fixture                                   | Metric                                             | First in, first out |  Visible first |
+| ----------------------------------------- | -------------------------------------------------- | ------------------: | -------------: |
+| Realistic: 25 turns, 8 blocks, 12 KB      | TTVH 1x / 4x                                       |      252 / 1,284 ms |   133 / 582 ms |
+|                                           | Highlights at open                                 |                   8 |              4 |
+|                                           | Highlight time after a full scroll, 4x             |            1,045 ms |       1,085 ms |
+| Worst case: 120 turns, 135 blocks, 245 KB | TTVH 1x / 4x                                       |      750 / 3,036 ms | 314 / 1,417 ms |
+|                                           | Highlights at open                                 |                 133 |              4 |
+|                                           | DOM nodes after a partial scroll                   |              45,990 |          8,961 |
+|                                           | Jump to top: blocks seen plain                     |                   0 |              3 |
+|                                           | Theme toggle: highlights / visible block plain, 4x |      133 / 1,332 ms |     1 / 102 ms |
+
+- Each block is highlighted once per theme, when it first nears the view.
+  Revisits and remounts are cache hits as before while the session fits the
+  2M-character cache (the worst case uses 1.69M). No block was seen plain at
+  reading speed. Once a reader visits everything, total work equals the old
+  order; the saving is the blocks never viewed.
+- Accepted costs: a far jump shows up to 3 blocks plain for about 0.15 s (1x)
+  to 0.6 s (4x); after a theme toggle, offscreen blocks stay plain until
+  scrolled near (toggling back is a cache hit); never-viewed blocks print
+  plain; collapsed reasoning highlights when opened; a block settling
+  mid-stream waits one observer frame. Copy and find-in-page use the raw
+  code, so plain blocks lose nothing but color.
+- No fade when highlighted HTML replaces plain code. A one-shot 160 ms
+  opacity fade was prototyped and declined.
+- The new floor is the first use of a grammar: compiling TypeScript takes
+  about 250 ms at 1x and 1.0 to 1.1 s at 4x as one task. The paint-hold wait
+  only delays a task's start, so the PR #209 popup risk is reduced, not
+  removed. A worker or precompiled grammars would target this floor.
+- Unit tests cover the helper (`lib/dom/scroll-root-intersection.test.ts`),
+  the gate (`components/ui/code-block.test.tsx`), and the order
+  (`lib/markdown/shiki-client-cancellation.test.ts`). The browser count
+  ratchet (highlights at open and after a theme toggle) is deferred: it needs
+  a perf-only fixture page that the paired base build does not have.
 
 ### Notification cadence
 

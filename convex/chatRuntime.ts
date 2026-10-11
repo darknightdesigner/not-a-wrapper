@@ -41,6 +41,8 @@ import {
   getEffectiveParentIdFromContext,
   getSelectedPathMessagesFromContext,
   getSiblingMessagesFromContext,
+  resolveLiveTail,
+  type LiveTail,
 } from "./domain/message_branches"
 import {
   isTerminalGenerationRunStatus,
@@ -695,9 +697,10 @@ async function applyMessageResolution(
 //
 // `queued`/`running`/`streaming` map to the live spinner (only the run-start
 // claim ever writes them, inline below — `queued` is never persisted); the
-// terminal arms clear the live phase, and `completed`/`failed` also stamp the
-// Phase-2 mirror. Patching `liveRunStatus: undefined` removes the field (Convex
-// `patch` semantics) — that is the "clear."
+// terminal arms clear the live phase and the live tail (ADR-0027), and
+// `completed`/`failed` also stamp the Phase-2 mirror. Patching
+// `liveRunStatus: undefined` removes the field (Convex `patch` semantics) —
+// that is the "clear." An approval pause keeps the live tail.
 function chatStatusProjection(
   status: GenerationRunStatus,
   now: number
@@ -715,6 +718,7 @@ function chatStatusProjection(
       return {
         liveRunStatus: undefined,
         liveRunFreshUntil: undefined,
+        liveTail: undefined,
         lastRunEndedAt: now,
         lastRunStatus: "completed",
       }
@@ -722,12 +726,17 @@ function chatStatusProjection(
       return {
         liveRunStatus: undefined,
         liveRunFreshUntil: undefined,
+        liveTail: undefined,
         lastRunEndedAt: now,
         lastRunStatus: "failed",
       }
     case "aborted":
       // User Stop / supersede — no signal; only clear the live phase.
-      return { liveRunStatus: undefined, liveRunFreshUntil: undefined }
+      return {
+        liveRunStatus: undefined,
+        liveRunFreshUntil: undefined,
+        liveTail: undefined,
+      }
   }
 }
 
@@ -1121,7 +1130,7 @@ export async function applyRegenerationIntentForGeneration(
     args.regeneration
   )
 
-  const assistantMessage = await createMessageBranchWriter(ctx, {
+  const writer = createMessageBranchWriter(ctx, {
     chatId: owner.chat._id,
     now,
     messages: await denyPendingApprovalsForChat(
@@ -1131,7 +1140,8 @@ export async function applyRegenerationIntentForGeneration(
       "auto-denied: new generation started",
       currentMessages
     ),
-  }).writeAssistantPlaceholder({
+  })
+  const assistantMessage = await writer.writeAssistantPlaceholder({
     generationRunId: args.runId,
     requestId: args.requestId,
     model: args.model,
@@ -1143,6 +1153,7 @@ export async function applyRegenerationIntentForGeneration(
   return {
     assistantMessageId,
     messages: regenerationPlan.messages,
+    liveTail: resolveLiveTail(await writer.messages(), assistantMessageId),
   }
 }
 
@@ -2138,6 +2149,9 @@ export async function prepareGenerationForChat(
 
   let assistantMessageId: Id<"messages">
   let modelHistory: Doc<"messages">[]
+  // Every branch resolves it from the messages it already holds; undefined
+  // clears a stale pointer at the slot claim below.
+  let liveTail: LiveTail | undefined
   let resumedOutputTokensBaseline: number | undefined
 
   if (args.regeneration) {
@@ -2156,6 +2170,7 @@ export async function prepareGenerationForChat(
     )
     assistantMessageId = preparedRegeneration.assistantMessageId
     modelHistory = preparedRegeneration.messages
+    liveTail = preparedRegeneration.liveTail
   } else if (continuationMessage) {
     // Approval-continuation idempotency, layer 1 of 3:
     // the paused run records its continuation inside this transaction, so of
@@ -2249,9 +2264,9 @@ export async function prepareGenerationForChat(
     })
     // History includes the continued assistant message; read after the
     // continuation writes above.
-    modelHistory = projectModelHistoryMessages(
-      getSelectedPath(await listMessages(ctx, chatId))
-    )
+    const messagesAfter = await listMessages(ctx, chatId)
+    modelHistory = projectModelHistoryMessages(getSelectedPath(messagesAfter))
+    liveTail = resolveLiveTail(messagesAfter, assistantMessageId)
   } else {
     writer ??= createMessageBranchWriter(ctx, { chatId, now, messages })
     const assistantMessage = await writer.writeAssistantPlaceholder({
@@ -2261,11 +2276,13 @@ export async function prepareGenerationForChat(
       provider: args.provider,
     })
     assistantMessageId = assistantMessage._id
+    const messagesAfter = await writer.messages()
     modelHistory = projectModelHistoryMessages(
-      getSelectedPath(await writer.messages()).filter(
+      getSelectedPath(messagesAfter).filter(
         (message) => message._id !== assistantMessage._id
       )
     )
+    liveTail = resolveLiveTail(messagesAfter, assistantMessageId)
   }
 
   await ctx.db.patch(runId, {
@@ -2289,6 +2306,7 @@ export async function prepareGenerationForChat(
     {
       liveRunStatus: "streaming",
       statusRunId: runId,
+      liveTail,
       // Written once here and overwritten only by an approval pause: the hard
       // ceiling no legitimate run outlives.
       liveRunFreshUntil: computeLiveRunFreshUntil(now),

@@ -349,6 +349,47 @@ export function getBranchInfoForMessageFromContext(
   }
 }
 
+export type LiveTail = NonNullable<Doc<"chats">["liveTail"]>
+
+/**
+ * The live tail a history read may stop before, or undefined unless the
+ * selected path is exactly `path(messages without live) ++ [live]`: nothing is
+ * ordered at or after the live message (so a bounded read hides no later
+ * sibling or child), the walk without it ends on its explicit parent, and its
+ * whole sibling group names that parent explicitly (the live query reads
+ * siblings by `parentMessageId`). Legacy or stale `selected` flags and
+ * inferred parents fail these checks, so those chats keep the full read.
+ */
+export function resolveLiveTail(
+  messages: readonly ChatMessage[],
+  liveMessageId: Id<"messages">
+): LiveTail | undefined {
+  const live = messages.find((message) => message._id === liveMessageId)
+  if (!live || live.parentMessageId === undefined) return undefined
+  if (messages.some((m) => m._id !== live._id && m.orderId >= live.orderId)) {
+    return undefined
+  }
+  const parentMessageId = live.parentMessageId
+  const history = getSelectedPathMessagesFromContext(
+    createBranchContext(messages.filter((m) => m._id !== live._id))
+  )
+  if (history.at(-1)?._id !== parentMessageId) return undefined
+  const context = createBranchContext(messages)
+  const full = getSelectedPathMessagesFromContext(context)
+  const isHistoryThenLive =
+    full.length === history.length + 1 &&
+    full.at(-1)?._id === live._id &&
+    history.every((message, index) => full[index]?._id === message._id)
+  const siblingsNameParent = getSiblingMessagesFromContext(
+    context,
+    parentMessageId,
+    live.role
+  ).every((sibling) => sibling.parentMessageId === parentMessageId)
+  return isHistoryThenLive && siblingsNameParent
+    ? { messageId: live._id, orderId: live.orderId, parentMessageId }
+    : undefined
+}
+
 // Array adapters for simple callers and benchmarks. Each builds a throwaway
 // context; production hot paths share the `*FromContext` primitives instead.
 export function getSelectedPathMessages(messages: ChatMessage[]) {

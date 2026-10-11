@@ -24,6 +24,7 @@ beforeEach(() => {
   chatCoreMocks.historyLoading = false
   chatCoreMocks.chatAdmissionReady = true
   chatCoreMocks.useBindingMessages = false
+  chatCoreMocks.isAuthenticated = true
 })
 
 let useChatCore: (typeof import("./use-chat-core"))["useChatCore"]
@@ -55,10 +56,15 @@ const chatCoreMocks = vi.hoisted(() => ({
   // Controllable useChat state for the selected-path projection effect tests.
   useChatState: { messages: [] as unknown[], status: "ready" as string },
   useBindingMessages: false,
+  isAuthenticated: true,
   // Every constructed mock Chat instance in creation order, plus the instance
   // the hook currently renders through — the re-adoption tests assert which
   // binding survives a mounted A→B→A transition.
-  chatInstances: [] as Array<{ status: string; messages: UIMessage[] }>,
+  chatInstances: [] as Array<{
+    status: string
+    messages: UIMessage[]
+    options: { onError?: (error: Error) => void }
+  }>,
   lastUseChatInstance: null as unknown,
   // Controllable Turn context hydration for the auto-submit gate tests.
   turnContextHydrated: true,
@@ -74,14 +80,14 @@ vi.mock("./turn-context", () => ({
     handleModelChange: vi.fn(),
     enableSearch: false,
     setEnableSearch: chatCoreMocks.setWebSearchEnabled,
-    isAuthenticated: true,
+    isAuthenticated: chatCoreMocks.isAuthenticated,
     systemPrompt: "system prompt",
     isHydrated: chatCoreMocks.turnContextHydrated,
     getTurnSnapshot: () => ({
       selectedModel: "openai/gpt-4.1-mini",
       systemPrompt: "system prompt",
       enableSearch: false,
-      isAuthenticated: true,
+      isAuthenticated: chatCoreMocks.isAuthenticated,
       isHydrated: chatCoreMocks.turnContextHydrated,
     }),
   }),
@@ -127,6 +133,7 @@ vi.mock("@ai-sdk/react", () => ({
     constructor(
       readonly options: {
         messages?: UIMessage[]
+        onError?: (error: Error) => void
         transport: {
           sendMessages: (options: {
             messageId?: string
@@ -223,13 +230,16 @@ const authenticatedUser = {
   profile_image: null,
   anonymous: false,
   premium: true,
-  message_count: 0,
-  daily_message_count: 0,
-  daily_reset: null,
-  last_active_at: null,
   created_at: null,
   favorite_models: null,
   system_prompt: "system prompt",
+}
+
+// Signed-in turns never consult the guest usage gate.
+const guestUsage = {
+  check: () => true,
+  spend: () => {},
+  limitReached: () => {},
 }
 
 async function flushAsyncWork() {
@@ -305,13 +315,11 @@ describe("useChatCore prompt query handling", () => {
     chatId = "chat-project",
     initialMessages = [],
     ensureChatExists = vi.fn(async () => ({ chatId: "chat-project" })),
-    checkLimitsAndNotify = vi.fn(async () => true),
   }: {
     search: string
     chatId?: string | null
     initialMessages?: UIMessage[]
     ensureChatExists?: Parameters<typeof useChatCore>[0]["ensureChatExists"]
-    checkLimitsAndNotify?: (uid: string) => Promise<boolean>
   }) {
     window.history.replaceState(
       null,
@@ -333,7 +341,7 @@ describe("useChatCore prompt query handling", () => {
         chatId,
         user: authenticatedUser,
         isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-        checkLimitsAndNotify,
+        guestUsage,
         ensureChatExists,
         firstTurn: { begin: () => "chat-1", rollback: () => {} },
         bumpChat: chatCoreMocks.bumpChat,
@@ -367,7 +375,6 @@ describe("useChatCore prompt query handling", () => {
     rerender()
 
     return {
-      checkLimitsAndNotify,
       ensureChatExists,
       rerender,
       getCore: () => currentCoreRef.current,
@@ -579,7 +586,7 @@ describe("useChatCore prompt query handling", () => {
     try {
       const { getCore } = renderCore({
         search: "",
-        checkLimitsAndNotify: vi.fn(async () => false),
+        ensureChatExists: vi.fn(async () => null),
       })
       await act(async () => {
         await expect(
@@ -702,7 +709,7 @@ describe("useChatCore selected-path projection", () => {
       chatId,
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_projection" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,
@@ -840,6 +847,29 @@ describe("useChatCore selected-path projection", () => {
     }
   })
 
+  it("presents a guest limit refusal that lands on a detached binding", () => {
+    chatCoreMocks.isAuthenticated = false
+    const limitReached = vi.spyOn(guestUsage, "limitReached")
+    try {
+      mount()
+      render([], "chat_projection")
+      const binding = chatCoreMocks.chatInstances[0]
+      render([], null) // Back before the refusal lands → detach
+
+      act(() => {
+        binding.options.onError?.(
+          new Error(JSON.stringify({ error: "Limit", code: "DAILY_LIMIT_REACHED" }))
+        )
+      })
+
+      // Sign-in and a zero hint, and no toast (the turn runner adds none).
+      expect(limitReached).toHaveBeenCalledTimes(1)
+      expect(chatCoreMocks.toast).not.toHaveBeenCalled()
+    } finally {
+      limitReached.mockRestore()
+    }
+  })
+
   it("defers a divergent branch swap to settle when entering a chat mid-stream", () => {
     mount()
     render([], "chat_a")
@@ -917,7 +947,7 @@ describe("useChatCore stream re-adoption on return", () => {
       chatId,
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_a" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,
@@ -1126,7 +1156,7 @@ describe("useChatCore deferred durable Stop (projection gap)", () => {
       chatId: "chat_stopgap",
       user: authenticatedUser,
       isChatAdmissionReady: chatCoreMocks.chatAdmissionReady,
-      checkLimitsAndNotify: vi.fn(async () => true),
+      guestUsage,
       ensureChatExists: vi.fn(async () => ({ chatId: "chat_stopgap" })),
       firstTurn: { begin: () => "chat-1", rollback: () => {} },
       bumpChat: chatCoreMocks.bumpChat,

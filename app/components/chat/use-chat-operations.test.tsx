@@ -1,6 +1,5 @@
 /** @vitest-environment jsdom */
 
-import { checkRateLimits } from "@/lib/api"
 import type {
   FirstTurnChat,
   FirstTurnChatResult,
@@ -23,12 +22,6 @@ import { useChatOperations } from "./use-chat-operations"
 vi.mock("@/components/ui/toast", () => ({
   toast: vi.fn(),
 }))
-
-vi.mock("@/lib/api", () => ({
-  checkRateLimits: vi.fn(),
-}))
-
-const mockCheckRateLimits = vi.mocked(checkRateLimits)
 
 const localStorageMock = (() => {
   let store = new Map<string, string>()
@@ -106,9 +99,6 @@ describe("useChatOperations", () => {
   beforeEach(() => {
     localStorage.clear()
     vi.clearAllMocks()
-    mockCheckRateLimits.mockResolvedValue({
-      remaining: 10,
-    })
   })
 
   afterEach(() => {
@@ -165,6 +155,7 @@ describe("useChatOperations", () => {
       selectedModel: "openai/gpt-5-mini",
       systemPrompt: "system",
       createFirstTurnChat: vi.fn(),
+      deleteChat: vi.fn(async () => true),
       commitChatIdentity: vi.fn(),
       resetChatIdentity: vi.fn(),
       setHasDialogAuth: vi.fn(),
@@ -172,6 +163,23 @@ describe("useChatOperations", () => {
       ...overrides,
     }
   }
+
+  it("gates a guest locally, with no round trip, once a send was refused at the limit", () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+    const setHasDialogAuth = vi.fn()
+    const { operations } = renderOperations(
+      baseProps({ isAuthenticated: false, setHasDialogAuth })
+    )
+
+    operations().guestUsage.limitReached()
+    expect(setHasDialogAuth).toHaveBeenCalledWith(true)
+    setHasDialogAuth.mockClear()
+
+    expect(operations().guestUsage.check()).toBe(false)
+    expect(setHasDialogAuth).toHaveBeenCalledWith(true)
+    expect(fetchSpy).not.toHaveBeenCalled()
+    fetchSpy.mockRestore()
+  })
 
   it("commits the minted identity at begin and creates the guest chat under it", async () => {
     localStorage.setItem(GUEST_CHAT_STORAGE_KEY, "stale-guest-chat")
@@ -188,7 +196,8 @@ describe("useChatOperations", () => {
 
     const ensured = await operations().ensureChatExists(turnArgs())
 
-    expect(ensured).toEqual({ chatId: "chat-minted" })
+    expect(ensured?.chatId).toBe("chat-minted")
+    expect(ensured?.firstTurn).toBeUndefined()
     expect(createFirstTurnChat).toHaveBeenCalledWith({
       publicId: "chat-minted",
       model: "openai/gpt-5-mini",
@@ -198,8 +207,48 @@ describe("useChatOperations", () => {
       attachmentIds: [],
     })
     expect(localStorage.getItem(GUEST_CHAT_STORAGE_KEY)).toBe("chat-minted")
-    // Committed: a later rollback is a no-op (ADR-0012 keeps the chat).
+    // A local creation still rolls back (a guest sign-in refusal, ADR-0045):
+    // origin route restored and the empty local chat discarded.
     operations().rollbackFirstTurn()
+    expect(props.resetChatIdentity).toHaveBeenCalledOnce()
+    expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
+    expect(localStorage.getItem(GUEST_CHAT_STORAGE_KEY)).toBeNull()
+  })
+
+  it("keeps a guest chat once a retry in it is accepted", async () => {
+    const createFirstTurnChat = vi
+      .fn<(input: unknown) => Promise<FirstTurnChatResult>>()
+      .mockResolvedValue(localFirstTurn("chat-minted"))
+    const props = baseProps({ isAuthenticated: false, createFirstTurnChat })
+    const { operations, rerender } = renderOperations(props)
+
+    operations().beginFirstTurn()
+    await operations().ensureChatExists(turnArgs())
+    // The first dispatch failed in place; a retry from the chat is accepted.
+    rerender({ ...props, chatId: "chat-minted" })
+    const retry = await operations().ensureChatExists(turnArgs())
+    retry?.confirmDispatched?.()
+    operations().rollbackFirstTurn()
+
+    expect(props.deleteChat).not.toHaveBeenCalled()
+  })
+
+  it("discards a refused guest chat even after Back cleared the allocation", async () => {
+    const createFirstTurnChat = vi
+      .fn<(input: unknown) => Promise<FirstTurnChatResult>>()
+      .mockResolvedValue(localFirstTurn("chat-minted"))
+    const props = baseProps({ isAuthenticated: false, createFirstTurnChat })
+    const { operations, rerender } = renderOperations(props)
+
+    operations().beginFirstTurn()
+    await operations().ensureChatExists(turnArgs())
+    // Back to onboarding while the dispatch is in flight.
+    rerender({ ...props, chatId: "chat-minted" })
+    rerender({ ...props, chatId: null })
+    operations().rollbackFirstTurn()
+
+    expect(props.deleteChat).toHaveBeenCalledWith("chat-minted")
+    // Back already left the route; nothing to reset.
     expect(props.resetChatIdentity).not.toHaveBeenCalled()
   })
 
@@ -246,6 +295,9 @@ describe("useChatOperations", () => {
       },
       confirmDispatched: expect.any(Function),
     })
+    // A durable creation never rolls back (ADR-0012).
+    operations().rollbackFirstTurn()
+    expect(props.resetChatIdentity).not.toHaveBeenCalled()
     expect(createFirstTurnChat).toHaveBeenCalledWith({
       publicId: "chat-minted",
       model: "openai/gpt-5-mini",
@@ -336,7 +388,10 @@ describe("useChatOperations", () => {
       operations().ensureChatExists(
         turnArgs({ userId: "user-1", clientMessageId: "optimistic-3" })
       )
-    ).resolves.toEqual({ chatId: "chat-minted" })
+    ).resolves.toEqual({
+      chatId: "chat-minted",
+      confirmDispatched: expect.any(Function),
+    })
   })
 
   it("retires the first-turn retry token only once a different payload is accepted", async () => {
@@ -374,7 +429,10 @@ describe("useChatOperations", () => {
       operations().ensureChatExists(
         turnArgs({ userId: "user-1", clientMessageId: "optimistic-4" })
       )
-    ).resolves.toEqual({ chatId: "chat-minted" })
+    ).resolves.toEqual({
+      chatId: "chat-minted",
+      confirmDispatched: expect.any(Function),
+    })
   })
 
   it("neither resurrects nor dispatches an allocation that Back invalidated while creation was in flight", async () => {
@@ -440,7 +498,10 @@ describe("useChatOperations", () => {
 
     await expect(
       operations().ensureChatExists(turnArgs())
-    ).resolves.toEqual({ chatId: "chat-active" })
+    ).resolves.toEqual({
+      chatId: "chat-active",
+      confirmDispatched: expect.any(Function),
+    })
     expect(props.createFirstTurnChat).not.toHaveBeenCalled()
     expect(props.commitChatIdentity).not.toHaveBeenCalled()
   })

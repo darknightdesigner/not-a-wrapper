@@ -8,6 +8,10 @@
  * negative CSS min-height values are ignored.
  */
 import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
+import {
+  closestScrollRoot,
+  createScrollRootIntersectionObserver,
+} from "@/lib/dom/scroll-root-intersection"
 import { noteChatProgrammaticScroll } from "@/lib/observability/chat-ui-events"
 import { useCallback, useRef, useState } from "react"
 import { ThreadTail } from "./thread-bottom-container"
@@ -84,86 +88,11 @@ export function addScrollEndListener(
 export const TURN_CENTER_INTERSECTION_ROOT_MARGIN = "-49% 0px -49% 0px"
 export const TURN_CENTER_INTERSECTION_THRESHOLD = 0
 
-type TurnIntersectionChange = (
-  intersecting: boolean,
-  entry?: IntersectionObserverEntry
-) => void
-
-export type TurnIntersectionObserver = {
-  observe: (turn: HTMLElement, onChange: TurnIntersectionChange) => () => void
-  disconnect: () => void
-}
-
-/** Shares one observer per scroll root and one callback registry per target. */
-export function createTurnIntersectionObserver({
-  rootMargin,
-  threshold,
-}: {
-  rootMargin: string
-  threshold: number
-}): TurnIntersectionObserver {
-  const roots = new Map<
-    HTMLElement,
-    {
-      callbacks: Map<HTMLElement, TurnIntersectionChange>
-      observer: IntersectionObserver
-    }
-  >()
-
-  return {
-    observe(turn, onChange) {
-      const root = closestScrollRoot(turn)
-      if (!root || typeof IntersectionObserver === "undefined") {
-        onChange(true)
-        return () => undefined
-      }
-
-      let observation = roots.get(root)
-      if (!observation) {
-        const callbacks = new Map<HTMLElement, TurnIntersectionChange>()
-        const observer = new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!(entry.target instanceof HTMLElement)) continue
-              callbacks.get(entry.target)?.(
-                entry.isIntersecting && entry.intersectionRatio >= threshold,
-                entry
-              )
-            }
-          },
-          { root, rootMargin, threshold }
-        )
-        observation = { callbacks, observer }
-        roots.set(root, observation)
-      }
-
-      observation.callbacks.set(turn, onChange)
-      observation.observer.observe(turn)
-      return () => {
-        const current = roots.get(root)
-        if (!current || current.callbacks.get(turn) !== onChange) return
-        current.callbacks.delete(turn)
-        current.observer.unobserve(turn)
-        if (current.callbacks.size === 0) {
-          current.observer.disconnect()
-          roots.delete(root)
-        }
-      }
-    },
-    disconnect() {
-      for (const { callbacks, observer } of roots.values()) {
-        callbacks.clear()
-        observer.disconnect()
-      }
-      roots.clear()
-    },
-  }
-}
-
 export function createTurnCenterIntersectionObserver() {
-  return createTurnIntersectionObserver({
+  return createScrollRootIntersectionObserver({
     rootMargin: TURN_CENTER_INTERSECTION_ROOT_MARGIN,
     threshold: TURN_CENTER_INTERSECTION_THRESHOLD,
+    withoutScrollRoot: "intersecting",
   })
 }
 
@@ -190,10 +119,6 @@ export function useConversationTurnObservation() {
     centerIntersectionObserver,
     markerRef,
   }
-}
-
-function closestScrollRoot(el: Element | null): HTMLElement | null {
-  return el?.closest<HTMLElement>("[data-scroll-root]") ?? null
 }
 
 /** Viewport space below the gutter's top edge. Unclamped: CSS min-height ignores negatives. */

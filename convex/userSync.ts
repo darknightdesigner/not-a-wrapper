@@ -91,8 +91,6 @@ export async function upsertAppUserFromWorkOS(
     ...profile,
     anonymous: false,
     premium: false,
-    messageCount: 0,
-    dailyMessageCount: 0,
   })
 }
 
@@ -118,9 +116,6 @@ export async function insertAppUserFromIdentity(
     profileImage: identity.pictureUrl,
     anonymous: false,
     premium: false,
-    messageCount: 0,
-    dailyMessageCount: 0,
-    lastActiveAt: Date.now(),
   })
 }
 
@@ -143,8 +138,6 @@ export async function softDeleteAppUserFromWorkOS(
         workosUserId: input.workosUserId,
         anonymous: false,
         premium: false,
-        messageCount: 0,
-        dailyMessageCount: 0,
       })
 
   await ctx.db.patch(userId, {

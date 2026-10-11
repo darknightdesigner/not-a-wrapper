@@ -1,7 +1,7 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { GUEST_TURN_LIMITS } from "../lib/config"
+import { AUTH_DAILY_MESSAGE_LIMIT, GUEST_TURN_LIMITS } from "../lib/config"
 import { resolveToolLimitPolicy } from "../lib/tools/limit-policy"
 import { api } from "./_generated/api"
 import {
@@ -9,11 +9,13 @@ import {
   type GuestActor,
   type GuestTurnRef,
 } from "./lib/serverCallProof"
+import { API_RATE_LIMIT_MAX_WINDOW_MS } from "./rateLimits"
 import schema from "./schema"
 import { modules } from "./test.setup"
 
-// Seam tests (ADR-0034) for guest turn admission (ADR-0045): the registered
-// functions a browser could reach, through their real validators and indexes.
+// Seam tests (ADR-0034) for turn admission (ADR-0021, ADR-0045): the
+// registered functions a browser could reach, through their real validators
+// and indexes.
 
 const SECRET = "test-chat-admission-secret-with-32-bytes"
 const makeT = () => convexTest(schema, modules)
@@ -43,6 +45,70 @@ const release = (t: T, guest: GuestActor, requestId: string) =>
     api.usage.releaseGuestTurn,
     signed("guest_turn_release", guest, requestId)
   )
+
+describe("signed-in turn admission", () => {
+  const seedUser = (t: T) =>
+    t.run((ctx) =>
+      ctx.db.insert("users", {
+        workosUserId: "workos_1",
+        anonymous: false,
+        premium: false,
+      })
+    )
+  const caller = (t: T) => t.withIdentity({ subject: "workos_1" })
+  afterEach(() => vi.useRealTimers())
+
+  // Every authenticated query reads the users row (ADR-0044), so an untouched
+  // row means admission re-runs no subscription.
+  it("counts turns without writing the users row", async () => {
+    const t = makeT()
+    const userId = await seedUser(t)
+    const before = await t.run((ctx) => ctx.db.get(userId))
+
+    for (const count of [1, 2]) {
+      await expect(
+        caller(t).mutation(api.usage.admit, {})
+      ).resolves.toMatchObject({
+        canSend: true,
+        count,
+        remaining: AUTH_DAILY_MESSAGE_LIMIT - count,
+      })
+    }
+    expect(await t.run((ctx) => ctx.db.get(userId))).toEqual(before)
+  })
+
+  it("admits the last daily slot, then refuses without counting", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(new Date("2027-01-15T23:59:00.000Z"))
+    const t = makeT()
+    const userId = await seedUser(t)
+    const dayStart =
+      Math.floor(Date.now() / API_RATE_LIMIT_MAX_WINDOW_MS) *
+      API_RATE_LIMIT_MAX_WINDOW_MS
+    await t.run((ctx) =>
+      ctx.db.insert("apiRateLimits", {
+        actorKey: `user:${userId}`,
+        bucket: "user_turns_daily",
+        windowStartMs: dayStart,
+        count: AUTH_DAILY_MESSAGE_LIMIT - 1,
+      })
+    )
+
+    await expect(
+      caller(t).mutation(api.usage.admit, {})
+    ).resolves.toMatchObject({ canSend: true, remaining: 0 })
+    await expect(
+      caller(t).mutation(api.usage.admit, {})
+    ).resolves.toMatchObject({
+      canSend: false,
+      count: AUTH_DAILY_MESSAGE_LIMIT,
+    })
+    const counts = await t.run(async (ctx) =>
+      (await ctx.db.query("apiRateLimits").collect()).map((row) => row.count)
+    )
+    expect(counts).toEqual([AUTH_DAILY_MESSAGE_LIMIT])
+  })
+})
 
 describe("guest turn admission (server-proven)", () => {
   beforeEach(() => vi.stubEnv("CHAT_ADMISSION_SECRET", SECRET))

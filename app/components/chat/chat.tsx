@@ -109,6 +109,7 @@ const ChatInner = memo(function ChatInner({
   const { commitChatIdentity, resetChatIdentity } = useChatSession()
   const {
     createFirstTurnChat,
+    deleteChat,
     bumpChat,
     isLoading: isChatsLoading,
   } = useChats()
@@ -144,22 +145,19 @@ const ChatInner = memo(function ChatInner({
     composerRef.current?.insertQuote(text)
   }, [])
 
-  const {
-    checkLimitsAndNotify,
-    ensureChatExists,
-    beginFirstTurn,
-    rollbackFirstTurn,
-  } = useChatOperations({
-    isAuthenticated,
-    chatId,
-    selectedModel,
-    systemPrompt,
-    projectId: project?.id,
-    createFirstTurnChat,
-    commitChatIdentity,
-    resetChatIdentity,
-    setHasDialogAuth,
-  })
+  const { guestUsage, ensureChatExists, beginFirstTurn, rollbackFirstTurn } =
+    useChatOperations({
+      isAuthenticated,
+      chatId,
+      selectedModel,
+      systemPrompt,
+      projectId: project?.id,
+      createFirstTurnChat,
+      deleteChat,
+      commitChatIdentity,
+      resetChatIdentity,
+      setHasDialogAuth,
+    })
 
   // Core chat functionality (initialization + state + actions)
   const {
@@ -183,7 +181,7 @@ const ChatInner = memo(function ChatInner({
     chatId,
     user,
     isChatAdmissionReady,
-    checkLimitsAndNotify,
+    guestUsage,
     ensureChatExists,
     firstTurn: { begin: beginFirstTurn, rollback: rollbackFirstTurn },
     bumpChat,

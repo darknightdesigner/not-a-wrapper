@@ -1,5 +1,4 @@
 import { toast } from "@/components/ui/toast"
-import { checkRateLimits } from "@/lib/api"
 import type {
   CreateFirstTurnChatInput,
   FirstTurnChatResult,
@@ -11,10 +10,17 @@ import {
 import type {
   EnsureChatForTurnArgs,
   EnsuredTurnChat,
+  GuestUsageGate,
 } from "@/lib/chat-turn/chat-turn-controller"
+import {
+  loadGuestUsageHint,
+  readGuestUsageHint,
+  recordGuestUsageHint,
+  spendGuestUsageHint,
+} from "@/lib/chat-turn/usage-hint"
 import { REMAINING_QUERY_ALERT_THRESHOLD } from "@/lib/config"
 import type { Attachment } from "@/lib/file-handling"
-import { useEffect, useRef } from "react"
+import { useEffect, useMemo, useRef } from "react"
 
 /**
  * The first turn's allocation (ADR-0033). The chat id is minted and committed
@@ -28,6 +34,9 @@ import { useEffect, useRef } from "react"
 type FirstTurnAllocation = {
   chatId: string
   committed: boolean
+  /** A guest's local creation: client-only, so a guest sign-in refusal can
+   * still roll it back (ADR-0045). A durable creation never rolls back. */
+  local?: true
   committedTurn?: {
     userMessageId: string
     clientMessageId: string
@@ -55,6 +64,8 @@ type UseChatOperationsProps = {
   createFirstTurnChat: (
     input: CreateFirstTurnChatInput
   ) => Promise<FirstTurnChatResult>
+  /** Discards a rolled-back guest first turn's local chat. */
+  deleteChat: (chatId: string) => Promise<unknown>
   /** Session identity commands (the only History API owner). */
   commitChatIdentity: (chatId: string) => void
   resetChatIdentity: () => void
@@ -70,6 +81,7 @@ export function useChatOperations({
   systemPrompt,
   projectId,
   createFirstTurnChat,
+  deleteChat,
   commitChatIdentity,
   resetChatIdentity,
   setHasDialogAuth,
@@ -81,6 +93,9 @@ export function useChatOperations({
   // which does NOT remount the mounted Chat, or a rollback) must invalidate
   // it, or the next first turn would silently append to the previous chat.
   const allocationRef = useRef<FirstTurnAllocation | null>(null)
+  // A guest's local chat awaiting its first acceptance. Kept apart from the
+  // allocation, which Back clears, so a later refusal can still discard it.
+  const unacceptedLocalChatRef = useRef<string | null>(null)
   const previousChatIdRef = useRef(chatId)
   useEffect(() => {
     const previousChatId = previousChatIdRef.current
@@ -98,6 +113,8 @@ export function useChatOperations({
   const beginFirstTurn = (): string => {
     const current = allocationRef.current
     if (current) return current.chatId
+    // A new first turn may only ever discard its own local chat.
+    unacceptedLocalChatRef.current = null
     const nextChatId = createChatId()
     allocationRef.current = { chatId: nextChatId, committed: false }
     commitChatIdentity(nextChatId)
@@ -106,12 +123,32 @@ export function useChatOperations({
 
   /**
    * The one pre-commit rollback: identity cleared (origin route restored)
-   * and the allocation dropped. Never called once creation has landed — a
-   * later dispatch failure keeps the chat at its route (ADR-0012).
+   * and the allocation dropped. A no-op once a durable creation has landed:
+   * a later dispatch failure keeps the chat at its route (ADR-0012). A
+   * guest's local chat is discarded instead, since the turn runner rolls it
+   * back only on a guest sign-in refusal, which committed nothing (ADR-0045).
    */
+  // Any accepted send on the local chat (first try or retry) keeps it.
+  const releaseLocalChat = (acceptedChatId: string) => {
+    if (unacceptedLocalChatRef.current === acceptedChatId) {
+      unacceptedLocalChatRef.current = null
+    }
+  }
+
   const rollbackFirstTurn = () => {
+    const refusedLocalChat = unacceptedLocalChatRef.current
+    unacceptedLocalChatRef.current = null
+    if (refusedLocalChat) {
+      // No fallback may still point at the discarded chat.
+      if (localStorage.getItem(GUEST_CHAT_STORAGE_KEY) === refusedLocalChat) {
+        localStorage.removeItem(GUEST_CHAT_STORAGE_KEY)
+      }
+      void deleteChat(refusedLocalChat).catch((error: unknown) => {
+        console.error("Failed to discard a refused guest chat:", error)
+      })
+    }
     const current = allocationRef.current
-    if (!current || current.committed) return
+    if (!current || (current.committed && !current.local)) return
     allocationRef.current = null
     resetChatIdentity()
   }
@@ -126,30 +163,40 @@ export function useChatOperations({
     }
   }
 
-  const checkLimitsAndNotify = async (uid: string): Promise<boolean> => {
-    try {
-      const rateData = await checkRateLimits(uid, isAuthenticated)
-
-      if (rateData.remaining === 0 && !isAuthenticated) {
+  // The guest usage gate (ADR-0045). The typing-time hint answers at Send
+  // with no round trip; a Send with no fresh hint (a ?prompt= auto-send)
+  // reads one, and a failed read lets the send through for admission to judge.
+  const guestUsage = useMemo(() => {
+    const admit = (remaining: number | null) => {
+      if (remaining === 0) {
         setHasDialogAuth(true)
         return false
       }
-
-      if (rateData.remaining === REMAINING_QUERY_ALERT_THRESHOLD) {
+      if (remaining === REMAINING_QUERY_ALERT_THRESHOLD) {
         toast({
-          title: `Only ${rateData.remaining} quer${
-            rateData.remaining === 1 ? "y" : "ies"
-          } remaining today.`,
+          title: `Only ${REMAINING_QUERY_ALERT_THRESHOLD} queries remaining today.`,
           status: "info",
         })
       }
-
       return true
-    } catch (err) {
-      console.error("Rate limit check failed:", err)
-      return false
     }
-  }
+    return {
+      check: () => {
+        const remaining = readGuestUsageHint()
+        return remaining === null
+          ? loadGuestUsageHint().then(admit)
+          : admit(remaining)
+      },
+      spend: spendGuestUsageHint,
+      // A daily-limit or guest-capacity refusal the hint missed (another
+      // tab, a shared network): the next Send gates locally, and sign-in
+      // opens now.
+      limitReached: () => {
+        recordGuestUsageHint(0)
+        setHasDialogAuth(true)
+      },
+    } satisfies GuestUsageGate & { limitReached: () => void }
+  }, [setHasDialogAuth])
 
   const createAllocatedChat = async (
     allocation: FirstTurnAllocation,
@@ -195,9 +242,17 @@ export function useChatOperations({
     if (!created) return null
     const activeChatId = active.chatId
     if (created.kind === "local") {
-      allocationRef.current = { chatId: activeChatId, committed: true }
+      allocationRef.current = {
+        chatId: activeChatId,
+        committed: true,
+        local: true,
+      }
       localStorage.setItem(GUEST_CHAT_STORAGE_KEY, activeChatId)
-      return { chatId: activeChatId }
+      unacceptedLocalChatRef.current = activeChatId
+      return {
+        chatId: activeChatId,
+        confirmDispatched: () => releaseLocalChat(activeChatId),
+      }
     }
 
     allocationRef.current = {
@@ -285,9 +340,13 @@ export function useChatOperations({
       }
     }
 
-    if (chatId) return { chatId }
-    // The prop still lags the committed identity.
-    if (allocation) return { chatId: allocation.chatId }
+    const existingChatId = chatId ?? allocation?.chatId
+    if (existingChatId) {
+      return {
+        chatId: existingChatId,
+        confirmDispatched: () => releaseLocalChat(existingChatId),
+      }
+    }
 
     // No identity was committed for this send (the surface returned to
     // onboarding mid-flight): refuse rather than mint outside Send.
@@ -295,7 +354,7 @@ export function useChatOperations({
   }
 
   return {
-    checkLimitsAndNotify,
+    guestUsage,
     ensureChatExists,
     beginFirstTurn,
     rollbackFirstTurn,

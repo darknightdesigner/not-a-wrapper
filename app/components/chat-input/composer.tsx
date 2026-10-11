@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/prompt-input"
 import { toast } from "@/components/ui/toast"
 import { TooltipShortcut } from "@/components/ui/tooltip"
+import { prefetchGuestUsageHint } from "@/lib/chat-turn/usage-hint"
 import {
   ACCEPTED_FILE_PICKER_TYPES,
   TEXT_FILE_PICKER_TYPES,
@@ -61,6 +62,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type FormEvent,
   type MouseEvent,
 } from "react"
 import { flushSync } from "react-dom"
@@ -129,6 +131,13 @@ type ComposerProps = {
 const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
 
 const stopPropagation = (event: MouseEvent) => event.stopPropagation()
+
+// Guests read their remaining turns on trusted typed input, so Send can gate
+// a known zero without a round trip (ADR-0045). Never on focus: the editor
+// autofocuses, so focus would read for every page load.
+const readGuestUsageOnInput = (event: FormEvent) => {
+  if (event.nativeEvent.isTrusted) prefetchGuestUsageHint()
+}
 
 // Shared across mounts and retained only while a send can settle.
 const pendingDraftSends = new Map<string | null, Set<{ edited: boolean }>>()
@@ -701,6 +710,7 @@ export const Composer = memo(
               bottomSpacing === "none" && "pb-0 sm:pb-0"
             )}
             onClick={() => editorRef.current?.focus()}
+            onInput={isUserAuthenticated ? undefined : readGuestUsageOnInput}
           >
             <PromptInput
               expanded={localValue.includes("\n")}

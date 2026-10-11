@@ -117,3 +117,46 @@ describe("highlight input and cache", () => {
     expect(loader.codeToHtml).toHaveBeenCalledTimes(1)
   })
 })
+
+describe("highlight queue order", () => {
+  it("tokenizes the newest request first and never tokenizes an aborted one", async () => {
+    const controller = new AbortController()
+    // The first tokenization aborts the request queued behind it.
+    loader.codeToHtml.mockImplementationOnce(() => {
+      controller.abort()
+      return "highlighted"
+    })
+    const oldest = highlightCode({ ...input, code: "oldest" })
+    const obsolete = highlightCode({
+      ...input,
+      code: "obsolete",
+      signal: controller.signal,
+    })
+    const rejected = expect(obsolete).rejects.toMatchObject({
+      name: "AbortError",
+    })
+    const newest = highlightCode({ ...input, code: "newest" })
+
+    await Promise.all([oldest, newest, rejected])
+    expect(loader.codeToHtml.mock.calls.map((call) => call.at(0))).toEqual([
+      "newest",
+      "oldest",
+    ])
+  })
+
+  it("rejects queued requests on reset without tokenizing them", async () => {
+    // The first tokenization resets the client while another request waits.
+    loader.codeToHtml.mockImplementationOnce(() => {
+      resetShikiClientForTests()
+      return "highlighted"
+    })
+    const queued = highlightCode({ ...input, code: "queued" })
+    const rejected = expect(queued).rejects.toMatchObject({
+      name: "AbortError",
+    })
+
+    await expect(highlightCode(input)).resolves.toBe("highlighted")
+    await rejected
+    expect(loader.codeToHtml).toHaveBeenCalledOnce()
+  })
+})

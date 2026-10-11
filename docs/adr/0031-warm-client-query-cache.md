@@ -37,9 +37,12 @@ not deliver anything, so that guarantee is unaffected.
   cost lens) than saving a switch. Idle cap 32 entries, global to every
   cached per-user query: the session-long reads (user document, key status,
   preferences) never go idle, so in practice that is ~16 parked chats × the
-  pair. At the cap a departing query is dropped instead
-  of parked and a warm is skipped, so the hit guarantee below holds for
-  chats left within the cap and the TTL.
+  pair. (48 since 2026-10-10: the ADR-0027 live tail adds `getLiveMessage`,
+  warmed with the pair.) Both bounds apply per query entry, not per chat: at
+  the cap a departing query is dropped instead of parked and a warm is
+  skipped, and each parked entry expires on its own TTL. So the hit guarantee
+  below holds only for a chat whose entries are all still parked; a chat that
+  lost any one of them opens in a loading state like any miss.
 - Warm ahead of the route. `useWarmPerUserQuery` opens a query as a
   momentary registry `start()` + `end()` — exactly the parked state a
   consumer leaves on unmount — gated on Convex auth readiness like the seam.
@@ -53,12 +56,12 @@ not deliver anything, so that guarantee is unaffected.
 
 ## Consequences
 
-- A chat revisited within the idle cap and TTL renders its delivered path in
-  the route commit itself (harness `SUITE=thread-switch`,
-  `nav_to_thread_painted`), and the switch opens no new server subscription:
-  the consumer's core hook joins the parked watch, so the socket carries zero
-  `ModifyQuerySet` Adds. Unvisited chats subscribe at click instead of at
-  commit.
+- A revisited chat whose entries are all still parked (each one parked under
+  the cap and within its TTL) renders its delivered path in the route commit
+  itself (harness `SUITE=thread-switch`, `nav_to_thread_painted`), and the
+  switch opens no new server subscription: the consumer's core hook joins the
+  parked watch, so the socket carries zero `ModifyQuerySet` Adds. Unvisited
+  chats subscribe at click instead of at commit.
 - Idle subscriptions cost: every write to a parked chat re-executes its path
   query once per parked tab, for up to the TTL. Bounded by the cap and the
   TTL; revisit if the Convex functions dashboard shows the parked window

@@ -22,7 +22,7 @@ import {
   it,
   vi,
 } from "vitest"
-import { CodeBlockCode } from "./code-block"
+import { CodeBlock, CodeBlockCode } from "./code-block"
 
 const shikiClientMock = vi.hoisted(() => {
   const escapeHtml = (value: string) =>
@@ -73,6 +73,26 @@ vi.mock("next-themes", () => ({
   useTheme: () => ({ resolvedTheme: themeMock.resolvedTheme }),
 }))
 
+// Near-view gate seam: reports "near" at once unless a test captures targets.
+const nearView = vi.hoisted(() => ({
+  capture: false,
+  targets: new Map<Element, (near: boolean) => void>(),
+}))
+
+vi.mock("@/lib/dom/scroll-root-intersection", () => ({
+  createScrollRootIntersectionObserver: () => ({
+    observe: (target: Element, onChange: (near: boolean) => void) => {
+      if (!nearView.capture) {
+        onChange(true)
+        return () => {}
+      }
+      nearView.targets.set(target, onChange)
+      return () => nearView.targets.delete(target)
+    },
+    disconnect: () => nearView.targets.clear(),
+  }),
+}))
+
 describe("CodeBlockCode streaming rendering", () => {
   let container: HTMLDivElement | null = null
   let root: Root | null = null
@@ -111,6 +131,7 @@ describe("CodeBlockCode streaming rendering", () => {
     container = null
     root = null
     vi.useRealTimers()
+    nearView.capture = false
   })
 
   type CodeProps = { code: string; language?: string; growing?: boolean }
@@ -376,5 +397,76 @@ describe("CodeBlockCode streaming rendering", () => {
     })
     expect(recoverableErrors).toEqual([])
     expect(highlightedEl()?.textContent).toBe(code)
+  })
+
+  it("highlights only the block near the view; a cache hit renders highlighted without observing", async () => {
+    nearView.capture = true
+    nearView.targets.clear()
+    const cached = "const cached = 1"
+    shikiClientMock.state.cache.set(
+      `github-light:ts:${cached}`,
+      shikiClientMock.render(cached, "ts", "github-light")
+    )
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(
+        <>
+          {["const near = 1", "const far = 1", cached].map((code) => (
+            <CodeBlock key={code} data-code={code}>
+              <CodeBlockCode code={code} language="ts" />
+            </CodeBlock>
+          ))}
+        </>
+      )
+    })
+    const box = (code: string) =>
+      container?.querySelector(`[data-code="${code}"]`) ?? document.body
+    // Uncached blocks wait on their content-visibility box; the hit is final.
+    expect(new Set(nearView.targets.keys())).toEqual(
+      new Set([box("const near = 1"), box("const far = 1")])
+    )
+    expect(box(cached).querySelector("pre.shiki")?.textContent).toBe(cached)
+
+    act(() => {
+      nearView.targets.get(box("const near = 1"))?.(true)
+      nearView.targets.get(box("const far = 1"))?.(false)
+    })
+    await advance(0)
+    expect(
+      shikiClientMock.highlightCode.mock.calls.map(([args]) => args.code)
+    ).toEqual([cached, "const near = 1"])
+    expect(box("const near = 1").querySelector("pre.shiki")).not.toBeNull()
+    expect(box("const far = 1").querySelector("pre.shiki")).toBeNull()
+    expect(new Set(nearView.targets.keys())).toEqual(
+      new Set([box("const far = 1")])
+    )
+  })
+
+  it("keeps near-view gating when callers pass their own refs", () => {
+    nearView.capture = true
+    nearView.targets.clear()
+    const boxRef = React.createRef<HTMLDivElement>()
+    const codeRef = React.createRef<HTMLDivElement>()
+    container = document.createElement("div")
+    document.body.appendChild(container)
+    root = createRoot(container)
+    act(() => {
+      root?.render(
+        <>
+          <CodeBlock ref={boxRef}>
+            <CodeBlockCode code="const boxed = 1" language="ts" />
+          </CodeBlock>
+          <CodeBlockCode ref={codeRef} code="const bare = 1" language="ts" />
+        </>
+      )
+    })
+    expect(boxRef.current).toBeInstanceOf(HTMLDivElement)
+    expect(codeRef.current).toBeInstanceOf(HTMLDivElement)
+    expect(new Set(nearView.targets.keys())).toEqual(
+      new Set([boxRef.current, codeRef.current])
+    )
+    expect(shikiClientMock.highlightCode).not.toHaveBeenCalled()
   })
 })

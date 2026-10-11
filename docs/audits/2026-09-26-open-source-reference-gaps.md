@@ -1640,12 +1640,13 @@ land in analytics that are otherwise anonymous (we never call
 receives the WorkOS reset `token` in its URL, which leaks the same way.
 
 **Our code.**
-- `app/providers/posthog-pageview.tsx:12-22`: builds `$current_url` from origin,
-  path and the full query string. It is mounted for every route through
-  `app/providers/posthog-provider.tsx:11`.
-- `instrumentation-client.ts:36-45`: `posthog.init` keeps the defaults
-  (autocapture on, `mask_personal_data_properties` off) and sets no URL
-  sanitizer, so every event also carries the full `location.href`.
+- `app/providers/posthog-pageview.tsx:11-21`: builds `$current_url` from origin,
+  path and the full query string. It is mounted for every route in
+  `app/providers/index.tsx`.
+- `lib/analytics/deferred-analytics.ts:72-82` (after the composer handoff,
+  ADR-0050): `posthog.init` keeps the defaults (autocapture on,
+  `mask_personal_data_properties` off) and sets no URL sanitizer, so every
+  event also carries the full `location.href`.
 - `app/auth/actions.ts:139-149`: `requestMagicAuthCode` redirects to
   `/email-verification?email=...`, or to `/auth/login?email=...` when codes are
   off.
@@ -1664,12 +1665,14 @@ receives the WorkOS reset `token` in its URL, which leaks the same way.
   with `custom_personal_data_properties`.
 
 **Fix.**
-1. In `instrumentation-client.ts`, give `posthog.init` one sanitizer that covers
-   every event: a `get_current_url` plus `before_send` hook that drops the query
-   string on `/auth/*` and `/email-verification`. This alone closes the live
-   leak.
+1. In `lib/analytics/deferred-analytics.ts`, give `posthog.init` one sanitizer
+   that covers every event: a `get_current_url` plus `before_send` hook that
+   drops the query string on `/auth/*` and `/email-verification`. This alone
+   closes the live leak. Done 2026-10-10 (ADR-0050, #213): `before_send` covers
+   every event and `maskCapturedNetworkRequestFn` covers recording URLs
+   (`get_current_url` only steers URL targeting, so it is not used).
 2. Delete `app/providers/posthog-pageview.tsx` (and its mount in
-   `posthog-provider.tsx`) and set `capture_pageview: "history_change"`, so
+   `app/providers/index.tsx`) and set `capture_pageview: "history_change"`, so
    pageviews pass through the same sanitizer.
 3. In `lib/observability/sentry-scrubbing.ts`, strip query strings from
    `request.url` and from navigation breadcrumb `from` and `to` on auth routes.
@@ -1681,9 +1684,8 @@ receives the WorkOS reset `token` in its URL, which leaks the same way.
 URL (`app/email-verification/page.tsx:19-21`), so moving it into a sealed cookie
 like `app/auth/_lib/auth-flow-cookie.ts` is new work, and optional once step 1
 lands. The reset-token leak is latent: production sign-in is email code, phone
-code and Apple, so reset links are probably not sent today. The TODO "Root
-layout bundle weight" item only asks about session replay masking, which is a
-different issue.
+code and Apple, so reset links are probably not sent today. Session replay
+masking is a different issue (ADR-0050 masks recorded text and inputs).
 
 ### Guest chats are lost at sign-in
 
@@ -2025,7 +2027,7 @@ load shared Convex, Vercel and Redis capacity for everyone.
    answer to finish" message next to the other prepare codes in
    `app/api/chat/durable-turn-runtime.ts:1612-1652`.
 2. Add a per-minute bucket (around 20 per minute) for every signed-in send in
-   `admitUsageHandler` (`convex/usage.ts:120-229`), reusing
+   `usage.admit` (`convex/usage.ts`), reusing
    `evaluateFixedWindow` and the `apiRateLimits` table from
    `convex/rateLimits.ts`. Surface it from `admitServerSideUsage`
    (`app/api/chat/api.ts:92-114`) as 429 with `Retry-After`. BYOK and $0 turns

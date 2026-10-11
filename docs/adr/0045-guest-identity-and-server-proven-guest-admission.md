@@ -1,6 +1,6 @@
 # 45. Guest identity and server-proven guest admission
 
-- Status: accepted
+- Status: accepted (amended 2026-10-10: typing-time guest usage hint)
 - Date: 2026-09-27
 - Context: TODO "Guest abuse and spending limits"; audit
   `docs/audits/2026-09-26-open-source-reference-gaps.md#tool-limit-rows-are-never-deleted`
@@ -130,8 +130,9 @@ Refusals map to public errors: daily limits to 403 `DAILY_LIMIT_REACHED`,
 running answers to 429 `TOO_MANY_ACTIVE_ANSWERS`, the ceiling to 429
 `GUEST_CAPACITY_REACHED`.
 
-`usage.admit` and `usage.checkUsage` are now signed-in only; guests read their
-remaining turns through `usage.checkGuestUsage` (proof-gated).
+`usage.admit` is now signed-in only; guests read their remaining turns through
+`usage.checkGuestUsage` (proof-gated). Signed-in users have no pre-send read
+(see the 2026-10-10 amendment).
 
 ### Tool limits (`convex/toolLimits.ts`)
 
@@ -194,3 +195,61 @@ own continuation.
 - Provider attribution for guests hashes the trusted `anonymousId` (ADR-0021,
   "Provider retention and attribution").
 - Follow-up: Vercel BotID can sit in front of guest admission.
+
+## Amendment (2026-10-10): typing-time guest usage hint
+
+Before this amendment, every Send awaited `GET /api/rate-limits` after
+painting the optimistic turn and before creating the chat or dispatching. For
+guests the read was 65 to 68%
+of click-to-request (29 to 33 ms, 134 ms on the constrained profile;
+`docs/performance/2026-10-10-clear-wins-investigation.md`, win 2), and it
+blocked only one case, a guest at zero. Signed-in users at zero passed it and
+`/api/chat` refused them anyway.
+
+- **Guests** read `/api/rate-limits` on trusted typed input in the composer
+  (an `input` event, only while no fresh hint exists and at most once per five
+  minutes), never on focus: the editor autofocuses, so a focus read would mint
+  a guest cookie on every page load, crawlers included. The value is a
+  guest-only module-level hint (`lib/chat-turn/usage-hint.ts`), not React
+  state, so nothing re-renders. It expires at the earlier of five minutes or
+  the next UTC midnight, drops by one per admitted turn, and goes to zero on a
+  guest sign-in refusal (`DAILY_LIMIT_REACHED` or `GUEST_CAPACITY_REACHED`).
+- **At Send**, before any route, row, or request, a guest with a fresh zero
+  gets the sign-in dialog and keeps the draft; at the warning threshold the
+  remaining-turns toast shows as before. A guest with no fresh hint (a
+  `?prompt=` auto-send) reads it at Send, the old cost. A failed read lets the
+  send through for admission to judge.
+- **Signed-in users** have no pre-send read: `runSendTurn` skips the guest
+  gate when authenticated, so a guest's zero never gates them, and
+  `/api/chat` admission is their only per-send check. The 998th-message toast is gone, `usage.checkUsage` and
+  the signed-in branch of `/api/rate-limits` are deleted, and the route
+  answers a signed-in caller 400 without minting a guest cookie.
+- **Backstop.** A guest sign-in refusal the hint missed (another tab, a
+  shared network) opens the sign-in dialog instead of a toast. On a first
+  turn the turn runner rolls the turn back like a pre-creation refusal: the
+  origin route returns, the optimistic row goes, the draft stays, and the
+  empty local chat is discarded (a guest chat is local only, so nothing else
+  exists). The turn runner skips its generic "Failed to send message" toast
+  for any refusal carrying a public code, which the stream's error handler
+  already showed.
+
+Consequences:
+
+- A guest who types gets the guest cookie at first typed input instead of
+  first send; one who sends without typing (a `?prompt=` link) still gets it
+  at Send. Still interactive guests only.
+- `TOO_MANY_ACTIVE_ANSWERS`, which the hint cannot see, still creates the
+  local chat before the refusal lands, as before. A sign-in refusal that a
+  stale positive hint let through (another tab, or a Stop that races
+  acceptance, for up to five minutes) now arrives after the round trip: the
+  guest sees `/c/<id>` until it lands (930 ms in one local run, against 96 ms
+  for the old Send-time read), then the rollback and the dialog.
+- A coded refusal that reaches a detached stream binding (the user navigated
+  away before acceptance, or a first-turn rollback left `/c/<id>`) is
+  presented like an attached one: its toast, or for a guest sign-in refusal
+  the dialog and a zero hint.
+- A rejected account (ADR-0044) is no longer caught before Send:
+  `chats.createWithFirstTurn` or `/api/chat` refuses it with a message, where
+  the old pre-check dropped the send silently.
+- `preDispatchApiRequests` (ADR-0049) counts same-origin API requests between
+  the Send click and the `/api/chat` POST. It is 0 for every signed-in send.

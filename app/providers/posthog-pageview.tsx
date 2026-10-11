@@ -1,30 +1,32 @@
 "use client"
 
 import { usePathname, useSearchParams } from "next/navigation"
-import { usePostHog } from "posthog-js/react"
 import { Suspense, useEffect } from "react"
+import { captureAnalyticsEvent } from "@/lib/analytics/deferred-analytics"
 
 function PostHogPageViewTracker() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const posthog = usePostHog()
 
   useEffect(() => {
-    if (pathname && posthog) {
-      let url = window.origin + pathname
-      if (searchParams.toString()) {
-        url = url + `?${searchParams.toString()}`
-      }
-      posthog.capture("$pageview", {
-        $current_url: url,
-      })
-    }
-  }, [pathname, searchParams, posthog])
+    if (!pathname) return
+    const query = searchParams.toString()
+    // PostHog loads after the composer handoff (ADR-0050), so the view's own
+    // URL is passed rather than read when the queued event sends. Its
+    // `before_send` drops the query string on auth routes.
+    captureAnalyticsEvent("$pageview", {
+      $current_url: window.origin + pathname + (query ? `?${query}` : ""),
+      $host: window.location.host,
+      $pathname: pathname,
+    })
+  }, [pathname, searchParams])
 
   return null
 }
 
-// Next requires a Suspense boundary around useSearchParams.
+// No PostHog context provider: posthog-js loads after the composer handoff
+// (ADR-0050), and `posthog-js/react` would pull it back into the initial
+// bundle. Next requires a Suspense boundary around useSearchParams.
 export function PostHogPageView() {
   return (
     <Suspense fallback={null}>

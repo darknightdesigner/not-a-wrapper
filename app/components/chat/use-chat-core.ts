@@ -1,4 +1,7 @@
-import { presentChatStreamError } from "@/app/components/chat/public-chat-error"
+import {
+  hasPublicChatErrorCode,
+  presentChatStreamError,
+} from "@/app/components/chat/public-chat-error"
 import { useChatEdit } from "@/app/components/chat/use-chat-edit"
 import { toast } from "@/components/ui/toast"
 import { api } from "@/convex/_generated/api"
@@ -55,6 +58,7 @@ import {
   useState,
 } from "react"
 import { useTurnContext } from "./turn-context"
+import type { useChatOperations } from "./use-chat-operations"
 import {
   useCommitDetachableChatStream,
   useDetachableChatStream,
@@ -90,7 +94,8 @@ type UseChatCoreProps = {
   chatId: string | null
   user: UserProfile | null
   isChatAdmissionReady: boolean
-  checkLimitsAndNotify: (uid: string) => Promise<boolean>
+  /** The guest usage gate (ADR-0045), owned by useChatOperations. */
+  guestUsage: ReturnType<typeof useChatOperations>["guestUsage"]
   ensureChatExists: (
     args: EnsureChatForTurnArgs
   ) => Promise<EnsuredTurnChat | null>
@@ -107,7 +112,7 @@ export function useChatCore({
   chatId,
   user,
   isChatAdmissionReady,
-  checkLimitsAndNotify,
+  guestUsage,
   ensureChatExists,
   firstTurn,
   bumpChat,
@@ -162,8 +167,6 @@ export function useChatCore({
       },
     }
   })
-
-  const [hasDialogAuth, setHasDialogAuth] = useState(false)
 
   const [lastFinishReasonState, setLastFinishReasonState] = useState<{
     chatId: string | null
@@ -248,23 +251,30 @@ export function useChatCore({
     [applyGeneratedTitle]
   )
 
-  const handleError = useCallback((error: Error) => {
-    const presentation = presentChatStreamError(error)
-    if (presentation.kind === "swallow") {
-      // A losing approval-continuation POST (another tab's auto-send won) is
-      // swallowed without a failed repaint;
-      // this tab simply observes the winner's run through the projection.
-      console.warn("Approval continuation conflict (another tab won):", error)
-      return
-    }
-    console.error("Chat error:", error)
-    console.error("Error message:", error.message)
+  const handleError = useCallback(
+    (error: Error) => {
+      const presentation = presentChatStreamError(error, { isAuthenticated })
+      if (presentation.kind === "swallow") {
+        // A losing approval-continuation POST (another tab's auto-send won) is
+        // swallowed without a failed repaint;
+        // this tab simply observes the winner's run through the projection.
+        console.warn("Approval continuation conflict (another tab won):", error)
+        return
+      }
+      if (presentation.kind === "sign-in") {
+        guestUsage.limitReached()
+        return
+      }
+      console.error("Chat error:", error)
+      console.error("Error message:", error.message)
 
-    toast({
-      title: presentation.title,
-      status: "error",
-    })
-  }, [])
+      toast({
+        title: presentation.title,
+        status: "error",
+      })
+    },
+    [isAuthenticated, guestUsage]
+  )
 
   const handleDurableStopError = useCallback((stopError: unknown) => {
     console.error("Durable stop failed:", stopError)
@@ -532,7 +542,7 @@ export function useChatCore({
       reportError: (message, error) => console.error(message, error),
     },
     resolveUserId: () => getOrCreateGuestUserId(user),
-    checkLimitsAndNotify,
+    guestUsage,
     firstTurn,
     ensureChatExists,
     setPreviousChatId,
@@ -551,6 +561,11 @@ export function useChatCore({
     onLocalDispatch: noteLocalDispatch,
     consumeLocalStopIntent,
     toastError: (title) => toast({ title, status: "error" }),
+    isPresentedRefusal: hasPublicChatErrorCode,
+    isGuestSignInRefusal: (error) =>
+      error instanceof Error &&
+      presentChatStreamError(error, { isAuthenticated: false }).kind ===
+        "sign-in",
     bumpChat,
     setLastFinishReason,
     reportError: (message, error) => console.error(message, error),
@@ -665,8 +680,15 @@ export function useChatCore({
         handleError(streamError)
       },
       onDetachedError: (_originChatId, streamError) => {
-        // No toast: a detached stream's error has no visible surface here;
-        // durable chats surface it through the run's terminal projection.
+        // A coded refusal is the route's answer to this tab's own request,
+        // and the turn runner leaves presenting it to the stream's handler:
+        // present it here too (a guest limit opens sign-in, zeroing the hint).
+        if (hasPublicChatErrorCode(streamError)) {
+          handleError(streamError)
+          return
+        }
+        // No toast otherwise: a detached stream's error has no visible surface
+        // here; durable chats surface it through the run's terminal projection.
         console.error("Detached chat stream error:", streamError)
       },
     },
@@ -954,8 +976,6 @@ export function useChatCore({
     isSubmitting,
     isSendReady,
     setIsSubmitting,
-    hasDialogAuth,
-    setHasDialogAuth,
     lastFinishReason,
     scrollToMessageId,
 

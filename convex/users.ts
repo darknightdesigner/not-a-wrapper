@@ -15,7 +15,6 @@ import {
   authenticatedMutation,
   identityMutation,
   identityQuery,
-  maybeAuthMutation,
   maybeAuthQuery,
 } from "./lib/authedFunctions"
 import {
@@ -84,9 +83,44 @@ export const getByWorkosUserId = identityQuery({
   },
 })
 
+/** The profile fields the signed-in client subscribes to. */
+export type CurrentUser = Pick<
+  Doc<"users">,
+  | "_id"
+  | "_creationTime"
+  | "workosUserId"
+  | "displayName"
+  | "profileImage"
+  | "profileImageOverride"
+  | "anonymous"
+  | "premium"
+  | "favoriteModels"
+  | "systemPrompt"
+>
+
+/**
+ * Every signed-in page subscribes to this, so it returns a projection, not the
+ * row: email, lifecycle flags and storage ids stay server-side, and a write to
+ * any other field re-delivers nothing.
+ */
+function projectCurrentUser(user: Doc<"users">): CurrentUser {
+  return {
+    _id: user._id,
+    _creationTime: user._creationTime,
+    workosUserId: user.workosUserId,
+    displayName: user.displayName,
+    profileImage: user.profileImage,
+    profileImageOverride: user.profileImageOverride,
+    anonymous: user.anonymous,
+    premium: user.premium,
+    favoriteModels: user.favoriteModels,
+    systemPrompt: user.systemPrompt,
+  }
+}
+
 export const getCurrent = maybeAuthQuery({
   args: {},
-  handler: async (ctx) => ctx.user,
+  handler: async (ctx) => (ctx.user ? projectCurrentUser(ctx.user) : null),
 })
 
 /**
@@ -111,15 +145,6 @@ export const deleteAccount = internalMutation({
   args: { workosUserId: v.string() },
   handler: async (ctx, { workosUserId }) =>
     await softDeleteAppUserFromWorkOS(ctx, { workosUserId }),
-})
-
-export const updateLastActive = maybeAuthMutation({
-  args: {},
-  handler: async (ctx) => {
-    if (ctx.user) {
-      await ctx.db.patch(ctx.user._id, { lastActiveAt: Date.now() })
-    }
-  },
 })
 
 export const updateFavoriteModels = authenticatedMutation({

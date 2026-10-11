@@ -6,6 +6,7 @@
 
 export type ChatStreamErrorPresentation =
   | { kind: "swallow"; reason: "approval-continuation-lost-race" }
+  | { kind: "sign-in" }
   | { kind: "toast"; title: string }
 
 const GENERIC_MESSAGES = new Set([
@@ -14,6 +15,12 @@ const GENERIC_MESSAGES = new Set([
   "failed to fetch",
 ])
 const GENERIC_FALLBACK = "Something went wrong. Please try again."
+// Guest refusals that ask the guest to sign in: their own daily limit, or the
+// all-guest daily ceiling. The guest usage read reports both as zero left.
+const GUEST_SIGN_IN_CODES = new Set([
+  "DAILY_LIMIT_REACHED",
+  "GUEST_CAPACITY_REACHED",
+])
 
 function parsePublicBody(message: string): { error?: string; code?: string } {
   try {
@@ -29,8 +36,17 @@ function parsePublicBody(message: string): { error?: string; code?: string } {
   }
 }
 
+/** True for a refusal carrying the public `code` contract, which the stream's
+ * error handler presents. */
+export function hasPublicChatErrorCode(error: unknown): boolean {
+  return (
+    error instanceof Error && parsePublicBody(error.message).code !== undefined
+  )
+}
+
 export function presentChatStreamError(
-  error: Error
+  error: Error,
+  { isAuthenticated }: { isAuthenticated: boolean }
 ): ChatStreamErrorPresentation {
   const body = parsePublicBody(error.message)
 
@@ -45,6 +61,11 @@ export function presentChatStreamError(
     error.message.includes("Approval continuation already dispatched")
   ) {
     return { kind: "swallow", reason: "approval-continuation-lost-race" }
+  }
+
+  // A guest refusal the usage hint missed: sign-in, not a toast (ADR-0045).
+  if (!isAuthenticated && body.code && GUEST_SIGN_IN_CODES.has(body.code)) {
+    return { kind: "sign-in" }
   }
 
   const title = body.error ?? error.message

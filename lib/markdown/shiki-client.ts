@@ -17,12 +17,14 @@
  *   completions (`components/ui/code-block.tsx`).
  * - Code is tokenized as a one-byte string when it fits Latin-1, finished
  *   HTML is kept in a bounded LRU (`./highlight-cache.ts`), and tokenization
- *   runs through a queue that yields to the main thread between blocks.
+ *   runs newest-first through a queue that yields to the main thread between
+ *   blocks.
  *
  * Consumers must not import `shiki` directly: `components/ui/code-block.tsx`
  * carries no runtime Shiki import (type-only imports here are erased at
  * build time), so no-code conversations ship zero Shiki bytes.
  */
+import { isStreamingPaintHeld } from "@/lib/chat-performance/interaction-priority"
 import { markChatPerf } from "@/lib/observability/chat-performance"
 import type { HighlighterCore } from "shiki/core"
 import {
@@ -230,27 +232,92 @@ async function yieldToMain(): Promise<void> {
   await postMessageTask()
 }
 
-let highlightQueue: Promise<unknown> = Promise.resolve()
+type QueuedHighlight = {
+  sequence: number
+  signal: AbortSignal | undefined
+  /** Tokenizes and settles the caller, or rejects when aborted. */
+  run: () => void
+  /** Settles the caller without tokenizing. */
+  reject: (reason: unknown) => void
+}
+
+let highlightSequence = 0
+/** Ascending by call sequence; the drain pops the newest. */
+const queuedHighlights: QueuedHighlight[] = []
+let drainingHighlights = false
+
+function nextFrame(): Promise<void> {
+  return new Promise((resolve) => requestAnimationFrame(() => resolve()))
+}
+
+/** Rejects aborted entries in place without tokenizing them. */
+function dropAbortedHighlights(): void {
+  for (let i = queuedHighlights.length - 1; i >= 0; i--) {
+    const entry = queuedHighlights[i]
+    if (entry?.signal?.aborted) {
+      queuedHighlights.splice(i, 1)
+      entry.reject(entry.signal.reason)
+    }
+  }
+}
+
+async function drainHighlights(): Promise<void> {
+  drainingHighlights = true
+  try {
+    while (true) {
+      dropAbortedHighlights()
+      if (queuedHighlights.length === 0) return
+      await yieldToMain()
+      // A click-opened popup commits first (ADR-0016 interaction priority).
+      while (isStreamingPaintHeld()) await nextFrame()
+      dropAbortedHighlights()
+      queuedHighlights.pop()?.run()
+    }
+  } finally {
+    drainingHighlights = false
+  }
+}
 
 /**
  * Tokenization is synchronous, so blocks that become stable together
  * (opening a long thread, a message settling) used to chain into one long
- * task. Serialize them and yield before each, so every block is its own task
- * and input, paint, and React commits run in between. Aborted entries skip
- * both the yield and tokenization, so they never delay live blocks.
+ * task. Run them one per task, yielding before each, so input, paint, and
+ * React commits run in between. Newest queued request first, by call
+ * sequence; a request joins only after its loads finish. With the code-block
+ * visibility gate that is the block that just came into view or just settled,
+ * ahead of any backlog. Aborted entries skip both the yield and tokenization,
+ * so they never delay live blocks.
  */
 function enqueueHighlight<T>(
+  sequence: number,
   signal: AbortSignal | undefined,
-  run: () => T
+  tokenize: () => T
 ): Promise<T> {
-  const task = highlightQueue.then(async () => {
-    signal?.throwIfAborted()
-    await yieldToMain()
-    signal?.throwIfAborted()
-    return run()
+  return new Promise<T>((resolve, reject) => {
+    const entry: QueuedHighlight = {
+      sequence,
+      signal,
+      run: () => {
+        try {
+          signal?.throwIfAborted()
+          resolve(tokenize())
+        } catch (error) {
+          reject(error)
+        }
+      },
+      reject,
+    }
+    // Loads finish out of call order, so order by the call's sequence.
+    const after = queuedHighlights.findIndex(
+      (queued) => queued.sequence > sequence
+    )
+    queuedHighlights.splice(
+      after === -1 ? queuedHighlights.length : after,
+      0,
+      entry
+    )
+    if (!drainingHighlights) void drainHighlights()
   })
-  highlightQueue = task.catch(() => undefined)
-  return task
 }
 
 /**
@@ -268,6 +335,7 @@ export async function highlightCode(
   const cached = readCachedHighlight(args)
   if (cached !== null) return cached
 
+  const sequence = ++highlightSequence
   const startedAt = performance.now()
   const resolved = resolveShikiLanguage(args.language)
   const highlighter = await loadHighlighterCore()
@@ -282,7 +350,7 @@ export async function highlightCode(
   args.signal?.throwIfAborted()
   const loadMs = performance.now() - startedAt
 
-  return enqueueHighlight(args.signal, () => {
+  return enqueueHighlight(sequence, args.signal, () => {
     // An identical block queued earlier may have filled the cache.
     const queuedHit = readCachedHighlight(args)
     if (queuedHit !== null) return queuedHit
@@ -304,11 +372,17 @@ export async function highlightCode(
   })
 }
 
-/** Test-only: drop every cached instance, load promise, and cached HTML. */
+/**
+ * Test-only: drop every cached instance, load promise, and cached HTML.
+ * Queued requests reject as aborted so no caller is left pending.
+ */
 export function resetShikiClientForTests(): void {
   corePromise = null
   loadedLanguages.clear()
   languageLoadPromises.clear()
   clearHighlightCacheForTests()
-  highlightQueue = Promise.resolve()
+  for (const entry of queuedHighlights.splice(0)) {
+    entry.reject(new DOMException("Shiki client reset", "AbortError"))
+  }
+  highlightSequence = 0
 }

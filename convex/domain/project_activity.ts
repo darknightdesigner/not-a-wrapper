@@ -62,12 +62,3 @@ export async function patchChatActivity(
   await ctx.db.patch(chat._id, { ...patch, updatedAt: activityAt })
   await recordKnownProjectActivity(ctx, project ?? undefined, activityAt)
 }
-
-/** Record chat activity when no other chat fields need to change. */
-export async function recordChatActivity(
-  ctx: ActivityMutationCtx,
-  chat: Doc<"chats">,
-  occurredAt: number
-): Promise<void> {
-  await patchChatActivity(ctx, chat, {}, occurredAt)
-}

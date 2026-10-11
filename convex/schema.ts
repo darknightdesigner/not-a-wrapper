@@ -41,11 +41,14 @@ export default defineSchema({
     anonymous: v.optional(v.boolean()),
     premium: v.optional(v.boolean()),
 
+    // Retired send counters: signed-in windows live in `apiRateLimits`
+    // (convex/usage.ts). Nothing writes them; optional until production rows
+    // are contracted.
     messageCount: v.optional(v.number()),
     dailyMessageCount: v.optional(v.number()),
     dailyReset: v.optional(v.number()),
-
     lastActiveAt: v.optional(v.number()),
+
     lastSyncedFromWorkOSAt: v.optional(v.number()),
     workosUpdatedAt: v.optional(v.string()),
     // Account lifecycle (ADR-0044). Either value makes the account rejected at
@@ -99,6 +102,17 @@ export default defineSchema({
     ),
     // Guards the projection so a late terminal event cannot clobber a newer run.
     statusRunId: v.optional(v.id("generationRuns")),
+    // Live tail (ADR-0027): the streaming assistant message the history read
+    // stops before. Stamped at prepare only when the selected path is exactly
+    // history then this message; cleared at terminal and branch select.
+    // Server-only: `toClientChat` strips it from every chat read.
+    liveTail: v.optional(
+      v.object({
+        messageId: v.id("messages"),
+        orderId: v.number(),
+        parentMessageId: v.id("messages"),
+      })
+    ),
     lastRunEndedAt: v.optional(v.number()),
     lastRunStatus: v.optional(
       v.union(v.literal("completed"), v.literal("failed"))

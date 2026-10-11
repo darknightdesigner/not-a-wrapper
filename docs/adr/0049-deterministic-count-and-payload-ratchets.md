@@ -104,10 +104,35 @@ returns the bytes a client receives, so a core-level fake cannot hold a budget.
 
 | Read | Bytes |
 | --- | --- |
-| `messages.getSelectedPath` (240 messages) | 645,851 |
+| `messages.getSelectedPath` settled (240 messages) | 424,867 |
+| `messages.getSelectedPath` during a run (history, 239) | 422,258 |
+| `messages.getLiveMessage` (each checkpoint) | 2,585 |
 | `messages.getSelectedRunState` live / settled | 175 / 173 |
 | `chats.getRecentWindowForCurrentUser` first page (25) | 9,667 |
 | `chats.getPinnedForCurrentUser` (6) | 2,334 |
+| `users.getCurrent` | 356 |
+
+**Initial JS budget** (`scripts/check-initial-js.ts`, ADR-0050). The CI Build
+job runs it after `bun run build:next`. It sums the gzip size of the build
+manifest's `rootMainFiles` (framework, Next runtime and `instrumentation-client`,
+which every page loads first) and fails above 225 KiB. It also fails when they
+or the root layout's chunks, which load before hydration too, contain `rrweb`
+(a session recorder) or `persistence_name` (the posthog-js core). The layout
+chunks (about 162 KiB) are scanned, not budgeted. Bytes in the budgeted set
+track hydration time: on the constrained network, 106 KB fewer predicted about
+530 ms and measured 597 to 716 ms. ADR-0050 took the set from 321.0 to
+219.4 KiB. Lower the budget when a change shrinks the set.
+
+**Pre-dispatch requests** (`preDispatchApiRequests`, browser harness,
+ADR-0045 amendment). Every responsiveness run counts the same-origin `/api/*`
+requests that start between the Send click and the `/api/chat` POST. Each one
+is awaited before dispatch, so the count is the round trips added to
+click-to-request: removing the pre-send `/api/rate-limits` read took it from 1
+to 0 and cut 29 to 33 ms (134 ms constrained) from click-to-first-text in the
+guest A/B. `compare-results.ts` fails a pair when head's maximum exceeds
+base's, with zero tolerance. The count is optional in the result contract, so
+a capture from before it existed still compares on time alone, but a capture
+that records it must record it in every run. Signed-in sends hold it at 0.
 
 ## Consequences
 
@@ -124,13 +149,29 @@ returns the bytes a client receives, so a core-level fake cannot hold a budget.
   keystrokes from 3,618 to 688 renders, 65,070 to 5,278 hooks, and 4,698 to 106
   store subscriptions; typing script time fell 194 to 96 ms at 4x CPU (87 to 57
   ms at 1x, interleaved A/B, n=7). Popover counts did not rise.
-- The selected path has no windowing: a 120-turn chat ships 646 KB on open.
+- The selected path has no windowing: a 120-turn chat ships 425 KB on open.
   The budget makes growth visible; bounding the read is separate work.
+- Live tail (2026-10-10, ADR-0027 amendment): trimming the path to the fields
+  the client reads (and `content` when it equals the text parts) took the open
+  from 645,851 to 424,814 B. Splitting off the live message means a checkpoint
+  re-sends 2,585 B instead of the whole path, and
+  `convex/selectedPathSplit.seam.test.ts` proves checkpoints never re-run
+  history.
+- Users row (2026-10-10, ADR-0044 amendment): signed-in send counters moved to
+  an `apiRateLimits` window, so a send no longer writes the row every
+  authenticated query reads. `convex/usage.seam.test.ts` proves a send leaves
+  the row unchanged, and the `users.getCurrent` budget (356 B, over a realistic
+  row) catches a regression to returning the whole row. The browser census of
+  that fan-out is deferred: it needs a signed-in harness run.
 - The ratchet only holds across PRs that trigger the workflow. Its path filter
   covers the typing and popover render path (chat input, `components/ui/**`,
-  the model selector, hooks, and the model, user, and preference stores); a
-  regression that lands through an unwatched module raises the next base
-  silently. The weekly schedule does not run counts.
+  the model selector, hooks, and the model, user, and preference stores) and
+  the cold-load, send-dispatch and thread-open paths that
+  `preDispatchApiRequests` and the timing pair measure (`lib/analytics`,
+  `app/providers`, `lib/chat-turn`, `lib/convex`, `lib/dom`); the workflow's
+  comments name each group. A regression that lands through an unwatched
+  module raises the next base silently. The weekly schedule does not run
+  counts. The initial-JS check runs in the Build job on every PR.
 - Streaming style invalidation (2026-10-10): the scroll root's
   `has-data-[fixed-header=...]` variants re-matched it on every streamed
   insertion, and typography's `blockquote p:last-of-type` flagged every

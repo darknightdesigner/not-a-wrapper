@@ -251,7 +251,9 @@ go straight to WorkOS with no throttle. Add an IP limit and pass the IP to
 WorkOS.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#auth-actions-have-no-rate-limit))
 - **Strip personal data from analytics:** PostHog records full auth URLs,
-including emails and reset tokens.
+including emails and reset tokens. Session recordings mask text and inputs
+(ADR-0050) but keep attribute values, so chat titles in `aria-label`s and file
+names are recorded.
 ([details](docs/audits/2026-09-26-open-source-reference-gaps.md#analytics-record-emails-and-reset-tokens))
 - **Carry guest chats into the account:** Guest chats disappear at sign-in and
 are deleted at sign-out.
@@ -421,8 +423,7 @@ are never read, and the stale-flag bug class goes away. Amend ADR-0027.
 - **Remove dead client state and unused indexes:** The staged-edit machinery is
 unreachable because edits are durable-only (`chat-turn-controller.ts`,
 `turn-store.ts`, `use-chat-core.ts`: every `pendingEdit` consumer acts only when
-`!routePersists`). `hasDialogAuth` is duplicated and the `use-chat-core.ts` copy
-is dead. `@tanstack/react-query` backs four call sites (a CSRF ping in
+`!routePersists`). `@tanstack/react-query` backs four call sites (a CSRF ping in
 `layout-client.tsx` and three settings calls) with no invalidation; decide
 whether to keep it. Five `chats` indexes are never queried (`by_user`,
 `by_user_pinned`, `by_user_updated`, `by_user_pinned_project_updated`,
@@ -437,23 +438,20 @@ project can exceed the 16 MiB read limit and any message write in the project
 re-runs it. Paginate it and store the preview on the chat.
 - **Bound the selected-path read:** `messages.getSelectedPath`
 (`convex/messages.ts`) reads every message in the chat and returns the whole
-selected path, so the checked-in 120-turn payload fixture ships 645,851 bytes
-on open (ADR-0049 budget) and any message write re-runs it. Return a recent
-window with a cursor for older turns, as ADR-0005 bounds the sidebar and T3
-Code bounds thread history
+selected path, so the checked-in 120-turn payload fixture ships 424,814 bytes
+on open (ADR-0049 budget). Checkpoints no longer re-run it (the live tail,
+ADR-0027 amendment, proved by `convex/selectedPathSplit.seam.test.ts`), but
+any other message write does. Return a recent window with a cursor for older
+turns: one more `orderId` bound on the index the live tail already bounds, as
+ADR-0005 bounds the sidebar and T3 Code bounds thread history
 ([guide](https://github.com/pingdotgg/t3code/blob/main/docs/internals/performance-regressions.md),
 summarized in `.agents/skills/make-chat-faster/references/t3-code.md`). Pairs
 with the branch pointer item above, which makes the path a parent walk.
-- **Move send counters off the users row:** They live on `users`
-(`convex/usage.ts`), so every query reading that row re-runs on each send.
-Guest counters already live in `apiRateLimits` fixed windows (ADR-0045); give
-signed-in counters the same treatment.
 - **Root layout bundle weight:** `route-bundle-stats.json` (Sep 23 build) shows
 `/_not-found` at about 500 KB gzipped and login at about 580 KB, because the
-root layout mounts every provider and Sentry replay and PostHog init eagerly.
-Scope providers to the routes that need them and defer analytics init; verify
-with the same stats file. Overlaps Thread code splitting above. Also check
-whether PostHog session replay is on and whether it needs masking.
+root layout mounts every provider. Analytics already load after the composer
+handoff (ADR-0050). Scope providers to the routes that need them; verify with
+the same stats file. Overlaps Thread code splitting above.
 - **Model catalog staleness guard:** The resolver ignores route lifecycle even
 for retired routes (`lib/model-route-resolver.ts`), CI checks only the generator
 offline, the live smoke test is not wired into CI, the OpenRouter snapshot is

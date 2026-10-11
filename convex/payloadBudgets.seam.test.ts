@@ -4,22 +4,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { SIDEBAR_WINDOW_PAGE_SIZE } from "../lib/config"
 import { api } from "./_generated/api"
 import type { Id } from "./_generated/dataModel"
+import { resolveLiveTail } from "./domain/message_branches"
+import { listMessagesByChatOrder } from "./messages"
 import schema from "./schema"
 import { modules } from "./test.setup"
 
 // Payload budgets (ADR-0049): serialized result bytes of the reads every chat
-// open and sidebar render subscribes to, over one deterministic realistic
-// fixture. Exact bytes are reproducible (fixed clock, counter ids), so a
-// change is a real payload change. Fails on any growth (regression) and when
-// more than 1% under budget (ratchet: lower it so a win cannot decay).
+// open, sidebar render and signed-in page subscribes to, over one
+// deterministic realistic fixture. Exact bytes are reproducible (fixed clock,
+// counter ids), so a change is a real payload change. Fails on any growth
+// (regression) and when more than 1% under budget (ratchet: lower it so a win
+// cannot decay).
 // Regenerate: run `bunx vitest run convex/payloadBudgets.seam.test.ts` and
 // paste the `PAYLOAD_BUDGETS` object printed in the failure.
 const PAYLOAD_BUDGETS = {
-  selectedPath: 645_851,
+  selectedPathSettled: 424_867,
+  selectedPathDuringRun: 422_258,
+  liveMessage: 2_585,
   selectedRunStateLive: 175,
   selectedRunStateSettled: 173,
   recentWindowFirstPage: 9_667,
   pinned: 2_334,
+  currentUser: 356,
 }
 const RATCHET_TOLERANCE = 0.01
 
@@ -238,23 +244,48 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
 
   it("keeps every subscribed read within its checked-in budget", async () => {
     const t = makeT()
+    // A synced production row: profile, preferences and the server-only
+    // fields `getCurrent` must not ship (email, WorkOS sync stamps).
     const userId = await t.run((ctx) =>
       ctx.db.insert("users", {
         workosUserId: OWNER,
         email: `${OWNER}@example.com`,
         displayName: "Payload Owner",
+        profileImage: "https://workoscdn.com/images/v1/payload-owner-avatar",
+        anonymous: false,
+        premium: false,
+        favoriteModels: ["claude-sonnet-5", "gpt-5", "gemini-3-pro"],
+        systemPrompt: "Answer concisely and cite sources.",
+        lastSyncedFromWorkOSAt: 1_799_999_000_000,
+        workosUpdatedAt: "2027-01-01T00:00:00.000Z",
       })
     )
-    const { runId, assistantMessageId } = await seedLongChat(t, userId)
+    const { chatId, runId, assistantMessageId } = await seedLongChat(t, userId)
     await seedSidebar(t, userId)
     const owner = t.withIdentity({ subject: OWNER })
 
-    const path = await owner.query(api.messages.getSelectedPath, {
+    // The live tail as prepare stamps it: while the answer streams, history
+    // stops before it and each checkpoint re-sends the live message alone.
+    await t.run(async (ctx) =>
+      ctx.db.patch(chatId, {
+        liveTail: resolveLiveTail(
+          await listMessagesByChatOrder(ctx, chatId),
+          assistantMessageId
+        ),
+      })
+    )
+    const history = await owner.query(api.messages.getSelectedPath, {
+      chatId: CHAT,
+      splitLiveTail: true,
+    })
+    const liveMessage = await owner.query(api.messages.getLiveMessage, {
       chatId: CHAT,
     })
     const live = await owner.query(api.messages.getSelectedRunState, {
       chatId: CHAT,
     })
+    // Settlement: the run goes terminal and the chat's terminal projection
+    // clears the live tail, so the subscribed path is whole again.
     await t.run(async (ctx) => {
       await ctx.db.patch(runId, {
         status: "completed",
@@ -263,29 +294,48 @@ describe("payload budgets (realistic long chat + populated sidebar)", () => {
         leaseExpiresAt: undefined,
         completedAt: TURNS + 1,
       })
+      await ctx.db.patch(chatId, {
+        liveRunStatus: undefined,
+        liveTail: undefined,
+        lastRunEndedAt: TURNS + 1,
+        lastRunStatus: "completed",
+      })
       await ctx.db.patch(assistantMessageId, { generationRunId: runId })
     })
     const settled = await owner.query(api.messages.getSelectedRunState, {
       chatId: CHAT,
     })
+    const path = await owner.query(api.messages.getSelectedPath, {
+      chatId: CHAT,
+      splitLiveTail: true,
+    })
     const recent = await owner.query(api.chats.getRecentWindowForCurrentUser, {
       paginationOpts: { numItems: SIDEBAR_WINDOW_PAGE_SIZE, cursor: null },
     })
     const pinned = await owner.query(api.chats.getPinnedForCurrentUser, {})
+    const currentUser = await owner.query(api.users.getCurrent, {})
 
     // Shape guards: a budget only means something over the intended fixture.
+    expect(path.liveMessageId).toBeNull()
     expect(path.selectedMessages).toHaveLength(TURNS * 2)
+    expect(path.selectedMessages.at(-1)?.generationRunId).toBe(runId)
+    expect(history.liveMessageId).toBe(assistantMessageId)
+    expect(history.selectedMessages).toHaveLength(TURNS * 2 - 1)
+    expect(liveMessage?._id).toBe(assistantMessageId)
     expect(live?.status).toBe("streaming")
     expect(settled?.status).toBe("completed")
     expect(recent.page).toHaveLength(SIDEBAR_WINDOW_PAGE_SIZE)
     expect(pinned).toHaveLength(PINNED_CHATS)
 
     const measured: Record<PayloadName, number> = {
-      selectedPath: bytes(path),
+      selectedPathSettled: bytes(path),
+      selectedPathDuringRun: bytes(history),
+      liveMessage: bytes(liveMessage),
       selectedRunStateLive: bytes(live),
       selectedRunStateSettled: bytes(settled),
       recentWindowFirstPage: bytes(recent),
       pinned: bytes(pinned),
+      currentUser: bytes(currentUser),
     }
     const violations = (Object.keys(PAYLOAD_BUDGETS) as PayloadName[]).flatMap(
       (name) => {

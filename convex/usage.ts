@@ -12,7 +12,7 @@ import {
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server"
-import { optionalAuthMutation, optionalAuthQuery } from "./lib/authedFunctions"
+import { optionalAuthMutation } from "./lib/authedFunctions"
 import { requireServerCallProof, type GuestActor } from "./lib/serverCallProof"
 import {
   API_RATE_LIMIT_MAX_WINDOW_MS,
@@ -28,41 +28,33 @@ import {
  * allowance reservation in convex/usageAllowance.ts, and BYOK messages bypass
  * allowance entirely while still counting here as ordinary requests.
  *
- * Signed-in counters live on the user row and are keyed by the Convex
- * identity. Guest turns (ADR-0045) are admitted only through server-proven
- * calls: the Next server verifies the signed guest cookie, derives the client
- * network, and signs the call; windows are keyed by that server-derived actor,
- * never by a client-sent id.
+ * Every counter is an `apiRateLimits` fixed window over a UTC day. Signed-in
+ * windows are keyed by the caller's users row id and never write that row:
+ * every authenticated query reads it (ADR-0044), so a per-send write there
+ * would re-run them all. Guest turns (ADR-0045) are admitted only through
+ * server-proven calls: the Next server verifies the signed guest cookie,
+ * derives the client network, and signs the call; windows are keyed by that
+ * server-derived actor, never by a client-sent id.
  *
- * The retired pro-model fields stay optional in the schema only until
- * production preflight proves older user rows can be contracted safely.
+ * The retired users-row counters (`messageCount`, `dailyMessageCount`,
+ * `dailyReset`, `lastActiveAt`) and pro-model fields stay optional in the
+ * schema only until production preflight proves older user rows can be
+ * contracted safely.
  */
 
 const USAGE_ERROR_CODES = {
   USER_NOT_FOUND: "USER_NOT_FOUND",
 } as const
 
-function getStartOfDayMs(): number {
-  const startOfDay = new Date()
-  startOfDay.setUTCHours(0, 0, 0, 0)
-  return startOfDay.getTime()
-}
-
-type AbuseAdmissionCtx = Pick<MutationCtx, "db"> & {
-  identity: Awaited<ReturnType<MutationCtx["auth"]["getUserIdentity"]>>
-  user: Doc<"users"> | null
-}
-
-/** Check whether the signed-in caller has reached their daily limit. */
-export const checkUsage = optionalAuthQuery({
+export const admit = optionalAuthMutation({
   args: {},
   handler: async (ctx) => {
+    // Guests are admitted only through `admitGuestTurn` (server-proven).
     if (!ctx.identity) {
       throw new Error("Not authenticated")
     }
 
-    const user = ctx.user
-
+    const { user } = ctx
     if (!user) {
       return {
         canSend: false,
@@ -73,82 +65,38 @@ export const checkUsage = optionalAuthQuery({
       }
     }
 
-    const startOfDayMs = getStartOfDayMs()
+    // The signed-in daily window is a private policy, not a `consume` bucket.
+    // Check and count in one transaction, so concurrent sends cannot both pass
+    // the final slot. A refusal writes nothing.
     const limit = user.anonymous
       ? NON_AUTH_DAILY_MESSAGE_LIMIT
       : AUTH_DAILY_MESSAGE_LIMIT
-    const lastReset = user.dailyReset ?? 0
-    const isNewDay = lastReset < startOfDayMs
-    const count = isNewDay ? 0 : (user.dailyMessageCount ?? 0)
-    const remaining = Math.max(0, limit - count)
-
-    return {
-      canSend: count < limit,
-      remaining,
+    const daily = await readFixedWindow(ctx, {
+      actorKey: `user:${user._id}`,
+      bucket: "user_turns_daily",
       limit,
-      count,
+      windowMs: API_RATE_LIMIT_MAX_WINDOW_MS,
+      now: Date.now(),
+    })
+    if (!daily.allowed) {
+      return {
+        canSend: false,
+        remaining: 0,
+        limit,
+        count: daily.currentCount,
+        isAnonymous: user.anonymous,
+      }
+    }
+
+    await commitFixedWindow(ctx, daily)
+    return {
+      canSend: true,
+      remaining: daily.remaining,
+      limit,
+      count: daily.currentCount + 1,
       isAnonymous: user.anonymous,
     }
   },
-})
-
-export async function admitUsageHandler(ctx: AbuseAdmissionCtx) {
-  // Guests are admitted only through `admitGuestTurn` (server-proven).
-  if (!ctx.identity) {
-    throw new Error("Not authenticated")
-  }
-
-  const user = ctx.user
-
-  if (!user) {
-    return {
-      canSend: false,
-      remaining: 0,
-      limit: 0,
-      error: "User not found",
-      errorCode: USAGE_ERROR_CODES.USER_NOT_FOUND,
-    }
-  }
-
-  const startOfDayMs = getStartOfDayMs()
-  const now = Date.now()
-  const limit = user.anonymous
-    ? NON_AUTH_DAILY_MESSAGE_LIMIT
-    : AUTH_DAILY_MESSAGE_LIMIT
-  const lastReset = user.dailyReset ?? 0
-  const isNewDay = lastReset < startOfDayMs
-  const count = isNewDay ? 0 : (user.dailyMessageCount ?? 0)
-  if (count >= limit) {
-    return {
-      canSend: false,
-      remaining: 0,
-      limit,
-      count,
-      isAnonymous: user.anonymous,
-    }
-  }
-
-  const nextCount = count + 1
-
-  await ctx.db.patch(user._id, {
-    messageCount: (user.messageCount ?? 0) + 1,
-    dailyMessageCount: nextCount,
-    dailyReset: isNewDay ? startOfDayMs : user.dailyReset,
-    lastActiveAt: now,
-  })
-
-  return {
-    canSend: true,
-    remaining: limit - nextCount,
-    limit,
-    count: nextCount,
-    isAnonymous: user.anonymous,
-  }
-}
-
-export const admit = optionalAuthMutation({
-  args: {},
-  handler: admitUsageHandler,
 })
 
 // ---------------------------------------------------------------------------
@@ -368,7 +316,7 @@ export const releaseGuestTurn = mutation({
   },
 })
 
-/** The guest's remaining daily turns, for the composer's pre-send hint. */
+/** The guest's remaining daily turns, for the composer's typing-time hint. */
 export const checkGuestUsage = query({
   args: {
     guest: guestActorValidator,
