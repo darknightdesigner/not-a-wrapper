@@ -130,8 +130,15 @@ errors, and the only guard was the 330-second client budget. The recovery above
 follows HuggingChat's `reattachStream.ts`: a 10-second stall window over server
 heartbeats, resubscription from the client's own last sequence, and reactions to
 visibility, `online` and `pageshow`. A provider that stops producing on a healthy
-connection is a server concern; AI SDK 7 `timeout: { firstChunkMs, chunkMs }` in
-the Chat turn runtime is the follow-up.
+connection is a server concern. Implemented (2026-10-10) in
+`app/api/chat/provider-stall-timeout.ts`: a provider call that goes 60 seconds
+without a stream part while writing its answer ends with a stream `error` part,
+so the turn settles failed through the normal error path; reasoning,
+provider-run tools and the pre-answer wait pause the clock and stay bounded by
+the provider deadline (60 s matches LobeHub's relay `idleMs`). AI SDK 7
+`timeout: { firstChunkMs, chunkMs }` was rejected because it settles as an abort
+(like Stop) and, in ai@7.0.73, `chunkMs` keeps counting while client tools run
+inside a step.
 
 Review corrections: a stall counts as a failure, so a route that never delivers
 cannot keep the answer frozen behind endless 10-second reconnects; a wake keeps a
