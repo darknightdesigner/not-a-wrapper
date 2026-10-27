@@ -288,7 +288,36 @@ function scrubSentryPayload<T>(payload: T): T {
   return scrubValue(payload, [], new WeakMap<object, Scrubbable>()) as T
 }
 
-export function sentryBeforeSend<T>(event: T): T {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+
+function isExclusivelyAnonymousInlineScriptError(event: unknown): boolean {
+  if (!isRecord(event) || !isRecord(event.exception)) return false
+
+  const values = event.exception.values
+  if (!Array.isArray(values)) return false
+
+  let hasFrame = false
+  for (const value of values) {
+    if (!isRecord(value) || !isRecord(value.stacktrace)) continue
+
+    const frames = value.stacktrace.frames
+    if (!Array.isArray(frames)) continue
+
+    for (const frame of frames) {
+      if (!isRecord(frame) || frame.filename !== "<script>") return false
+      hasFrame = true
+    }
+  }
+
+  return hasFrame
+}
+
+export function sentryBeforeSend<T>(event: T): T | null {
+  // Next application code ships in named chunks; anonymous-only stacks come
+  // from injected inline scripts and cannot be symbolicated or repaired here.
+  if (isExclusivelyAnonymousInlineScriptError(event)) return null
   return scrubSentryPayload(event)
 }
 
