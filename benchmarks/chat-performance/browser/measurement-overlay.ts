@@ -34,11 +34,11 @@ const SCROLL_DEPTH_OPT_OUT =
 const BENCHMARK_RECORDING_OFF =
   "    ...(chatUiBenchmark ? { disable_session_recording: true } : {}),\n"
 
-/** One audited change: exact earlier hunks and their replacements. */
+/** One audited client-observability change: exact earlier hunks and replacements. */
 type AnalyticsRevision = ReadonlyArray<readonly [before: string, after: string]>
 
 /**
- * Audited product-analytics revisions of instrumentation-client.ts, oldest
+ * Audited client-observability revisions of instrumentation-client.ts, oldest
  * first. Only these exact hunks are rewritten to their successors; everything
  * else, analytics start, observer installation and reporting included, must
  * match byte for byte.
@@ -79,6 +79,28 @@ const ANALYTICS_REVISIONS: readonly AnalyticsRevision[] = [
         "}\n\n",
       "// Replay (with the rates above) and PostHog load after the composer handoff (ADR-0050).\n" +
         "startDeferredAnalytics()\n\n",
+    ],
+  ],
+  // Mark first-party bundles and reject errors exclusively from unmarked code.
+  [
+    [
+      'import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"\n' +
+        "import {\n",
+      'import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"\n' +
+        'import { SENTRY_APPLICATION_KEY } from "./lib/observability/sentry-application"\n' +
+        "import {\n",
+    ],
+    [
+      "  beforeBreadcrumb: sentryBeforeBreadcrumb,\n" +
+        "  replaysSessionSampleRate",
+      "  beforeBreadcrumb: sentryBeforeBreadcrumb,\n" +
+        "  integrations: [\n" +
+        "    Sentry.thirdPartyErrorFilterIntegration({\n" +
+        "      filterKeys: [SENTRY_APPLICATION_KEY],\n" +
+        '      behaviour: "drop-error-if-exclusively-contains-third-party-frames",\n' +
+        "    }),\n" +
+        "  ],\n" +
+        "  replaysSessionSampleRate",
     ],
   ],
 ]

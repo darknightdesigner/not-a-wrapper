@@ -11,7 +11,16 @@ function swap(text: string, from: string, to: string) {
 }
 
 const deferredImport = 'import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"\n'
+const applicationKeyImport =
+  'import { SENTRY_APPLICATION_KEY } from "./lib/observability/sentry-application"\n'
 const eagerImport = 'import posthog from "posthog-js"\n'
+const thirdPartyErrorFilter = `  integrations: [
+    Sentry.thirdPartyErrorFilterIntegration({
+      filterKeys: [SENTRY_APPLICATION_KEY],
+      behaviour: "drop-error-if-exclusively-contains-third-party-frames",
+    }),
+  ],
+`
 const scrollDepthOptOut = `    // Document scroll-depth analytics force layout during nested chat scrolling.
     disable_scroll_properties: true,
 `
@@ -41,11 +50,32 @@ ${scrollDepthOptOut}    ...(chatUiBenchmark ? { disable_session_recording: true 
 }
 `],
 ]
-const base = preAdr0050.reduce((text, [current, previous]) => swap(text, current, previous), head)
+const preThirdPartyFilter = [
+  [
+    deferredImport + applicationKeyImport + "import {\n",
+    deferredImport + "import {\n",
+  ],
+  [
+    "  beforeBreadcrumb: sentryBeforeBreadcrumb,\n" +
+      thirdPartyErrorFilter +
+      "  replaysSessionSampleRate",
+    "  beforeBreadcrumb: sentryBeforeBreadcrumb,\n" +
+      "  replaysSessionSampleRate",
+  ],
+] as const
+const withoutThirdPartyFilter = preThirdPartyFilter.reduce(
+  (text, [current, previous]) => swap(text, current, previous),
+  head
+)
+const base = preAdr0050.reduce(
+  (text, [current, previous]) => swap(text, current, previous),
+  withoutThirdPartyFilter
+)
 
 describe("measurement bootstrap", () => {
   it("upgrades audited older bootstraps to the current one", () => {
     expect(measurementBootstrap(head)).toBe(head)
+    expect(measurementBootstrap(withoutThirdPartyFilter)).toBe(head)
     expect(measurementBootstrap(base)).toBe(head)
     // The legacy overlay base also predates the scroll-depth opt-out.
     expect(measurementBootstrap(swap(base, scrollDepthOptOut, ""))).toBe(head)
@@ -62,6 +92,15 @@ describe("measurement bootstrap", () => {
     ]) {
       expect(measurementBootstrap(changed)).not.toBe(measurementBootstrap(base))
     }
+    expect(() =>
+      measurementBootstrap(
+        swap(
+          withoutThirdPartyFilter,
+          deferredImport + "import {\n",
+          deferredImport + applicationKeyImport + "import {\n"
+        )
+      )
+    ).toThrow(/partially matches/)
     expect(() => measurementBootstrap(swap(base, eagerImport, deferredImport))).toThrow(/partially matches/)
   })
 })
