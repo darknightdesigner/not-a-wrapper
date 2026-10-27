@@ -43,10 +43,9 @@ clear (no production recording was viewed).
 
 - **Eager Sentry core.** `Sentry.init` keeps errors, scrubbing,
   `tracesSampler`, `onRouterTransitionStart` and the web vitals ADR-0037 uses.
-  It carries the replay rates but no Replay integration. Sentry's application
-  key marks first-party bundles, and the eager third-party error filter drops
-  browser errors only when every stack frame comes from unmarked code. Mixed
-  stacks remain visible.
+  It carries the replay rates but no Replay integration. The final event
+  boundary drops browser errors only when every stack frame comes from an
+  anonymous inline `<script>`; mixed and app-attributed stacks remain visible.
 - **Trigger** (`lib/analytics/deferred-analytics.ts`). After the document is
   parsed, analytics wait until no visible `textarea.composer-fallback-textarea`
   remains: the editor hides it at mount (ADR-0047). A `MutationObserver` watches

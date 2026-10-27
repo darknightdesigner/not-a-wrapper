@@ -5,9 +5,15 @@ import {
 import {
   getSanitizedExceptionSummary,
   sanitizeExceptionForTelemetry,
-  sentryBeforeSend,
+  sentryBeforeSend as rawSentryBeforeSend,
 } from "@/lib/observability/sentry-scrubbing"
 import { describe, expect, it } from "vitest"
+
+function sentryBeforeSend<T>(event: T): T {
+  const scrubbed = rawSentryBeforeSend(event)
+  if (scrubbed === null) throw new Error("Expected Sentry event to be retained")
+  return scrubbed
+}
 
 describe("secret value detection", () => {
   it("matches the key shapes this app brokers", () => {
@@ -118,6 +124,52 @@ describe("chat-performance scrub corpus", () => {
 })
 
 describe("sentryBeforeSend", () => {
+  it("drops errors exclusively attributed to anonymous inline scripts", () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "TypeError",
+            value: "Injected script failed",
+            stacktrace: {
+              frames: [
+                { filename: "<script>", lineno: 2, colno: 10 },
+                { filename: "<script>", lineno: 44, colno: 20 },
+              ],
+            },
+          },
+        ],
+      },
+    }
+
+    expect(rawSentryBeforeSend(event)).toBeNull()
+  })
+
+  it("keeps errors with any app-attributed stack frame", () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: "TypeError",
+            value: "Application callback failed",
+            stacktrace: {
+              frames: [
+                { filename: "<script>", lineno: 2, colno: 10 },
+                {
+                  filename: "app:///_next/static/chunks/app.js",
+                  lineno: 12,
+                  colno: 8,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    }
+
+    expect(rawSentryBeforeSend(event)).toEqual(event)
+  })
+
   it("allow-lists exception types at the final event boundary", () => {
     const sentinel = "PRIVATE_PROVIDER_PAYLOAD"
     const event = {

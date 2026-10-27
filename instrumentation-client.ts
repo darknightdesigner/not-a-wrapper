@@ -1,6 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
 import { startDeferredAnalytics } from "./lib/analytics/deferred-analytics"
-import { SENTRY_APPLICATION_KEY } from "./lib/observability/sentry-application"
 import {
   sentryBeforeBreadcrumb,
   sentryBeforeSend,
@@ -20,12 +19,6 @@ Sentry.init({
   beforeSend: sentryBeforeSend,
   beforeSendSpan: sentryBeforeSendSpan,
   beforeBreadcrumb: sentryBeforeBreadcrumb,
-  integrations: [
-    Sentry.thirdPartyErrorFilterIntegration({
-      filterKeys: [SENTRY_APPLICATION_KEY],
-      behaviour: "drop-error-if-exclusively-contains-third-party-frames",
-    }),
-  ],
   replaysSessionSampleRate: chatUiBenchmark ? 0 : 0.1,
   replaysOnErrorSampleRate: chatUiBenchmark ? 0 : 1,
 })

@@ -7,9 +7,6 @@ vi.mock("@sentry/nextjs", () => ({
   init: vi.fn(),
   captureRouterTransitionStart: vi.fn(),
   captureException: vi.fn(),
-  thirdPartyErrorFilterIntegration: vi.fn(() => ({
-    name: "ThirdPartyErrorsFilter",
-  })),
 }))
 vi.mock("./lib/analytics/deferred-analytics", () => ({ startDeferredAnalytics: vi.fn() }))
 vi.mock("./lib/observability/chat-ui-observer", () => ({ installChatUiObserver: vi.fn() }))
@@ -32,13 +29,9 @@ it.each([false, true])("keeps Sentry eager and defers Replay and PostHog for ben
     replaysOnErrorSampleRate: benchmark ? 0 : 1,
     tracesSampler: expect.any(Function),
     beforeSend: expect.any(Function),
-    integrations: [{ name: "ThirdPartyErrorsFilter" }],
   }))
-  expect(Sentry.thirdPartyErrorFilterIntegration).toHaveBeenCalledWith({
-    filterKeys: ["not-a-wrapper"],
-    behaviour: "drop-error-if-exclusively-contains-third-party-frames",
-  })
-  // Only the error filter is eager. Replay attaches after the handoff (ADR-0050).
+  // Replay attaches after the composer handoff, never at init (ADR-0050).
+  expect(vi.mocked(Sentry.init).mock.calls[0][0]).not.toHaveProperty("integrations")
   expect(startDeferredAnalytics).toHaveBeenCalledTimes(1)
   expect(performance.getEntriesByName("chat-perf:replay_disabled_v1")).toHaveLength(benchmark ? 1 : 0)
 })
