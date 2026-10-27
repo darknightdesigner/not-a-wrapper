@@ -1,6 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
 import { getConvexSiteUrl } from "./app/api/_lib/convex-site-url"
+import { SENTRY_APPLICATION_KEY } from "./lib/observability/sentry-application"
 
 const isProduction = process.env.NODE_ENV === "production"
 
@@ -181,6 +182,7 @@ const nextConfig: NextConfig = {
 }
 
 export default withSentryConfig(nextConfig, {
+  applicationKey: SENTRY_APPLICATION_KEY,
   authToken: process.env.SENTRY_AUTH_TOKEN,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
