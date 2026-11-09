@@ -122,11 +122,12 @@ transitions without weakening the ordinary same-lane invariant.
 
 Recommendation policies are also dated catalog data. Compilation rejects
 duplicate maker policies, duplicate or missing current ids, current ids from a
-different maker, and hidden current models. The exact portfolios are currently:
+different maker, and hidden current models. The exact portfolios are currently
+(verified 2026-11-09 against each maker's models API and documentation):
 
-- OpenAI: GPT-5.6 Sol, Terra, and Luna.
-- Anthropic: Claude Fable 5, Opus 5, Sonnet 5, and Haiku 4.5.
-- Google: Gemini 3.5 Flash-Lite, 3.7 Flash, and 3.1 Pro.
+- OpenAI: GPT-6 Astra, GPT-6.1 Sol, GPT-6.1 Terra, and GPT-6 Luna.
+- Anthropic: Claude Fable 5.2, Opus 5.5, Sonnet 5.5, and Haiku 5.5.
+- Google: Gemini 4 Argon, 3.8 Flash, and 3.5 Flash-Lite.
 
 Because each policy is an allowlist, a newly cataloged model from any of these
 makers defaults to Legacy until its portfolio is deliberately updated.
@@ -157,7 +158,9 @@ remains intact.
   recommendation lane automatically transitions older members after the grace
   period.
 - DeepSeek chat, reasoning, and fast snapshots use separate lanes; Kimi's
-  general and code-focused models do the same. Explicit lifecycle evidence can
+  general and code-focused models do the same. GLM (flagship, fast, vision),
+  Qwen (Max, Flash, open 27B), MiniMax M, MiMo (base, Pro), and Ling Flash
+  each have a lane since 2026-11-09. Explicit lifecycle evidence can
   mark a known replaced snapshot Legacy immediately without weakening the
   global successor grace period.
 - Recommendation lanes must be curated carefully. Peer tiers and specialist

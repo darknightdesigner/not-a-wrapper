@@ -1,6 +1,10 @@
 /** @vitest-environment jsdom */
 
 import type { Doc } from "@/convex/_generated/dataModel"
+import {
+  MODEL_DEFAULT_ANONYMOUS,
+  MODEL_DEFAULT_AUTHENTICATED,
+} from "@/lib/config"
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import {
@@ -570,7 +574,7 @@ describe("ChatsProvider guest local chats", () => {
         title: "New chat",
         title_source: "provisional",
         title_generation: 1,
-        model: "gpt-5-mini",
+        model: MODEL_DEFAULT_ANONYMOUS,
       },
     })
     expect(convexMocks.mutationFn).not.toHaveBeenCalled()
@@ -771,7 +775,7 @@ describe("ChatsProvider guest local chats", () => {
 
     expect(convexMocks.mutationFn).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: "gpt-5-mini",
+        model: MODEL_DEFAULT_AUTHENTICATED,
         projectId: "project-1",
       })
     )

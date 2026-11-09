@@ -62,7 +62,7 @@ and staging, and blobs left by the pre-ADR-0046 flow) through
 only (`convex/domain/usage_accounting.ts`, `lib/usage/billable-pricing.ts`);
 per-call search fees exist as display metadata in `provider-strategy.ts` and the
 ADR-0021 platform-paid operation inventory omits provider-hosted search. A
-gpt-5-mini turn with two searches can cost several times what the $1 meter
+default-model turn with two searches can cost several times what the $1 meter
 records (bounded only by the 25 per 15 minutes tool cap). Meter the fees or
 document the accepted exposure in ADR-0021.
 - **MCP circuit breaker never resets:** After three failures a server is skipped

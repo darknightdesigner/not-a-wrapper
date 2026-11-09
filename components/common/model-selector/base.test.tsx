@@ -71,9 +71,9 @@ const modelSelectorMocks = {
       ],
     },
     {
-      id: "gpt-5-mini",
-      name: "GPT-5 Mini",
-      shortName: "5 Mini",
+      id: "gpt-6-luna",
+      name: "GPT-6 Luna",
+      shortName: "6 Luna",
       provider: "OpenAI",
       providerId: "openai",
       catalogStatus: "visible",
@@ -81,7 +81,7 @@ const modelSelectorMocks = {
       idKind: "stable",
       baseProviderId: "openai",
       accessible: true,
-      routes: [{ id: "gpt-5-mini", providerId: "openai" }],
+      routes: [{ id: "gpt-6-luna", providerId: "openai" }],
     },
     {
       id: "gpt-4.1",
@@ -445,7 +445,7 @@ describe("ModelSelector", () => {
     onOpenChange,
     onSelectionCommitted,
     disabled = false,
-    selectedModelId = "gpt-5-mini",
+    selectedModelId = "gpt-6-luna",
     variant = "default",
   }: {
     isUserAuthenticated: boolean
@@ -582,7 +582,7 @@ describe("ModelSelector", () => {
     expect(getModelOptionNames()).toEqual([
       "GPT-5.4",
       "Claude Sonnet 5",
-      "GPT-5 Mini",
+      "GPT-6 Luna",
       "GLM-5.2",
       "Kimi K3",
     ])
@@ -785,7 +785,7 @@ describe("ModelSelector", () => {
   it("uses a lock icon instead of the locked badge for signed-out users", () => {
     renderSelector({ isUserAuthenticated: false })
 
-    expect(document.body.textContent).toContain("GPT-5 Mini")
+    expect(document.body.textContent).toContain("GPT-6 Luna")
     expect(document.body.textContent).toContain("GPT-5.4")
     expect(document.body.textContent).toContain("Claude Haiku 4.5")
     expect(document.body.textContent).not.toContain("October 2025")
@@ -800,9 +800,9 @@ describe("ModelSelector", () => {
 
   it("swaps resting check and lock states for pin actions without selecting", () => {
     const onSelect = renderSelector({ isUserAuthenticated: true })
-    const selectedOption = getModelOption("GPT-5 Mini")
+    const selectedOption = getModelOption("GPT-6 Luna")
     const pinAction = selectedOption.querySelector<HTMLButtonElement>(
-      '[aria-label="Pin GPT-5 Mini"]'
+      '[aria-label="Pin GPT-6 Luna"]'
     )
 
     expect(pinAction).not.toBeNull()
@@ -814,7 +814,7 @@ describe("ModelSelector", () => {
     expect(favoriteModelMocks.updateFavoriteModels).toHaveBeenCalledWith([
       "gpt-5.4",
       "openrouter:moonshotai/kimi-k2.6",
-      "gpt-5-mini",
+      "gpt-6-luna",
     ])
     expect(onSelect).not.toHaveBeenCalled()
 
@@ -833,8 +833,8 @@ describe("ModelSelector", () => {
       "[data-scrollable-surface]"
     )
     const pinAction = getModelOption(
-      "GPT-5 Mini"
-    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-5 Mini"]')
+      "GPT-6 Luna"
+    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-6 Luna"]')
 
     expect(scrollSurface).not.toBeNull()
     expect(pinAction).not.toBeNull()
@@ -872,8 +872,8 @@ describe("ModelSelector", () => {
     )
     const anchorRow = getModelOption("GPT-5.4")
     const pinAction = getModelOption(
-      "GPT-5 Mini"
-    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-5 Mini"]')
+      "GPT-6 Luna"
+    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-6 Luna"]')
     let anchorTop = 48
 
     expect(scrollSurface).not.toBeNull()
@@ -914,10 +914,10 @@ describe("ModelSelector", () => {
     const onSelect = renderSelector({ isUserAuthenticated: false })
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
 
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
 
     act(() => {
       getModelOption("GPT-5.4").click()
@@ -943,9 +943,9 @@ describe("ModelSelector", () => {
     expect(onSelectionCommitted).not.toHaveBeenCalled()
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
     expect(onSelectionCommitted).not.toHaveBeenCalled()
 
     act(() => {
@@ -966,12 +966,12 @@ describe("ModelSelector", () => {
       variant: "composer",
     })
 
-    expect(document.body.textContent).toContain("GPT-5 Mini")
+    expect(document.body.textContent).toContain("GPT-6 Luna")
     expect(document.body.textContent).toContain("GLM-5.2")
     expect(
       document.body.querySelector('[data-testid="drawer-trigger"]')
     ).toBeTruthy()
-    const mobileOption = getModelOption("GPT-5 Mini")
+    const mobileOption = getModelOption("GPT-6 Luna")
     expect(
       mobileOption.querySelector('[data-slot="selected-model-check"]')
     ).not.toBeNull()
@@ -993,12 +993,12 @@ describe("ModelSelector", () => {
     const allModelsSection = sections.find(
       (section) => section.getAttribute("aria-label") === "All models"
     )
-    expect(allModelsSection?.textContent).toContain("GPT-5 Mini")
+    expect(allModelsSection?.textContent).toContain("GPT-6 Luna")
     act(() => {
       mobileOption.click()
     })
 
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
   })
 
   it("normalizes a legacy routed selection to one logical row with no route suffix", () => {
@@ -1051,20 +1051,20 @@ describe("ModelSelector", () => {
   it("uses compact composer text while rows and accessibility stay full", () => {
     renderSelector({
       isUserAuthenticated: false,
-      selectedModelId: "gpt-5-mini",
+      selectedModelId: "gpt-6-luna",
       variant: "composer",
     })
 
     const trigger = document.body.querySelector<HTMLButtonElement>(
       '[data-testid="model-trigger"]'
     )
-    const option = getModelOption("GPT-5 Mini")
+    const option = getModelOption("GPT-6 Luna")
 
-    expect(trigger?.textContent).toBe("5 Mini")
+    expect(trigger?.textContent).toBe("6 Luna")
     expect(trigger?.getAttribute("aria-label")).toBe(
-      "Select model, current model GPT-5 Mini"
+      "Select model, current model GPT-6 Luna"
     )
-    expect(option.textContent).toBe("GPT-5 Mini")
+    expect(option.textContent).toBe("GPT-6 Luna")
   })
 
   it.each([
@@ -1172,7 +1172,7 @@ describe("ModelSelector", () => {
     const onOpenChange = vi.fn()
     renderSelector({
       isUserAuthenticated: false,
-      selectedModelId: "gpt-5-mini",
+      selectedModelId: "gpt-6-luna",
       variant: "composer",
       onOpenChange,
     })
@@ -1197,7 +1197,7 @@ describe("ModelSelector", () => {
     ).toBe(true)
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
 
     expect(onSelect).not.toHaveBeenCalled()

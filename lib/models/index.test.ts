@@ -20,16 +20,16 @@ describe("model catalog exposure", () => {
   })
 
   it("exposes derived priority without changing selector visibility", () => {
-    const models = getVisibleLogicalModelViews(new Date("2026-08-25T00:00:00Z"))
+    const models = getVisibleLogicalModelViews(new Date("2026-11-09T00:00:00Z"))
 
-    expect(models.find((model) => model.id === "gpt-5.6-sol")).toMatchObject({
+    expect(models.find((model) => model.id === "gpt-6.1-sol")).toMatchObject({
       classification: "current",
     })
     expect(models.find((model) => model.id === "gpt-5.5")).toMatchObject({
       classification: "legacy",
       classificationReason: "not_recommended",
       classificationSource: "editorial",
-      classificationEffectiveAt: "2026-08-25",
+      classificationEffectiveAt: "2026-11-09",
     })
     expect(models.some((model) => model.id === "grok-code-fast-1")).toBe(false)
   })
@@ -37,7 +37,7 @@ describe("model catalog exposure", () => {
   it("flags platform access only on the free-listed logical models", () => {
     const models = getVisibleLogicalModelViews()
 
-    expect(models.find((model) => model.id === "gpt-5-mini")?.accessible).toBe(
+    expect(models.find((model) => model.id === "gpt-6-luna")?.accessible).toBe(
       true
     )
     expect(models.find((model) => model.id === "gpt-5.4")?.accessible).toBe(

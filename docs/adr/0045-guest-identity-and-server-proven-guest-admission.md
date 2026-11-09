@@ -10,7 +10,7 @@
 
 ## Context
 
-Guests (signed-out visitors) get five turns a day on `gpt-5-mini`, paid with
+Guests (signed-out visitors) get five turns a day on the default model, paid with
 the platform key. Every guest limit keyed off one value: an id the browser
 mints, keeps in localStorage, and sends in the `/api/chat` body. Clearing
 storage reset the limit. Worse, both limiters were public Convex mutations

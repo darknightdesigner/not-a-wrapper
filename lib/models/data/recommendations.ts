@@ -8,25 +8,30 @@ export const MODEL_RECOMMENDATION_POLICIES = [
   {
     vendorId: "claude",
     currentModelIds: [
-      "claude-fable-5",
-      "openrouter:anthropic/claude-opus-5",
-      "claude-sonnet-5",
-      "claude-haiku-4-5-20251001",
+      "claude-fable-5-2",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "claude-haiku-5-5",
     ],
-    verifiedAt: "2026-08-25",
+    verifiedAt: "2026-11-09",
   },
   {
     vendorId: "gemini",
     currentModelIds: [
+      "gemini-4-argon",
+      "gemini-3.8-flash",
       "openrouter:google/gemini-3.5-flash-lite",
-      "openrouter:google/gemini-3.7-flash",
-      "gemini-3.1-pro-preview",
     ],
-    verifiedAt: "2026-08-25",
+    verifiedAt: "2026-11-09",
   },
   {
     vendorId: "openai",
-    currentModelIds: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
-    verifiedAt: "2026-08-25",
+    currentModelIds: [
+      "gpt-6-astra",
+      "gpt-6.1-sol",
+      "gpt-6.1-terra",
+      "gpt-6-luna",
+    ],
+    verifiedAt: "2026-11-09",
   },
 ] as const satisfies readonly ModelRecommendationPolicy[]

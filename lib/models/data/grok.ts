@@ -2,6 +2,45 @@ import { ModelConfig } from "../types"
 
 const grokModels: ModelConfig[] = [
   {
+    id: "grok-4.7",
+    name: "Grok 4.7",
+    provider: "xAI",
+    providerId: "xai",
+    catalogStatus: "visible",
+    idKind: "stable",
+    // Id, modalities, and prices confirmed against the xAI language-models
+    // API 2026-11-09.
+    verifiedAgainst: "grok-4.7",
+    lastVerifiedAt: "2026-11-09",
+    modelFamily: "Grok",
+    lineageId: "xai:grok",
+    baseProviderId: "xai",
+    description:
+      "xAI's recommended model for code and chat. $2/$6 per MTok up to 200k-token prompts; $4/$12 above.",
+    tags: ["flagship", "reasoning", "coding", "advanced"],
+    contextWindow: 500000,
+    // xAI's docs do not state a max output, so leave it unset.
+    inputCost: 2.0,
+    outputCost: 6.0,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    reasoningText: true,
+    // reasoning_effort per the grok-4.7 model page; unlike grok-4.3 there is
+    // no "none".
+    effortLevels: ["low", "medium", "high", "xhigh"],
+    defaultEffort: "high",
+    searchMode: "optional",
+    openSource: false,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://x.ai",
+    apiDocs: "https://docs.x.ai/docs/models",
+    releasedAt: "2026-09-21",
+    icon: "grok",
+  },
+  {
     id: "grok-4.3",
     name: "Grok 4.3",
     provider: "xAI",

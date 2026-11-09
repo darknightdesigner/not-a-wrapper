@@ -537,31 +537,36 @@ describe("production logical catalog", () => {
     {
       maker: "OpenAI",
       vendorId: "openai",
-      expectedCurrentIds: ["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"],
+      expectedCurrentIds: [
+        "gpt-6-astra",
+        "gpt-6.1-sol",
+        "gpt-6.1-terra",
+        "gpt-6-luna",
+      ],
     },
     {
       maker: "Anthropic",
       vendorId: "claude",
       expectedCurrentIds: [
-        "claude-fable-5",
-        "openrouter:anthropic/claude-opus-5",
-        "claude-sonnet-5",
-        "claude-haiku-4-5-20251001",
+        "claude-fable-5-2",
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
       ],
     },
     {
       maker: "Google",
       vendorId: "gemini",
       expectedCurrentIds: [
+        "gemini-4-argon",
+        "gemini-3.8-flash",
         "openrouter:google/gemini-3.5-flash-lite",
-        "openrouter:google/gemini-3.7-flash",
-        "gemini-3.1-pro-preview",
       ],
     },
   ])(
     "keeps exactly the curated $maker portfolio Current",
     ({ vendorId, expectedCurrentIds }) => {
-      const asOf = new Date("2026-08-25T00:00:00Z")
+      const asOf = new Date("2026-11-09T00:00:00Z")
       const currentIds = LOGICAL_MODELS.filter(
         (model) =>
           model.vendorId === vendorId &&
@@ -587,7 +592,7 @@ describe("production logical catalog", () => {
     "ministral-3b-2512",
     "openrouter:deepseek/deepseek-v4-flash-vision-exp",
     "openrouter:qwen/qwen3.8-2.4t-a95b",
-    "openrouter:qwen/qwen3.8-max",
+    "openrouter:qwen/qwen3.8-max-0902",
     "openrouter:qwen/qwen3.8-27b",
     "openrouter:qwen/qwen3.7-flash",
     "openrouter:deepseek/deepseek-v3.2",
@@ -630,10 +635,11 @@ describe("production logical catalog", () => {
   it("unions effort levels across routes in canonical order (ADR-0026)", () => {
     // Sonnet 4.6 supports low|medium|high|max (Anthropic models API,
     // 2026-08-26 — no "xhigh" on the 4.6 generation, no "minimal" anywhere).
-    // Its OpenRouter wrap mirrors that minus the wire-inexpressible "max";
+    // Its OpenRouter wrap adds the gateway's "none" (2026-11-09 snapshot);
     // the view menu is the ordered union of both routes' real sets.
     const sonnet46 = getLogicalModel("claude-sonnet-4-6")!
     expect(toLogicalModelView(sonnet46).effortLevels).toEqual([
+      "none",
       "low",
       "medium",
       "high",
