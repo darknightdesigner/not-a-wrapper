@@ -14,7 +14,6 @@ import {
 
 type ChatSessionContextValue = {
   chatId: string | null
-  isNewChatSurface: boolean
   /**
    * Send sets the active chat identity; the route follows synchronously
    * (`/c/<chatId>` via pushState) before any request leaves (ADR-0033).
@@ -34,7 +33,6 @@ type ChatSessionContextValue = {
 
 const ChatSessionContext = createContext<ChatSessionContextValue>({
   chatId: null,
-  isNewChatSurface: false,
   commitChatIdentity: () => undefined,
   resetChatIdentity: () => undefined,
   selectedModelOverride: null,
@@ -120,7 +118,6 @@ export function ChatSessionProvider({
   }
 
   const chatId = pathnameChatId ?? handoffChatId
-  const isNewChatSurface = pathname === "/" && chatId === null
   const isChatIdHandoff = isHandoffPending
 
   // The route is a derived view of session state: this provider is the only
@@ -205,7 +202,6 @@ export function ChatSessionProvider({
   const value = useMemo<ChatSessionContextValue>(
     () => ({
       chatId,
-      isNewChatSurface,
       commitChatIdentity,
       resetChatIdentity,
       selectedModelOverride,
@@ -214,7 +210,6 @@ export function ChatSessionProvider({
     }),
     [
       chatId,
-      isNewChatSurface,
       commitChatIdentity,
       resetChatIdentity,
       selectedModelOverride,

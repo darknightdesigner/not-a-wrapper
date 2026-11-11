@@ -112,14 +112,17 @@ export function SidebarRow({
   )
 
   // Hover, selected, and menu-open use one translucent token. Editing pins it.
+  // Ink comes from the shared `[data-sidebar-item]` rule in globals.css.
   // The trailing reveal keys off `.sidebar-row`, so a single `group/row` scope
   // is enough (the old per-row group/chat·group/project names were vestigial).
   const containerClassName = useMemo(
     () =>
       cn(
-        "sidebar-row sidebar-menu-row sidebar-row-shell menu-item-hoverable text-foreground hover:bg-[var(--sidebar-row-active-background)] hover:text-foreground group/row relative flex items-center text-sm",
+        "sidebar-row sidebar-menu-row sidebar-row-shell menu-item-hoverable hover:bg-[var(--sidebar-row-active-background)] group/row relative flex items-center text-sm",
         (isActive || isEditing) &&
-          "bg-[var(--sidebar-row-active-background)] hover:bg-[var(--sidebar-row-active-background)]"
+          "bg-[var(--sidebar-row-active-background)] hover:bg-[var(--sidebar-row-active-background)]",
+        // The rename shell has no item marker, so it pins full ink itself.
+        isEditing && "text-foreground"
       ),
     [isActive, isEditing]
   )

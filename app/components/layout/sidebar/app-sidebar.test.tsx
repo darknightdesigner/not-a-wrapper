@@ -37,7 +37,7 @@ vi.mock("@/lib/convex/use-per-user-query", () => ({
   usePerUserQuery: () => ({ data: state.liveProjects }),
 }))
 vi.mock("@/lib/chat-store/session/provider", () => ({
-  useChatSession: () => ({ chatId: null, isNewChatSurface: true }),
+  useChatSession: () => ({ chatId: null }),
 }))
 vi.mock("@/lib/user-store/provider", () => ({
   useUser: () => ({ user: { id: "user-1" } }),
@@ -87,9 +87,6 @@ vi.mock("./sidebar-project", () => ({
 }))
 vi.mock("./sidebar-item", () => ({ SidebarItem: () => null }))
 vi.mock("./sidebar-project-item", () => ({ SidebarProjectItem: () => null }))
-vi.mock("./sidebar-pagination-skeleton", () => ({
-  SidebarPaginationState: () => null,
-}))
 
 function chat(id: string, projectId: string | null): Chats {
   return {

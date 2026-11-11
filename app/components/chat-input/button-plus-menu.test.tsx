@@ -6,11 +6,8 @@ import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { ButtonPlusMenu } from "./button-plus-menu"
 
-const breakpointMocks = vi.hoisted(() => ({ isMobile: false, isTouch: false }))
+const breakpointMocks = vi.hoisted(() => ({ isTouch: false }))
 
-vi.mock("@/hooks/use-breakpoint", () => ({
-  useBreakpoint: () => breakpointMocks.isMobile,
-}))
 vi.mock("@/hooks/use-mobile-device-os", () => ({
   useIsMobileDeviceOs: () => breakpointMocks.isTouch,
 }))
@@ -22,7 +19,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
   let scrollIntoView: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
-    breakpointMocks.isMobile = false
     breakpointMocks.isTouch = false
     container = document.createElement("div")
     document.body.appendChild(container)
@@ -40,143 +36,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     vi.restoreAllMocks()
   })
 
-  it("drives the + button through one editor-owned synthetic session", () => {
-    const onOpenActionMenu = vi.fn()
-    const onCloseActionQuery = vi.fn()
-    const onToggleSearch = vi.fn()
-    const renderMenu = (
-      actionQuery: React.ComponentProps<typeof ButtonPlusMenu>["actionQuery"]
-    ) => {
-      act(() => {
-        root.render(
-          <FileUpload onFilesAdded={() => {}}>
-            <form data-type="unified-composer">
-              <div id="prompt-textarea" role="textbox" tabIndex={0} />
-              <ButtonPlusMenu
-                actionQuery={actionQuery}
-                connectors={[]}
-                enableSearch={false}
-                acceptsImages
-                searchMode="optional"
-                isUserAuthenticated
-                onCloseActionQuery={onCloseActionQuery}
-                onOpenActionMenu={onOpenActionMenu}
-                onToggleSearch={onToggleSearch}
-              />
-              <div data-composer-overlay-host />
-            </form>
-          </FileUpload>
-        )
-      })
-    }
-
-    renderMenu(null)
-    const editor = container.querySelector("#prompt-textarea") as HTMLElement
-    const trigger = container.querySelector(
-      '[aria-label="Add files and more"]'
-    ) as HTMLButtonElement
-    const tooltipShortcut = document.querySelector(
-      '[data-slot="tooltip-shortcut"]'
-    )
-    expect(
-      tooltipShortcut?.querySelector('[data-slot="tooltip-shortcut-keys"]')
-        ?.textContent
-    ).toBe("@")
-
-    // Clicking + delegates to the editor's synthetic session — the menu
-    // itself opens only once the session publishes an action query.
-    act(() => {
-      editor.focus()
-      trigger.click()
-    })
-    expect(onOpenActionMenu).toHaveBeenCalledTimes(1)
-    expect(trigger.getAttribute("aria-expanded")).toBe("false")
-
-    renderMenu({
-      from: 1,
-      id: 3,
-      isSynthetic: true,
-      query: "",
-      to: 1,
-      trigger: "@",
-    })
-    expect(trigger.getAttribute("aria-expanded")).toBe("true")
-    expect(
-      container.querySelector("[data-composer-overlay-host] [aria-busy=false]")
-    ).not.toBeNull()
-    expect(
-      container.querySelector("[data-highlighted]")?.textContent
-    ).toContain("Add photos & files")
-    expect(
-      container.querySelector("[data-composer-menu-hint]")?.textContent
-    ).toContain("Type to search")
-    const initialScrollCalls = scrollIntoView.mock.calls.length
-
-    act(() => {
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          bubbles: true,
-          cancelable: true,
-          key: "ArrowDown",
-        })
-      )
-    })
-    expect(
-      container.querySelector("[data-highlighted]")?.textContent
-    ).toContain("Web search")
-    expect(scrollIntoView.mock.calls.length).toBeGreaterThan(initialScrollCalls)
-    expect(document.activeElement).toBe(editor)
-
-    const highlightedScrollCalls = scrollIntoView.mock.calls.length
-    renderMenu({
-      from: 1,
-      id: 3,
-      isSynthetic: true,
-      query: "",
-      to: 1,
-      trigger: "@",
-    })
-    expect(container.querySelector("[data-highlighted]")?.textContent).toContain(
-      "Web search"
-    )
-    expect(scrollIntoView).toHaveBeenCalledTimes(highlightedScrollCalls)
-
-    act(() => {
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          bubbles: true,
-          cancelable: true,
-          key: "Enter",
-        })
-      )
-    })
-    expect(onToggleSearch).toHaveBeenCalledWith(true)
-    expect(document.activeElement).toBe(editor)
-
-    // Escape on a synthetic session ends it in the editor instead of the
-    // menu-side dismissal used for typed sessions.
-    renderMenu({
-      from: 1,
-      id: 4,
-      isSynthetic: true,
-      query: "",
-      to: 1,
-      trigger: "@",
-    })
-    act(() => {
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          bubbles: true,
-          cancelable: true,
-          key: "Escape",
-        })
-      )
-    })
-    // Both the capture-phase Escape handler and the Popover's own escape
-    // close route through the same idempotent session close.
-    expect(onCloseActionQuery).toHaveBeenCalled()
-  })
-
   it("shows inherent search as selected and non-toggleable", () => {
     const onToggleSearch = vi.fn()
     act(() => {
@@ -188,9 +47,8 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
               actionQuery={{
                 from: 1,
                 id: 1,
-                isSynthetic: true,
                 query: "web",
-                to: 1,
+                to: 5,
                 trigger: "@",
               }}
               connectors={[]}
@@ -244,17 +102,16 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
       })
     }
 
-    const syntheticQuery = {
+    const emptyQuery = {
       from: 1,
       id: 1,
-      isSynthetic: true,
       query: "",
-      to: 1,
+      to: 2,
       trigger: "@",
     } as const
 
     // Loading uses one shimmer row while connector suggestions resolve.
-    renderMenu(syntheticQuery, undefined)
+    renderMenu(emptyQuery, undefined)
     const skeleton = container.querySelector(
       "[data-composer-menu-skeleton]"
     ) as HTMLElement
@@ -269,7 +126,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
       description: "mcp.github.dev",
       enabled: false,
     }
-    renderMenu(syntheticQuery, [github])
+    renderMenu(emptyQuery, [github])
     expect(container.querySelector("[data-composer-menu-skeleton]")).toBeNull()
     expect(container.textContent).toContain("GitHub")
     expect(container.textContent).toContain("mcp.github.dev")
@@ -279,7 +136,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     const typedQuery = {
       from: 1,
       id: 2,
-      isSynthetic: false,
       query: "gith",
       to: 6,
       trigger: "@",
@@ -304,7 +160,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
       {
         from: 1,
         id: 3,
-        isSynthetic: false,
         query: "",
         to: 2,
         trigger: "/",
@@ -316,8 +171,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     expect(container.querySelector("[data-composer-menu-hint]")).toBeNull()
   })
 
-  it("uses native menu semantics and keyboard containment on mobile", () => {
-    breakpointMocks.isMobile = true
+  it("opens the + menu with native menu semantics and keyboard containment", () => {
 
     act(() => {
       root.render(
@@ -383,7 +237,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
   })
 
   it("renders touch actions and routes their native inputs on mobile-OS devices", () => {
-    breakpointMocks.isMobile = true
     breakpointMocks.isTouch = true
     const onFilesAdded = vi.fn()
 
@@ -478,8 +331,7 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     expect(onFilesAdded).toHaveBeenCalledWith([file])
   })
 
-  it("toggles real connectors from the direct mobile menu", () => {
-    breakpointMocks.isMobile = true
+  it("toggles real connectors from the + menu", () => {
     breakpointMocks.isTouch = true
     const onToggleConnector = vi.fn()
 
@@ -557,15 +409,10 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     renderMenu({
       from: 1,
       id: 7,
-      isSynthetic: false,
       query: "",
       to: 2,
       trigger: "@",
     })
-    const trigger = container.querySelector(
-      '[aria-label="Add files and more"]'
-    ) as HTMLButtonElement
-    expect(trigger.getAttribute("aria-expanded")).toBe("true")
     expect(container.querySelector("[data-highlighted]")?.textContent).toContain(
       "Add photos & files"
     )
@@ -586,7 +433,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     renderMenu({
       from: 1,
       id: 7,
-      isSynthetic: false,
       query: "w",
       to: 3,
       trigger: "@",
@@ -597,7 +443,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     renderMenu({
       from: 1,
       id: 8,
-      isSynthetic: false,
       query: "w",
       to: 3,
       trigger: "@",
@@ -619,13 +464,11 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     expect(onActivateActionQuery).toHaveBeenCalledWith("web-search", {
       from: 1,
       id: 8,
-      isSynthetic: false,
       query: "w",
       to: 3,
       trigger: "@",
     })
     expect(container.querySelector("[data-highlighted]")).toBeNull()
-    expect(trigger.getAttribute("aria-expanded")).toBe("false")
     expect(document.activeElement).toBe(editor)
   })
 })

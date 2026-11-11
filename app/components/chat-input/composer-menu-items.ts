@@ -103,8 +103,8 @@ function resolveComposerMenuSections({
       )
     : []
 
-  // "/" is the command menu (actions only); "@"/"+" typed
-  // triggers and the synthetic + session also search connectors.
+  // "/" is the command menu (actions only); "@"/"+" triggers also
+  // search connectors.
   const isConnectorSectionVisible =
     actionQuery !== null && actionQuery.trigger !== "/"
   const isConnectorsLoading =

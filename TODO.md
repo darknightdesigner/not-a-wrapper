@@ -178,28 +178,13 @@ Convex subscriptions; then show a tab and measure time from visible to a
 working composer. Expected: near-zero subscriptions and chat JS execution
 while hidden, and a composer that accepts input within 500 ms of becoming
 visible.
-- **Evaluate effort-level naming: API accuracy vs provider-interface parity:**
-the composer's effort menu labels are the wire values spelled out
-(`lib/reasoning-effort.ts`: `none` → "Off", `xhigh` → "Extra High", `max` →
-"Max"), which ADR-0026 chose as "the honest provider-level names, not invented
-tiers". The providers' own products do not use those words: T3 Chat and
-ChatGPT show "Instant" for OpenAI's `none`, Anthropic's console groups
-`output_config.effort`, and xAI/Google expose their own scales. Decide, per
-level and per provider, whether the label should track the API value (stable,
-greppable, matches docs and the request-shaping code, but "Off" next to a
-model that still reasons a little is misleading and "Extra High/Max" read as
-invented) or the provider's consumer-facing name (recognizable to users coming
-from ChatGPT/T3, but a single label table then lies for other providers that
-share the wire value, e.g. Grok 4.3's `none`, and names drift with each
-provider's marketing). Options to weigh: keep API names; per-provider label
-overrides in the catalog (ADR-0020 discipline: a route fact, not a UI
-constant); or API name as the primary label with the provider's word as
-secondary text or tooltip. Verifiable test: a five-person label-comprehension
-check with the three benchmark models (which option makes users pick the
-level they intended for "fastest reply" and "deepest reasoning"), plus a
-catalog test asserting every declared `effortLevels` value has a label per
-provider so no route can render a wrong or missing word. Expected outcome: a
-short ADR-0026 amendment recording the rule and the label source of truth.
+- **Record effort-level words for OpenAI, xAI, and Google:** ADR-0026
+"Labels" now names levels in the model maker's own words
+(`MAKER_EFFORT_LABELS` in `lib/reasoning-effort.ts`); only Anthropic is
+recorded (`xhigh` → "Extra"). The others still show the API value spelled out
+("Off", "Extra High"), which may not match ChatGPT, Grok, or Gemini. Check
+each product's effort menu, add only the words that differ with the date
+checked, and extend `lib/reasoning-effort.test.ts` with that maker's list.
 
 
 

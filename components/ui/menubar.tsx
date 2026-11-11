@@ -13,12 +13,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { floatingMenuItemClassName } from "@/components/ui/floating-surface"
-import { Icon } from "@/components/ui/icon"
+import {
+  floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
+} from "@/components/ui/floating-surface"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { Menubar as MenubarPrimitive } from "@base-ui/react/menubar"
-import { RiCheckLine } from "@remixicon/react"
 import * as React from "react"
 
 function Menubar({ className, ...props }: MenubarPrimitive.Props) {
@@ -126,11 +128,11 @@ function MenubarCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-5 items-center justify-center [&_svg:not([class*='size-'])]:size-5">
-        <MenuPrimitive.CheckboxItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </MenuPrimitive.CheckboxItemIndicator>
-      </span>
+      <MenuPrimitive.CheckboxItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "left-2")}
+      >
+        <MenuCheckIcon />
+      </MenuPrimitive.CheckboxItemIndicator>
       {children}
     </MenuPrimitive.CheckboxItem>
   )
@@ -161,11 +163,11 @@ function MenubarRadioItem({
       )}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-5 items-center justify-center [&_svg:not([class*='size-'])]:size-5">
-        <MenuPrimitive.RadioItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </MenuPrimitive.RadioItemIndicator>
-      </span>
+      <MenuPrimitive.RadioItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "left-2")}
+      >
+        <MenuCheckIcon />
+      </MenuPrimitive.RadioItemIndicator>
       {children}
     </MenuPrimitive.RadioItem>
   )

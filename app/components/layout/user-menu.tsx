@@ -147,6 +147,8 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
           onOpenChange={setMenuOpen}
           modal={false}
         >
+          {/* Inline padding is the row inset minus the 24px avatar's 2px
+              overhang past the 20px icon slot, so it sits on the rail center. */}
           <DropdownMenuTrigger
             render={
               <button
@@ -156,7 +158,7 @@ export function UserMenu({ variant = "header" }: UserMenuProps) {
                 aria-haspopup="menu"
                 aria-expanded={isMenuOpen}
                 data-testid="accounts-profile-button"
-                className="group/menu-item hover:bg-sidebar-row active:bg-sidebar-row flex h-(--sidebar-footer-row-height) w-full items-center gap-2 rounded-xl px-1.5 text-left text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+                className="group/menu-item hover:bg-sidebar-row active:bg-sidebar-row flex h-(--sidebar-footer-row-height) w-full items-center gap-2 rounded-xl px-[calc(var(--sidebar-row-content-inline)-2px)] text-left text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               />
             }
           >

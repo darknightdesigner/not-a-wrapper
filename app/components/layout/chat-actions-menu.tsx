@@ -1,17 +1,17 @@
 "use client"
 
-import { Icon } from "@/components/ui/icon"
 import { api } from "@/convex/_generated/api"
 import { useChatActions } from "@/lib/chat-store/chats/provider"
 import { useResetMessages } from "@/lib/chat-store/messages/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import type { Chat } from "@/lib/chat-store/types"
-import { Pin, PinOff } from "@/lib/icons"
 import {
   RiDeleteBinLine,
   RiEditLine,
   RiLinkUnlinkM,
+  RiPushpinLine,
   RiShare2Line,
+  RiUnpinFill,
 } from "@remixicon/react"
 import { useMutation } from "convex/react"
 import { useRouter } from "next/navigation"
@@ -145,7 +145,7 @@ const ChatActionsMenuContent = memo(
         ? [
             {
               key: "share",
-              icon: <Icon icon={RiShare2Line} slotSize={20} />,
+              icon: RiShare2Line,
               label: "Share",
               onSelect: handleShare,
               prefetch: preloadSharePublishContent,
@@ -159,7 +159,7 @@ const ChatActionsMenuContent = memo(
         ? [
             {
               key: "stop-sharing",
-              icon: <Icon icon={RiLinkUnlinkM} slotSize={20} />,
+              icon: RiLinkUnlinkM,
               label: "Stop sharing",
               onSelect: handleStopSharing,
               loading: isStopSharingLoading,
@@ -169,19 +169,19 @@ const ChatActionsMenuContent = memo(
         : []),
       {
         key: "rename",
-        icon: <Icon icon={RiEditLine} slotSize={20} />,
+        icon: RiEditLine,
         label: "Rename",
         onSelect: handleRename,
       },
       {
         key: "pin",
-        icon: chat.pinned ? <PinOff size={20} /> : <Pin size={20} />,
+        icon: chat.pinned ? RiUnpinFill : RiPushpinLine,
         label: chat.pinned ? "Unpin" : "Pin",
         onSelect: () => togglePinned(chat.id, !chat.pinned),
       },
       {
         key: "delete",
-        icon: <Icon icon={RiDeleteBinLine} slotSize={20} />,
+        icon: RiDeleteBinLine,
         label: "Delete",
         variant: "destructive",
         separatorBefore: true,

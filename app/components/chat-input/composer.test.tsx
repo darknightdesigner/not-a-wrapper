@@ -97,8 +97,6 @@ const composerMocks = vi.hoisted(() => ({
   setReasoningEffort: vi.fn(),
   mutation: vi.fn(),
   replaceActionQuery: vi.fn(() => true),
-  toggleSyntheticActionQuery: vi.fn(),
-  endActionQuery: vi.fn(),
 }))
 
 beforeAll(async () => {
@@ -322,8 +320,6 @@ vi.mock("@/components/ui/prompt-input", () => ({
       replaceActionQuery: (
         query: import("@/components/ui/prompt-input").PromptInputActionQuery
       ) => boolean
-      toggleSyntheticActionQuery: () => void
-      endActionQuery: () => void
       setSelectionRange: (start: number, end: number) => void
     },
     Omit<
@@ -342,8 +338,6 @@ vi.mock("@/components/ui/prompt-input", () => ({
     React.useImperativeHandle(ref, () => ({
       focus: (options) => textareaRef.current?.focus(options),
       replaceActionQuery: composerMocks.replaceActionQuery,
-      toggleSyntheticActionQuery: composerMocks.toggleSyntheticActionQuery,
-      endActionQuery: composerMocks.endActionQuery,
       setSelectionRange: (start, end) =>
         textareaRef.current?.setSelectionRange(start, end),
     }))
@@ -479,7 +473,6 @@ describe("Composer primary action", () => {
       query: "web",
       to: 5,
       trigger: "@" as const,
-      isSynthetic: false,
     }
     const handled = buttonPlusMenuMockCalls
       .at(-1)

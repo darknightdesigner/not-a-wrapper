@@ -10,10 +10,10 @@ import type { ReactNode } from "react"
 
 /**
  * Shared recipe for a sidebar row's trailing button: a 34×36 hit area with no
- * background. Only the
- * icon color shifts, muted→foreground, on hover / menu-open. The icon is wrapped
- * in a `TrailingIconChip` (24×24) that owns the keyboard focus ring, so the ring
- * hugs the inner chip instead of the whole button. Glyph size is unchanged (18px).
+ * background of its own. On hover / menu-open the icon goes muted→foreground
+ * and the inner `TrailingIconChip` (24×24) takes the row tint (globals.css).
+ * The chip also owns the keyboard focus ring, so the ring hugs the chip
+ * instead of the whole button. Glyph size is unchanged (18px).
  *
  * The button carries no ring itself (`outline-none`); the keyboard focus ring
  * lives on the inner chip via a `:focus-visible` CSS rule in globals.css.
@@ -29,7 +29,7 @@ export const trailingIconButtonClassName =
  */
 export function TrailingIconChip({ children }: { children: ReactNode }) {
   return (
-    <span className="trailing-icon-chip relative flex size-6 items-center justify-center rounded-md">
+    <span className="trailing-icon-chip relative flex size-6 items-center justify-center rounded-(--sidebar-action-chip-radius)">
       {children}
     </span>
   )

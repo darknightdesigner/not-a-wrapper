@@ -12,6 +12,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ChatsProvider } from "@/lib/chat-store/chats/provider"
 import { ChatSessionProvider } from "@/lib/chat-store/session/provider"
 import { readComposerShellHint } from "@/lib/composer-shell-hint.server"
+import { readSidebarWidth } from "@/lib/sidebar-width.server"
 import { APP_DOMAIN } from "@/lib/config"
 import { ModelProvider } from "@/lib/model-store/provider"
 import { TanstackQueryProvider } from "@/lib/tanstack-query/tanstack-query-provider"
@@ -53,12 +54,14 @@ export default async function RootLayout({
 }>) {
   const isDev = process.env.NODE_ENV === "development"
   const isOfficialDeployment = process.env.NAW_OFFICIAL === "true"
-  // Both read the request only (session cookie, shell-hint cookie): no
-  // network before the HTML streams.
-  const [{ initialAuth, userProfile }, composerShellHint] = await Promise.all([
-    getUserAuth(),
-    readComposerShellHint(),
-  ])
+  // All read the request only (session, shell-hint, sidebar-width cookies):
+  // no network before the HTML streams.
+  const [{ initialAuth, userProfile }, composerShellHint, sidebarWidth] =
+    await Promise.all([
+      getUserAuth(),
+      readComposerShellHint(),
+      readSidebarWidth(),
+    ])
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -100,7 +103,7 @@ export default async function RootLayout({
                             enableSystem
                             disableTransitionOnChange
                           >
-                            <SidebarProvider defaultOpen>
+                            <SidebarProvider defaultOpen defaultWidth={sidebarWidth}>
                               <Toaster position="top-center" />
                               {children}
                             </SidebarProvider>

@@ -5,7 +5,6 @@ import {
   type RowActionItem,
 } from "@/app/components/layout/row-actions-menu"
 import { DialogDeleteProject } from "@/app/components/projects/dialog-delete-project"
-import { Icon } from "@/components/ui/icon"
 import type { Id } from "@/convex/_generated/dataModel"
 import {
   RiDeleteBinLine,
@@ -61,9 +60,7 @@ export function ProjectActionsMenu({
   const items: RowActionItem[] = [
     {
       key: "pin",
-      icon: (
-        <Icon icon={isPinned ? RiUnpinFill : RiPushpin2Line} slotSize={20} />
-      ),
+      icon: isPinned ? RiUnpinFill : RiPushpin2Line,
       label: isDirectory
         ? `${isPinned ? "Unpin" : "Pin"} project`
         : isPinned
@@ -81,7 +78,7 @@ export function ProjectActionsMenu({
   if (!isDirectory && onStartEditing) {
     items.push({
       key: "rename",
-      icon: <Icon icon={RiEditLine} slotSize={20} />,
+      icon: RiEditLine,
       label: "Rename",
       onSelect: onStartEditing,
     })
@@ -89,7 +86,7 @@ export function ProjectActionsMenu({
 
   items.push({
     key: "delete",
-    icon: <Icon icon={RiDeleteBinLine} slotSize={20} />,
+    icon: RiDeleteBinLine,
     label: isDirectory ? "Delete project" : "Delete",
     variant: "destructive",
     separatorBefore: true,

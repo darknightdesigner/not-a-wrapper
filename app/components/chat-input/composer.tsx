@@ -6,7 +6,7 @@
  *
  * It owns the draft (display state + per-chat persistence + clearing), the
  * pending attachment files, paste/drop capture, and the primary
- * action; it reads the model picker and search toggle from the Turn context
+ * action; it reads the model picker and search state from the Turn context
  * and auth from the user store directly. Its interface to the parent is one
  * payload callback (`onTurn`) plus a small imperative handle for external
  * commands (quote insertion, ?prompt= hydration, focus) — replacing the
@@ -82,7 +82,6 @@ import {
   type ComposerPrimaryActionState,
 } from "./primary-action-state"
 import { useComposerConnectors } from "./use-composer-connectors"
-import { WebSearchControl } from "./web-search-control"
 
 export type ComposerTurnPayload = {
   text: string
@@ -348,12 +347,6 @@ export const Composer = memo(
       activateConnector: handleActivateConnector,
       toggleConnector: handleToggleConnector,
     } = useComposerConnectors({ isUserAuthenticated, editorRef })
-    const handleOpenActionMenu = useCallback(() => {
-      editorRef.current?.toggleSyntheticActionQuery()
-    }, [])
-    const handleCloseActionQuery = useCallback(() => {
-      editorRef.current?.endActionQuery()
-    }, [])
     const handleActionQueryChange = useCallback(
       (query: PromptInputActionQuery | null) => {
         setActionQuery(query)
@@ -746,16 +739,8 @@ export const Composer = memo(
                   connectors={menuConnectors}
                   onActivateConnector={handleActivateConnector}
                   onToggleConnector={handleToggleConnector}
-                  onOpenActionMenu={handleOpenActionMenu}
-                  onCloseActionQuery={handleCloseActionQuery}
                   tooltipDisabled={isComposerOverlayOpen}
                   onMenuOpenChange={setIsActionMenuOpen}
-                />
-                <WebSearchControl
-                  enabled={enableSearch}
-                  mode={searchMode}
-                  onEnabledChange={setEnableSearch}
-                  tooltipDisabled={isComposerOverlayOpen}
                 />
               </PromptInputActions>
               <PromptInputTextarea
@@ -820,6 +805,7 @@ export const Composer = memo(
                     onSelectionCommitted={handleModelSelectionCommitted}
                   />
                   <EffortControl
+                    modelId={selectedModel}
                     levels={effortLevels}
                     value={reasoningEffort}
                     defaultLevel={selectModelConfig?.defaultEffort}

@@ -7,11 +7,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Icon } from "@/components/ui/icon"
+import { Icon, type IconProps } from "@/components/ui/icon"
 import { useIntentPrefetch } from "@/components/ui/intent-prefetch"
+import { MenuLeadingIcon } from "@/components/ui/menu-leading-icon"
 import { useBreakpoint } from "@/hooks/use-breakpoint"
 import { RiLoader4Line, RiMoreFill } from "@remixicon/react"
-import { Fragment, type ReactElement, type ReactNode } from "react"
+import { Fragment, type ReactElement } from "react"
 import {
   trailingIconButtonClassName,
   TrailingIconChip,
@@ -19,8 +20,8 @@ import {
 
 export type RowActionItem = {
   key: string
-  /** Rendered as-is; replaced by the shared spinner while `loading`. */
-  icon: ReactNode
+  /** Drawn in the shared menu icon slot; the spinner replaces it while `loading`. */
+  icon: IconProps["icon"]
   label: string
   ariaLabel?: string
   onSelect: () => void
@@ -118,9 +119,13 @@ function RowActionMenuItem({ item }: { item: RowActionItem }) {
       }}
     >
       {item.loading ? (
-        <Icon icon={RiLoader4Line} slotSize={20} className="animate-spin" />
+        <Icon
+          icon={RiLoader4Line}
+          slotSize="var(--floating-menu-leading-slot-size)"
+          className="animate-spin"
+        />
       ) : (
-        item.icon
+        <MenuLeadingIcon icon={item.icon} />
       )}
       {item.label}
     </DropdownMenuItem>

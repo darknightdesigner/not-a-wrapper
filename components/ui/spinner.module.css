@@ -1,0 +1,21 @@
+/* Dot-matrix loader. The eight frames sit side by side in one strip and
+ * the strip hard-cuts one frame (10 user units) every 175ms: a 1.4s loop
+ * with no easing or fades, matching the reference frame for frame.
+ * steps() keeps the glyph still between cuts, so it changes 8 times per
+ * loop instead of every display frame. */
+
+.strip {
+  animation: dot-matrix-step 1400ms steps(8, end) infinite;
+}
+
+@keyframes dot-matrix-step {
+  to {
+    transform: translateX(-80px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .strip {
+    animation: none;
+  }
+}

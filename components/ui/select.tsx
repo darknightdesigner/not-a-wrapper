@@ -1,14 +1,16 @@
 import {
   floatingMenuContentClassName,
   floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
   floatingMenuLabelClassName,
   floatingMenuSeparatorClassName,
   floatingSelectSurfaceClassName,
 } from "@/components/ui/floating-surface"
 import { Icon } from "@/components/ui/icon"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { Select as SelectPrimitive } from "@base-ui/react/select"
-import { RiArrowDownSLine, RiArrowUpSLine, RiCheckLine } from "@remixicon/react"
+import { RiArrowDownSLine, RiArrowUpSLine } from "@remixicon/react"
 import * as React from "react"
 
 const Select = SelectPrimitive.Root
@@ -145,11 +147,9 @@ function SelectItem({
         {children}
       </SelectPrimitive.ItemText>
       <SelectPrimitive.ItemIndicator
-        render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
-        }
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
       >
-        <Icon icon={RiCheckLine} className="pointer-events-none" />
+        <MenuCheckIcon />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   )

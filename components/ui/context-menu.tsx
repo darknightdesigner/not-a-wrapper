@@ -1,14 +1,16 @@
 import {
   floatingMenuContentClassName,
   floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
   floatingMenuLabelClassName,
   floatingMenuSeparatorClassName,
   floatingSurfaceClassName,
 } from "@/components/ui/floating-surface"
 import { Icon } from "@/components/ui/icon"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
-import { RiArrowRightSLine, RiCheckLine } from "@remixicon/react"
+import { RiArrowRightSLine } from "@remixicon/react"
 import * as React from "react"
 
 function ContextMenu({ ...props }: ContextMenuPrimitive.Root.Props) {
@@ -185,11 +187,11 @@ function ContextMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute right-2">
-        <ContextMenuPrimitive.CheckboxItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </ContextMenuPrimitive.CheckboxItemIndicator>
-      </span>
+      <ContextMenuPrimitive.CheckboxItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
+      >
+        <MenuCheckIcon />
+      </ContextMenuPrimitive.CheckboxItemIndicator>
       {children}
     </ContextMenuPrimitive.CheckboxItem>
   )
@@ -225,11 +227,11 @@ function ContextMenuRadioItem({
       )}
       {...props}
     >
-      <span className="pointer-events-none absolute right-2">
-        <ContextMenuPrimitive.RadioItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </ContextMenuPrimitive.RadioItemIndicator>
-      </span>
+      <ContextMenuPrimitive.RadioItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
+      >
+        <MenuCheckIcon />
+      </ContextMenuPrimitive.RadioItemIndicator>
       {children}
     </ContextMenuPrimitive.RadioItem>
   )

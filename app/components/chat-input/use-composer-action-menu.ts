@@ -42,11 +42,6 @@ type ComposerActionMenuOptions = {
     connectorId: string,
     query: PromptInputActionQuery
   ) => boolean
-  /** Open (or toggle off) a synthetic action-query session in the editor —
-   * the desktop + button drives the same menu as typing "@". */
-  onOpenActionMenu?: () => void
-  /** End the active action-query session (synthetic Escape / focus-out). */
-  onCloseActionQuery?: () => void
   /** Direct (non-query) activation of a registry action. The product behavior
    * switch stays with the shell that owns the corresponding props. */
   onRunAction: (actionId: ComposerActionId) => void
@@ -64,8 +59,6 @@ function useComposerActionMenu({
   availability,
   onActivateActionQuery,
   onActivateConnector,
-  onOpenActionMenu,
-  onCloseActionQuery,
   onRunAction,
   onMenuOpenChange,
 }: ComposerActionMenuOptions) {
@@ -200,13 +193,9 @@ function useComposerActionMenu({
 
   const dismissActionQuery = useCallback(() => {
     if (!actionQuery) return
-    if (actionQuery.isSynthetic) {
-      onCloseActionQuery?.()
-    } else {
-      setDismissedActionQueryId(actionQuery.id)
-    }
+    setDismissedActionQueryId(actionQuery.id)
     onMenuOpenChange?.(false)
-  }, [actionQuery, onCloseActionQuery, onMenuOpenChange])
+  }, [actionQuery, onMenuOpenChange])
 
   const handleComposerKeyDown = useCallback(
     (event: KeyboardEvent) => {
@@ -301,8 +290,8 @@ function useComposerActionMenu({
       eventDetails.cancel()
       return
     }
-    // A press on the + button is the session toggle, not an outside press —
-    // its own click handler closes (or reopens) the synthetic session.
+    // A press on the + button is not an outside press: its own click
+    // handler dismisses the typed session before opening the + menu.
     if (
       eventDetails.reason === "outside-press" &&
       eventDetails.event.target instanceof Element &&
@@ -356,12 +345,6 @@ function useComposerActionMenu({
     setHighlightedItemId(open ? initialItemId : null)
   }
 
-  const handleSyntheticSessionToggle = useCallback(() => {
-    setHighlightedItemId(null)
-    onMenuOpenChange?.(!isActionQueryOpen)
-    onOpenActionMenu?.()
-  }, [isActionQueryOpen, onMenuOpenChange, onOpenActionMenu])
-
   return {
     activateItem,
     composerAnchor,
@@ -370,7 +353,6 @@ function useComposerActionMenu({
     focusEditor,
     handleActionQueryOpenChange,
     handleAuthPopoverOpenChange,
-    handleSyntheticSessionToggle,
     handleTriggerMenuOpenChange,
     isActionQueryOpen,
     isConnectorSectionVisible,

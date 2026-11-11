@@ -3,7 +3,11 @@
 import { useFavoriteModels } from "@/app/components/layout/settings/models/use-favorite-models"
 import { useKeyShortcut } from "@/app/hooks/use-key-shortcut"
 import { Button } from "@/components/ui/button"
-import { ComposerControl } from "@/components/ui/composer-control"
+import {
+  COMPOSER_TEXT_CONTROL_ICON_SIZE,
+  ComposerControl,
+  composerTextControlClassName,
+} from "@/components/ui/composer-control"
 import {
   Drawer,
   DrawerContent,
@@ -189,13 +193,16 @@ function ModelOptionContent({
       >
         <Icon
           icon={getModelIcon(model)}
-          slotSize={isMobile ? 24 : 20}
+          slotSize={isMobile ? 24 : 18}
           glyphSize={isMobile ? 24 : undefined}
           data-slot="model-option-icon"
           className="shrink-0"
         />
         <div className="flex min-w-0 items-baseline gap-1.5">
-          <span data-slot="model-name" className="truncate text-base">
+          <span
+            data-slot="model-name"
+            className={cn("truncate", isMobile ? "text-base" : "text-sm")}
+          >
             {getModelDisplayName(model)}
           </span>
           {snapshotDateLabel ? (
@@ -647,7 +654,12 @@ export const ModelSelector = memo(function ModelSelector({
       className={cn(
         "min-w-0 shrink font-normal",
         isComposerVariant
-          ? "text-muted-foreground can-hover:relative can-hover:after:absolute can-hover:after:-inset-x-1 can-hover:after:inset-y-0 can-hover:after:content-[''] h-9 max-w-full justify-start gap-1.5 overflow-visible rounded-full py-0 ps-3.5 pe-3 text-base leading-[26px]"
+          ? cn(
+              composerTextControlClassName,
+              // Same ink as sidebar items: 76% at rest, full when engaged.
+              "can-hover:hover:text-foreground focus-visible:text-foreground aria-expanded:text-foreground text-[var(--item-foreground)]",
+              "can-hover:relative can-hover:after:absolute can-hover:after:-inset-x-1 can-hover:after:inset-y-0 can-hover:after:content-[''] max-w-full justify-start gap-1.5 overflow-visible rounded-full ps-3 pe-2.5"
+            )
           : "max-w-full justify-between overflow-hidden rounded-lg text-lg",
         className
       )}
@@ -657,17 +669,15 @@ export const ModelSelector = memo(function ModelSelector({
       {isComposerVariant && currentModel ? (
         <Icon
           icon={getModelIcon(currentModel)}
-          slotSize={16}
-          glyphSize={16}
+          slotSize={COMPOSER_TEXT_CONTROL_ICON_SIZE}
+          glyphSize={COMPOSER_TEXT_CONTROL_ICON_SIZE}
           data-slot="selected-model-icon"
-          className="text-foreground shrink-0 opacity-100"
+          className="shrink-0 opacity-100"
         />
       ) : null}
+      {/* Model name sits a hair heavier than the effort label beside it. */}
       <span
-        className={cn(
-          "min-w-0 truncate",
-          isComposerVariant && "text-foreground"
-        )}
+        className={cn("min-w-0 truncate", isComposerVariant && "font-[450]")}
       >
         {currentModel
           ? getModelDisplayName(

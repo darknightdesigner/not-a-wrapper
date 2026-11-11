@@ -133,6 +133,18 @@ model that supports the level restores it — the clamp at derivation is what
 guarantees an unsupported level is never sent. Unsupported levels are hidden,
 never disabled; the whole control unmounts for models without `effortLevels`.
 
+### Labels
+
+Level names are the model maker's own product words, keyed by the model's
+`baseProviderId` (so a Claude model reads the same on the Anthropic and
+OpenRouter routes). `getReasoningEffortLabel(level, modelId)` in
+`lib/reasoning-effort.ts` is the only way to name a level; every surface
+(composer menu, trigger, Activity badge) goes through it. A maker's words are
+copied from its UI with the date checked, never derived by spelling out the
+wire value: spelling `xhigh` as "Extra High" invented a name Claude does not
+use ("Extra"). Makers without a recorded override fall back to the API value
+spelled out.
+
 ### Gating
 
 One `NEXT_PUBLIC_REASONING_EFFORT_CONTROL` predicate function is the kill

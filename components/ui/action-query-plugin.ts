@@ -26,9 +26,6 @@ export type PromptInputActionQuery = Readonly<{
   to: number
   query: string
   trigger: PromptInputActionQueryTrigger
-  /** True when the session was opened by UI (the + button) rather than a
-   * typed trigger character, so no trigger symbol exists in the document. */
-  isSynthetic: boolean
 }>
 
 type PromptInputActionQueryRange = Omit<PromptInputActionQuery, "id">
@@ -134,24 +131,18 @@ function readPromptInputActionQuery(
     to: typed.to,
     query: typed.query,
     trigger: typed.trigger,
-    isSynthetic: false,
   }
 }
 
 /**
- * The action-query session state machine. Typed sessions re-evaluate only on
- * document changes at an empty selection; synthetic sessions (opened by the +
- * button) track a mapped
- * anchor on every transaction, adopt a typed trigger that appears at or after
- * the anchor, and close on newline, a caret before the anchor, or a changed
- * range selection.
+ * The action-query session state machine. Sessions re-evaluate only on
+ * document changes at an empty selection.
  */
 type PromptInputActionQuerySessionState = Readonly<{
   active: boolean
   trigger: PromptInputActionQueryTrigger
   query: string
   range: { from: number; to: number } | null
-  isSynthetic: boolean
   /** Session identity. A new id marks a new trigger position or symbol, so
    * menu-side Escape dismissal clears exactly when a new session starts.
    * Closed states keep the last id so reopening at the same position still
@@ -159,16 +150,11 @@ type PromptInputActionQuerySessionState = Readonly<{
   id: number
 }>
 
-type PromptInputActionQueryMeta =
-  | { readonly toggleSynthetic: true }
-  | { readonly close: true }
-
 const inactiveActionQuerySession: PromptInputActionQuerySessionState = {
   active: false,
   trigger: "@",
   query: "",
   range: null,
-  isSynthetic: false,
   id: 0,
 }
 
@@ -200,71 +186,11 @@ function createActionQueryPlugin() {
     state: {
       init: () => inactiveActionQuerySession,
       apply(transaction, previous, oldState, newState) {
-        const meta = transaction.getMeta(promptInputActionQueryPluginKey) as
-          | PromptInputActionQueryMeta
-          | undefined
-        if (meta && "close" in meta) return closedActionQuerySession(previous)
-        if (meta && "toggleSynthetic" in meta) {
-          if (previous.active && previous.isSynthetic) {
-            return closedActionQuerySession(previous)
-          }
-          const caret = newState.selection.from
-          return {
-            active: true,
-            trigger: "@",
-            query: "",
-            range: { from: caret, to: caret },
-            isSynthetic: true,
-            id: nextActionQuerySessionId(previous, {
-              trigger: "@",
-              from: caret,
-            }),
-          }
-        }
         if (transaction.getMeta("externalValue")) {
           return closedActionQuerySession(previous)
         }
 
         const selection = newState.selection
-        if (previous.isSynthetic && previous.range) {
-          const anchor = transaction.mapping.map(previous.range.from, -1)
-          if (
-            (!selection.empty && !selection.eq(oldState.selection)) ||
-            selection.from < anchor
-          ) {
-            return closedActionQuerySession(previous)
-          }
-          const typed = readTypedActionQuery(selection.$from)
-          if (typed && typed.from >= anchor) {
-            return {
-              active: true,
-              trigger: typed.trigger,
-              query: typed.query,
-              range: { from: typed.from, to: typed.to },
-              isSynthetic: false,
-              id: nextActionQuerySessionId(previous, typed),
-            }
-          }
-          const text = newState.doc.textBetween(
-            anchor,
-            selection.from,
-            "\n",
-            "\n"
-          )
-          if (text.includes("\n")) return closedActionQuerySession(previous)
-          return {
-            active: true,
-            trigger: previous.trigger,
-            query: text,
-            range: { from: anchor, to: selection.from },
-            isSynthetic: true,
-            id: nextActionQuerySessionId(previous, {
-              trigger: previous.trigger,
-              from: anchor,
-            }),
-          }
-        }
-
         if (!selection.empty || newState.doc.eq(oldState.doc)) {
           return previous
         }
@@ -277,7 +203,6 @@ function createActionQueryPlugin() {
           trigger: typed.trigger,
           query: typed.query,
           range: { from: typed.from, to: typed.to },
-          isSynthetic: false,
           id: nextActionQuerySessionId(previous, typed),
         }
       },
@@ -294,8 +219,7 @@ function readPromptInputActionQuerySession(state: EditorState) {
 
 /**
  * Diff-publishes the plugin's session state to a callback. The plugin owns its
- * re-evaluation rules (typed sessions on document changes, synthetic sessions
- * every transaction) and session identity. Publishing suppresses only
+ * re-evaluation rules and session identity. Publishing suppresses only
  * consecutive equal queries, so consumers see each session change exactly once.
  */
 function createActionQueryPublisher(
@@ -312,37 +236,19 @@ function createActionQueryPublisher(
             to: session.range.to,
             query: session.query,
             trigger: session.trigger,
-            isSynthetic: session.isSynthetic,
           }
         : null
     if (
       last?.from === next?.from &&
       last?.to === next?.to &&
       last?.query === next?.query &&
-      last?.trigger === next?.trigger &&
-      last?.isSynthetic === next?.isSynthetic
+      last?.trigger === next?.trigger
     ) {
       return
     }
     last = next
     onActionQueryChange(next)
   }
-}
-
-function toggleSyntheticPromptInputActionQuery(
-  state: EditorState,
-  dispatch: (transaction: Transaction) => void
-) {
-  dispatch(
-    state.tr.setMeta(promptInputActionQueryPluginKey, { toggleSynthetic: true })
-  )
-}
-
-function endPromptInputActionQuery(
-  state: EditorState,
-  dispatch: (transaction: Transaction) => void
-) {
-  dispatch(state.tr.setMeta(promptInputActionQueryPluginKey, { close: true }))
 }
 
 function replacePromptInputActionQuery(
@@ -354,10 +260,7 @@ function replacePromptInputActionQuery(
   // Activation consumes the published trigger range even when
   // the caret has since moved. Doc edits republish the query, so the range is
   // validated against the document text instead of the current selection.
-  // Synthetic sessions carry no trigger character in the document.
-  const expectedText = actionQuery.isSynthetic
-    ? actionQuery.query
-    : `${actionQuery.trigger}${actionQuery.query}`
+  const expectedText = `${actionQuery.trigger}${actionQuery.query}`
   if (
     actionQuery.from < 0 ||
     actionQuery.to > state.doc.content.size ||
@@ -369,9 +272,6 @@ function replacePromptInputActionQuery(
   const currentQuery = actionQuery
 
   const transaction = state.tr
-  if (actionQuery.isSynthetic) {
-    transaction.setMeta(promptInputActionQueryPluginKey, { close: true })
-  }
   if (!entity) {
     transaction.delete(currentQuery.from, currentQuery.to)
     transaction.setSelection(
@@ -398,9 +298,7 @@ function replacePromptInputActionQuery(
 export {
   createActionQueryPlugin,
   createActionQueryPublisher,
-  endPromptInputActionQuery,
   readPromptInputActionQuery,
   readPromptInputActionQuerySession,
   replacePromptInputActionQuery,
-  toggleSyntheticPromptInputActionQuery,
 }

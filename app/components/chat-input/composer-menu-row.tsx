@@ -13,8 +13,18 @@ import type { ReactNode } from "react"
  * element, which must stay the row's real DOM node.
  */
 
+/** A checked capability toggle (web search) reads "on" in the accent color and
+ *  hovers on a blue surface. The row owns the color; children inherit it.
+ *  Shared by both Composer menu surfaces. */
+const composerMenuRowCheckedClassName = cn(
+  "aria-checked:text-composer-capability-accent",
+  "aria-checked:hover:text-composer-capability-accent-hover aria-checked:focus:text-composer-capability-accent-hover aria-checked:data-highlighted:text-composer-capability-accent-hover",
+  "aria-checked:hover:bg-composer-capability-accent-hover-surface aria-checked:focus:bg-composer-capability-accent-hover-surface aria-checked:data-highlighted:bg-composer-capability-accent-hover-surface"
+)
+
 const composerMenuRowClassName = cn(
   floatingMenuItemActiveClassName,
+  composerMenuRowCheckedClassName,
   "menu-item-hoverable relative mx-2 flex h-(--floating-menu-item-height) cursor-pointer items-center gap-3 rounded-(--floating-menu-item-radius) px-2 py-1.5 text-sm outline-none select-none aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
 )
 
@@ -72,4 +82,4 @@ function composerMenuRow({
   )
 }
 
-export { composerMenuRow }
+export { composerMenuRow, composerMenuRowCheckedClassName }

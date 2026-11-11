@@ -31,6 +31,8 @@ type SidebarMenuItemProps = Omit<
   testId?: string
   className?: string
   isActive?: boolean
+  /** `muted` is the quiet disclosure row (e.g. "Show more"). */
+  tone?: "default" | "muted"
 }
 
 const baseClassName = cn(
@@ -38,7 +40,7 @@ const baseClassName = cn(
   "cursor-pointer",
   "disabled:cursor-not-allowed disabled:hover:bg-transparent",
   "aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent",
-  "text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row",
+  "hover:bg-sidebar-row active:bg-sidebar-row",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
 )
 
@@ -57,6 +59,7 @@ export const SidebarMenuItem = forwardRef<
     testId,
     className,
     isActive,
+    tone = "default",
     ...buttonProps
   },
   ref
@@ -92,8 +95,9 @@ export const SidebarMenuItem = forwardRef<
   const combinedClassName = cn(
     baseClassName,
     hasTrailing && "justify-between",
+    tone === "muted" && "text-[var(--text-tertiary)] hover:text-foreground",
     isActive &&
-      "bg-sidebar-row text-foreground hover:bg-sidebar-row",
+      "bg-sidebar-row hover:bg-sidebar-row",
     className
   )
 

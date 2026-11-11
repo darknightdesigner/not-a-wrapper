@@ -1,14 +1,15 @@
+import { getModelInfo } from "@/lib/models"
 import type { ModelReasoningEffort } from "@/lib/models/types"
 import { isModelReasoningEffort } from "@/lib/models/types"
 
 /**
  * Per-turn reasoning effort — client presentation and memory (ADR-0026).
- * Labels are the honest provider-level names (not invented tiers); the
- * per-model memory mirrors `lastUsedModel`: device-local, keyed by logical
- * model id, written on explicit selection.
+ * The per-model memory mirrors `lastUsedModel`: device-local, keyed by
+ * logical model id, written on explicit selection.
  */
 
-export const REASONING_EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
+/** Fallback words: the API value spelled out, for makers without overrides. */
+const API_EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
   none: "Off",
   minimal: "Minimal",
   low: "Low",
@@ -16,6 +17,34 @@ export const REASONING_EFFORT_LABELS: Record<ModelReasoningEffort, string> = {
   high: "High",
   xhigh: "Extra High",
   max: "Max",
+}
+
+/**
+ * The model maker's own product words, keyed by `baseProviderId`, where they
+ * differ from the API spelling. Copy them from the maker's UI with the date
+ * checked; never derive them from wire values (ADR-0026 "Labels").
+ */
+const MAKER_EFFORT_LABELS: Readonly<
+  Record<string, Partial<Record<ModelReasoningEffort, string>>>
+> = {
+  // claude.ai effort menu: Low, Medium, High, Extra, Max (2026-11-11).
+  anthropic: { xhigh: "Extra" },
+}
+
+/**
+ * The one way to name an effort level. Labels follow the model's maker (also
+ * when served through OpenRouter), so Sonnet's `xhigh` reads as Claude names
+ * it while GPT's keeps OpenAI's word.
+ */
+export function getReasoningEffortLabel(
+  level: ModelReasoningEffort,
+  modelId: string | undefined
+): string {
+  const maker = modelId ? getModelInfo(modelId)?.baseProviderId : undefined
+  return (
+    (maker ? MAKER_EFFORT_LABELS[maker]?.[level] : undefined) ??
+    API_EFFORT_LABELS[level]
+  )
 }
 
 /**

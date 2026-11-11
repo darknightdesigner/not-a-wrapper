@@ -1,11 +1,9 @@
 import {
   createActionQueryPlugin,
   createActionQueryPublisher,
-  endPromptInputActionQuery,
   readPromptInputActionQuery,
   readPromptInputActionQuerySession,
   replacePromptInputActionQuery,
-  toggleSyntheticPromptInputActionQuery,
   type PromptInputActionQuery,
   type PromptInputActionQueryTrigger,
 } from "@/components/ui/action-query-plugin"
@@ -159,7 +157,6 @@ export {
   createPromptInputPlugins,
   deleteComposerEntityBackward,
   deleteComposerEntityForward,
-  endPromptInputActionQuery,
   getPromptInputEntitySelectionDecorations,
   promptInputEntitiesEqual,
   promptInputSchema,
@@ -170,5 +167,4 @@ export {
   replacePromptInputActionQuery,
   replacePromptInputDocument,
   setPromptInputSelection,
-  toggleSyntheticPromptInputActionQuery,
 }

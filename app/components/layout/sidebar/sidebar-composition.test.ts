@@ -3,7 +3,6 @@ import type { Chat } from "@/lib/chat-store/types"
 import { describe, expect, it } from "vitest"
 import {
   deriveSidebarComposition,
-  deriveSidebarSelection,
   type SidebarProjectModel,
 } from "./sidebar-composition"
 
@@ -85,43 +84,5 @@ describe("sidebar grouping composition", () => {
       "newest",
       "alpha",
     ])
-  })
-})
-
-describe("sidebar selection", () => {
-  it("keeps the new-chat action selected until the session commits a chat id", () => {
-    expect(
-      deriveSidebarSelection({
-        isNewChatSurface: true,
-        sessionChatId: null,
-      })
-    ).toEqual({
-      currentChatId: undefined,
-      isNewChatActive: true,
-    })
-  })
-
-  it("selects the session's chat id, which a first turn commits before its row exists", () => {
-    expect(
-      deriveSidebarSelection({
-        isNewChatSurface: false,
-        sessionChatId: "chat-minted",
-      })
-    ).toEqual({
-      currentChatId: "chat-minted",
-      isNewChatActive: false,
-    })
-  })
-
-  it("selects nothing on a chat-less route outside the new-chat surface", () => {
-    expect(
-      deriveSidebarSelection({
-        isNewChatSurface: false,
-        sessionChatId: null,
-      })
-    ).toEqual({
-      currentChatId: undefined,
-      isNewChatActive: false,
-    })
   })
 })

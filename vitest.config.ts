@@ -18,6 +18,10 @@ export default defineConfig({
       include: ["benchmarks/**/*.bench.?(c|m)[jt]s?(x)"],
     },
   },
+  // Inline config stops Vite from loading postcss.config.mjs (Next's
+  // string-plugin format) when a test imports a CSS module. Tests need no
+  // Tailwind processing.
+  css: { postcss: {} },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),

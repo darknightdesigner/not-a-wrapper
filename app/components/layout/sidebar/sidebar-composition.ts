@@ -13,26 +13,6 @@ export type SidebarComposition = {
   chats: Chat[]
 }
 
-/**
- * Resolve the sidebar's single selected chat row. ChatSession is the only
- * authority: a first turn commits its client-minted id to the session before
- * the sidebar row exists (ADR-0033), so there is no optimistic-id bridge.
- */
-export function deriveSidebarSelection({
-  isNewChatSurface,
-  sessionChatId,
-}: {
-  isNewChatSurface: boolean
-  sessionChatId: string | null
-}) {
-  const currentChatId = sessionChatId ?? undefined
-
-  return {
-    currentChatId,
-    isNewChatActive: isNewChatSurface && currentChatId === undefined,
-  }
-}
-
 export function deriveSidebarComposition({
   chats,
   projects,
