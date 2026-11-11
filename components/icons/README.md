@@ -129,7 +129,7 @@ export default MyIcon
 | Copy        | `RiFileCopyLine`     |
 | Edit        | `RiEditLine`         |
 | Add         | `RiAddLine`          |
-| New chat    | `RiAddCircleLine`    |
+| New chat    | `NewChatIcon`        |
 | Share       | `RiShare2Line`       |
 | Minus       | `RiSubtractLine`     |
 

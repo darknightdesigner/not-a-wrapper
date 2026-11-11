@@ -62,36 +62,6 @@ describe("ThreadBottomContainer", () => {
     vi.restoreAllMocks()
   })
 
-  it("renders the stable footer regions", () => {
-    const footer = container.querySelector("#thread-bottom-container")
-
-    expect(footer?.children).toHaveLength(4)
-    expect(
-      footer?.children[0].hasAttribute("data-thread-footer-overflow-spacer")
-    ).toBe(true)
-    expect(
-      footer?.children[1].hasAttribute("data-thread-above-composer")
-    ).toBe(true)
-    expect(
-      footer?.children[1].querySelector("[data-thread-above-composer-slot]")
-    ).not.toBeNull()
-    expect(
-      footer?.children[2].hasAttribute("data-thread-scroll-control-layer")
-    ).toBe(true)
-    expect(footer?.children[3].id).toBe("thread-bottom")
-    expect(
-      footer?.children[3].querySelector("[data-thread-bottom-content]")
-    ).not.toBeNull()
-    expect(
-      footer?.querySelector(
-        "[data-thread-composer-column] [data-composer-keyboard-pin] [data-keyboard-open-mask]"
-      )
-    ).not.toBeNull()
-    expect(
-      container.querySelector("[data-thread-scroll-control-visibility]")
-    ).not.toBeNull()
-  })
-
   it("preserves composer DOM identity when keyboard positioning activates", () => {
     const composer = container.querySelector('[data-testid="composer"]')
 
@@ -143,14 +113,5 @@ describe("ThreadBottomContainer", () => {
       top: 0,
       behavior: "smooth",
     })
-  })
-
-  it("renders both scroll-button states", () => {
-    const button = container.querySelector(
-      '[data-testid="scroll-to-bottom-button"]'
-    )
-
-    expect(button?.querySelector("[data-scroll-button-arrow]")).not.toBeNull()
-    expect(button?.querySelector("[data-scroll-button-wave]")).not.toBeNull()
   })
 })

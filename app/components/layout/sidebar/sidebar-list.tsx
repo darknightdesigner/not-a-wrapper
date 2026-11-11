@@ -1,12 +1,4 @@
 import { CollapsibleSection } from "@/components/ui/collapsible-section"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Icon } from "@/components/ui/icon"
 import {
   Tooltip,
@@ -14,53 +6,33 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import type { Chat } from "@/lib/chat-store/types"
-import {
-  RiAddLine,
-  RiFolderLine,
-  RiListUnordered,
-  RiMoreFill,
-} from "@remixicon/react"
+import { RiAddLine } from "@remixicon/react"
 import Link from "next/link"
-import { Children, useState, type ReactNode } from "react"
-import type { ChatOrganization } from "./chat-organization"
+import type { ReactNode } from "react"
 import { SidebarCollection, SidebarCollectionItem } from "./sidebar-collection"
 import { SidebarItem } from "./sidebar-item"
 
 type SidebarListProps = {
   title: string
   items: Chat[]
-  beforeItems?: ReactNode
-  presentation?:
-    | { kind: "history"; projectNames?: ReadonlyMap<string, string> }
-    | { kind: "pinned"; projectNames: ReadonlyMap<string, string> }
   currentChatId?: string
   defaultOpen?: boolean
   storageKey?: string
   showHeaderActions?: boolean
-  organization?: ChatOrganization
-  onOrganizationChange?: (organization: ChatOrganization) => void
   onNewChat?: () => void
 }
 
 export function SidebarList({
   title,
   items,
-  beforeItems,
-  presentation = { kind: "history" },
   currentChatId,
   defaultOpen = true,
   storageKey,
   showHeaderActions = false,
-  organization,
-  onOrganizationChange,
   onNewChat,
 }: SidebarListProps) {
   const headerActions = showHeaderActions ? (
-    <SidebarChatGroupActions
-      organization={organization ?? "by-project"}
-      onOrganizationChange={onOrganizationChange}
-      onNewChat={onNewChat}
-    />
+    <SidebarChatGroupActions onNewChat={onNewChat} />
   ) : null
 
   return (
@@ -72,18 +44,9 @@ export function SidebarList({
       headerActions={headerActions}
     >
       <SidebarCollection>
-        {Children.map(beforeItems, (item) =>
-          item == null ? null : (
-            <SidebarCollectionItem>{item}</SidebarCollectionItem>
-          )
-        )}
         {items.map((chat) => (
           <SidebarCollectionItem key={chat.id}>
-            <SidebarItem
-              chat={chat}
-              currentChatId={currentChatId}
-              presentation={getChatRowPresentation(chat, presentation)}
-            />
+            <SidebarItem chat={chat} currentChatId={currentChatId} />
           </SidebarCollectionItem>
         ))}
       </SidebarCollection>
@@ -91,23 +54,8 @@ export function SidebarList({
   )
 }
 
-function getChatRowPresentation(
-  chat: Chat,
-  presentation: NonNullable<SidebarListProps["presentation"]>
-) {
-  const projectName = chat.project_id
-    ? presentation.projectNames?.get(chat.project_id)
-    : undefined
-  if (presentation.kind === "pinned") {
-    return { kind: "pinned" as const, projectName }
-  }
-  return projectName
-    ? { kind: "recent-project" as const, projectName }
-    : { kind: "history" as const }
-}
-
 const headerActionClassName =
-  "sidebar-group-header-action text-[var(--text-tertiary)] hover:text-foreground active:text-foreground focus-visible:text-foreground data-popup-open:text-foreground flex h-9 w-[34px] shrink-0 items-center -my-2 -ms-1 -me-2.5 rounded-e-[10px] ps-1 pe-1.5 opacity-0 transition-opacity duration-150 group-hover/sidebar-expando-section-header:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 outline-none pointer-coarse:opacity-100"
+  "sidebar-group-header-action text-[var(--text-tertiary)] hover:text-foreground active:text-foreground focus-visible:text-foreground data-popup-open:text-foreground flex h-9 w-[34px] shrink-0 items-center -my-2 -ms-1 -me-2.5 rounded-e-(--sidebar-row-radius) ps-1 pe-1.5 opacity-0 transition-opacity duration-150 group-hover/sidebar-expando-section-header:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 outline-none pointer-coarse:opacity-100"
 
 function SidebarHeaderActionChip({ children }: { children: ReactNode }) {
   return (
@@ -118,64 +66,16 @@ function SidebarHeaderActionChip({ children }: { children: ReactNode }) {
 }
 
 export function SidebarChatGroupActions({
-  organization,
-  onOrganizationChange,
   onNewChat,
   onNewProject,
 }: {
-  organization: ChatOrganization
-  onOrganizationChange?: (organization: ChatOrganization) => void
   onNewChat?: () => void
   onNewProject?: () => void
 }) {
   const isProjectAction = onNewProject != null
-  const [isOrganizerOpen, setIsOrganizerOpen] = useState(false)
 
   return (
-    <div className="flex w-[58px] shrink-0 items-center gap-2 pe-2.5 text-[var(--text-tertiary)]">
-      <DropdownMenu open={isOrganizerOpen} onOpenChange={setIsOrganizerOpen}>
-        <DropdownMenuTrigger
-          render={
-            <button
-              type="button"
-              className={headerActionClassName}
-              aria-label="Organize chats"
-            />
-          }
-        >
-          <SidebarHeaderActionChip>
-            <Icon icon={RiMoreFill} slotSize={16} glyphInset={0} />
-          </SidebarHeaderActionChip>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          side="bottom"
-          sideOffset={-4}
-          align="start"
-          alignOffset={-8}
-          animated={false}
-          className="sidebar-group-header w-[190px] min-w-[190px]"
-        >
-          <DropdownMenuRadioGroup
-            value={organization}
-            onValueChange={(value) => {
-              onOrganizationChange?.(value as ChatOrganization)
-              setIsOrganizerOpen(false)
-            }}
-          >
-            <DropdownMenuLabel className="text-sm font-normal text-[var(--text-tertiary)]">
-              Organize chats
-            </DropdownMenuLabel>
-            <DropdownMenuRadioItem value="one-list">
-              <Icon icon={RiListUnordered} />
-              In one list
-            </DropdownMenuRadioItem>
-            <DropdownMenuRadioItem value="by-project">
-              <Icon icon={RiFolderLine} />
-              By project
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <div className="flex shrink-0 items-center pe-2.5 text-[var(--text-tertiary)]">
       <Tooltip disableHoverablePopup>
         <TooltipTrigger
           render={

@@ -6,10 +6,8 @@ import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
 import { AppSidebar } from "./app-sidebar"
-import type { ChatOrganization } from "./chat-organization"
 
 const state = vi.hoisted(() => ({
-  organization: "one-list" as ChatOrganization,
   chats: [] as Chats[],
   persistedProjects: null as Doc<"projects">[] | null,
   liveProjects: undefined as Doc<"projects">[] | undefined,
@@ -20,6 +18,7 @@ vi.mock("@/components/ui/sidebar", () => ({
     <div>{children}</div>
   ),
   SIDEBAR_CONTAINER_ID: "sidebar",
+  SidebarTrigger: () => null,
   useSidebar: () => ({ isMobile: false, state: "expanded" }),
   useSidebarShortcutScope: () => undefined,
 }))
@@ -50,9 +49,6 @@ vi.mock("@/app/components/projects/use-project-pinning", () => ({
     togglePinned: vi.fn(),
   }),
 }))
-vi.mock("./chat-organization", () => ({
-  useChatOrganization: () => [state.organization, vi.fn(), true],
-}))
 vi.mock("../../history/history-search-provider", () => ({
   useHistorySearch: () => ({ isHistoryOpen: false, openHistory: vi.fn() }),
 }))
@@ -68,21 +64,11 @@ vi.mock("../../chat-input/popover-content-auth", () => ({
   PopoverContentAuth: () => null,
 }))
 vi.mock("./sidebar-list", () => ({
-  // Rows render "title|project label" so the one-list project labels are
-  // observable too.
-  SidebarList: ({
-    title,
-    items,
-    presentation,
-  }: {
-    title: string
-    items: Chats[]
-    presentation?: { projectNames?: ReadonlyMap<string, string> }
-  }) => (
+  SidebarList: ({ title, items }: { title: string; items: Chats[] }) => (
     <section aria-label={title}>
       {items.map((chat) => (
         <div key={chat.id} data-testid="chat-row">
-          {`${chat.title}|${presentation?.projectNames?.get(chat.project_id ?? "") ?? ""}`}
+          {chat.title}
         </div>
       ))}
     </section>
@@ -163,42 +149,29 @@ describe("AppSidebar persisted window (ADR-0048)", () => {
     return { chats: text("chat-row"), projects: text("project-row") }
   }
 
-  it.each([
-    [
-      "one-list",
-      {
-        chats: ["cached-loose|", "cached-in-project|cached-project"],
-        projects: [],
-      },
-      { chats: ["cached-loose|", "cached-in-project|"], projects: [] },
-    ],
-    [
-      "by-project",
-      { chats: ["cached-loose|"], projects: ["cached-project"] },
-      { chats: ["cached-loose|"], projects: ["live-project"] },
-    ],
-  ] as const)(
-    "%s: paints cached rows while the live project read is pending, then swaps to live",
-    (organization, pending, live) => {
-      state.organization = organization
-      state.chats = [
-        chat("cached-loose", null),
-        chat("cached-in-project", "cached-project"),
-      ]
-      state.persistedProjects = [project("cached-project")]
-      state.liveProjects = undefined
+  it("paints cached rows while the live project read is pending, then swaps to live", () => {
+    state.chats = [
+      chat("cached-loose", null),
+      chat("cached-in-project", "cached-project"),
+    ]
+    state.persistedProjects = [project("cached-project")]
+    state.liveProjects = undefined
 
-      expect(render()).toEqual(pending)
+    expect(render()).toEqual({
+      chats: ["cached-loose"],
+      projects: ["cached-project"],
+    })
 
-      // Live data replaces the persisted projects wholesale.
-      state.persistedProjects = null
-      state.liveProjects = [project("live-project")]
-      expect(render()).toEqual(live)
-    }
-  )
+    // Live data replaces the persisted projects wholesale.
+    state.persistedProjects = null
+    state.liveProjects = [project("live-project")]
+    expect(render()).toEqual({
+      chats: ["cached-loose"],
+      projects: ["live-project"],
+    })
+  })
 
   it("holds the loading state without a persisted window", () => {
-    state.organization = "by-project"
     state.chats = []
     state.persistedProjects = null
     state.liveProjects = undefined

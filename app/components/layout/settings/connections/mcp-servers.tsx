@@ -220,15 +220,17 @@ export function McpServers() {
                 </div>
 
                 <div className="mt-3 border-t pt-3">
-                  <button
-                    type="button"
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    aria-expanded={expandedServer === server._id}
                     onClick={() => handleToggleExpand(server._id)}
-                    className="text-muted-foreground hover:text-foreground text-xs transition-colors"
+                    className="text-muted-foreground -ms-1.5"
                   >
                     {expandedServer === server._id
                       ? "▾ Hide tools"
                       : "▸ Show tools"}
-                  </button>
+                  </Button>
                   {expandedServer === server._id && (
                     <McpToolApprovals serverId={server._id} />
                   )}

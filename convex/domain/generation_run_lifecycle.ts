@@ -507,6 +507,3 @@ export function isSupersedableGenerationRunStatus(status: unknown): boolean {
 // The sweep reads exactly these through `messages.by_chat_status`.
 export const SUPERSEDABLE_MESSAGE_STATUSES = ["submitted", "streaming"] as const
 
-export function isSupersedableMessageStatus(status: unknown): boolean {
-  return SUPERSEDABLE_MESSAGE_STATUSES.some((live) => live === status)
-}

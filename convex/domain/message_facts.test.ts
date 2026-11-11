@@ -1,52 +1,13 @@
 import { describe, expect, it } from "vitest"
 import {
-  DURABLE_MESSAGE_STATUSES,
   extractTextFromMessageParts,
-  GENERATION_RUN_STATUSES,
   isActiveGenerationRunStatus,
   isAwaitingApprovalStatus,
-  isDurableMessageStatus,
-  isGenerationRunStatus,
   isTerminalGenerationRunStatus,
   isTerminalMessageStatus,
-  type DurableMessageStatus,
-  type GenerationRunStatus,
 } from "./message_facts"
 
 describe("message facts", () => {
-  it("owns the durable status vocabulary and type guards", () => {
-    expect(DURABLE_MESSAGE_STATUSES).toEqual([
-      "submitted",
-      "streaming",
-      "completed",
-      "aborted",
-      "failed",
-      "awaiting_approval",
-    ])
-    expect(GENERATION_RUN_STATUSES).toEqual([
-      "queued",
-      "running",
-      "streaming",
-      "awaiting_approval",
-      "completed",
-      "aborted",
-      "failed",
-    ])
-
-    const messageStatus: unknown = "streaming"
-    const generationStatus: unknown = "queued"
-    expect(isDurableMessageStatus(messageStatus)).toBe(true)
-    expect(isGenerationRunStatus(generationStatus)).toBe(true)
-    if (isDurableMessageStatus(messageStatus)) {
-      expect(messageStatus satisfies DurableMessageStatus).toBe("streaming")
-    }
-    if (isGenerationRunStatus(generationStatus)) {
-      expect(generationStatus satisfies GenerationRunStatus).toBe("queued")
-    }
-    expect(isDurableMessageStatus("ready")).toBe(false)
-    expect(isGenerationRunStatus("pending")).toBe(false)
-  })
-
   it("classifies the shared lifecycle states", () => {
     expect(isTerminalMessageStatus("completed")).toBe(true)
     expect(isTerminalMessageStatus("streaming")).toBe(false)

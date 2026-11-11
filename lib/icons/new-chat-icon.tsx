@@ -1,12 +1,14 @@
-import { Icon } from "@/components/ui/icon"
-import { RiAddCircleLine } from "@remixicon/react"
+import { createIcon } from "./create-icon"
 
-export function NewChatIcon({
-  size = 18,
-  className,
-}: {
-  size?: number
-  className?: string
-}) {
-  return <Icon icon={RiAddCircleLine} slotSize={size} className={className} />
-}
+/**
+ * Plus sized to claude.ai's sidebar New icon (13px at the sidebar's 18px
+ * glyph), with the 2-unit (1.5px) line of our Remix icons.
+ */
+export const NewChatIcon = createIcon(
+  <path
+    d="M12 3.333V20.667M3.333 12H20.667"
+    stroke="currentColor"
+    strokeWidth="2"
+  />,
+  { displayName: "NewChatIcon" }
+)

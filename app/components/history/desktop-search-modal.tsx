@@ -1,14 +1,10 @@
 "use client"
 
+import { DialogCloseButton } from "@/components/ui/dialog"
 import type { Chats } from "@/lib/chat-store/types"
 import { cn } from "@/lib/utils"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
-import {
-  RiAddLine,
-  RiChat3Line,
-  RiCloseLargeLine,
-  RiSearchLine,
-} from "@remixicon/react"
+import { RiAddLine, RiChat3Line, RiSearchLine } from "@remixicon/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
@@ -239,16 +235,7 @@ export function DesktopSearchModal({
                     "placeholder:text-placeholder focus:ring-0 focus:outline-none"
                   )}
                 />
-                <DialogPrimitive.Close
-                  aria-label="Close"
-                  className={cn(
-                    "ms-4 inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent",
-                    "text-muted-foreground hover:bg-interactive-hover hover:text-foreground active:bg-interactive-pressed",
-                    "focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
-                  )}
-                >
-                  <RiCloseLargeLine className="size-5" aria-hidden="true" />
-                </DialogPrimitive.Close>
+                <DialogCloseButton className="ms-4 shrink-0" />
               </div>
 
               <hr className="border-border" />
@@ -340,16 +327,7 @@ export function DesktopSearchModal({
               )}
             >
               <header className="flex min-h-12 items-start justify-end p-2.5 pb-0">
-                <DialogPrimitive.Close
-                  aria-label="Close"
-                  className={cn(
-                    "inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full bg-transparent",
-                    "text-muted-foreground hover:bg-interactive-hover hover:text-foreground active:bg-interactive-pressed",
-                    "focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:outline-none"
-                  )}
-                >
-                  <RiCloseLargeLine className="size-5" aria-hidden="true" />
-                </DialogPrimitive.Close>
+                <DialogCloseButton className="shrink-0" />
               </header>
               <HistoryAuthPrompt />
             </div>

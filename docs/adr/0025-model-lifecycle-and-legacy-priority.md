@@ -85,24 +85,21 @@ an active direct logical model Legacy.
 The API computes every model in one response with the same injected `asOf`
 date. No cron mutates stored Legacy booleans.
 
-The model selector consumes `classification` as presentation priority. It
-hides Legacy models initially and adds one `Show legacy models...` option for
-each maker with hidden Legacy models. Revealing one maker does not reveal any
-other maker, and the option disappears once that maker is revealed. This state
-lasts only for the current open popover; closing it hides every Legacy model
-again, except that the composer's selected Legacy model remains visible as
-explicit chat state. Only that selected row bypasses disclosure; the maker's
-other Legacy models remain collapsed. This never changes catalog visibility,
-classification, favorites, or route lifecycle metadata. Disclosure replaces
-the maker's option in place with its Legacy rows; Current and favorite rows keep
-their existing order.
-Anthropic's option uses the Claude product mark, matching its model rows.
+The model selector consumes `classification` as presentation priority. Its
+resting list shows only Current models and has no Legacy disclosure control
+(amended 2026-11-09; this replaced a per-maker `Show legacy models...` option).
+Search covers the whole visible catalog, so typing is how a Legacy model is
+reached; matches join the same maker-ordered list as Current models, and
+clearing the query hides them again. The composer's selected Legacy model
+stays listed as explicit chat state; only that row bypasses the rule. This
+never changes catalog visibility, classification, favorites, or route
+lifecycle metadata. A pinned model that becomes Legacy stays pinned and shows
+under Pinned whenever a search matches it.
 
 Snapshot codes such as `0423`, `0731`, and `0905` do not belong in ordinary
 model names. Current rows use the stable product label. When a dated snapshot
-is classified Legacy and its maker is revealed, the selector appends the
-explicit snapshot date as a muted, readable month and year. Closing the
-popover removes both the Legacy row and its date detail. Canonical and raw
+is classified Legacy, its row appends the explicit snapshot date as a muted,
+readable month and year. Canonical and raw
 route ids remain unchanged, and `LogicalModelView.routes` continues to expose
 the unmodified route lifecycle evidence.
 
@@ -169,8 +166,9 @@ remains intact.
 - Models without a maker policy or trustworthy lineage or lifecycle evidence
   remain Current. This fails conservatively instead of guessing from age or
   names, while the audit makes suspicious stale lanes visible for human review.
-- The selector prioritizes Current models through provider-scoped disclosure
-  while keeping favorites and explicit user visibility authoritative.
+- The selector prioritizes Current models by keeping Legacy models out of its
+  resting list and reachable through search, while explicit user visibility
+  stays authoritative.
 
 ## Alternatives considered
 

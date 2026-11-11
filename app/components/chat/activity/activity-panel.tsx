@@ -1,6 +1,7 @@
 "use client"
 
 import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
+import { Button } from "@/components/ui/button"
 import { Favicon } from "@/components/ui/favicon"
 import { Icon } from "@/components/ui/icon"
 import { LazyMarkdown as Markdown } from "@/components/ui/lazy-markdown"
@@ -104,14 +105,14 @@ function ActivityToolCard({
           {entry.tool.displayName}
         </span>
         {code ? (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             aria-label={copied ? "Copied" : "Copy"}
             onClick={copy}
-            className="hover:bg-interactive-hover active:bg-interactive-pressed focus-visible:ring-focus-ring inline-flex size-9 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2"
           >
             <Icon icon={copied ? RiCheckLine : RiFileCopyLine} slotSize={18} />
-          </button>
+          </Button>
         ) : null}
       </div>
       {code ? (
@@ -121,22 +122,19 @@ function ActivityToolCard({
       ) : null}
       {approvalId ? (
         <div className="flex flex-wrap gap-2 px-4 pb-4">
-          <button
-            type="button"
+          <Button
             disabled={!onToolApproval || isSubmittingApproval}
             onClick={() => void submitToolApproval(true)}
-            className="bg-foreground text-background h-8 rounded-full px-3 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             Approve
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
             disabled={!onToolApproval || isSubmittingApproval}
             onClick={() => void submitToolApproval(false, "Denied by user")}
-            className="hover:bg-interactive-hover active:bg-interactive-pressed disabled:text-disabled-foreground h-8 rounded-full px-3 text-sm font-medium disabled:cursor-not-allowed"
           >
             Deny
-          </button>
+          </Button>
         </div>
       ) : null}
     </div>

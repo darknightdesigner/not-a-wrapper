@@ -9,7 +9,6 @@ import type { SidebarRow } from "./sidebar-row"
 const mocks = vi.hoisted(() => ({
   rowRender: vi.fn(),
   updateTitle: vi.fn(),
-  togglePinned: vi.fn(),
 }))
 vi.mock("@/lib/chat-store/chats/provider", () => ({
   useChatActions: () => mocks,
@@ -28,35 +27,31 @@ vi.mock("./sidebar-item-status", () => ({
     <span data-status={status} />
   ),
 }))
-vi.mock("./trailing-icon-button", () => ({
-  SidebarPinAction: ({
-    pinned,
-    onTogglePinned,
+vi.mock("./sidebar-row-actions", () => ({
+  SidebarRowEndSlot: ({
+    status,
+    children,
   }: {
-    pinned: boolean
-    onTogglePinned: () => void
+    status?: React.ReactNode
+    children: React.ReactNode
   }) => (
-    <button data-pin={pinned} onClick={onTogglePinned}>
-      Pin
-    </button>
+    <>
+      {status}
+      {children}
+    </>
   ),
+  SidebarPinnedIndicator: () => <span data-pinned-mark />,
 }))
 vi.mock("./sidebar-row", () => ({
   SidebarRow: ({
     title,
     isActive,
-    secondaryLabel,
     onRename,
     trailing,
   }: ComponentProps<typeof SidebarRow>) => {
     mocks.rowRender()
     return (
-      <div
-        data-row
-        data-title={title}
-        data-active={isActive}
-        data-secondary={secondaryLabel}
-      >
+      <div data-row data-title={title} data-active={isActive}>
         <button data-rename onClick={() => void onRename("Saved title")}>
           Rename
         </button>
@@ -66,7 +61,7 @@ vi.mock("./sidebar-row", () => ({
   },
 }))
 
-it("skips equal inactive rows while preserving selection, chat fields, presentation, and actions", () => {
+it("skips equal inactive rows while preserving selection, chat fields, and the resting pin mark", () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true)
   const container = document.createElement("div")
   const root = createRoot(container)
@@ -82,22 +77,16 @@ it("skips equal inactive rows while preserving selection, chat fields, presentat
     created_at: null,
     updated_at: null,
   }
-  const render = (
-    currentChatId: string,
-    presentation?: ComponentProps<typeof SidebarItem>["presentation"]
-  ) =>
+  const render = (currentChatId: string) =>
     act(() =>
       root.render(
-        <SidebarItem
-          chat={{ ...chat }}
-          currentChatId={currentChatId}
-          presentation={presentation}
-        />
+        <SidebarItem chat={{ ...chat }} currentChatId={currentChatId} />
       )
     )
+  const pinMark = () => container.querySelector("[data-pinned-mark]")
   try {
     render("other-chat")
-    render("another-chat", { kind: "history" })
+    render("another-chat")
     expect(mocks.rowRender).toHaveBeenCalledTimes(1)
     render("row-chat")
     expect(mocks.rowRender).toHaveBeenCalledTimes(2)
@@ -115,29 +104,22 @@ it("skips equal inactive rows while preserving selection, chat fields, presentat
     expect(
       container.querySelector("[data-row]")?.getAttribute("data-title")
     ).toBe("Renamed")
-    expect(
-      container.querySelector("[data-pin]")?.getAttribute("data-pin")
-    ).toBe("true")
+    // Live status outranks the pin mark at rest.
     expect(
       container.querySelector("[data-status]")?.getAttribute("data-status")
     ).toBe("streaming")
-    chat = { ...chat, last_read_at: 123 }
+    expect(pinMark()).toBeNull()
+    chat = { ...chat, live_run_status: undefined, last_read_at: 123 }
     render("row-chat")
     expect(mocks.rowRender).toHaveBeenCalledTimes(4)
-    render("row-chat", { kind: "pinned", projectName: "Project" })
-    expect(
-      container.querySelector("[data-row]")?.getAttribute("data-secondary")
-    ).toBe("Project")
-    expect(mocks.rowRender).toHaveBeenCalledTimes(5)
+    expect(pinMark()).not.toBeNull()
     act(() =>
       container.querySelector<HTMLButtonElement>("[data-rename]")!.click()
     )
-    act(() => container.querySelector<HTMLButtonElement>("[data-pin]")!.click())
     expect(mocks.updateTitle).toHaveBeenLastCalledWith(
       "row-chat",
       "Saved title"
     )
-    expect(mocks.togglePinned).toHaveBeenLastCalledWith("row-chat", false)
   } finally {
     act(() => root.unmount())
     vi.unstubAllGlobals()

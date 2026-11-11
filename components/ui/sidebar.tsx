@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
-import { RiSideBarLine } from "@remixicon/react"
+import { RiLayoutLeft2Line, RiSideBarLine } from "@remixicon/react"
 import * as React from "react"
 
 /**
@@ -258,10 +258,12 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
+      shape="square"
       aria-expanded={open}
       aria-controls={SIDEBAR_CONTAINER_ID}
       className={cn(
-        "size-9 rounded-md",
+        // Muted at rest; the ghost variant owns hover, press, and focus.
+        "text-[var(--text-tertiary)]",
         state === "collapsed"
           ? "cursor-e-resize rtl:cursor-w-resize"
           : "cursor-w-resize rtl:cursor-e-resize",
@@ -274,10 +276,9 @@ function SidebarTrigger({
       {...props}
     >
       <Icon
-        icon={RiSideBarLine}
+        icon={open ? RiLayoutLeft2Line : RiSideBarLine}
         slotSize={20}
         glyphInset={0}
-        className="group-hover/button:text-foreground size-5 text-[var(--text-tertiary)]"
       />
       <span className="sr-only">{open ? "Close sidebar" : "Open sidebar"}</span>
     </Button>

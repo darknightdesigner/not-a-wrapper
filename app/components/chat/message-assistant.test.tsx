@@ -717,27 +717,6 @@ describe("MessageAssistant activity trigger", () => {
     )
   })
 
-  it("renders full canonical text on non-last and settled rows", async () => {
-    const store = makeStore({ panelTurnId: "assistant-1" })
-    await act(async () => {
-      root?.render(
-        <ActivityPanelStoreProvider store={store} panelId="activity-panel">
-          <MessageAssistant
-            messageId="assistant-1"
-            view={makeView([], "ready")}
-            status="ready"
-          >
-            {"A settled answer with **markdown** in it."}
-          </MessageAssistant>
-        </ActivityPanelStoreProvider>
-      )
-    })
-
-    expect(container?.textContent).toContain(
-      "A settled answer with markdown in it."
-    )
-  })
-
   it("replaces live work with its summary and answer in the same update", async () => {
     const commentary = {
       type: "text",

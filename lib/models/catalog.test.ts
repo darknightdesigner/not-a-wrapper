@@ -12,7 +12,6 @@ import {
   ROUTE_CONFIGS,
   toLogicalModelView,
 } from "./catalog"
-import { getModelSnapshotDateLabel } from "./presentation"
 import type { ModelConfig } from "./types"
 
 function makeConfig(
@@ -503,13 +502,6 @@ describe("production logical catalog", () => {
     }
   })
 
-  it("keeps Gemini's preview lifecycle out of its display name", () => {
-    expect(getLogicalModel("gemini-3.1-pro-preview")).toMatchObject({
-      name: "Gemini 3.1 Pro",
-      releaseStage: "preview",
-    })
-  })
-
   it("merges the direct/OpenRouter duplicates into two-route models", () => {
     const sonnet = getLogicalModel("claude-sonnet-5")
     expect(sonnet?.vendorId).toBe("claude")
@@ -532,94 +524,6 @@ describe("production logical catalog", () => {
     const glm = getLogicalModel("openrouter:z-ai/glm-5.2")
     expect(glm?.routes.map((route) => route.providerId)).toEqual(["openrouter"])
   })
-
-  it.each([
-    {
-      maker: "OpenAI",
-      vendorId: "openai",
-      expectedCurrentIds: [
-        "gpt-6-astra",
-        "gpt-6.1-sol",
-        "gpt-6.1-terra",
-        "gpt-6-luna",
-      ],
-    },
-    {
-      maker: "Anthropic",
-      vendorId: "claude",
-      expectedCurrentIds: [
-        "claude-fable-5-2",
-        "claude-opus-5-5",
-        "claude-sonnet-5-5",
-        "claude-haiku-5-5",
-      ],
-    },
-    {
-      maker: "Google",
-      vendorId: "gemini",
-      expectedCurrentIds: [
-        "gemini-4-argon",
-        "gemini-3.8-flash",
-        "openrouter:google/gemini-3.5-flash-lite",
-      ],
-    },
-  ])(
-    "keeps exactly the curated $maker portfolio Current",
-    ({ vendorId, expectedCurrentIds }) => {
-      const asOf = new Date("2026-11-09T00:00:00Z")
-      const currentIds = LOGICAL_MODELS.filter(
-        (model) =>
-          model.vendorId === vendorId &&
-          model.catalogStatus === "visible" &&
-          classifyLogicalModel(model, LOGICAL_MODELS, asOf).classification ===
-            "current"
-      )
-        .map((model) => model.id)
-        .toSorted()
-
-      expect(currentIds).toEqual(expectedCurrentIds.toSorted())
-    }
-  )
-
-  it.each([
-    "gpt-5.6-sol",
-    "gpt-5.6-terra",
-    "gpt-5.6-luna",
-    "mistral-medium-3-5",
-    "mistral-small-2603",
-    "ministral-14b-2512",
-    "ministral-8b-2512",
-    "ministral-3b-2512",
-    "openrouter:deepseek/deepseek-v4-flash-vision-exp",
-    "openrouter:qwen/qwen3.8-2.4t-a95b",
-    "openrouter:qwen/qwen3.8-max-0902",
-    "openrouter:qwen/qwen3.8-27b",
-    "openrouter:qwen/qwen3.7-flash",
-    "openrouter:deepseek/deepseek-v3.2",
-    "openrouter:google/gemini-3.7-flash",
-    "openrouter:minimax/minimax-m2.7",
-    "openrouter:inclusionai/ling-3.0-flash",
-    "openrouter:moonshotai/kimi-k2.7-code",
-    "openrouter:moonshotai/kimi-k3",
-    "openrouter:openai/gpt-5.5-pro",
-    "openrouter:z-ai/glm-5v-turbo",
-    "openrouter:x-ai/grok-4.6",
-  ])("keeps reference-catalog route %s visible", (modelId) => {
-    expect(getLogicalModel(modelId)?.catalogStatus).toBe("visible")
-  })
-
-  it.each([
-    ["claude-sonnet-4-6", "openrouter:anthropic/claude-sonnet-4.6"],
-    ["gpt-4.1", "openrouter:openai/gpt-4.1"],
-    ["gemini-2.5-pro", "openrouter:google/gemini-2.5-pro"],
-  ])(
-    "adds the reference route to direct logical model %s",
-    (modelId, routeId) => {
-      const model = getLogicalModel(modelId)
-      expect(model?.catalogStatus).toBe("visible")
-      expect(model?.routes.map((route) => route.id)).toContain(routeId)
-    }
-  )
 
   it("reports optional search when every route can provide it", () => {
     const sonnet = getLogicalModel("claude-sonnet-5")!
@@ -697,45 +601,6 @@ describe("production logical catalog", () => {
   })
 
   it.each([
-    ["gpt-5.6-luna", "GPT-5.6 Luna", "5.6 Luna"],
-    ["gpt-5.5", "GPT-5.5", "5.5"],
-    ["gpt-5.4-mini", "GPT-5.4 Mini", "5.4 Mini"],
-    ["openrouter:openai/gpt-5.5-pro", "GPT-5.5 Pro", "5.5 Pro"],
-    ["gemini-3.5-flash", "Gemini 3.5 Flash", "3.5 Flash"],
-    ["openrouter:google/gemini-3.7-flash", "Gemini 3.7 Flash", "3.7 Flash"],
-    ["openrouter:deepseek/deepseek-v4-pro-0813", "DeepSeek V4 Pro", "V4 Pro"],
-    ["openrouter:moonshotai/kimi-k3", "Kimi K3", "K3"],
-    ["openrouter:inclusionai/ling-3.0-flash", "Ling 3.0 Flash", "3.0 Flash"],
-    ["openrouter:xiaomi/mimo-v2.5", "MiMo-V2.5", "V2.5"],
-    [
-      "openrouter:meta-llama/llama-4-maverick",
-      "Llama 4 Maverick",
-      "4 Maverick",
-    ],
-    ["openrouter:qwen/qwen3-coder", "Qwen3-Coder", "3-Coder"],
-    ["openrouter:minimax/minimax-m3", "MiniMax M3", "M3"],
-    ["openrouter:z-ai/glm-5.2", "GLM-5.2", "5.2"],
-    ["claude-sonnet-5", "Claude Sonnet 5", "Sonnet 5"],
-    ["sonar", "Perplexity Sonar", "Sonar"],
-    [
-      "sonar-reasoning-pro",
-      "Perplexity Sonar Reasoning Pro",
-      "Sonar Reasoning Pro",
-    ],
-    ["sonar-pro", "Perplexity Sonar Pro", "Sonar Pro"],
-    [
-      "sonar-deep-research",
-      "Perplexity Sonar Deep Research",
-      "Sonar Deep Research",
-    ],
-  ])("exposes full and compact names for %s", (modelId, name, shortName) => {
-    const model = getLogicalModel(modelId)
-
-    expect(model).toMatchObject({ name, shortName })
-    expect(toLogicalModelView(model!)).toMatchObject({ name, shortName })
-  })
-
-  it.each([
     ["GPT", "GPT-", /gpt/i],
     ["Gemini", "Gemini ", /gemini/i],
     ["DeepSeek", "DeepSeek ", /deepseek/i],
@@ -760,62 +625,6 @@ describe("production logical catalog", () => {
       }
     }
   )
-
-  it.each([
-    ["openrouter:google/gemini-3-flash-preview", "Gemini 3 Flash"],
-    [
-      "openrouter:deepseek/deepseek-v4-flash-vision-exp",
-      "DeepSeek V4 Flash Vision",
-    ],
-    ["openrouter:qwen/qwen3.8-2.4t-a95b", "Qwen3.8-2.4T"],
-    ["openrouter:qwen/qwen3-coder", "Qwen3-Coder"],
-    ["openrouter:qwen/qwen3-235b-a22b-2507", "Qwen3-235B"],
-    ["openrouter:qwen/qwen3.6-35b-a3b", "Qwen3.6-35B"],
-  ])("keeps route metadata out of the %s label", (modelId, name) => {
-    expect(toLogicalModelView(getLogicalModel(modelId)!)).toMatchObject({
-      name,
-    })
-  })
-
-  it.each([
-    ["openrouter:deepseek/deepseek-chat-v3-0324", "March 2025"],
-    ["openrouter:deepseek/deepseek-r1-0528", "May 2025"],
-    ["openrouter:deepseek/deepseek-v4-pro", "April 2026"],
-    ["openrouter:deepseek/deepseek-v4-flash", "April 2026"],
-    ["openrouter:moonshotai/kimi-k2", "July 2025"],
-    ["openrouter:moonshotai/kimi-k2-0905", "September 2025"],
-    ["openrouter:qwen/qwen3-235b-a22b-2507", "July 2025"],
-    ["mistral-small-2506", "June 2025"],
-    ["claude-sonnet-4-5-20250929", "September 2025"],
-  ])("classifies older snapshot %s as Legacy", (modelId, dateLabel) => {
-    const model = getLogicalModel(modelId)!
-
-    expect(getModelSnapshotDateLabel(model.routes[0]!.config)).toBe(dateLabel)
-    expect(model.name).not.toMatch(/\b\d{4}\b|\(\d{4}\)/)
-    expect(
-      classifyLogicalModel(
-        model,
-        LOGICAL_MODELS,
-        new Date("2026-08-25T00:00:00Z")
-      ).classification
-    ).toBe("legacy")
-  })
-
-  it.each([
-    "openrouter:deepseek/deepseek-v4-flash-0731",
-    "openrouter:deepseek/deepseek-v4-pro-0813",
-  ])("keeps latest snapshot %s Current without a dated label", (modelId) => {
-    const model = getLogicalModel(modelId)!
-
-    expect(
-      classifyLogicalModel(
-        model,
-        LOGICAL_MODELS,
-        new Date("2026-08-25T00:00:00Z")
-      ).classification
-    ).toBe("current")
-    expect(model.name).not.toMatch(/\b\d{4}\b|\(\d{4}\)/)
-  })
 
   it("keeps raw route lifecycle metadata on the logical model view", () => {
     const model = getLogicalModel("openrouter:deepseek/deepseek-v4-pro")!

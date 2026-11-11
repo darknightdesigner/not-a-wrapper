@@ -75,9 +75,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     const trigger = container.querySelector(
       '[aria-label="Add files and more"]'
     ) as HTMLButtonElement
-    expect(trigger.parentElement?.getAttribute("data-slot")).toBe(
-      "tooltip-trigger"
-    )
     const tooltipShortcut = document.querySelector(
       '[data-slot="tooltip-shortcut"]'
     )
@@ -217,45 +214,6 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     expect(row?.querySelector("[data-composer-action-check]")).not.toBeNull()
     act(() => row?.click())
     expect(onToggleSearch).not.toHaveBeenCalled()
-  })
-
-  it("anchors disabled-action tooltips to the primary text", () => {
-    act(() => {
-      root.render(
-        <FileUpload onFilesAdded={() => {}}>
-          <form data-type="unified-composer">
-            <div id="prompt-textarea" role="textbox" tabIndex={0} />
-            <ButtonPlusMenu
-              actionQuery={{
-                from: 1,
-                id: 1,
-                isSynthetic: true,
-                query: "web",
-                to: 1,
-                trigger: "@",
-              }}
-              connectors={[]}
-              enableSearch={false}
-              acceptsImages
-              searchMode="unsupported"
-              isUserAuthenticated
-              onToggleSearch={() => {}}
-            />
-            <div data-composer-overlay-host />
-          </form>
-        </FileUpload>
-      )
-    })
-
-    const row = container.querySelector<HTMLElement>(
-      '[data-slot="tooltip-trigger"][aria-disabled="true"]'
-    )
-    const anchor = row?.querySelector<HTMLElement>(
-      "[data-composer-action-tooltip-anchor]"
-    )
-
-    expect(row?.textContent).toContain("Find real-time news and info")
-    expect(anchor?.textContent).toBe("Web search")
   })
 
   it("renders connector rows with skeleton loading and slash scoping", () => {

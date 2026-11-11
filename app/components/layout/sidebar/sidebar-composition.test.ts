@@ -40,113 +40,46 @@ function project(
 }
 
 describe("sidebar grouping composition", () => {
-  const regular = chat("regular", {
-    updated_at: "2026-01-03T00:00:00.000Z",
-  })
-  const projectRecent = chat("project-recent", {
-    project_id: "alpha",
-    updated_at: "2026-01-04T00:00:00.000Z",
-  })
-  const projectOlder = chat("project-older", {
-    project_id: "alpha",
-    updated_at: "2026-01-02T00:00:00.000Z",
-  })
-  const pinnedChat = chat("pinned-chat", {
-    pinned: true,
-    project_id: "alpha",
-    pinned_at: "2026-01-05T00:00:00.000Z",
-    updated_at: "2026-01-01T00:00:00.000Z",
-  })
-  const projects = [
-    project("alpha", { created: 1 }),
-    project("pinned-project", { pinned: true, created: 2 }),
-  ]
-  it("keeps project recents on project home while retaining pinned project chats", () => {
+  it("puts pinned items first in their own list, newest pin first", () => {
     const result = deriveSidebarComposition({
-      chats: [regular, projectOlder, projectRecent, pinnedChat],
-      projects,
-      organization: "by-project",
+      chats: [
+        chat("recent", { updated_at: "2026-01-09T00:00:00.000Z" }),
+        chat("older", { updated_at: "2026-01-03T00:00:00.000Z" }),
+        chat("pinned-early", {
+          pinned: true,
+          pinned_at: "2026-01-05T00:00:00.000Z",
+          updated_at: "2026-01-08T00:00:00.000Z",
+        }),
+        chat("pinned-late", {
+          pinned: true,
+          pinned_at: "2026-01-06T00:00:00.000Z",
+          updated_at: "2026-01-01T00:00:00.000Z",
+        }),
+        // Project chats belong to their project page, pinned or not.
+        chat("in-project", {
+          project_id: "alpha",
+          pinned: true,
+          pinned_at: "2026-01-07T00:00:00.000Z",
+          updated_at: "2026-01-10T00:00:00.000Z",
+        }),
+      ],
+      projects: [
+        project("alpha", { created: 1 }),
+        project("pinned-project", { pinned: true, created: 2 }),
+        project("newest", { created: 3 }),
+      ],
     })
 
-    expect(result.historyChats.map(({ id }) => id)).toEqual(["regular"])
-    expect(result.pinnedChats.map(({ id }) => id)).toEqual(["pinned-chat"])
-    expect(result.sectionProjects.map(({ _id }) => _id)).toEqual(["alpha"])
-    expect(result.pinnedProjects.map(({ _id }) => _id)).toEqual([
+    expect(result.chats.map(({ id }) => id)).toEqual([
+      "pinned-late",
+      "pinned-early",
+      "recent",
+      "older",
+    ])
+    expect(result.projects.map(({ _id }) => _id)).toEqual([
       "pinned-project",
-    ])
-  })
-
-  it("interleaves project and regular chats in Recents in In one list", () => {
-    const result = deriveSidebarComposition({
-      chats: [regular, projectOlder, projectRecent, pinnedChat],
-      projects,
-      organization: "one-list",
-    })
-
-    expect(result.historyChats.map(({ id }) => id)).toEqual([
-      "project-recent",
-      "regular",
-      "project-older",
-    ])
-    expect(new Set(result.historyChats.map(({ id }) => id)).size).toBe(
-      result.historyChats.length
-    )
-    expect(result.projectNames.get("alpha")).toBe("alpha")
-    expect(result.pinnedChats.map(({ id }) => id)).toEqual(["pinned-chat"])
-  })
-
-  it("orders pinned chats by pinned time and projects newest-first", () => {
-    const firstPinnedChat = chat("first-pinned", {
-      pinned: true,
-      pinned_at: "2026-01-05T00:00:00.000Z",
-      updated_at: "2026-01-05T00:00:00.000Z",
-    })
-    const secondPinnedChat = chat("second-pinned", {
-      pinned: true,
-      pinned_at: "2026-01-06T00:00:00.000Z",
-      updated_at: "2026-01-06T00:00:00.000Z",
-    })
-    const secondProject = project("second", { created: 3 })
-    const result = deriveSidebarComposition({
-      chats: [firstPinnedChat, secondPinnedChat],
-      projects: [...projects, secondProject],
-      organization: "by-project",
-    })
-
-    expect(result.pinnedChats.map(({ id }) => id)).toEqual([
-      "second-pinned",
-      "first-pinned",
-    ])
-    expect(result.sectionProjects.map(({ _id }) => _id)).toEqual([
-      "second",
+      "newest",
       "alpha",
-    ])
-  })
-
-  it("keeps chats from a pinned project in their chat sections", () => {
-    const pinnedProjectChat = chat("pinned-project-chat", {
-      pinned: true,
-      project_id: "pinned-project",
-      pinned_at: "2026-01-07T00:00:00.000Z",
-      updated_at: "2026-01-07T00:00:00.000Z",
-    })
-    const pinnedProjectRecent = chat("pinned-project-recent", {
-      project_id: "pinned-project",
-      updated_at: "2026-01-08T00:00:00.000Z",
-    })
-    const result = deriveSidebarComposition({
-      chats: [regular, pinnedChat, pinnedProjectChat, pinnedProjectRecent],
-      projects,
-      organization: "one-list",
-    })
-
-    expect(result.pinnedChats.map(({ id }) => id)).toEqual([
-      "pinned-project-chat",
-      "pinned-chat",
-    ])
-    expect(result.historyChats.map(({ id }) => id)).toEqual([
-      "pinned-project-recent",
-      "regular",
     ])
   })
 })

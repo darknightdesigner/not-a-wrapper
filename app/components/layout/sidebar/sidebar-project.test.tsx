@@ -25,12 +25,6 @@ vi.mock("@/components/ui/collapsible-section", () => ({
     </section>
   ),
 }))
-vi.mock("@/components/ui/sidebar", () => ({
-  useSidebar: () => ({ setOpenMobile: vi.fn() }),
-}))
-vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
-}))
 vi.mock("./sidebar-list", () => ({
   SidebarChatGroupActions: () => null,
 }))
@@ -79,11 +73,9 @@ describe("SidebarProject empty state", () => {
       root?.render(
         <SidebarProject
           isAuthenticated
-          organization="by-project"
           projects={projects}
           isPinPending={() => false}
           onTogglePinned={vi.fn()}
-          onOrganizationChange={vi.fn()}
         />
       )
     )

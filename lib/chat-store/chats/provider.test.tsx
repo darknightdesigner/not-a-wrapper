@@ -186,7 +186,7 @@ describe("ChatsProvider guest local chats", () => {
     ;(
       globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true
-    // Map-backed storage, as in chat-organization.test.ts.
+    // Map-backed localStorage.
     const values = new Map<string, string>()
     Object.defineProperty(window, "localStorage", {
       configurable: true,

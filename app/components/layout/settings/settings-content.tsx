@@ -1,7 +1,13 @@
 "use client"
 
 import { useScrollAttributes } from "@/app/hooks/use-scroll-attributes"
+import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useBreakpoint } from "@/hooks/use-breakpoint"
 import { cn, isDev } from "@/lib/utils"
@@ -105,38 +111,36 @@ export function SettingsContent() {
             <form
               role="search"
               autoComplete="off"
-              className="relative"
               onSubmit={(event) => event.preventDefault()}
             >
-              <Icon
-                icon={RiSearchLine}
-                slotSize={16}
-                className="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
-              />
-              <input
-                ref={searchInputRef}
-                type="search"
-                name="settings-search"
-                autoComplete="off"
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search"
-                aria-label="Search settings"
-                className={cn(
-                  "border-input-border bg-popover placeholder:text-placeholder focus-visible:ring-focus-ring h-8 w-full rounded-md border py-1 pr-2.5 pl-8 text-sm outline-none focus-visible:ring-1",
-                  searchQuery && "pr-8"
-                )}
-              />
-              {searchQuery ? (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={clearSearch}
-                  className="text-muted-foreground hover:bg-interactive-hover focus-visible:bg-interactive-hover focus-visible:ring-focus-ring absolute end-0.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md outline-none focus-visible:ring-1"
-                >
-                  <Icon icon={RiCloseLine} slotSize={18} glyphInset={0} />
-                </button>
-              ) : null}
+              <InputGroup className="h-8">
+                <InputGroupAddon>
+                  <Icon icon={RiSearchLine} slotSize={16} />
+                </InputGroupAddon>
+                <InputGroupInput
+                  ref={searchInputRef}
+                  type="search"
+                  name="settings-search"
+                  autoComplete="off"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Search"
+                  aria-label="Search settings"
+                  className="h-full text-sm"
+                />
+                {searchQuery ? (
+                  <InputGroupAddon align="inline-end">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label="Clear search"
+                      onClick={clearSearch}
+                    >
+                      <Icon icon={RiCloseLine} slotSize={18} glyphInset={0} />
+                    </Button>
+                  </InputGroupAddon>
+                ) : null}
+              </InputGroup>
             </form>
           </div>
 

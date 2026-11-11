@@ -198,8 +198,11 @@ export async function getProjectChatDirectoryForProject(
 ) {
   const chats = await collectLinkedChats(ctx, project)
 
+  // Pinned chats lead (newest pin first), matching the sidebar's lists.
   const sortedChats = chats.sort(
     (a, b) =>
+      Number(b.pinned) - Number(a.pinned) ||
+      (b.pinnedAt ?? 0) - (a.pinnedAt ?? 0) ||
       (b.updatedAt ?? b._creationTime) - (a.updatedAt ?? a._creationTime)
   )
 

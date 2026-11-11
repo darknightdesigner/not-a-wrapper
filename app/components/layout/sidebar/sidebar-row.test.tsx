@@ -1,10 +1,9 @@
 /** @vitest-environment jsdom */
 
-import { RiFolderFill, RiFolderLine, RiSearchLine } from "@remixicon/react"
+import { RiFolderFill, RiFolderLine } from "@remixicon/react"
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { SidebarMenuItem } from "./sidebar-menu-item"
 import { SidebarRow } from "./sidebar-row"
 
 const mocks = vi.hoisted(() => ({
@@ -165,45 +164,5 @@ describe("SidebarRow navigation contract", () => {
     )
     expect(onWarm).toHaveBeenCalledTimes(2)
     vi.useRealTimers()
-  })
-
-  it("keeps resting and rename states on the shared leading-icon slot", () => {
-    const rerender = renderRow(vi.fn())
-    const restingSlot = container?.querySelector(
-      '[data-slot="sidebar-leading-icon"]'
-    )
-
-    expect(restingSlot).not.toBeNull()
-    expect(restingSlot?.getAttribute("data-label-spacing")).toBe("true")
-    expect(restingSlot?.closest("a")).not.toBeNull()
-    expect(restingSlot?.querySelector('[data-slot="icon"]')).not.toBeNull()
-
-    mocks.isEditing = true
-    rerender()
-
-    const editingSlot = container?.querySelector(
-      '[data-slot="sidebar-leading-icon"]'
-    )
-    const input = container?.querySelector('input[aria-label="Project title"]')
-
-    expect(editingSlot).not.toBeNull()
-    expect(editingSlot?.getAttribute("data-label-spacing")).toBe("true")
-    expect(editingSlot?.closest("a")).toBeNull()
-    expect(editingSlot?.nextElementSibling).toBe(input)
-  })
-
-  it("shares the same leading-icon slot with sidebar menu items", () => {
-    container = document.createElement("div")
-    document.body.appendChild(container)
-    root = createRoot(container)
-    act(() =>
-      root?.render(<SidebarMenuItem icon={RiSearchLine} label="Search" />)
-    )
-
-    const slot = container.querySelector('[data-slot="sidebar-leading-icon"]')
-
-    expect(slot).not.toBeNull()
-    expect(slot?.getAttribute("data-label-spacing")).toBe("true")
-    expect(slot?.querySelector('[data-slot="icon"]')).not.toBeNull()
   })
 })

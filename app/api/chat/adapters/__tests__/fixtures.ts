@@ -527,26 +527,6 @@ export const heavyToolUseConversation: UIMessage[] = [
   } as UIMessage,
 ]
 
-export const textOnlyConversation: UIMessage[] = [
-  userMessage("msg-user-11", "Hi"),
-  {
-    id: "msg-assistant-11",
-    role: "assistant",
-    parts: [{ type: "text", text: "Hello!" }],
-  } as UIMessage,
-  userMessage("msg-user-12", "Can you help me pick Batman comics?"),
-  {
-    id: "msg-assistant-12",
-    role: "assistant",
-    parts: [
-      {
-        type: "text",
-        text: "Absolutely, tell me your budget and format preference.",
-      },
-    ],
-  } as UIMessage,
-]
-
 export const abortedToolConversation: UIMessage[] = [
   userMessage("msg-user-13", "Find Batman masks"),
   {

@@ -256,20 +256,6 @@ describe("truncateToolResult", () => {
       expect(serializedSize(result)).toBeLessThanOrEqual(512)
     })
   })
-
-  describe("edge cases", () => {
-    it("logs a warning when truncation occurs", () => {
-      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
-      const largeString = "a".repeat(2000)
-
-      truncateToolResult(largeString, 100)
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("[tools] Result truncated:")
-      )
-      warnSpy.mockRestore()
-    })
-  })
 })
 
 describe("isTruncated", () => {

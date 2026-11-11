@@ -25,8 +25,11 @@ export function SidebarPaginationSkeleton({ seed }: { seed: number }) {
       data-sidebar-pagination-skeleton=""
     >
       {widths.map((width, index) => (
-        <li className="h-9 list-none" key={`${index}-${width}`}>
-          <div className="mx-1.5 flex h-9 items-center rounded-[10px] py-1.5 ps-2.5 pe-8">
+        <li
+          className="h-(--sidebar-row-height) list-none"
+          key={`${index}-${width}`}
+        >
+          <div className="mx-1.5 flex h-(--sidebar-row-height) items-center rounded-(--sidebar-row-radius) py-1.5 ps-2.5 pe-8">
             <div
               className="h-4 rounded-[4px] bg-size-[200%_100%] motion-safe:animate-[shimmer_3s_infinite_linear]"
               data-sidebar-pagination-skeleton-bar=""

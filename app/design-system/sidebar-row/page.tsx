@@ -14,8 +14,10 @@ const statesCode = `"use client"
 
 import { ChatActionsMenu } from "@/app/components/layout/chat-actions-menu"
 import { SidebarRow } from "@/app/components/layout/sidebar/sidebar-row"
-import { SidebarRowEndSlot } from "@/app/components/layout/sidebar/sidebar-row-actions"
-import { SidebarPinAction } from "@/app/components/layout/sidebar/trailing-icon-button"
+import {
+  SidebarPinnedIndicator,
+  SidebarRowEndSlot,
+} from "@/app/components/layout/sidebar/sidebar-row-actions"
 
 export function ChatRow({ chat }: { chat: Chat }) {
   return (
@@ -23,18 +25,15 @@ export function ChatRow({ chat }: { chat: Chat }) {
       interaction={{ kind: "link", href: \`/c/\${chat.id}\` }}
       isActive={chat.id === currentChatId}
       title={chat.title}
-      secondaryLabel={projectName}
       renameValue={chat.title}
       renameLabel="Chat title"
       onRename={(next) => updateTitle(chat.id, next)}
       trailing={({ startRename }) => (
-        <SidebarRowEndSlot>
-          <SidebarPinAction
-            pinned={pinned}
-            title={chat.title}
-            itemType="Chat"
-            onTogglePinned={togglePinned}
-          />
+        // Pin and unpin live in the actions menu; at rest a pinned row shows the
+        // pin mark, which hover swaps for the actions.
+        <SidebarRowEndSlot
+          status={chat.pinned ? <SidebarPinnedIndicator /> : undefined}
+        >
           <ChatActionsMenu chat={chat} onRename={startRename} />
         </SidebarRowEndSlot>
       )}
@@ -74,13 +73,6 @@ const apiRows = [
     type: "string",
     defaultValue: "—",
     description: "Truncating label; also the rename seed.",
-  },
-  {
-    prop: "secondaryLabel",
-    type: "string",
-    defaultValue: "—",
-    description:
-      "Optional inline provenance (e.g. project name) after the title.",
   },
   {
     prop: "renameValue / renameLabel",

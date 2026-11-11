@@ -470,18 +470,6 @@ describe("Composer primary action", () => {
     expect(mounted.querySelector('[data-testid="send-button"]')?.getAttribute("aria-label")).toBe("Stop")
   })
 
-  it("keeps search outside the editor document and preserves the surface placeholder", () => {
-    composerMocks.enableSearch = true
-    renderComposer({ placeholder: "Message this project" })
-
-    const promptInput = promptInputMockCalls.at(-1)
-    expect(promptInput?.entities).toBeUndefined()
-    expect(promptInput?.onEntitiesChange).toBeUndefined()
-    expect(container?.querySelector("textarea")?.placeholder).toBe(
-      "Message this project"
-    )
-  })
-
   it("consumes a typed Web Search query without inserting an entity", () => {
     renderComposer({})
 
@@ -583,14 +571,6 @@ describe("Composer primary action", () => {
     expect(onTurn).not.toHaveBeenCalled()
   })
 
-  it('labels an empty disabled Send action as "Message is empty"', () => {
-    composerMocks.draftValue = ""
-
-    renderComposer({ isSubmitting: false, status: "ready" })
-
-    expect(promptInputActionMockCalls.at(-1)?.tooltip).toBe("Message is empty")
-  })
-
   it("keeps the draft writable while Send waits for history, then sends the retained draft", async () => {
     const onTurn = vi.fn(async () => true)
     const mounted = renderComposer({ onTurn, isSendReady: false, status: "ready" })
@@ -623,33 +603,6 @@ describe("Composer primary action", () => {
       files: [],
       attachments: [],
     })
-  })
-
-  it("keeps the shared default placeholder and accepts narrow surface copy", () => {
-    const defaultComposer = renderComposer({ status: "ready" })
-    expect(promptInputMockCalls.at(-1)?.maxHeight).toBeUndefined()
-    expect(defaultComposer.querySelector("textarea")?.placeholder).toBe(
-      "Ask anything"
-    )
-    expect(defaultComposer.querySelector("textarea")?.ariaLabel).toBe(
-      "Ask anything"
-    )
-    act(() => {
-      root?.render(
-        composerElement({
-          status: "ready",
-          placeholder: "New chat in Investing",
-          ariaLabel: "New chat in Investing project",
-          bottomSpacing: "none",
-        })
-      )
-    })
-    expect(defaultComposer.querySelector("textarea")?.placeholder).toBe(
-      "New chat in Investing"
-    )
-    expect(defaultComposer.querySelector("textarea")?.ariaLabel).toBe(
-      "New chat in Investing project"
-    )
   })
 
   it("restores editor focus without moving the caret after model selection", () => {

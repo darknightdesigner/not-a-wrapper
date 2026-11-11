@@ -47,7 +47,7 @@ describe("project conversation previews", () => {
     expect(preview).toHaveLength(320)
   })
 
-  it("projects one bounded message tail per owner-checked project chat", async () => {
+  it("lists pinned chats first, then by activity, with one bounded message tail each", async () => {
     const user = createUser("owner")
     const project: Doc<"projects"> = {
       _id: asId<"projects">("project-1"),
@@ -61,12 +61,15 @@ describe("project conversation previews", () => {
       _id: asId<"chats">("older"),
       userId: user._id,
       projectId: project._id,
+      pinnedAt: 5,
       updatedAt: 10,
     })
     const newer = createChat({
       _id: asId<"chats">("newer"),
       userId: user._id,
       projectId: project._id,
+      pinned: false,
+      pinnedAt: undefined,
       updatedAt: 20,
     })
     const previewMessages = new Map<string, Array<Partial<Doc<"messages">>>>([
@@ -157,13 +160,14 @@ describe("project conversation previews", () => {
 
     const result = await getProjectChatDirectoryForProject(ctx, project)
 
+    // The pinned chat leads even though the other one is newer.
     expect(result.map(({ chat, preview }) => [chat._id, preview])).toEqual([
-      [newer._id, "newer preview"],
       [older._id, "older preview"],
+      [newer._id, "newer preview"],
     ])
     expect(messageReads).toEqual([
-      { chatId: newer._id, limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT },
       { chatId: older._id, limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT },
+      { chatId: newer._id, limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT },
     ])
   })
 

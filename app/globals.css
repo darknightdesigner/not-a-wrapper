@@ -519,7 +519,7 @@
   );
   --sidebar-section-stack-gap: var(--sidebar-section-margin-top);
   --sidebar-item-gap: 0.375rem;
-  --sidebar-row-height: 2.25rem;
+  --sidebar-row-height: 2.5rem;
   --sidebar-row-outer-inset: 0.375rem;
   --sidebar-row-content-block: 0.375rem;
   --sidebar-row-content-inline: 0.625rem;
@@ -537,7 +537,7 @@
   --sidebar-row-card-action-overlap: 0.625rem;
   --sidebar-row-card-action-rail-width: 3.625rem;
   --sidebar-row-separator-size: 1px;
-  --sidebar-row-radius: 0.625rem;
+  --sidebar-row-radius: 0.75rem;
   --sidebar-leading-slot-size: 1.25rem;
   --sidebar-collapsed-item-width: calc(
     var(--sidebar-leading-slot-size) + 2 * var(--sidebar-row-content-inline)

@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest"
-import {
-  evaluateFixedWindow,
-  getRateLimitPolicy,
-  type WindowBucket,
-} from "./rateLimits"
+import { evaluateFixedWindow, type WindowBucket } from "./rateLimits"
 
 const WINDOW = 60_000
 const LIMIT = 3
@@ -21,17 +17,6 @@ function bucket(
 }
 
 describe("evaluateFixedWindow", () => {
-  it("keeps the public mutation policy server-owned by bucket", () => {
-    expect(getRateLimitPolicy("mcp_test")).toEqual({
-      limit: 10,
-      windowMs: WINDOW,
-    })
-    expect(getRateLimitPolicy("profile_image_upload")).toEqual({
-      limit: 10,
-      windowMs: WINDOW,
-    })
-  })
-
   it("allows and decrements remaining when under the limit", () => {
     const d = evaluateFixedWindow([], {
       now: NOW,

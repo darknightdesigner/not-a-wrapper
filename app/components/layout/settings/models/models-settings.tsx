@@ -1,6 +1,8 @@
 "use client"
 
+import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { Input } from "@/components/ui/input"
 import { useModel } from "@/lib/model-store/provider"
 import type { LogicalModelView } from "@/lib/models/catalog"
 import { getModelDisplayName } from "@/lib/models/presentation"
@@ -132,14 +134,16 @@ export function ModelsSettings() {
                       )}
                     </div>
 
-                    <button
+                    <Button
+                      variant="outline"
+                      size="icon-xs"
                       onClick={() => removeFavorite(model.id)}
-                      type="button"
-                      className="text-muted-foreground focus-visible:ring-focus-ring rounded-md border p-1 opacity-0 transition-all group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2"
+                      className="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                      aria-label="Unpin model"
                       title="Unpin model"
                     >
                       <Icon icon={RiSubtractLine} slotSize={16} />
-                    </button>
+                    </Button>
                   </div>
                 </Reorder.Item>
               )
@@ -169,12 +173,11 @@ export function ModelsSettings() {
         </p>
 
         <div className="mb-4">
-          <input
+          <Input
             type="text"
             placeholder="Search models..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border-input-border bg-input-bg ring-offset-background placeholder:text-placeholder focus-visible:ring-focus-ring flex h-9 w-full rounded-md border px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:ring-1 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
         </div>
 
@@ -207,14 +210,16 @@ export function ModelsSettings() {
                           </span>
                         )}
                       </div>
-                      <button
+                      <Button
+                        variant="outline"
+                        size="icon-xs"
                         onClick={() => toggleFavorite(model.id)}
-                        type="button"
-                        className="text-muted-foreground hover:text-foreground border-border rounded-md border p-1 transition-colors"
+                        className="text-muted-foreground"
+                        aria-label="Pin model"
                         title="Pin model"
                       >
                         <Icon icon={RiAddLine} slotSize={16} />
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>

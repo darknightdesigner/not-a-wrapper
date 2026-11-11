@@ -280,7 +280,6 @@ describe("ProjectsView essential behavior", () => {
     const search = container.querySelector<HTMLInputElement>(
       "#projects-page-search"
     )!
-    expect(search.className).toContain("keyboard-focused:outline-[1.5px]")
     expect(search.hasAttribute("data-keyboard-focused")).toBe(false)
     await act(async () => setInputValue(search, "zzz"))
     expect(container.querySelector('[data-project-row="true"]')).toBeNull()
@@ -366,9 +365,6 @@ describe("ProjectsView essential behavior", () => {
     )!
 
     expect(createButton.disabled).toBe(true)
-    expect(createButton.className.split(" ")).toContain(
-      "disabled:bg-primary/50"
-    )
     await act(async () => setInputValue(nameInput, "P".repeat(51)))
     expect(nameInput.getAttribute("aria-invalid")).toBe("true")
     expect(

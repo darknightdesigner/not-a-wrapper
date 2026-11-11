@@ -43,12 +43,18 @@ const buttonVariants = cva(
         scale: "press-motion",
         none: "",
       },
+      /** `square` trades the pill for the 8px corner of toolbar icon buttons. */
+      shape: {
+        default: "",
+        square: "rounded-md",
+      },
     },
     defaultVariants: {
       variant: "default",
       disabledVariant: "default",
       size: "default",
       pressMotion: "scale",
+      shape: "default",
     },
   }
 )
@@ -70,6 +76,7 @@ function Button({
   disabledVariant = "default",
   size = "default",
   pressMotion = "scale",
+  shape = "default",
   loading = false,
   visuallyDisabled = false,
   disabled = false,
@@ -92,6 +99,7 @@ function Button({
           disabledVariant,
           size,
           pressMotion,
+          shape,
           className,
         })
       )}

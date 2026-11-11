@@ -80,7 +80,7 @@ when `onError` already presented, and add a test. (2) Inline edit Save or Cancel
 unmounts the editor and drops focus to `<body>` (`message-user.tsx`); return
 focus to the Edit button or the composer. (3) `localStorage` is unguarded in
 `app/hooks/use-chat-draft.ts`, `lib/user-preference-store/provider.tsx`,
-`lib/api.ts`, `collapsible-section.tsx`, and `sidebar/chat-organization.ts`;
+`lib/api.ts`, and `collapsible-section.tsx`;
 extract one safe-storage helper (the model-store provider already guards it).
 - **Model presentation: Improve how models display across the UI**
   - Make model logos appear during thinking states to make assistant output ownership clear

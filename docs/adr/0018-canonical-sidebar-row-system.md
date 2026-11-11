@@ -40,10 +40,14 @@ The app's CSS-contract row system is THE sidebar component system.
   variants are deleted. Do not reintroduce a parallel menu system there.
 - Sidebar rows are composed from `app/components/layout/sidebar/`
   (`SidebarMenuItem` for static nav rows — `icon` optional; `SidebarRow` +
-  adapters for editable list rows). Section headers ("Pinned", "Recents",
+  adapters for editable list rows). Section headers ("Projects", "Chats",
   "Components") are part of the same vocabulary and render through
   `CollapsibleSection variant="sidebar"` — never a hand-styled label. Mobile
   presentation is consumer-owned (the app's own Sheet drawer).
+- Pinning never creates a section (2026-11-11, after Grok). A pinned chat or
+  project leads its own list, newest pin first, with a resting pin mark in the
+  row's end slot that hover swaps for the actions. Pin/Unpin lives in the
+  row's actions menu; there is no separate pin button.
 - Widths are CSS-owned: `--sidebar-width` and
   `--sidebar-width-icon: var(--sidebar-rail-width)` live in `app/globals.css`
   `:root`; the collapsed frame equals the rail by construction, pinned in
