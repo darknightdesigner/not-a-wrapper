@@ -49,6 +49,8 @@ The app's CSS-contract row system is THE sidebar component system.
   time, so pinned projects keep newest-created order), with a resting pin mark in the
   row's end slot that hover swaps for the actions. Pin/Unpin lives in the
   row's actions menu; there is no separate pin button.
+- The `/projects` directory page stays, but the sidebar intentionally has no
+  link to it (2026-11-11). Do not add one back or delete the route.
 - Widths are CSS-owned: `--sidebar-width` and
   `--sidebar-width-icon: var(--sidebar-rail-width)` live in `app/globals.css`
   `:root`; the collapsed frame equals the rail by construction, pinned in
