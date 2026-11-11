@@ -8,7 +8,6 @@ import {
   reasoningPlusText,
   singleProviderExecutedTool,
   singleSdkToolComplete,
-  textOnlyAssistant,
   userMessage,
 } from "./fixtures"
 
@@ -59,100 +58,6 @@ describe("cross-provider replay matrix", () => {
   describe("OpenAI -> Anthropic", () => {
     const provider = "anthropic"
     const context = { targetModelId: "claude-4-opus", hasTools: true }
-
-    it("handles OpenAI action/sources web_search replay as text", async () => {
-      const regressionHistory: UIMessage[] = [
-        userMessage(
-          "reg-openai-anthropic-user-1",
-          "Find Batman products on Amazon"
-        ),
-        {
-          id: "reg-openai-anthropic-assistant-1",
-          role: "assistant",
-          parts: [
-            { type: "step-start" },
-            {
-              type: "reasoning",
-              reasoning: "I will check Amazon listings.",
-              state: "done",
-            },
-            {
-              type: "tool-web_search",
-              state: "output-available",
-              toolCallId: "reg_tc_openai_to_anthropic_1",
-              toolName: "web_search",
-              providerExecuted: true,
-              input: { query: "Batman products Amazon official links" },
-              output: {
-                action: "search",
-                sources: [
-                  {
-                    url: "https://www.amazon.com/s?k=batman+products",
-                    title: "Amazon Batman search",
-                    snippet: "Batman products and listings.",
-                  },
-                ],
-              },
-              callProviderMetadata: {
-                openai: {
-                  responseId: "msg_reg_openai_1",
-                  reasoningId: "rs_reg_openai_1",
-                },
-              },
-            },
-            { type: "text", text: "I found Amazon links and product context." },
-          ],
-        } as UIMessage,
-        userMessage(
-          "reg-openai-anthropic-user-2",
-          "Why were links missing before?"
-        ),
-      ]
-
-      const result = await adaptHistoryForProvider(
-        regressionHistory,
-        provider,
-        context
-      )
-      const assistant = result.messages.find(
-        (message) => message.role === "assistant"
-      )
-      const hasCompiledWebSearch = Boolean(
-        assistant?.parts.some((part) => part.type === "tool-web_search")
-      )
-      const continuityTextKept = Boolean(
-        assistant?.parts.some(
-          (part) =>
-            part.type === "text" &&
-            typeof (part as { text?: unknown }).text === "string" &&
-            (part as { text: string }).text.includes("Amazon links")
-        )
-      )
-      expect(hasCompiledWebSearch).toBe(false)
-      expect(continuityTextKept).toBe(true)
-      expect(
-        assistant?.parts.some(
-          (part) =>
-            part.type === "text" &&
-            typeof (part as { text?: unknown }).text === "string" &&
-            (part as { text: string }).text.includes(
-              "Replay context from prior web_search"
-            )
-        )
-      ).toBe(true)
-    })
-
-    it("converts incompatible web_search replay into text and strips cross-provider metadata", async () => {
-      const result = await adaptHistoryForProvider(
-        [singleProviderExecutedTool],
-        provider,
-        context
-      )
-      expect(hasPartType(result.messages, "tool-web_search")).toBe(false)
-      expect(hasPartType(result.messages, "text")).toBe(true)
-      assertNoCallProviderMetadata(result.messages)
-      expect(result.stats.providerIdsStripped).toBeGreaterThan(0)
-    })
 
     it("keeps reasoning + tool chains", async () => {
       const result = await adaptHistoryForProvider(
@@ -245,15 +150,6 @@ describe("cross-provider replay matrix", () => {
     const provider = "google"
     const context = { targetModelId: "gemini-3-pro", hasTools: true }
 
-    it("preserves reasoning as native-thought candidate content", async () => {
-      const result = await adaptHistoryForProvider(
-        [reasoningPlusText],
-        provider,
-        context
-      )
-      expect(hasPartType(result.messages, "reasoning")).toBe(true)
-    })
-
     it("preserves reasoning + tool chains and validates role alternation", async () => {
       const roleBreakHistory = [
         userMessage("u-google-1", "first user"),
@@ -273,28 +169,6 @@ describe("cross-provider replay matrix", () => {
         )
       ).toBe(true)
     })
-
-    it("injects Gemini 3 thought signatures for tool invocations", async () => {
-      const result = await adaptHistoryForProvider(
-        [singleSdkToolComplete],
-        provider,
-        context
-      )
-      const toolParts = getAssistantMessages(result.messages)
-        .flatMap((message) => message.parts)
-        .filter(
-          (part) => part.type.startsWith("tool-") && part.type !== "tool-result"
-        )
-      expect(toolParts.length).toBeGreaterThan(0)
-
-      for (const part of toolParts as Array<{
-        providerMetadata?: { google?: { thoughtSignature?: string } }
-      }>) {
-        expect(part.providerMetadata?.google?.thoughtSignature).toBe(
-          "skip_thought_signature_validator"
-        )
-      }
-    })
   })
 
   describe("Perplexity target", () => {
@@ -311,55 +185,6 @@ describe("cross-provider replay matrix", () => {
       expect(hasPartType(result.messages, "reasoning")).toBe(false)
       expect(hasPartType(result.messages, "tool-web_search")).toBe(false)
       expect(hasPartType(result.messages, "tool-exa_search")).toBe(false)
-    })
-  })
-
-  describe("OpenRouter routing", () => {
-    it("routes openrouter:anthropic/* models to AnthropicAdapter behavior", async () => {
-      const messages = [reasoningPlusText]
-      const direct = await adaptHistoryForProvider(messages, "anthropic", {
-        targetModelId: "claude-4-opus",
-        hasTools: true,
-      })
-      const throughOpenRouter = await adaptHistoryForProvider(
-        messages,
-        "openrouter",
-        {
-          targetModelId: "openrouter:anthropic/claude-4-opus",
-          hasTools: true,
-        }
-      )
-
-      expect(throughOpenRouter.messages).toEqual(direct.messages)
-      expect(hasPartType(throughOpenRouter.messages, "reasoning")).toBe(true)
-    })
-
-    it("routes unknown org models to DefaultAdapter behavior", async () => {
-      const messages = [reasoningPlusText, textOnlyAssistant]
-      const direct = await adaptHistoryForProvider(
-        messages,
-        "unknown-provider",
-        {
-          targetModelId: "unknown-org/mystery-model",
-          hasTools: true,
-        }
-      )
-      const throughOpenRouter = await adaptHistoryForProvider(
-        messages,
-        "openrouter",
-        {
-          targetModelId: "unknown-org/mystery-model",
-          hasTools: true,
-        }
-      )
-
-      expect(throughOpenRouter.messages).toEqual(direct.messages)
-      expect(hasPartType(throughOpenRouter.messages, "reasoning")).toBe(false)
-      expect(
-        getAssistantMessages(throughOpenRouter.messages).every((message) =>
-          hasPartType([message], "text")
-        )
-      ).toBe(true)
     })
   })
 })

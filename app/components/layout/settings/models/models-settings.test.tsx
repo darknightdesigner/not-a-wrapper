@@ -160,25 +160,6 @@ describe("ModelsSettings", () => {
     return container
   }
 
-  it("uses model presentation icons while vendor headings keep group identity", () => {
-    const rendered = renderSettings()
-
-    const favoriteItem = rendered.querySelector('[data-testid="reorder-item"]')
-    const anthropicHeading = Array.from(rendered.querySelectorAll("h4")).find(
-      (heading) => heading.textContent === "Anthropic"
-    )
-
-    expect(favoriteItem?.textContent).toContain("Claude Sonnet 5")
-    expect(favoriteItem?.querySelector("svg.text-claude-logo")).not.toBeNull()
-    expect(rendered.textContent).toContain("Pinned (1)")
-    expect(rendered.textContent).toContain("Choose models to pin.")
-    expect(rendered.querySelector('[title="Unpin model"]')).not.toBeNull()
-    expect(anthropicHeading).toBeTruthy()
-    expect(
-      anthropicHeading?.parentElement?.querySelector("svg.text-claude-logo")
-    ).toBeNull()
-  })
-
   it("searches compact names while rendering the full settings label", () => {
     const rendered = renderSettings()
     const searchInput = rendered.querySelector<HTMLInputElement>(

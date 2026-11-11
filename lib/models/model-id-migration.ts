@@ -180,21 +180,71 @@ const MODEL_ID_SUCCESSIONS = [
   },
   {
     // OpenRouter delisted the cloaked `stealth/ox-alpha` test model. Its
-    // reveal is unconfirmed; qwen3.8-max is the nearest live allowlisted
+    // reveal is unconfirmed; Qwen3.8 Max is the nearest live allowlisted
     // equivalent (closed, Medium/High, text+image+video, 131k max output,
     // ~1M context).
     sourceId: "openrouter:stealth/ox-alpha",
-    targetId: "openrouter:qwen/qwen3.8-max",
-    replacementModelId: "openrouter:qwen/qwen3.8-max",
-    verifiedAgainst: "qwen/qwen3.8-max",
-    lastVerifiedAt: "2026-08-27",
+    targetId: "openrouter:qwen/qwen3.8-max-0902",
+    replacementModelId: "openrouter:qwen/qwen3.8-max-0902",
+    verifiedAgainst: "qwen/qwen3.8-max-0902",
+    lastVerifiedAt: "2026-11-09",
+  },
+  {
+    // OpenRouter replaced the undated listing with this dated snapshot.
+    sourceId: "openrouter:qwen/qwen3.8-max",
+    targetId: "openrouter:qwen/qwen3.8-max-0902",
+    replacementModelId: "openrouter:qwen/qwen3.8-max-0902",
+    verifiedAgainst: "qwen/qwen3.8-max-0902",
+    lastVerifiedAt: "2026-11-09",
+  },
+  {
+    // OpenRouter delisted MiniMax M2 and M2.1; M2.5 is the nearest survivor.
+    sourceId: "openrouter:minimax/minimax-m2",
+    targetId: "openrouter:minimax/minimax-m2.5",
+    replacementModelId: "openrouter:minimax/minimax-m2.5",
+    verifiedAgainst: "minimax/minimax-m2.5",
+    lastVerifiedAt: "2026-11-09",
+  },
+  {
+    sourceId: "openrouter:minimax/minimax-m2.1",
+    targetId: "openrouter:minimax/minimax-m2.5",
+    replacementModelId: "openrouter:minimax/minimax-m2.5",
+    verifiedAgainst: "minimax/minimax-m2.5",
+    lastVerifiedAt: "2026-11-09",
+  },
+  {
+    // OpenAI shut down o3-mini and o4-mini on 2026-10-23. Its deprecations
+    // page names gpt-5.6-sol/terra, which are now Legacy and direct-only, so
+    // these move to the current tier's OpenRouter routes: the route id keeps
+    // the saved selection's OpenRouter hint (resolveModelSelection).
+    sourceId: "openrouter:openai/o3-mini",
+    targetId: "openrouter:openai/gpt-6.1-sol",
+    replacementModelId: "openrouter:openai/gpt-6.1-sol",
+    verifiedAgainst: "openai/gpt-6.1-sol",
+    lastVerifiedAt: "2026-11-11",
+  },
+  {
+    sourceId: "openrouter:openai/o4-mini",
+    targetId: "openrouter:openai/gpt-6.1-terra",
+    replacementModelId: "openrouter:openai/gpt-6.1-terra",
+    verifiedAgainst: "openai/gpt-6.1-terra",
+    lastVerifiedAt: "2026-11-11",
+  },
+  {
+    // Mistral retired mistral-small-2506 on 2026-07-31; its hidden route
+    // record stays for lifecycle metadata, but chats resolve past it.
+    sourceId: "mistral-small-2506",
+    targetId: "mistral-small-2603",
+    replacementModelId: "mistral-small-2603",
+    verifiedAgainst: "mistral-small-2603",
+    lastVerifiedAt: "2026-11-11",
   },
   {
     sourceId: "mistral-small-2503",
-    targetId: "mistral-small-2506",
-    replacementModelId: "mistral-small-2506",
-    verifiedAgainst: "mistral-small-2506",
-    lastVerifiedAt: "2026-03-08",
+    targetId: "mistral-small-2603",
+    replacementModelId: "mistral-small-2603",
+    verifiedAgainst: "mistral-small-2603",
+    lastVerifiedAt: "2026-11-09",
   },
   {
     sourceId: "sonar-reasoning",

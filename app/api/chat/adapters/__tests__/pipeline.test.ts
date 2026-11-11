@@ -162,30 +162,5 @@ for (const provider of providers) {
       assertToolCallsHaveResults(modelMessages)
       assertNoEmptyContentArrays(modelMessages)
     })
-
-    it("supports source-provider A -> target-provider B cross-provider adaptation", async () => {
-      for (const sourceProvider of providers) {
-        if (sourceProvider === provider) continue
-
-        const adapted = await adaptHistoryForProvider(
-          crossProviderConversation,
-          provider,
-          {
-            targetModelId: modelByProvider[provider],
-            hasTools: true,
-            sourceProviderHint: sourceProvider,
-          }
-        )
-
-        const modelMessages = await convertToModelMessages(adapted.messages, {
-          ignoreIncompleteToolCalls: true,
-        })
-
-        assertStructuralValidity(modelMessages)
-        assertNoProviderLinkedIds(modelMessages)
-        assertToolCallsHaveResults(modelMessages)
-        assertNoEmptyContentArrays(modelMessages)
-      }
-    })
   })
 }

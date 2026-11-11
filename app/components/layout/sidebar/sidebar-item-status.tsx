@@ -1,7 +1,10 @@
 import type { SidebarChatStatus } from "@/lib/chat-store/status/sidebar-chat-status"
 import { cn } from "@/lib/utils"
 
-const STATUS_LABEL: Record<Exclude<SidebarChatStatus, "idle">, string> = {
+export const SIDEBAR_CHAT_STATUS_LABEL: Record<
+  Exclude<SidebarChatStatus, "idle">,
+  string
+> = {
   streaming: "Generating response",
   awaiting: "Waiting for you",
   unread: "New activity",
@@ -51,7 +54,7 @@ export function SidebarChatStatusIndicator({
       ) : (
         <span className="bg-info size-2 rounded-full" aria-hidden />
       )}
-      <span className="sr-only">{STATUS_LABEL[status]}</span>
+      <span className="sr-only">{SIDEBAR_CHAT_STATUS_LABEL[status]}</span>
     </span>
   )
 }

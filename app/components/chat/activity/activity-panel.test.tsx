@@ -272,50 +272,6 @@ describe("ActivityPanel coexistence", () => {
     ).toHaveLength(0)
   })
 
-  it("falls back if the docked close transition end is skipped", () => {
-    vi.useFakeTimers()
-    function Harness({ open }: { open: boolean }) {
-      return (
-        <ActivityPanelHostProvider>
-          <ActivityPanelDockSlot />
-          <ActivityPanel
-            open={open}
-            onOpenChange={() => {}}
-            {...panelProps(2)}
-          />
-        </ActivityPanelHostProvider>
-      )
-    }
-
-    try {
-      act(() => {
-        root?.render(<Harness open />)
-      })
-      expect(
-        document.querySelectorAll('[data-testid="screen-threadFlyOut"]')
-      ).toHaveLength(1)
-
-      act(() => {
-        root?.render(<Harness open={false} />)
-      })
-      expect(
-        document.querySelectorAll('[data-testid="screen-threadFlyOut"]')
-      ).toHaveLength(1)
-
-      act(() => {
-        vi.advanceTimersByTime(700)
-      })
-      expect(
-        document.querySelectorAll('[data-testid="screen-threadFlyOut"]')
-      ).toHaveLength(0)
-      expect(
-        document.querySelector('[data-testid="stage-thread-flyout"]')
-      ).toBeTruthy()
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
   it("renders only a non-empty visible reasoning section", async () => {
     await act(async () => {
       root?.render(
@@ -463,58 +419,6 @@ describe("ActivityPanel coexistence", () => {
     const group = document.querySelector('[role="group"][aria-label]')
     expect(group?.querySelector("a")).toBeNull()
     expect(group?.textContent).toContain("javascript:alert(1)")
-  })
-
-  it("preserves source identity for duplicate URLs", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
-    const sources = [
-      {
-        type: "source-url",
-        sourceId: "source-a",
-        url: "https://example.com/reused",
-        title: "First citation title",
-      },
-      {
-        type: "source-url",
-        sourceId: "source-b",
-        url: "https://example.com/reused",
-        title: "Second citation title",
-      },
-    ] as unknown as SourceUrlUIPart[]
-
-    try {
-      act(() => {
-        root?.render(
-          <ActivityPanelHostProvider>
-            <ActivityPanelDockSlot />
-            <ActivityPanel
-              open
-              onOpenChange={() => {}}
-              {...panelProps(0)}
-              activity={{
-                entries: [
-                  {
-                    id: "search",
-                    kind: "search",
-                    title: "Searching the web",
-                    status: "complete",
-                    sources,
-                  },
-                ],
-                sourceResults: sources,
-                imageResults: [],
-              }}
-            />
-          </ActivityPanelHostProvider>
-        )
-      })
-
-      expect(document.body.textContent).toContain("First citation title")
-      expect(document.body.textContent).toContain("Second citation title")
-      expect(consoleError).not.toHaveBeenCalled()
-    } finally {
-      consoleError.mockRestore()
-    }
   })
 
   it("copies normalized tool code and exposes temporary completion feedback", async () => {

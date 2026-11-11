@@ -56,15 +56,4 @@ describe("resolveChatChrome", () => {
       })
     }
   })
-
-  it("a rejected first send rolls back to the owning onboarding surface", () => {
-    expect(
-      resolveChatChrome({ chatId: null, messageCount: 0, hasProject: true })
-        .surface
-    ).toBe("project-onboarding")
-    expect(
-      resolveChatChrome({ chatId: null, messageCount: 0, hasProject: false })
-        .surface
-    ).toBe("home-onboarding")
-  })
 })

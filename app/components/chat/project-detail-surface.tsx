@@ -4,6 +4,7 @@ import { HeaderSidebarTrigger } from "@/app/components/layout/header-sidebar-tri
 import { ProjectActionsMenu } from "@/app/components/projects/project-actions-menu"
 import { useProjectPinning } from "@/app/components/projects/use-project-pinning"
 import { useRenameProject } from "@/app/components/projects/use-rename-project"
+import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { InlineRenameInput } from "@/components/ui/inline-rename-input"
 import { api } from "@/convex/_generated/api"
@@ -22,9 +23,6 @@ type ProjectDetailSurfaceProps = {
   }
   onStartChat: () => void
 }
-
-const projectActionsTriggerClassName =
-  "text-[var(--text-primary)] hover:bg-interactive-hover focus-visible:ring-border-strong flex size-9 shrink-0 items-center justify-center rounded-full border border-border-strong bg-background text-sm/5 font-medium outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
 
 // The project-onboarding surface's HEADER region only: the mobile compact
 // header and the desktop title block. The composer chrome and the chat
@@ -82,23 +80,24 @@ export function ProjectDetailSurface({
   }
 
   const desktopActionsTrigger = (
-    <button
-      type="button"
-      className={projectActionsTriggerClassName}
+    <Button
+      variant="outline"
+      size="icon"
       aria-label={`Open project actions for ${projectName}`}
     >
       <Icon icon={RiMoreFill} slotSize={20} />
-    </button>
+    </Button>
   )
 
   const mobileActionsTrigger = (
-    <button
-      type="button"
-      className="hover:bg-interactive-hover focus-visible:ring-border-strong flex size-9 items-center justify-center rounded-lg text-[var(--text-primary)] outline-none focus-visible:ring-2"
+    <Button
+      variant="ghost"
+      size="icon"
+      shape="square"
       aria-label={`Show project details for ${projectName}`}
     >
       <Icon icon={RiMoreFill} slotSize={20} />
-    </button>
+    </Button>
   )
 
   return (

@@ -26,18 +26,18 @@ export const GUEST_TURN_LIMITS = {
   dailyTurnsAllGuests: 1_000,
 } as const
 
-export const NON_AUTH_ALLOWED_MODELS = ["gpt-5-mini"]
+export const NON_AUTH_ALLOWED_MODELS = ["gpt-6-luna"]
 
 export const FREE_MODELS_IDS = [
   "openrouter:google/gemma-4-26b-a4b-it:free",
   "openrouter:nvidia/nemotron-3-ultra-550b-a55b:free",
   "pixtral-large-2411",
   "mistral-large-2512",
-  "gpt-5-mini",
+  "gpt-6-luna",
 ]
 
-export const MODEL_DEFAULT_ANONYMOUS = "gpt-5-mini"
-export const MODEL_DEFAULT_AUTHENTICATED = "gpt-5-mini"
+export const MODEL_DEFAULT_ANONYMOUS = "gpt-6-luna"
+export const MODEL_DEFAULT_AUTHENTICATED = "gpt-6-luna"
 
 export function getDefaultModelForUser(isAuthenticated: boolean): string {
   return isAuthenticated ? MODEL_DEFAULT_AUTHENTICATED : MODEL_DEFAULT_ANONYMOUS

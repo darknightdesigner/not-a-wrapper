@@ -2,9 +2,11 @@
 
 import { SidebarChatStatusIndicator } from "@/app/components/layout/sidebar/sidebar-item-status"
 import { SidebarRow } from "@/app/components/layout/sidebar/sidebar-row"
-import { SidebarRowEndSlot } from "@/app/components/layout/sidebar/sidebar-row-actions"
 import {
-  SidebarPinAction,
+  SidebarPinnedIndicator,
+  SidebarRowEndSlot,
+} from "@/app/components/layout/sidebar/sidebar-row-actions"
+import {
   trailingIconButtonClassName,
   TrailingIconChip,
 } from "@/app/components/layout/sidebar/trailing-icon-button"
@@ -22,8 +24,8 @@ import { useState } from "react"
 /**
  * Client-side demos with a stub persistence adapter: rename commits to local
  * state instead of a chat-store mutation, everything else is the production
- * row. The trailing cluster uses the real SidebarPinAction plus a rename
- * button in the ChatActionsMenu position (the real menu needs the chat store).
+ * row. A rename button stands in for ChatActionsMenu (the real menu needs the
+ * chat store); pinned rows rest on the real pin mark.
  */
 
 function RenameAction({ onStartRename }: { onStartRename: () => void }) {
@@ -57,40 +59,34 @@ function RenameAction({ onStartRename }: { onStartRename: () => void }) {
 function DemoChatRow({
   initialTitle,
   isActive = false,
-  secondaryLabel,
+  pinned = false,
   status = "idle",
 }: {
   initialTitle: string
   isActive?: boolean
-  secondaryLabel?: string
+  pinned?: boolean
   status?: SidebarChatStatus
 }) {
   const [title, setTitle] = useState(initialTitle)
-  const [pinned, setPinned] = useState(false)
 
   return (
     <SidebarRow
       interaction={{ kind: "link", href: "#" }}
       isActive={isActive}
       title={title}
-      secondaryLabel={secondaryLabel}
       renameValue={title}
       renameLabel="Chat title"
       onRename={(next) => setTitle(next)}
       trailing={({ startRename }) => (
         <SidebarRowEndSlot
           status={
-            status === "idle" ? undefined : (
+            status !== "idle" ? (
               <SidebarChatStatusIndicator status={status} />
-            )
+            ) : pinned ? (
+              <SidebarPinnedIndicator />
+            ) : undefined
           }
         >
-          <SidebarPinAction
-            pinned={pinned}
-            title={title}
-            itemType="Chat"
-            onTogglePinned={() => setPinned((p) => !p)}
-          />
           <RenameAction onStartRename={startRename} />
         </SidebarRowEndSlot>
       )}
@@ -102,11 +98,11 @@ export function SidebarRowStates() {
   return (
     <SidebarDemoColumn>
       <DemoChatRow initialTitle="Active conversation" isActive />
-      <DemoChatRow initialTitle="Hover me: pin and rename reveal" />
       <DemoChatRow
-        initialTitle="Quarterly report draft"
-        secondaryLabel="Work notes"
+        initialTitle="Pinned: hover swaps the pin for actions"
+        pinned
       />
+      <DemoChatRow initialTitle="Hover me: rename reveals" />
       <DemoChatRow initialTitle="A very long title that truncates before the trailing lane" />
     </SidebarDemoColumn>
   )

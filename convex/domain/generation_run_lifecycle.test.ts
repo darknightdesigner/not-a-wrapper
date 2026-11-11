@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
   isIgnoredSignal,
-  isSupersedableGenerationRunStatus,
-  isSupersedableMessageStatus,
   resolveGenerationRunTransition,
   resolveTerminalAssistantMessageResolution,
   type AssistantMessageFacts,
@@ -535,26 +533,5 @@ describe("isIgnoredSignal", () => {
         )
       }
     }
-  })
-})
-
-describe("supersedable predicates", () => {
-  it("supersedable run statuses are the pre-terminal, pre-pause states", () => {
-    expect(isSupersedableGenerationRunStatus("queued")).toBe(true)
-    expect(isSupersedableGenerationRunStatus("running")).toBe(true)
-    expect(isSupersedableGenerationRunStatus("streaming")).toBe(true)
-    expect(isSupersedableGenerationRunStatus("awaiting_approval")).toBe(false)
-    expect(isSupersedableGenerationRunStatus("completed")).toBe(false)
-    expect(isSupersedableGenerationRunStatus("aborted")).toBe(false)
-    expect(isSupersedableGenerationRunStatus("failed")).toBe(false)
-  })
-
-  it("supersedable message statuses are the live-run states only", () => {
-    expect(isSupersedableMessageStatus("submitted")).toBe(true)
-    expect(isSupersedableMessageStatus("streaming")).toBe(true)
-    expect(isSupersedableMessageStatus("awaiting_approval")).toBe(false)
-    expect(isSupersedableMessageStatus("completed")).toBe(false)
-    expect(isSupersedableMessageStatus("aborted")).toBe(false)
-    expect(isSupersedableMessageStatus("failed")).toBe(false)
   })
 })

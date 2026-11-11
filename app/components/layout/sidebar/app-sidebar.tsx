@@ -29,6 +29,7 @@ import {
 import {
   Sidebar,
   SIDEBAR_CONTAINER_ID,
+  SidebarTrigger,
   useSidebar,
   useSidebarShortcutScope,
 } from "@/components/ui/sidebar"
@@ -42,18 +43,16 @@ import { api } from "@/convex/_generated/api"
 import { useChats } from "@/lib/chat-store/chats/provider"
 import { useChatSession } from "@/lib/chat-store/session/provider"
 import { usePerUserQuery } from "@/lib/convex/use-per-user-query"
+import { NewChatIcon } from "@/lib/icons"
 import { useUser } from "@/lib/user-store/provider"
 import { cn } from "@/lib/utils"
 import {
-  RiAddCircleFill,
-  RiAddCircleLine,
   RiArrowRightSLine,
   RiChat3Line,
   RiCloseLine,
   RiDownloadLine,
   RiFileTextLine,
   RiInformationLine,
-  RiPushpinLine,
   RiQuestionLine,
   RiQuillPenLine,
   RiSearchLine,
@@ -65,11 +64,9 @@ import {
 import Link from "next/link"
 import React, { useMemo, useRef } from "react"
 import { PopoverContentAuth } from "../../chat-input/popover-content-auth"
-import { useHistorySearch } from "../../history/history-search-provider"
 import { HistoryTrigger } from "../../history/history-trigger"
 import { useInfiniteScroll } from "../../history/use-history-view"
 import { UserMenu } from "../user-menu"
-import { useChatOrganization } from "./chat-organization"
 import {
   deriveSidebarComposition,
   deriveSidebarSelection,
@@ -80,7 +77,6 @@ import { SidebarList } from "./sidebar-list"
 import { SidebarMenuItem } from "./sidebar-menu-item"
 import { SidebarPaginationState } from "./sidebar-pagination-skeleton"
 import { SidebarProject } from "./sidebar-project"
-import { SidebarProjectItem } from "./sidebar-project-item"
 
 export function AppSidebar() {
   const { isMobile } = useSidebar()
@@ -94,11 +90,6 @@ export function AppSidebar() {
 
   return <DesktopAppSidebar />
 }
-
-const sidebarHeaderActionClassName =
-  "text-[var(--text-tertiary)] hover:bg-black/[0.07] active:bg-black/[0.07] dark:hover:bg-white/10 dark:active:bg-white/10 inline-flex size-9 shrink-0 items-center justify-center rounded-[8px] bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
-
-const sidebarHeaderActionOpenClassName = "bg-black/[0.07] dark:bg-white/10"
 
 function DesktopAppSidebar() {
   const { state, toggleSidebar } = useSidebar()
@@ -174,9 +165,8 @@ function DesktopAppSidebar() {
 
         <div className="mt-(--sidebar-section-first-margin-top) flex w-full flex-col items-start gap-0 px-(--sidebar-row-outer-inset)">
           <CollapsedMenuItem
-            icon={RiAddCircleLine}
-            activeIcon={RiAddCircleFill}
-            label="New chat"
+            icon={NewChatIcon}
+            label="New"
             href="/"
             compact
             shortcut={
@@ -201,7 +191,6 @@ function DesktopAppSidebar() {
                       <Kbd>K</Kbd>
                     </>
                   }
-                  isActive={sidebarData.isHistoryOpen}
                 />
               }
               hasPopover={false}
@@ -210,24 +199,10 @@ function DesktopAppSidebar() {
             <SignedOutCollapsedSearchPopover onOpenChange={setRailPopupOpen} />
           )}
           {sidebarData.isLoggedIn &&
-          (sidebarData.composition.pinnedChats.length > 0 ||
-            sidebarData.composition.pinnedProjects.length > 0) ? (
-            <CollapsedSectionMenu
+          sidebarData.composition.chats.length > 0 ? (
+            <CollapsedRecentsMenu
               data={sidebarData}
-              icon={RiPushpinLine}
-              label="Pinned"
               onOpenChange={setRailPopupOpen}
-              section="pinned"
-            />
-          ) : null}
-          {sidebarData.isLoggedIn &&
-          sidebarData.composition.historyChats.length > 0 ? (
-            <CollapsedSectionMenu
-              data={sidebarData}
-              icon={RiChat3Line}
-              label="Recents"
-              onOpenChange={setRailPopupOpen}
-              section="recents"
             />
           ) : null}
         </div>
@@ -306,7 +281,6 @@ function MobileAppSidebarDrawer() {
 }
 
 function useAppSidebarData() {
-  const { isHistoryOpen, openHistory } = useHistorySearch()
   const {
     chats,
     isLoading,
@@ -322,8 +296,6 @@ function useAppSidebarData() {
     isNewChatSurface,
     sessionChatId: chatId,
   })
-  const [chatOrganization, setChatOrganization, isOrganizationHydrated] =
-    useChatOrganization()
   const { data: liveProjectDocs } = usePerUserQuery(
     api.projects.getForCurrentUser
   )
@@ -344,26 +316,18 @@ function useAppSidebarData() {
       deriveSidebarComposition({
         chats,
         projects,
-        organization: chatOrganization,
       }),
-    [chatOrganization, chats, projects]
+    [chats, projects]
   )
 
   return {
-    chatOrganization,
     composition,
     currentChatId,
-    isHistoryOpen,
-    isLoading:
-      !isOrganizationHydrated ||
-      isLoading ||
-      (isLoggedIn && projectDocs === undefined),
+    isLoading: isLoading || (isLoggedIn && projectDocs === undefined),
     isLoadingMore,
     isLoggedIn,
     isNewChatActive,
     isProjectPinPending: isPinPending,
-    openHistory,
-    setChatOrganization,
     toggleProjectPinned: togglePinned,
     user,
     loadMore,
@@ -412,28 +376,20 @@ function SidebarExpandedNav({
                   Wrapper
                 </span>
               </Link>
-              <div className="flex items-center gap-0">
-                {data.isLoggedIn ? (
-                  <SidebarHeaderSearchAction
-                    isActive={data.isHistoryOpen}
-                    onClick={data.openHistory}
-                  />
-                ) : (
-                  <SignedOutSidebarHeaderSearchPopover />
-                )}
-                {onMobileClose ? (
-                  <button
-                    type="button"
-                    onClick={onMobileClose}
-                    className={sidebarHeaderActionClassName}
-                    aria-label="Close sidebar"
-                  >
-                    <Icon icon={RiCloseLine} slotSize={20} glyphInset={0} />
-                  </button>
-                ) : (
-                  <ExpandedSidebarToggle />
-                )}
-              </div>
+              {onMobileClose ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  shape="square"
+                  onClick={onMobileClose}
+                  className="text-[var(--text-tertiary)]"
+                  aria-label="Close sidebar"
+                >
+                  <Icon icon={RiCloseLine} slotSize={20} glyphInset={0} />
+                </Button>
+              ) : (
+                <ExpandedSidebarToggle />
+              )}
             </div>
           </div>
         </div>
@@ -448,9 +404,8 @@ function SidebarExpandedNav({
         >
           <div className="flex w-full flex-col items-start gap-0">
             <SidebarMenuItem
-              icon={RiAddCircleLine}
-              activeIcon={RiAddCircleFill}
-              label="New chat"
+              icon={NewChatIcon}
+              label="New"
               href="/"
               testId="new-chat-button"
               isActive={data.isNewChatActive}
@@ -463,6 +418,27 @@ function SidebarExpandedNav({
                 </KbdGroup>
               }
             />
+            {data.isLoggedIn ? (
+              <HistoryTrigger
+                hasSidebar={false}
+                trigger={
+                  <SidebarMenuItem
+                    icon={RiSearchLine}
+                    label="Search"
+                    tabIndex={0}
+                    trailing={
+                      <KbdGroup>
+                        <Kbd label="Command">⌘</Kbd>
+                        <Kbd>K</Kbd>
+                      </KbdGroup>
+                    }
+                  />
+                }
+                hasPopover={false}
+              />
+            ) : (
+              <SignedOutSidebarSearchPopover />
+            )}
           </div>
           {/* On tall viewports the mask gains a hairline after scrolling. */}
           <div
@@ -477,85 +453,29 @@ function SidebarExpandedNav({
         </aside>
 
         <div className="px-0">
-          {/* Project and chat lists. The one-list Projects nav row extends the
-              action cluster (flush, no margin); all section spacing below is
-              owned by the section-stack tokens on the shared stack container,
-              so both organizer modes share one rhythm. */}
-          {data.chatOrganization === "one-list" ? (
-            <SidebarProject
-              isAuthenticated={data.isLoggedIn}
-              organization={data.chatOrganization}
-              projects={[]}
-              isPinPending={data.isProjectPinPending}
-              onTogglePinned={data.toggleProjectPinned}
-              onOrganizationChange={data.setChatOrganization}
-            />
-          ) : null}
           {data.isLoading ? (
             <div className="h-full" />
           ) : data.isLoggedIn ? (
             <>
               <div className="sidebar-section-stack">
-                {(data.composition.pinnedChats.length > 0 ||
-                  data.composition.pinnedProjects.length > 0) && (
-                  <SidebarList
-                    key="pinned"
-                    title="Pinned"
-                    items={data.composition.pinnedChats}
-                    presentation={{
-                      kind: "pinned",
-                      projectNames: data.composition.projectNames,
-                    }}
-                    beforeItems={data.composition.pinnedProjects.map(
-                      (project) => (
-                        <SidebarProjectItem
-                          key={project._id}
-                          project={project}
-                          isPinPending={data.isProjectPinPending(project._id)}
-                          onTogglePinned={() =>
-                            data.toggleProjectPinned(project)
-                          }
-                        />
-                      )
-                    )}
-                    currentChatId={data.currentChatId}
-                    storageKey="sidebar-section-pinned"
-                  />
-                )}
-                {data.chatOrganization === "by-project" ? (
-                  <SidebarProject
-                    isAuthenticated={data.isLoggedIn}
-                    organization={data.chatOrganization}
-                    projects={data.composition.sectionProjects}
-                    isPinPending={data.isProjectPinPending}
-                    onTogglePinned={data.toggleProjectPinned}
-                    onOrganizationChange={data.setChatOrganization}
-                  />
-                ) : null}
+                <SidebarProject
+                  isAuthenticated={data.isLoggedIn}
+                  projects={data.composition.projects}
+                  isPinPending={data.isProjectPinPending}
+                  onTogglePinned={data.toggleProjectPinned}
+                />
                 <SidebarList
-                  title={
-                    data.chatOrganization === "one-list" ? "Recents" : "Chats"
-                  }
-                  items={data.composition.historyChats}
-                  presentation={
-                    data.chatOrganization === "one-list"
-                      ? {
-                          kind: "history",
-                          projectNames: data.composition.projectNames,
-                        }
-                      : undefined
-                  }
+                  title="Chats"
+                  items={data.composition.chats}
                   currentChatId={data.currentChatId}
                   storageKey="sidebar-section-your-chats"
                   showHeaderActions
-                  organization={data.chatOrganization}
-                  onOrganizationChange={data.setChatOrganization}
                   onNewChat={onMobileClose}
                 />
               </div>
               <SidebarPaginationState
                 isLoadingMore={data.isLoadingMore}
-                seed={data.composition.historyChats.length}
+                seed={data.composition.chats.length}
               />
             </>
           ) : null}
@@ -622,62 +542,10 @@ function SidebarExpandedNav({
   )
 }
 
-function SidebarHeaderSearchAction({
-  isActive,
-  onClick,
-}: {
-  isActive: boolean
-  onClick: () => void
-}) {
-  return (
-    <Tooltip disableHoverablePopup>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            onClick={onClick}
-            className={cn(
-              sidebarHeaderActionClassName,
-              isActive && sidebarHeaderActionOpenClassName
-            )}
-            aria-label="Search"
-          />
-        }
-      >
-        <Icon icon={RiSearchLine} slotSize={20} glyphInset={0} />
-      </TooltipTrigger>
-      <TooltipContent side="bottom" align="center">
-        <TooltipShortcut label="Search">
-          <Kbd label="Command">⌘</Kbd>
-          <Kbd>K</Kbd>
-        </TooltipShortcut>
-      </TooltipContent>
-    </Tooltip>
-  )
-}
-
 function ExpandedSidebarToggle() {
-  const { toggleSidebar } = useSidebar()
-
   return (
     <Tooltip disableHoverablePopup>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            className={cn(
-              sidebarHeaderActionClassName,
-              "cursor-w-resize rtl:cursor-e-resize"
-            )}
-            aria-label="Close sidebar"
-            aria-expanded={true}
-            aria-controls={SIDEBAR_CONTAINER_ID}
-          />
-        }
-      >
-        <Icon icon={RiSideBarLine} slotSize={20} glyphInset={0} />
-      </TooltipTrigger>
+      <TooltipTrigger render={<SidebarTrigger />} />
       <TooltipContent side="bottom" align="center">
         <TooltipShortcut label="Close sidebar">
           <Kbd label="Shift">⇧</Kbd>
@@ -689,37 +557,26 @@ function ExpandedSidebarToggle() {
   )
 }
 
-function SignedOutSidebarHeaderSearchPopover() {
+function SignedOutSidebarSearchPopover() {
   const [open, setOpen] = React.useState(false)
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip disableHoverablePopup>
-        <TooltipTrigger
-          render={
-            <PopoverTrigger
-              render={
-                <button
-                  type="button"
-                  className={cn(
-                    sidebarHeaderActionClassName,
-                    open && sidebarHeaderActionOpenClassName
-                  )}
-                  aria-label="Search"
-                />
-              }
-            />
-          }
-        >
-          <Icon icon={RiSearchLine} slotSize={20} glyphInset={0} />
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="center">
-          <TooltipShortcut label="Search">
-            <Kbd label="Command">⌘</Kbd>
-            <Kbd>K</Kbd>
-          </TooltipShortcut>
-        </TooltipContent>
-      </Tooltip>
+      <PopoverTrigger
+        render={
+          <SidebarMenuItem
+            icon={RiSearchLine}
+            label="Search"
+            isActive={open}
+            trailing={
+              <KbdGroup>
+                <Kbd label="Command">⌘</Kbd>
+                <Kbd>K</Kbd>
+              </KbdGroup>
+            }
+          />
+        }
+      />
       <PopoverContentAuth side="right" align="start" sideOffset={8} />
     </Popover>
   )
@@ -732,10 +589,12 @@ function CollapsedHeaderToggle() {
     <Tooltip disableHoverablePopup>
       <TooltipTrigger
         render={
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
+            shape="square"
             onClick={toggleSidebar}
-            className="group/open-sidebar text-foreground focus-visible:ring-focus-ring relative flex h-9 w-9 cursor-e-resize items-center justify-center rounded-[8px] hover:bg-black/[0.07] focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none active:bg-black/[0.07] rtl:cursor-w-resize dark:hover:bg-white/10 dark:active:bg-white/10"
+            className="group/open-sidebar text-foreground relative cursor-e-resize rtl:cursor-w-resize"
             aria-label="Open sidebar"
             aria-expanded={false}
             aria-controls={SIDEBAR_CONTAINER_ID}
@@ -788,8 +647,10 @@ function CollapsedMenuItem({
   )
 
   const className = cn(
-    "menu-item-hoverable flex h-9 items-center justify-center rounded-[10px]",
-    compact ? "mx-auto w-9" : "w-(--sidebar-collapsed-item-width)",
+    "menu-item-hoverable flex h-(--sidebar-row-height) items-center justify-center rounded-(--sidebar-row-radius)",
+    compact
+      ? "mx-auto w-(--sidebar-row-height)"
+      : "w-(--sidebar-collapsed-item-width)",
     "cursor-pointer",
     "hover:bg-sidebar-row active:bg-sidebar-row",
     isActive && "text-foreground",
@@ -834,21 +695,21 @@ function CollapsedMenuItem({
   )
 }
 
-function CollapsedSectionMenu({
+function CollapsedRecentsMenu({
   data,
-  icon,
-  label,
   onOpenChange,
-  section,
 }: {
   data: AppSidebarData
-  icon: IconProps["icon"]
-  label: "Pinned" | "Recents"
   onOpenChange?: (open: boolean) => void
-  section: "pinned" | "recents"
 }) {
+  const label = "Recents"
   const [open, setOpen] = React.useState(false)
-  const recentChats = data.composition.historyChats.slice(0, 10)
+  // Pins lead, but never crowd out the ten most recent unpinned chats.
+  const { chats } = data.composition
+  const recentChats = [
+    ...chats.filter((chat) => chat.pinned),
+    ...chats.filter((chat) => !chat.pinned).slice(0, 10),
+  ]
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen)
@@ -871,7 +732,7 @@ function CollapsedSectionMenu({
                 <button
                   type="button"
                   className={cn(
-                    "menu-item-hoverable text-foreground flex h-9 w-full items-center justify-center rounded-[10px]",
+                    "menu-item-hoverable text-foreground flex h-(--sidebar-row-height) w-full items-center justify-center rounded-(--sidebar-row-radius)",
                     "hover:bg-sidebar-row active:bg-sidebar-row focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                     open && "bg-sidebar-row"
                   )}
@@ -883,7 +744,7 @@ function CollapsedSectionMenu({
             />
           }
         >
-          <SidebarLeadingIcon icon={icon} labelSpacing={false} />
+          <SidebarLeadingIcon icon={RiChat3Line} labelSpacing={false} />
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
       </Tooltip>
@@ -904,53 +765,16 @@ function CollapsedSectionMenu({
           onClickCapture={handleContentClick}
         >
           <div className="w-(--sidebar-width)">
-            <div className="mx-1.5 h-9 px-2.5 py-2 text-sm leading-5 font-normal text-[var(--text-tertiary)]">
+            <div className="mx-1.5 flex h-(--sidebar-row-height) items-center px-2.5 text-sm leading-5 font-normal text-[var(--text-tertiary)]">
               {label}
             </div>
-            {section === "pinned" ? (
-              <>
-                {data.composition.pinnedProjects.map((project) => (
-                  <SidebarProjectItem
-                    key={project._id}
-                    project={project}
-                    isPinPending={data.isProjectPinPending(project._id)}
-                    onTogglePinned={() => data.toggleProjectPinned(project)}
-                  />
-                ))}
-                {data.composition.pinnedChats.map((chat) => (
-                  <SidebarItem
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={data.currentChatId}
-                    presentation={{
-                      kind: "pinned",
-                      projectName: chat.project_id
-                        ? data.composition.projectNames.get(chat.project_id)
-                        : undefined,
-                    }}
-                  />
-                ))}
-              </>
-            ) : (
-              recentChats.map((chat) => {
-                const projectName = chat.project_id
-                  ? data.composition.projectNames.get(chat.project_id)
-                  : undefined
-
-                return (
-                  <SidebarItem
-                    key={chat.id}
-                    chat={chat}
-                    currentChatId={data.currentChatId}
-                    presentation={
-                      projectName
-                        ? { kind: "recent-project", projectName }
-                        : { kind: "history" }
-                    }
-                  />
-                )
-              })
-            )}
+            {recentChats.map((chat) => (
+              <SidebarItem
+                key={chat.id}
+                chat={chat}
+                currentChatId={data.currentChatId}
+              />
+            ))}
           </div>
         </div>
       </PopoverContent>
@@ -966,7 +790,7 @@ function SignedOutCollapsedSearchPopover({
   const [open, setOpen] = React.useState(false)
 
   const className = cn(
-    "menu-item-hoverable flex h-9 w-(--sidebar-collapsed-item-width) items-center justify-center rounded-lg",
+    "menu-item-hoverable flex h-(--sidebar-row-height) w-(--sidebar-collapsed-item-width) items-center justify-center rounded-(--sidebar-row-radius)",
     "cursor-pointer",
     "hover:bg-sidebar-row active:bg-sidebar-row",
     open && "text-foreground",
@@ -1059,7 +883,7 @@ function SignedOutCollapsedAccountPopover({
             data-sidebar-item="true"
             data-testid="accounts-profile-button"
             className={cn(
-              "menu-item-hoverable text-foreground mx-auto flex h-10 w-10 items-center justify-center rounded-[10px]",
+              "menu-item-hoverable text-foreground mx-auto flex h-10 w-10 items-center justify-center rounded-(--sidebar-row-radius)",
               "hover:bg-sidebar-row active:bg-sidebar-row focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
               open && "bg-sidebar-row"
             )}
@@ -1169,7 +993,7 @@ function SignedOutHelpPopover() {
           <button
             type="button"
             className={cn(
-              "menu-item-hoverable group/help text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row focus-visible:ring-focus-ring relative mx-1.5 inline-flex h-9 w-[calc(100%-var(--spacing)*3)] cursor-pointer items-center rounded-lg bg-transparent px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+              "menu-item-hoverable group/help text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row focus-visible:ring-focus-ring relative mx-1.5 inline-flex h-(--sidebar-row-height) w-[calc(100%-var(--spacing)*3)] cursor-pointer items-center rounded-(--sidebar-row-radius) bg-transparent px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
               open && "bg-sidebar-row text-foreground"
             )}
             data-sidebar-item="true"
@@ -1247,7 +1071,7 @@ function SignedOutPopoverItem({
     <button
       type="button"
       onClick={onClick}
-      className="menu-item-hoverable group/help-popover-item text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row focus-visible:bg-sidebar-row focus-visible:text-foreground focus-visible:ring-focus-ring inline-flex h-9 w-full cursor-pointer items-center gap-(--sidebar-item-gap) rounded-lg bg-transparent px-2.5 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset"
+      className="menu-item-hoverable group/help-popover-item text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row focus-visible:bg-sidebar-row focus-visible:text-foreground focus-visible:ring-focus-ring inline-flex h-(--sidebar-row-height) w-full cursor-pointer items-center gap-(--sidebar-item-gap) rounded-lg bg-transparent px-2.5 py-1.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset"
     >
       <div className="flex shrink-0 items-center justify-center">{icon}</div>
       <div className="flex min-w-0 grow items-center gap-(--sidebar-item-gap)">

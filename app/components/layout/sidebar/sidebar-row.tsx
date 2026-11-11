@@ -21,8 +21,6 @@ type SidebarRowProps = {
   isActive: boolean
   /** Truncating label; also the rename seed. */
   title: string
-  /** Optional inline provenance shown after the primary title. */
-  secondaryLabel?: string
   /** Accessible name when visible provenance needs to be announced. */
   ariaLabel?: string
   /** Current persisted label the inline rename edits from. */
@@ -63,7 +61,6 @@ export function SidebarRow({
   interaction,
   isActive,
   title,
-  secondaryLabel,
   ariaLabel,
   renameValue,
   renameLabel,
@@ -158,27 +155,18 @@ export function SidebarRow({
   const rowContent = (
     <div className="flex min-w-0 grow items-center">
       {leading}
-      <div className="flex min-w-0 grow items-center gap-2">
-        <span className="min-w-0 truncate" dir="auto">
-          {title}
-        </span>
-        {secondaryLabel ? (
-          <span
-            className="min-w-0 shrink truncate text-[var(--text-tertiary)]"
-            dir="auto"
-          >
-            {secondaryLabel}
-          </span>
-        ) : null}
-      </div>
+      <span className="min-w-0 grow truncate" dir="auto">
+        {title}
+      </span>
     </div>
   )
 
   // The title lane and trailing controls share one full-row anchor. At rest
   // the trailing item is visually clipped and absolutely
   // positioned; on hover/focus/menu-open it returns to flex flow, contributing
-  // 44px plus the row's 8px gap. Short labels therefore remain unchanged while
-  // only labels wider than the remaining lane truncate earlier.
+  // its buttons' net width plus the row's 8px gap. Short labels therefore
+  // remain unchanged while only labels wider than the remaining lane truncate
+  // earlier.
   return (
     <Link
       href={interaction.href}

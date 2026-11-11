@@ -71,9 +71,9 @@ const modelSelectorMocks = {
       ],
     },
     {
-      id: "gpt-5-mini",
-      name: "GPT-5 Mini",
-      shortName: "5 Mini",
+      id: "gpt-6-luna",
+      name: "GPT-6 Luna",
+      shortName: "6 Luna",
       provider: "OpenAI",
       providerId: "openai",
       catalogStatus: "visible",
@@ -81,7 +81,7 @@ const modelSelectorMocks = {
       idKind: "stable",
       baseProviderId: "openai",
       accessible: true,
-      routes: [{ id: "gpt-5-mini", providerId: "openai" }],
+      routes: [{ id: "gpt-6-luna", providerId: "openai" }],
     },
     {
       id: "gpt-4.1",
@@ -445,7 +445,7 @@ describe("ModelSelector", () => {
     onOpenChange,
     onSelectionCommitted,
     disabled = false,
-    selectedModelId = "gpt-5-mini",
+    selectedModelId = "gpt-6-luna",
     variant = "default",
   }: {
     isUserAuthenticated: boolean
@@ -551,12 +551,6 @@ describe("ModelSelector", () => {
     ).map((name) => name.textContent?.trim())
   }
 
-  function getLegacyDisclosure(providerName: string) {
-    return document.body.querySelector(
-      `[aria-label="Show legacy models for ${providerName}"]`
-    )
-  }
-
   function searchModels(query: string) {
     const input = document.body.querySelector<HTMLInputElement>(
       'input[placeholder="Search models..."]'
@@ -582,7 +576,7 @@ describe("ModelSelector", () => {
     expect(getModelOptionNames()).toEqual([
       "GPT-5.4",
       "Claude Sonnet 5",
-      "GPT-5 Mini",
+      "GPT-6 Luna",
       "GLM-5.2",
       "Kimi K3",
     ])
@@ -601,191 +595,47 @@ describe("ModelSelector", () => {
       selectedOption.querySelector('[data-slot="selected-model-check"]')
     ).not.toBeNull()
     expect(document.body.textContent).not.toContain("GPT-4.1")
-    expect(
-      document.body.querySelector(
-        '[aria-label="Show legacy models for OpenAI"]'
-      )
-    ).not.toBeNull()
-  })
-
-  it("reveals legacy models for one provider", () => {
-    renderSelector({ isUserAuthenticated: true })
-
-    expect(document.body.textContent).not.toContain("GPT-4.1")
-    expect(document.body.textContent).not.toContain("Claude Sonnet 4.5")
-    expect(document.body.textContent).not.toContain("September 2025")
-
-    const revealOptions = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="show-legacy-models"]'
-      )
-    )
-    const anthropicOption = revealOptions.find(
-      (option) =>
-        option.getAttribute("aria-label") === "Show legacy models for Anthropic"
-    )
-
-    expect(revealOptions).toHaveLength(3)
-    expect(anthropicOption?.textContent?.trim()).toBe("Show legacy models...")
-    expect(anthropicOption?.getAttribute("aria-label")).toBe(
-      "Show legacy models for Anthropic"
-    )
-    expect(anthropicOption?.dataset.closeOnClick).toBe("false")
-    act(() => {
-      anthropicOption?.click()
-    })
-
-    expect(document.body.textContent).toContain("Claude Sonnet 4.5")
-    expect(
-      getModelOption("Claude Sonnet 4.5").querySelector(
-        '[data-slot="model-snapshot-date"]'
-      )?.textContent
-    ).toBe("September 2025")
-    expect(document.body.textContent).not.toContain("GPT-4.1")
-    expect(
-      document.body.querySelector(
-        '[aria-label="Show legacy models for Anthropic"]'
-      )
-    ).toBeNull()
-    expect(
-      document.body.querySelector(
-        '[aria-label="Show legacy models for OpenAI"]'
-      )
-    ).not.toBeNull()
-
-    act(() => {
-      changeDropdownOpen?.(false)
-    })
-
-    expect(document.body.textContent).not.toContain("Claude Sonnet 4.5")
-    expect(document.body.textContent).not.toContain("September 2025")
-    expect(
-      document.body.querySelector(
-        '[aria-label="Show legacy models for Anthropic"]'
-      )
-    ).not.toBeNull()
   })
 
   it.each([
     ["desktop", false],
     ["mobile", true],
   ] as const)(
-    "shows a matching legacy model directly during %s search",
+    "reaches legacy models only through %s search",
     (_surface, isMobile) => {
       breakpointMocks.isMobile = isMobile
       renderSelector({ isUserAuthenticated: true })
 
-      expect(document.body.textContent).not.toContain("GPT-4.1")
-      expect(getLegacyDisclosure("OpenAI")).not.toBeNull()
+      expect(document.body.textContent).not.toContain("Claude Sonnet 4.5")
+      expect(document.body.textContent).not.toContain("Show legacy")
 
-      searchModels("GPT-4.1")
+      searchModels("Sonnet 4.5")
 
-      expect(getModelOptionNames()).toEqual(["GPT-4.1"])
-      expect(getLegacyDisclosure("OpenAI")).toBeNull()
+      expect(getModelOptionNames()).toEqual(["Claude Sonnet 4.5"])
+      expect(
+        getModelOption("Claude Sonnet 4.5").querySelector(
+          '[data-slot="model-snapshot-date"]'
+        )?.textContent
+      ).toBe("September 2025")
+
+      // One search covers current and legacy models together.
+      searchModels("gpt")
+
+      expect(getModelOptionNames()).toEqual(
+        expect.arrayContaining(["GPT-6 Luna", "GPT-4.1", "GPT-5.5"])
+      )
 
       searchModels("")
 
+      expect(document.body.textContent).not.toContain("Claude Sonnet 4.5")
       expect(document.body.textContent).not.toContain("GPT-4.1")
-      expect(getLegacyDisclosure("OpenAI")).not.toBeNull()
     }
   )
-
-  it("replaces a provider disclosure in place without reordering current models", () => {
-    renderSelector({ isUserAuthenticated: true })
-
-    const currentNamesBefore = getModelOptionNames()
-    const rowsBefore = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="model-option"], [data-testid="show-legacy-models"]'
-      )
-    )
-    const moonshotOption = rowsBefore.find(
-      (row) =>
-        row.getAttribute("aria-label") === "Show legacy models for Moonshot AI"
-    )
-    const disclosureIndex = moonshotOption
-      ? rowsBefore.indexOf(moonshotOption)
-      : -1
-
-    expect(disclosureIndex).toBeGreaterThan(-1)
-
-    act(() => {
-      moonshotOption?.click()
-    })
-
-    const currentNamesAfter = getModelOptionNames().filter(
-      (name) => name !== "Kimi K2.6"
-    )
-    const rowsAfter = Array.from(
-      document.body.querySelectorAll<HTMLButtonElement>(
-        '[data-testid="model-option"], [data-testid="show-legacy-models"]'
-      )
-    )
-
-    expect(currentNamesAfter).toEqual(currentNamesBefore)
-    expect(rowsAfter[disclosureIndex]?.textContent).toContain("Kimi K2.6")
-  })
-
-  it("preserves scroll before legacy rows can paint", () => {
-    renderSelector({ isUserAuthenticated: true })
-    const scrollSurface = document.body.querySelector<HTMLElement>(
-      "[data-scrollable-surface]"
-    )
-    const legacyDisclosure = getLegacyDisclosure("Anthropic") as HTMLElement
-    const searchInput = document.body.querySelector<HTMLInputElement>(
-      'input[placeholder="Search models..."]'
-    )
-
-    expect(scrollSurface).not.toBeNull()
-    expect(legacyDisclosure).not.toBeNull()
-    expect(searchInput).not.toBeNull()
-
-    scrollSurface!.scrollTop = 137
-    searchInput!.focus()
-    const pointerDown = new MouseEvent("pointerdown", {
-      bubbles: true,
-      cancelable: true,
-    })
-
-    expect(legacyDisclosure.dispatchEvent(pointerDown)).toBe(false)
-    expect(document.activeElement).toBe(searchInput)
-
-    const frameCallbacks: FrameRequestCallback[] = []
-    const originalRequestAnimationFrame = window.requestAnimationFrame
-    window.requestAnimationFrame = vi.fn((callback) => {
-      frameCallbacks.push(callback)
-      return frameCallbacks.length
-    })
-    legacyDisclosure.focus()
-    const focusSearch = searchInput!.focus.bind(searchInput)
-    vi.spyOn(searchInput!, "focus").mockImplementation((options) => {
-      focusSearch(options)
-      scrollSurface!.scrollTop = 999
-    })
-
-    try {
-      act(() => {
-        legacyDisclosure.click()
-      })
-
-      expect(document.activeElement).toBe(searchInput)
-      expect(document.body.textContent).toContain("Claude Sonnet 4.5")
-      expect(frameCallbacks).toHaveLength(1)
-
-      act(() => {
-        frameCallbacks[0]?.(0)
-      })
-
-      expect(scrollSurface!.scrollTop).toBe(137)
-    } finally {
-      window.requestAnimationFrame = originalRequestAnimationFrame
-    }
-  })
 
   it("uses a lock icon instead of the locked badge for signed-out users", () => {
     renderSelector({ isUserAuthenticated: false })
 
-    expect(document.body.textContent).toContain("GPT-5 Mini")
+    expect(document.body.textContent).toContain("GPT-6 Luna")
     expect(document.body.textContent).toContain("GPT-5.4")
     expect(document.body.textContent).toContain("Claude Haiku 4.5")
     expect(document.body.textContent).not.toContain("October 2025")
@@ -800,9 +650,9 @@ describe("ModelSelector", () => {
 
   it("swaps resting check and lock states for pin actions without selecting", () => {
     const onSelect = renderSelector({ isUserAuthenticated: true })
-    const selectedOption = getModelOption("GPT-5 Mini")
+    const selectedOption = getModelOption("GPT-6 Luna")
     const pinAction = selectedOption.querySelector<HTMLButtonElement>(
-      '[aria-label="Pin GPT-5 Mini"]'
+      '[aria-label="Pin GPT-6 Luna"]'
     )
 
     expect(pinAction).not.toBeNull()
@@ -814,7 +664,7 @@ describe("ModelSelector", () => {
     expect(favoriteModelMocks.updateFavoriteModels).toHaveBeenCalledWith([
       "gpt-5.4",
       "openrouter:moonshotai/kimi-k2.6",
-      "gpt-5-mini",
+      "gpt-6-luna",
     ])
     expect(onSelect).not.toHaveBeenCalled()
 
@@ -833,8 +683,8 @@ describe("ModelSelector", () => {
       "[data-scrollable-surface]"
     )
     const pinAction = getModelOption(
-      "GPT-5 Mini"
-    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-5 Mini"]')
+      "GPT-6 Luna"
+    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-6 Luna"]')
 
     expect(scrollSurface).not.toBeNull()
     expect(pinAction).not.toBeNull()
@@ -872,8 +722,8 @@ describe("ModelSelector", () => {
     )
     const anchorRow = getModelOption("GPT-5.4")
     const pinAction = getModelOption(
-      "GPT-5 Mini"
-    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-5 Mini"]')
+      "GPT-6 Luna"
+    ).querySelector<HTMLButtonElement>('[aria-label="Pin GPT-6 Luna"]')
     let anchorTop = 48
 
     expect(scrollSurface).not.toBeNull()
@@ -914,10 +764,10 @@ describe("ModelSelector", () => {
     const onSelect = renderSelector({ isUserAuthenticated: false })
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
 
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
 
     act(() => {
       getModelOption("GPT-5.4").click()
@@ -943,9 +793,9 @@ describe("ModelSelector", () => {
     expect(onSelectionCommitted).not.toHaveBeenCalled()
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
     expect(onSelectionCommitted).not.toHaveBeenCalled()
 
     act(() => {
@@ -966,12 +816,12 @@ describe("ModelSelector", () => {
       variant: "composer",
     })
 
-    expect(document.body.textContent).toContain("GPT-5 Mini")
+    expect(document.body.textContent).toContain("GPT-6 Luna")
     expect(document.body.textContent).toContain("GLM-5.2")
     expect(
       document.body.querySelector('[data-testid="drawer-trigger"]')
     ).toBeTruthy()
-    const mobileOption = getModelOption("GPT-5 Mini")
+    const mobileOption = getModelOption("GPT-6 Luna")
     expect(
       mobileOption.querySelector('[data-slot="selected-model-check"]')
     ).not.toBeNull()
@@ -993,12 +843,12 @@ describe("ModelSelector", () => {
     const allModelsSection = sections.find(
       (section) => section.getAttribute("aria-label") === "All models"
     )
-    expect(allModelsSection?.textContent).toContain("GPT-5 Mini")
+    expect(allModelsSection?.textContent).toContain("GPT-6 Luna")
     act(() => {
       mobileOption.click()
     })
 
-    expect(onSelect).toHaveBeenCalledWith("gpt-5-mini")
+    expect(onSelect).toHaveBeenCalledWith("gpt-6-luna")
   })
 
   it("normalizes a legacy routed selection to one logical row with no route suffix", () => {
@@ -1051,20 +901,20 @@ describe("ModelSelector", () => {
   it("uses compact composer text while rows and accessibility stay full", () => {
     renderSelector({
       isUserAuthenticated: false,
-      selectedModelId: "gpt-5-mini",
+      selectedModelId: "gpt-6-luna",
       variant: "composer",
     })
 
     const trigger = document.body.querySelector<HTMLButtonElement>(
       '[data-testid="model-trigger"]'
     )
-    const option = getModelOption("GPT-5 Mini")
+    const option = getModelOption("GPT-6 Luna")
 
-    expect(trigger?.textContent).toBe("5 Mini")
+    expect(trigger?.textContent).toBe("6 Luna")
     expect(trigger?.getAttribute("aria-label")).toBe(
-      "Select model, current model GPT-5 Mini"
+      "Select model, current model GPT-6 Luna"
     )
-    expect(option.textContent).toBe("GPT-5 Mini")
+    expect(option.textContent).toBe("GPT-6 Luna")
   })
 
   it.each([
@@ -1172,7 +1022,7 @@ describe("ModelSelector", () => {
     const onOpenChange = vi.fn()
     renderSelector({
       isUserAuthenticated: false,
-      selectedModelId: "gpt-5-mini",
+      selectedModelId: "gpt-6-luna",
       variant: "composer",
       onOpenChange,
     })
@@ -1197,7 +1047,7 @@ describe("ModelSelector", () => {
     ).toBe(true)
 
     act(() => {
-      getModelOption("GPT-5 Mini").click()
+      getModelOption("GPT-6 Luna").click()
     })
 
     expect(onSelect).not.toHaveBeenCalled()

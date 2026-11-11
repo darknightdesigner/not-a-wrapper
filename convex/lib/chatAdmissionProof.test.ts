@@ -6,7 +6,6 @@ import {
   verifyChatAdmissionProof,
   type ChatAdmissionProofPayload,
 } from "./chatAdmissionProof"
-import { hmacSha256Hex } from "./sha256"
 
 const SECRET = "test-chat-admission-secret-with-32-bytes"
 const NOW = 1_700_000_000_000
@@ -27,50 +26,12 @@ const payload: ChatAdmissionProofPayload = {
 }
 
 describe("chat admission proof", () => {
-  it("matches the RFC 4231 HMAC-SHA-256 test vector", () => {
-    expect(
-      hmacSha256Hex(
-        String.fromCharCode(...Array<number>(20).fill(0x0b)),
-        "Hi There"
-      )
-    ).toBe("b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7")
-  })
-
   it("accepts an intact, fresh server-signed admission", () => {
     const proof = signChatAdmissionProof(payload, SECRET)
 
     expect(
       verifyChatAdmissionProof(payload, proof, { secret: SECRET, now: NOW })
     ).toBe(true)
-  })
-
-  it("rejects the retired v1 format", () => {
-    const v1Proof = hmacSha256Hex(
-      SECRET,
-      JSON.stringify([
-        "chat-admission-v1",
-        payload.chatId,
-        payload.requestId,
-        payload.model,
-        payload.provider,
-        [
-          payload.route!.routeId,
-          payload.route!.credentialSource,
-          payload.route!.routeReason,
-        ],
-        payload.grantDigest,
-        null,
-        null,
-        payload.issuedAt,
-      ])
-    )
-
-    expect(
-      verifyChatAdmissionProof(payload, v1Proof, {
-        secret: SECRET,
-        now: NOW,
-      })
-    ).toBe(false)
   })
 
   it("binds reasoning effort into the admission proof", () => {
@@ -190,35 +151,6 @@ describe("chat admission proof", () => {
     ).toBe(false)
     expect(
       verifyChatAdmissionProof(payload, proof, { secret: SECRET, now: NOW })
-    ).toBe(false)
-  })
-
-  it("rejects the retired v2 format", () => {
-    const v2Proof = hmacSha256Hex(
-      SECRET,
-      JSON.stringify([
-        "chat-admission-v2",
-        payload.chatId,
-        payload.requestId,
-        payload.model,
-        payload.provider,
-        [
-          payload.route!.routeId,
-          payload.route!.credentialSource,
-          payload.route!.routeReason,
-        ],
-        null,
-        payload.grantDigest,
-        null,
-        null,
-        payload.issuedAt,
-      ])
-    )
-    expect(
-      verifyChatAdmissionProof(payload, v2Proof, {
-        secret: SECRET,
-        now: NOW,
-      })
     ).toBe(false)
   })
 

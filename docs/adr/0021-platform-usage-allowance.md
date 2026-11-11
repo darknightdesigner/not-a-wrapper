@@ -50,9 +50,9 @@ single Convex mutations (transactional, OCC-serialized).
   missing rate or count falls back to the full input rate, and reservations
   stay at the full rate. Each step's cache-read count is stored with its
   usage on the run and mirrored onto the reservation, so failure, lease-expiry
-  and deadline settlements price it too. Only gpt-5-mini declares one today, on both of its
-  routes: the direct record states it, and the generated OpenRouter route
-  takes it from the snapshot's `pricing.input_cache_read` (ADR-0007), so the
+  and deadline settlements price it too. The free default (gpt-6-luna since
+  2026-11-09, gpt-5-mini before) declares one on both of its routes: the
+  direct record states it, and the generated OpenRouter route takes it from the snapshot's `pricing.input_cache_read` (ADR-0007), so the
   rate follows whichever route the platform tier picks. Cache writes are
   not priced separately because no metered route bills them yet; Claude
   requests turn prompt caching on, so a platform-funded Claude route must

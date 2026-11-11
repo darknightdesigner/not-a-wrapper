@@ -1,3 +1,4 @@
+import { PinFilled } from "@/lib/icons"
 import { Children, type ReactNode } from "react"
 
 type SidebarRowActionsProps = {
@@ -15,9 +16,8 @@ type SidebarRowEndSlotProps = {
  * The only placement primitive for sidebar row actions.
  *
  * Compact rows use one trailing flex item with a 4px inner gap and direct
- * 34×36 button children. The buttons' negative inline
- * margins make the revealed item contribute exactly 44px to row layout while
- * preserving the full hit targets.
+ * 34×36 button children. Each button's negative inline margins net it to 20px
+ * of row layout (the resting status slot matches), preserving full hit targets.
  */
 export function SidebarRowActions({
   layout = "compact",
@@ -72,4 +72,12 @@ export function SidebarRowEndSlot({
       {contents}
     </div>
   )
+}
+
+/**
+ * Resting pin mark for the end slot's `status`. Hover reveals the actions in
+ * its place; rows announce the pinned state in their own accessible name.
+ */
+export function SidebarPinnedIndicator() {
+  return <PinFilled slotSize={16} className="text-[var(--text-tertiary)]" />
 }

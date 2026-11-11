@@ -21,8 +21,8 @@ const MODELS: ModelConfig[] = [
     accessible: false,
   },
   {
-    id: "gpt-5-mini",
-    name: "GPT-5 Mini",
+    id: "gpt-6-luna",
+    name: "GPT-6 Luna",
     shortName: "Mini compact",
     provider: "OpenAI",
     providerId: "openai",
@@ -67,7 +67,7 @@ describe("resolvePreferredModelId", () => {
         models: VISIBLE_MODELS,
         isAuthenticated: true,
         currentModelId: "gpt-5.1",
-        preferredModelIds: ["gpt-5-mini"],
+        preferredModelIds: ["gpt-6-luna"],
       })
     ).toBe("gpt-5.1")
   })
@@ -111,9 +111,9 @@ describe("resolvePreferredModelId", () => {
         models: VISIBLE_MODELS,
         isAuthenticated: false,
         currentModelId: "gpt-5.4",
-        preferredModelIds: ["claude-haiku-4-5-20251001", "gpt-5-mini"],
+        preferredModelIds: ["claude-haiku-4-5-20251001", "gpt-6-luna"],
       })
-    ).toBe("gpt-5-mini")
+    ).toBe("gpt-6-luna")
   })
 })
 
@@ -123,8 +123,8 @@ describe("model access by auth state", () => {
       isModelSelectableForAuthState(model, false)
     ).map((model) => model.id)
 
-    expect(signedOutSelectable).toEqual(["gpt-5-mini"])
-    expect(isModelAllowedForAnonymous("gpt-5-mini")).toBe(true)
+    expect(signedOutSelectable).toEqual(["gpt-6-luna"])
+    expect(isModelAllowedForAnonymous("gpt-6-luna")).toBe(true)
     expect(isModelAllowedForAnonymous("mistral-large-2512")).toBe(false)
   })
 
@@ -151,13 +151,13 @@ describe("groupModelsForSelector", () => {
   it("ranks favorites without hiding the rest of the catalog", () => {
     const { favorites, others } = groupModelsForSelector(
       MODELS,
-      ["gpt-5-mini", "claude-haiku-4-5-20251001"],
+      ["gpt-6-luna", "claude-haiku-4-5-20251001"],
       "",
       isModelHidden
     )
 
     expect(favorites.map((model) => model.id)).toEqual([
-      "gpt-5-mini",
+      "gpt-6-luna",
       "claude-haiku-4-5-20251001",
     ])
     expect(others.map((model) => model.id)).toEqual(["gpt-5.4"])
@@ -166,7 +166,7 @@ describe("groupModelsForSelector", () => {
   it("searches the whole catalog, not just favorites", () => {
     const { favorites, others } = groupModelsForSelector(
       MODELS,
-      ["gpt-5-mini"],
+      ["gpt-6-luna"],
       "gpt-5.4",
       isModelHidden
     )
@@ -184,7 +184,7 @@ describe("groupModelsForSelector", () => {
     )
 
     expect(favorites).toEqual([])
-    expect(others.map((model) => model.id)).toEqual(["gpt-5-mini"])
+    expect(others.map((model) => model.id)).toEqual(["gpt-6-luna"])
   })
 
   it("keeps locked models visible", () => {
@@ -200,13 +200,13 @@ describe("groupModelsForSelector", () => {
   it("still honors explicit user-hidden models", () => {
     const { favorites, others } = groupModelsForSelector(
       MODELS,
-      ["gpt-5-mini"],
+      ["gpt-6-luna"],
       "",
-      (modelId) => modelId === "gpt-5-mini"
+      (modelId) => modelId === "gpt-6-luna"
     )
 
     expect(favorites).toEqual([])
-    expect(others.some((model) => model.id === "gpt-5-mini")).toBe(false)
+    expect(others.some((model) => model.id === "gpt-6-luna")).toBe(false)
   })
 
 })

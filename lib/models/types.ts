@@ -23,6 +23,8 @@ export const MODEL_RECOMMENDATION_LANE_IDS = [
   "deepseek:chat",
   "deepseek:fast",
   "deepseek:reasoning",
+  "inclusionai:ling-flash",
+  "minimax:m",
   "mistral:codestral",
   "mistral:large",
   "mistral:medium",
@@ -34,6 +36,7 @@ export const MODEL_RECOMMENDATION_LANE_IDS = [
   "mistral:small",
   "moonshot:kimi",
   "moonshot:kimi-code",
+  "openai:astra",
   "openai:balanced",
   "openai:fast",
   "openai:flagship",
@@ -42,8 +45,16 @@ export const MODEL_RECOMMENDATION_LANE_IDS = [
   "perplexity:sonar-deep-research",
   "perplexity:sonar-pro",
   "perplexity:sonar-reasoning",
+  "qwen:flash",
+  "qwen:max",
+  "qwen:open-27b",
   "qwen:open-flagship",
   "xai:grok",
+  "xiaomi:mimo",
+  "xiaomi:mimo-pro",
+  "zai:glm",
+  "zai:glm-fast",
+  "zai:glm-vision",
 ] as const
 
 export type ModelRecommendationLaneId =

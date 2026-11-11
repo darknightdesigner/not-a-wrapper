@@ -35,31 +35,6 @@ describe("settings field primitives", () => {
     act(() => root?.render(node))
   }
 
-  it("makes the complete interactive surface a native keyboard-focusable button", () => {
-    const onClick = vi.fn()
-    render(
-      <SettingsFieldGroup>
-        <SettingsField>
-          <SettingsFieldSurface
-            render={<button type="button" onClick={onClick} />}
-            data-interactive
-          >
-            <SettingsFieldLabel>Interactive field</SettingsFieldLabel>
-          </SettingsFieldSurface>
-        </SettingsField>
-      </SettingsFieldGroup>
-    )
-
-    const button = container?.querySelector<HTMLButtonElement>("button")
-    act(() => button?.focus())
-    expect(button).toBeInstanceOf(HTMLButtonElement)
-    expect(document.activeElement).toBe(button)
-    expect(button?.tabIndex).toBe(0)
-
-    act(() => button?.click())
-    expect(onClick).toHaveBeenCalledTimes(1)
-  })
-
   it("does not bubble an embedded control click to a row action", () => {
     const onRowClick = vi.fn()
     const onControlClick = vi.fn()

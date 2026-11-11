@@ -69,6 +69,13 @@ const apiRows = [
     description: "Size of the button.",
   },
   {
+    prop: "shape",
+    type: '"default" | "square"',
+    defaultValue: '"default"',
+    description:
+      "square swaps the pill for 8px corners, as on the sidebar toggles.",
+  },
+  {
     prop: "render",
     type: "ReactElement | render function",
     defaultValue: "—",

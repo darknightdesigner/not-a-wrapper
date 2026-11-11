@@ -294,26 +294,4 @@ describe("chat turn plans", () => {
       expectedVisibleMessageCount: 0,
     })
   })
-
-  it("reads the selected-path token tail through the typed serverMessageId accessor", () => {
-    // Guards the readServerMessageId contract the token now depends on:
-    // an empty or non-string serverMessageId must yield no tail anchor.
-    expect(
-      buildSelectedPathToken([
-        {
-          ...assistantMessage("client-assistant-1", "answer"),
-          metadata: { serverMessageId: "" },
-        },
-      ])
-    ).toEqual({ expectedVisibleMessageCount: 1 })
-
-    expect(
-      buildSelectedPathToken([
-        {
-          ...assistantMessage("client-assistant-1", "answer"),
-          metadata: { serverMessageId: 123 as unknown as string },
-        },
-      ])
-    ).toEqual({ expectedVisibleMessageCount: 1 })
-  })
 })

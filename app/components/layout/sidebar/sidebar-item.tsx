@@ -6,32 +6,28 @@ import { useWarmSelectedConversation } from "@/lib/chat-store/messages/warm"
 import { useSidebarChatStatus } from "@/lib/chat-store/status/sidebar-chat-status"
 import { Chat } from "@/lib/chat-store/types"
 import { markChatNavigationIntent } from "@/lib/observability/chat-performance-client"
-import { RiChat3Line, RiChatSmile2Fill } from "@remixicon/react"
 import { memo, useCallback } from "react"
 import { shallow } from "zustand/shallow"
-import { SidebarChatStatusIndicator } from "./sidebar-item-status"
+import {
+  SIDEBAR_CHAT_STATUS_LABEL,
+  SidebarChatStatusIndicator,
+} from "./sidebar-item-status"
 import { SidebarRow } from "./sidebar-row"
-import { SidebarRowEndSlot } from "./sidebar-row-actions"
-import { SidebarPinAction } from "./trailing-icon-button"
+import {
+  SidebarPinnedIndicator,
+  SidebarRowEndSlot,
+} from "./sidebar-row-actions"
 
 type SidebarItemProps = {
   chat: Chat
   currentChatId?: string
-  presentation?:
-    | { kind: "history" }
-    | { kind: "pinned"; projectName?: string }
-    | { kind: "recent-project"; projectName: string }
 }
 
 // Chat adapter over the Sidebar row module: supplies the chat href/active
-// predicate, the title-rename mutation, and the status + pin + actions trailing.
+// predicate, the title-rename mutation, and the status-or-pin + actions trailing.
 export const SidebarItem = memo(
-  function SidebarItem({
-    chat,
-    currentChatId,
-    presentation = { kind: "history" },
-  }: SidebarItemProps) {
-    const { togglePinned, updateTitle } = useChatActions()
+  function SidebarItem({ chat, currentChatId }: SidebarItemProps) {
+    const { updateTitle } = useChatActions()
     const warmSelectedConversation = useWarmSelectedConversation()
     const warmChat = useCallback(
       () => warmSelectedConversation(chat.id),
@@ -39,31 +35,23 @@ export const SidebarItem = memo(
     )
     const status = useSidebarChatStatus(chat)
     const displayTitle = chat.title || "Untitled Chat"
-    const isProjectPresentation =
-      presentation.kind === "recent-project" ||
-      (presentation.kind === "pinned" && presentation.projectName != null)
-    const projectName = isProjectPresentation
-      ? presentation.projectName
-      : undefined
-    const ariaLabel =
-      presentation.kind === "pinned"
-        ? `${displayTitle}, pinned conversation${projectName ? ` in project ${projectName}` : ""}`
-        : projectName
-          ? `${displayTitle}, chat in project ${projectName}`
-          : undefined
-
     return (
       <SidebarRow
         interaction={{ kind: "link", href: `/c/${chat.id}` }}
         isActive={chat.id === currentChatId}
         title={displayTitle}
-        secondaryLabel={
-          presentation.kind === "recent-project" ||
-          presentation.kind === "pinned"
-            ? projectName
+        // An aria-label replaces the link's text, so it restates live status.
+        ariaLabel={
+          chat.pinned
+            ? [
+                displayTitle,
+                "pinned",
+                status !== "idle" && SIDEBAR_CHAT_STATUS_LABEL[status],
+              ]
+                .filter(Boolean)
+                .join(", ")
             : undefined
         }
-        ariaLabel={ariaLabel}
         renameValue={chat.title || ""}
         renameLabel="Chat title"
         onRename={(next) => updateTitle(chat.id, next)}
@@ -73,25 +61,18 @@ export const SidebarItem = memo(
         // with no chat and must never arm the thread paint pair.
         onNavigate={markChatNavigationIntent}
         onWarm={warmChat}
-        leadingIcon={presentation.kind === "pinned" ? RiChat3Line : undefined}
-        activeLeadingIcon={
-          presentation.kind === "pinned" ? RiChatSmile2Fill : undefined
-        }
         trailing={({ startRename }) => (
           <SidebarRowEndSlot
             key={chat.id}
+            // Live status outranks the pin mark at rest.
             status={
-              status === "idle" ? undefined : (
+              status !== "idle" ? (
                 <SidebarChatStatusIndicator status={status} />
-              )
+              ) : chat.pinned ? (
+                <SidebarPinnedIndicator />
+              ) : undefined
             }
           >
-            <SidebarPinAction
-              pinned={chat.pinned}
-              title={displayTitle}
-              itemType="Chat"
-              onTogglePinned={() => togglePinned(chat.id, !chat.pinned)}
-            />
             <ChatActionsMenu
               chat={chat}
               onRename={startRename}
@@ -105,9 +86,5 @@ export const SidebarItem = memo(
   (previous, next) =>
     shallow(previous.chat, next.chat) &&
     (previous.chat.id === previous.currentChatId) ===
-      (next.chat.id === next.currentChatId) &&
-    shallow(
-      previous.presentation ?? { kind: "history" },
-      next.presentation ?? { kind: "history" }
-    )
+      (next.chat.id === next.currentChatId)
 )

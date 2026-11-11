@@ -207,45 +207,6 @@ describe("Conversation recovered turn contracts", () => {
     })
   }
 
-  it("reserves the fixed composer and keyboard below thread content", () => {
-    render()
-
-    expect(
-      container?.querySelector('[data-testid="thread-scroll-edge"]')
-        ?.parentElement?.className
-    ).toContain(
-      "keyboard-open:pb-[calc(var(--composer-height,100px)+var(--screen-keyboard-height,0))]"
-    )
-    expect(
-      container?.querySelector('[data-testid="thread-scroll-edge"]')
-        ?.parentElement?.className
-    ).toContain("grow")
-  })
-
-  it("puts the edit-only 40px separation on the user turn-message owner", () => {
-    render()
-
-    const userOwner = () =>
-      container?.querySelector<HTMLElement>(
-        '[data-turn="user"] [data-conversation-screenshot-content]'
-      )
-    const assistantOwner = container?.querySelector<HTMLElement>(
-      '[data-turn="assistant"] [data-conversation-screenshot-content]'
-    )
-
-    expect(userOwner()?.classList.contains("mb-10")).toBe(false)
-    expect(assistantOwner?.classList.contains("mb-10")).toBe(false)
-
-    act(() => {
-      container
-        ?.querySelector<HTMLButtonElement>('[data-testid="toggle-edit-user-1"]')
-        ?.click()
-    })
-
-    expect(userOwner()?.classList.contains("mb-10")).toBe(true)
-    expect(assistantOwner?.classList.contains("mb-10")).toBe(false)
-  })
-
   it("drops the open editor when the mounted Conversation changes chat", () => {
     render(undefined, "chat-a")
     const editing = () =>
@@ -510,37 +471,6 @@ describe("Conversation regeneration availability", () => {
     })
 
     expect(onReload).toHaveBeenCalledWith("assistant-1")
-  })
-
-  it("matches the reference turn sections and vertical rhythm", () => {
-    renderConversation()
-
-    const turns = Array.from(
-      container?.querySelectorAll<HTMLElement>(
-        '[data-testid^="conversation-turn-"]'
-      ) ?? []
-    )
-
-    expect(turns).toHaveLength(4)
-    expect(turns.every((turn) => turn.tagName === "SECTION")).toBe(true)
-    const padding = turns.map((turn) =>
-      turn.querySelector<HTMLElement>(":scope > div")
-    )
-    expect(turns[0]?.querySelector(":scope > h4")?.textContent).toBe(
-      "You said:"
-    )
-    expect(padding[0]?.classList.contains("pt-3")).toBe(true)
-    expect(padding[0]?.classList.contains("pt-12")).toBe(false)
-    expect(padding[2]?.classList.contains("pt-12")).toBe(true)
-    expect(padding[3]?.classList.contains("pb-8")).toBe(true)
-    expect(padding[3]?.classList.contains("pb-10")).toBe(false)
-    // Wrapper-free eager shape: the section IS the turn owner; no ancestor
-    // carries a duplicate turn id.
-    expect(
-      turns.every(
-        (turn) => turn.parentElement?.dataset.turnIdContainer === undefined
-      )
-    ).toBe(true)
   })
 
   it("hydrates finish reasons from durable metadata for historical and last rows", () => {

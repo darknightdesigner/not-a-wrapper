@@ -2,14 +2,60 @@ import { ModelConfig } from "../types"
 
 const mistralModels: ModelConfig[] = [
   {
+    id: "mistral-large-4-0",
+    name: "Mistral Large 4",
+    provider: "Mistral",
+    providerId: "mistral",
+    catalogStatus: "visible",
+    idKind: "stable",
+    // Id (alias of `mistral-large-4`), context, and capabilities confirmed
+    // against the Mistral models API 2026-11-09.
+    verifiedAgainst: "mistral-large-4-0",
+    lastVerifiedAt: "2026-11-09",
+    baseProviderId: "mistral",
+    modelFamily: "Mistral Large",
+    lineageId: "mistral:large",
+    description:
+      "Mistral's open-weight multimodal flagship with a 1M-token context.",
+    tags: ["reasoning", "flagship", "open-source"],
+    contextWindow: 1048576,
+    inputCost: 0.7,
+    outputCost: 2.1,
+    priceUnit: "per 1M tokens",
+    vision: true,
+    tools: true,
+    audio: false,
+    // The model reasons, but the installed @ai-sdk/mistral only forwards
+    // reasoning_effort for an id allowlist that excludes this one (see
+    // Mistral Medium 3.5 below).
+    reasoningText: false,
+    openSource: true,
+    speed: "Medium",
+    intelligence: "High",
+    website: "https://mistral.ai",
+    apiDocs: "https://docs.mistral.ai/models",
+    modelPage: "https://docs.mistral.ai/models/mistral-large-4-0",
+    releasedAt: "2026-10-06",
+    icon: "mistral",
+  },
+  {
     id: "mistral-medium-3-5",
     name: "Mistral Medium 3.5",
     provider: "Mistral",
     providerId: "mistral",
     catalogStatus: "visible",
+    lifecycle: {
+      status: "deprecated",
+      source: "provider",
+      verifiedAt: "2026-11-09",
+      sourceUrl:
+        "https://docs.mistral.ai/getting-started/models/models_overview/",
+      retiresAt: "2027-04-30",
+      replacementModelId: "mistral-large-4-0",
+    },
     idKind: "stable",
     verifiedAgainst: "mistral-medium-3-5",
-    lastVerifiedAt: "2026-08-20",
+    lastVerifiedAt: "2026-11-09",
     baseProviderId: "mistral",
     modelFamily: "Mistral Medium",
     lineageId: "mistral:medium",
@@ -206,13 +252,21 @@ const mistralModels: ModelConfig[] = [
   {
     id: "mistral-large-2512",
     name: "Mistral Large 3",
-    shortName: "Mistral Large",
     provider: "Mistral",
     providerId: "mistral",
     catalogStatus: "visible",
+    lifecycle: {
+      status: "deprecated",
+      source: "provider",
+      verifiedAt: "2026-11-09",
+      sourceUrl:
+        "https://docs.mistral.ai/getting-started/models/models_overview/",
+      retiresAt: "2027-04-30",
+      replacementModelId: "mistral-large-4-0",
+    },
     idKind: "snapshot",
     verifiedAgainst: "mistral-large-2512",
-    lastVerifiedAt: "2026-08-25",
+    lastVerifiedAt: "2026-11-09",
     baseProviderId: "mistral",
     modelFamily: "Mistral",
     lineageId: "mistral:large",
@@ -242,10 +296,21 @@ const mistralModels: ModelConfig[] = [
     shortName: "Mistral Small",
     provider: "Mistral",
     providerId: "mistral",
-    catalogStatus: "visible",
+    // Mistral retired this id on 2026-07-31. Kept as a route record for
+    // existing chats; no longer selectable.
+    catalogStatus: "hidden",
+    lifecycle: {
+      status: "retired",
+      source: "provider",
+      verifiedAt: "2026-11-09",
+      sourceUrl:
+        "https://docs.mistral.ai/getting-started/models/models_overview/",
+      retiresAt: "2026-07-31",
+      replacementModelId: "mistral-small-2603",
+    },
     idKind: "snapshot",
     verifiedAgainst: "mistral-small-2506",
-    lastVerifiedAt: "2026-08-25",
+    lastVerifiedAt: "2026-11-09",
     baseProviderId: "mistral",
     modelFamily: "Mistral",
     lineageId: "mistral:small",

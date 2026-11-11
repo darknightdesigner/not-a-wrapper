@@ -1,6 +1,7 @@
 "use client"
 
 import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogClose,
@@ -413,14 +414,7 @@ export function FilePreviewModal({
           <DialogTitle className="truncate text-base leading-6">
             {file.name}
           </DialogTitle>
-          <DialogClose
-            render={
-              <button
-                type="button"
-                className="focus-visible:ring-focus-ring shrink-0 rounded-md px-2 py-1 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
-              />
-            }
-          >
+          <DialogClose render={<Button variant="ghost" size="sm" />}>
             Close
           </DialogClose>
         </DialogHeader>

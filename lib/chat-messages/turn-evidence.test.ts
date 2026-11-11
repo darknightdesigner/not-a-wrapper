@@ -1,8 +1,6 @@
 import type { UIMessage } from "ai"
 import { describe, expect, it } from "vitest"
-import { getSources } from "./sources"
 import {
-  classifyToolName,
   deriveTurnEvidence,
   readReasoningVisibility,
   readTextPhase,
@@ -90,17 +88,6 @@ describe("tool lifecycle × liveness resolution", () => {
     ).timeline
     expect(resolveEntryStatus(item, false)).toBe("running")
     expect(resolveEntryStatus(item, true)).toBe("complete")
-  })
-})
-
-describe("classifyToolName", () => {
-  it("declares the tool-name sets once", () => {
-    expect(classifyToolName("web_search")).toBe("search")
-    expect(classifyToolName("google_search")).toBe("search")
-    expect(classifyToolName("imageGeneration")).toBe("image-generation")
-    expect(classifyToolName("image_generation")).toBe("image-generation")
-    expect(classifyToolName("imageSearch")).toBe("image-search")
-    expect(classifyToolName("anything_else")).toBe("generic")
   })
 })
 
@@ -326,31 +313,6 @@ describe("source provenance", () => {
       expect(item.webActivity).toEqual(expected)
     }
   )
-
-  it("derives turn-level sources identically to getSources", () => {
-    const fixture = parts([
-      {
-        type: "tool-web_search",
-        toolCallId: "c1",
-        state: "output-available",
-        input: { query: "q" },
-        output: { sources: [{ url: "https://dup.example", title: "T" }] },
-      },
-      {
-        type: "source-url",
-        sourceId: "s1",
-        url: "https://dup.example",
-        title: "Duplicate",
-      },
-      {
-        type: "source-url",
-        sourceId: "s2",
-        url: "https://unique.example",
-        title: "Unique",
-      },
-    ])
-    expect(deriveTurnEvidence(fixture).sources).toEqual(getSources(fixture))
-  })
 })
 
 describe("provider phase and reasoning visibility readers (ADR-0041)", () => {

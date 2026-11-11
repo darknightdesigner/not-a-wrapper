@@ -6,8 +6,10 @@ import type { Id } from "@/convex/_generated/dataModel"
 import { RiFolderLine, RiFolderOpenFill } from "@remixicon/react"
 import { usePathname } from "next/navigation"
 import { SidebarRow } from "./sidebar-row"
-import { SidebarRowActions } from "./sidebar-row-actions"
-import { SidebarPinAction } from "./trailing-icon-button"
+import {
+  SidebarPinnedIndicator,
+  SidebarRowEndSlot,
+} from "./sidebar-row-actions"
 
 type Project = {
   _id: Id<"projects">
@@ -38,7 +40,7 @@ export function SidebarProjectItem({
     <SidebarRow
       interaction={{ kind: "link", href: `/p/${project._id}` }}
       isActive={isActive}
-      ariaLabel={`${displayName}, project`}
+      ariaLabel={`${displayName}, ${project.pinned ? "pinned project" : "project"}`}
       title={displayName}
       renameValue={project.name || ""}
       renameLabel="Project title"
@@ -46,14 +48,10 @@ export function SidebarProjectItem({
       leadingIcon={RiFolderLine}
       activeLeadingIcon={RiFolderOpenFill}
       trailing={({ startRename }) => (
-        <SidebarRowActions key={project._id}>
-          <SidebarPinAction
-            pinned={project.pinned}
-            title={displayName}
-            itemType="Project"
-            onTogglePinned={onTogglePinned}
-            isPending={isPinPending}
-          />
+        <SidebarRowEndSlot
+          key={project._id}
+          status={project.pinned ? <SidebarPinnedIndicator /> : undefined}
+        >
           <ProjectActionsMenu
             project={project}
             onStartEditing={startRename}
@@ -62,7 +60,7 @@ export function SidebarProjectItem({
             isPinPending={isPinPending}
             triggerAriaLabel={`Open project options for ${displayName}`}
           />
-        </SidebarRowActions>
+        </SidebarRowEndSlot>
       )}
     />
   )

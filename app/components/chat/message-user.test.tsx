@@ -101,39 +101,6 @@ describe("MessageUser attachments", () => {
     )
   })
 
-  it("leaves the role heading to the owning turn section", () => {
-    renderMessage(undefined)
-
-    expect(container?.querySelector("h4")).toBeNull()
-  })
-
-  it("matches the source-backed sent-message ownership chain", () => {
-    renderMessage(undefined)
-
-    const message = container?.querySelector(
-      '[data-message-author-role="user"]'
-    )
-    const stack = message?.firstElementChild
-    const widthOwner = stack?.lastElementChild
-    const contentsWrapper = widthOwner?.firstElementChild
-    const bubble = contentsWrapper?.firstElementChild
-
-    expect(message?.className).toContain("outline-none")
-    expect(message?.className).toContain("font-native")
-    expect(message?.className).toContain("keyboard-focused:focus-ring")
-    expect(stack?.className).toContain("rtl:items-start")
-    expect(widthOwner?.className).toContain("w-fit")
-    expect(widthOwner?.className).toContain("max-w-(--user-chat-width,70%)")
-    expect(contentsWrapper?.className).toBe("contents w-full")
-    expect(bubble?.className).toContain("rounded-[22px]")
-    expect(bubble?.className).toContain("px-4 py-2.5 leading-6")
-    expect(bubble?.className).toContain("user-message-bubble-color")
-    expect(bubble?.className).toContain("corner-superellipse/0.98")
-    expect(
-      bubble?.querySelector('[data-testid="collapsible-user-message-root"]')
-    ).toBeTruthy()
-  })
-
   it("collapses overflowing messages to the captured 264px boundary", () => {
     vi.spyOn(HTMLElement.prototype, "scrollHeight", "get").mockReturnValue(528)
     renderMessage(undefined)

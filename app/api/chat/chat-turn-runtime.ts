@@ -949,7 +949,6 @@ export function createChatTurnRuntime(args: {
       targetRouteId: route.routeId,
       hasTools: hasAnyTools,
       vision: modelConfig.vision === true,
-      sourceProviderHint: resolvedProvider,
     }
 
     // A live approval response is the only tool activity exempt from history

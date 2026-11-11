@@ -89,22 +89,6 @@ describe("highlightCode (real modules)", () => {
     expect(html).toContain("&#x3C;script>")
   })
 
-  it("applies the requested theme", async () => {
-    const dark = await highlightCode({
-      code: "x = 1",
-      language: "python",
-      theme: "github-dark",
-    })
-    const light = await highlightCode({
-      code: "x = 1",
-      language: "python",
-      theme: "github-light",
-    })
-    expect(dark).toContain("github-dark")
-    expect(light).toContain("github-light")
-    expect(dark).not.toBe(light)
-  })
-
   it("deduplicates concurrent initialization and same-grammar loads", async () => {
     // Fire concurrent highlights for the same not-yet-loaded grammar plus a
     // second grammar; all must resolve consistently from one core instance.

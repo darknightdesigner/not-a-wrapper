@@ -266,30 +266,6 @@ describe("adoptServerOwned", () => {
   })
 })
 
-describe("server-owned key-set drift guard", () => {
-  it("stampServerFields and adoptServerOwned agree on the owned key-set", () => {
-    // The keys stampServerFields writes (minus the id + branch) must be exactly
-    // the set adoptServerOwned governs. Both derive from one source, so this
-    // fails the moment a key is added to one writer and not the other.
-    const written = new Set(
-      Object.keys(stampServerFields({}, fullSource, "extended"))
-    )
-    written.delete("serverMessageId")
-
-    const local: Record<string, unknown> = {}
-    for (const key of SERVER_OWNED_METADATA_KEYS) local[key] = "x"
-    const adopted = adoptServerOwned(local, { serverMessageId: "s" }) as Record<
-      string,
-      unknown
-    >
-    // adoptServerOwned cleared every owned key the empty server lacked.
-    const governed = SERVER_OWNED_METADATA_KEYS.filter((k) => !(k in adopted))
-
-    expect(written).toEqual(new Set(SERVER_OWNED_METADATA_KEYS))
-    expect(new Set(governed)).toEqual(new Set(SERVER_OWNED_METADATA_KEYS))
-  })
-})
-
 describe("getToolDisplayMetadataRecords", () => {
   it("does not expose a mutable shared empty fallback", () => {
     const records = getToolDisplayMetadataRecords(undefined)

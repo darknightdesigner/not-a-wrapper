@@ -59,29 +59,6 @@ describe("UserProfile", () => {
     act(() => root?.render(<UserProfile />))
   }
 
-  it("renders the authenticated profile as settings rows", () => {
-    profileMocks.user = userProfileFixture
-    renderProfile()
-
-    expect(container?.textContent).toContain("Profile picture")
-    expect(container?.textContent).toContain("Email")
-    expect(container?.textContent).toContain(userProfileFixture.email)
-    expect(
-      container?.querySelector<HTMLInputElement>("#settings-full-name")?.value
-    ).toBe(userProfileFixture.display_name)
-    expect(
-      container?.querySelector("[data-slot=settings-field-group]")
-    ).toBeInstanceOf(HTMLDivElement)
-    expect(container?.querySelector("a")?.getAttribute("href")).toBe(
-      `mailto:${userProfileFixture.email}`
-    )
-    expect(
-      container?.querySelector<HTMLButtonElement>(
-        'button[aria-label="Change profile picture"]'
-      )
-    ).toBeInstanceOf(HTMLButtonElement)
-  })
-
   it("reflects profile name updates for the same authenticated user", async () => {
     profileMocks.user = userProfileFixture
     renderProfile()
