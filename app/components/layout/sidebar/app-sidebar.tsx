@@ -425,6 +425,7 @@ function SidebarExpandedNav({
                   <SidebarMenuItem
                     icon={RiSearchLine}
                     label="Search"
+                    tabIndex={0}
                     trailing={
                       <KbdGroup>
                         <Kbd label="Command">⌘</Kbd>
@@ -703,7 +704,12 @@ function CollapsedRecentsMenu({
 }) {
   const label = "Recents"
   const [open, setOpen] = React.useState(false)
-  const recentChats = data.composition.chats.slice(0, 10)
+  // Pins lead, but never crowd out the ten most recent unpinned chats.
+  const { chats } = data.composition
+  const recentChats = [
+    ...chats.filter((chat) => chat.pinned),
+    ...chats.filter((chat) => !chat.pinned).slice(0, 10),
+  ]
 
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen)

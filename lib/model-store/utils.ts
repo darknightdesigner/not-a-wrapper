@@ -51,15 +51,14 @@ export function groupModelsForSelector<M extends ModelConfig>(
   searchQuery: string,
   isModelHidden: (modelId: string) => boolean
 ): SelectorModelGroups<M> {
-  const normalizedSearchQuery = searchQuery.toLowerCase()
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase()
   const selectorModels = models.filter(
     (model) =>
       isModelVisibleInSelector(model) &&
       !isModelHidden(model.id) &&
-      [
-        getModelDisplayName(model),
-        getModelDisplayName(model, "compact"),
-      ].some((name) => name.toLowerCase().includes(normalizedSearchQuery))
+      [getModelDisplayName(model), getModelDisplayName(model, "compact")].some(
+        (name) => name.toLowerCase().includes(normalizedSearchQuery)
+      )
   )
 
   const favoriteRank = new Map(

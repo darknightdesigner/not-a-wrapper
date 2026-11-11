@@ -50,7 +50,8 @@ export function HistoryTrigger({
           openHistory()
         },
         "aria-label": trigger.props["aria-label"] ?? "Search",
-        tabIndex: isMobile ? -1 : trigger.props.tabIndex,
+        // A trigger's own tabIndex wins (the mobile drawer's Search row).
+        tabIndex: trigger.props.tabIndex ?? (isMobile ? -1 : undefined),
       })
     ) : (
       <button
