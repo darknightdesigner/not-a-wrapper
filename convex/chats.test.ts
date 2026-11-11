@@ -178,10 +178,12 @@ describe("project conversation previews", () => {
     // Pins lead newest pin first, even over newer activity; the rest follow
     // by activity.
     const order = [latestPin, older, newer, oldest].map((chat) => chat._id)
-    expect(result.map(({ chat }) => chat._id)).toEqual(order)
-    expect(result.find(({ chat }) => chat._id === older._id)?.preview).toBe(
-      "older preview"
-    )
+    expect(result.map(({ chat, preview }) => [chat._id, preview])).toEqual([
+      [latestPin._id, null],
+      [older._id, "older preview"],
+      [newer._id, "newer preview"],
+      [oldest._id, null],
+    ])
     expect(messageReads).toEqual(
       order.map((chatId) => ({
         chatId,

@@ -23,7 +23,7 @@ vi.mock("@/app/components/layout/chat-actions-menu", () => ({
   ChatActionsMenu: () => null,
 }))
 vi.mock("./sidebar-item-status", () => ({
-  SIDEBAR_CHAT_STATUS_LABEL: {},
+  SIDEBAR_CHAT_STATUS_LABEL: { streaming: "Generating response" },
   SidebarChatStatusIndicator: ({ status }: { status: string }) => (
     <span data-status={status} />
   ),
@@ -46,13 +46,19 @@ vi.mock("./sidebar-row-actions", () => ({
 vi.mock("./sidebar-row", () => ({
   SidebarRow: ({
     title,
+    ariaLabel,
     isActive,
     onRename,
     trailing,
   }: ComponentProps<typeof SidebarRow>) => {
     mocks.rowRender()
     return (
-      <div data-row data-title={title} data-active={isActive}>
+      <div
+        data-row
+        data-title={title}
+        aria-label={ariaLabel}
+        data-active={isActive}
+      >
         <button data-rename onClick={() => void onRename("Saved title")}>
           Rename
         </button>
@@ -105,6 +111,10 @@ it("skips equal inactive rows while preserving selection, chat fields, and the r
     expect(
       container.querySelector("[data-row]")?.getAttribute("data-title")
     ).toBe("Renamed")
+    // An aria-label replaces the row's text, so it restates live status.
+    expect(
+      container.querySelector("[data-row]")?.getAttribute("aria-label")
+    ).toBe("Renamed, pinned, Generating response")
     // Live status outranks the pin mark at rest.
     expect(
       container.querySelector("[data-status]")?.getAttribute("data-status")
