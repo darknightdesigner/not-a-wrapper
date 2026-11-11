@@ -23,6 +23,7 @@ vi.mock("@/app/components/layout/chat-actions-menu", () => ({
   ChatActionsMenu: () => null,
 }))
 vi.mock("./sidebar-item-status", () => ({
+  SIDEBAR_CHAT_STATUS_LABEL: {},
   SidebarChatStatusIndicator: ({ status }: { status: string }) => (
     <span data-status={status} />
   ),

@@ -8,7 +8,10 @@ import { Chat } from "@/lib/chat-store/types"
 import { markChatNavigationIntent } from "@/lib/observability/chat-performance-client"
 import { memo, useCallback } from "react"
 import { shallow } from "zustand/shallow"
-import { SidebarChatStatusIndicator } from "./sidebar-item-status"
+import {
+  SIDEBAR_CHAT_STATUS_LABEL,
+  SidebarChatStatusIndicator,
+} from "./sidebar-item-status"
 import { SidebarRow } from "./sidebar-row"
 import {
   SidebarPinnedIndicator,
@@ -37,7 +40,18 @@ export const SidebarItem = memo(
         interaction={{ kind: "link", href: `/c/${chat.id}` }}
         isActive={chat.id === currentChatId}
         title={displayTitle}
-        ariaLabel={chat.pinned ? `${displayTitle}, pinned` : undefined}
+        // An aria-label replaces the link's text, so it restates live status.
+        ariaLabel={
+          chat.pinned
+            ? [
+                displayTitle,
+                "pinned",
+                status !== "idle" && SIDEBAR_CHAT_STATUS_LABEL[status],
+              ]
+                .filter(Boolean)
+                .join(", ")
+            : undefined
+        }
         renameValue={chat.title || ""}
         renameLabel="Chat title"
         onRename={(next) => updateTitle(chat.id, next)}

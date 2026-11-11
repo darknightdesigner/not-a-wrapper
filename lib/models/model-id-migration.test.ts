@@ -46,6 +46,7 @@ describe("model ID migration", () => {
     // Alias-of-a-delisted-id chains through the succession in one resolve.
     expect(resolveModelId("deepseek-r1")).toBe("openrouter:openai/gpt-oss-120b")
     expect(resolveModelId("mistral-small-2503")).toBe("mistral-small-2603")
+    expect(resolveModelId("mistral-small-2506")).toBe("mistral-small-2603")
     expect(resolveModelId("mistral-small-latest")).toBe("mistral-small-2603")
     expect(resolveModelId("ministral-14b-latest")).toBe("ministral-14b-2512")
     expect(resolveModelId("mistral-large-latest")).toBe("mistral-large-2512")

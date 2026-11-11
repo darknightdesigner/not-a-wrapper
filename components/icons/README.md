@@ -56,6 +56,7 @@ Some commonly used icons are re-exported from `@/lib/icons` for convenience:
 ```typescript
 import {
   GripVerticalIcon,
+  NewChatIcon,
   PanelLeftIcon,
   PinIcon,
   PinOffIcon,
@@ -104,34 +105,34 @@ export default MyIcon
 
 ### Common Icons Quick Reference
 
-| Purpose     | Remix icon           |
-| ----------- | -------------------- |
-| Checkmark   | `RiCheckLine`        |
-| Close/X     | `RiCloseLine`        |
-| Arrow down  | `RiArrowDownSLine`   |
-| Send/up     | `RiArrowUpLine`      |
-| Arrow up    | `RiArrowUpSLine`     |
-| Back arrow  | `RiArrowLeftLine`    |
-| Prev arrow  | `RiArrowLeftSLine`   |
-| Arrow right | `RiArrowRightSLine`  |
-| Search      | `RiSearchLine`       |
-| Loading     | `RiLoader4Line`      |
-| Refresh     | `RiRefreshLine`      |
-| Warning     | `RiErrorWarningLine` |
-| Error       | `RiCloseCircleLine`  |
-| Info        | `RiInformationLine`  |
-| Delete      | `RiDeleteBinLine`    |
-| More menu   | `RiMoreFill`         |
-| Quote       | `RiDoubleQuotesL`    |
-| Chat        | `RiChat3Line`        |
-| Settings    | `RiSettings3Line`    |
-| User        | `RiUserLine`         |
-| Copy        | `RiFileCopyLine`     |
-| Edit        | `RiEditLine`         |
-| Add         | `RiAddLine`          |
-| New chat    | `NewChatIcon`        |
-| Share       | `RiShare2Line`       |
-| Minus       | `RiSubtractLine`     |
+| Purpose     | Remix icon                            |
+| ----------- | ------------------------------------- |
+| Checkmark   | `RiCheckLine`                         |
+| Close/X     | `RiCloseLine`                         |
+| Arrow down  | `RiArrowDownSLine`                    |
+| Send/up     | `RiArrowUpLine`                       |
+| Arrow up    | `RiArrowUpSLine`                      |
+| Back arrow  | `RiArrowLeftLine`                     |
+| Prev arrow  | `RiArrowLeftSLine`                    |
+| Arrow right | `RiArrowRightSLine`                   |
+| Search      | `RiSearchLine`                        |
+| Loading     | `RiLoader4Line`                       |
+| Refresh     | `RiRefreshLine`                       |
+| Warning     | `RiErrorWarningLine`                  |
+| Error       | `RiCloseCircleLine`                   |
+| Info        | `RiInformationLine`                   |
+| Delete      | `RiDeleteBinLine`                     |
+| More menu   | `RiMoreFill`                          |
+| Quote       | `RiDoubleQuotesL`                     |
+| Chat        | `RiChat3Line`                         |
+| Settings    | `RiSettings3Line`                     |
+| User        | `RiUserLine`                          |
+| Copy        | `RiFileCopyLine`                      |
+| Edit        | `RiEditLine`                          |
+| Add         | `RiAddLine`                           |
+| New chat    | `NewChatIcon` (custom, `@/lib/icons`) |
+| Share       | `RiShare2Line`                        |
+| Minus       | `RiSubtractLine`                      |
 
 ## Available Brand Icons
 

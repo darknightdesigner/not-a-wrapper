@@ -64,9 +64,9 @@ const grokModels: ModelConfig[] = [
     tools: true,
     audio: false,
     reasoningText: true,
-    // reasoning_effort per the xAI API reference — grok-4.3 is the only
-    // catalogued Grok that accepts it ("none" disables reasoning); the other
-    // Grok 4 models reason unconditionally and reject the parameter.
+    // reasoning_effort per the xAI API reference — grok-4.3 and grok-4.7 are
+    // the only catalogued Groks that accept it ("none" disables reasoning
+    // here); the other Grok 4 models reason unconditionally and reject it.
     // Live-verified 2026-08-26: none/medium/xhigh all 200, "max" 400, and a
     // bogus value 400s (real validation). The API also accepts "minimal",
     // but the installed @ai-sdk/xai enum cannot send it — wire-inexpressible

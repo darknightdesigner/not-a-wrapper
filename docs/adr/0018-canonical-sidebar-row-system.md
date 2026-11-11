@@ -45,7 +45,8 @@ The app's CSS-contract row system is THE sidebar component system.
   `CollapsibleSection variant="sidebar"` — never a hand-styled label. Mobile
   presentation is consumer-owned (the app's own Sheet drawer).
 - Pinning never creates a section (2026-11-11, after Grok). A pinned chat or
-  project leads its own list, newest pin first, with a resting pin mark in the
+  project leads its own list (chats newest pin first; projects store no pin
+  time, so pinned projects keep newest-created order), with a resting pin mark in the
   row's end slot that hover swaps for the actions. Pin/Unpin lives in the
   row's actions menu; there is no separate pin button.
 - Widths are CSS-owned: `--sidebar-width` and

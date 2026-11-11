@@ -213,23 +213,33 @@ const MODEL_ID_SUCCESSIONS = [
     lastVerifiedAt: "2026-11-09",
   },
   {
-    // OpenAI shut down o3-mini and o4-mini on 2026-10-23; these are the
-    // replacements its deprecations page names.
+    // OpenAI shut down o3-mini and o4-mini on 2026-10-23. Its deprecations
+    // page names gpt-5.6-sol/terra, which are now Legacy and direct-only, so
+    // these move to the current tier with an OpenRouter route: a saved
+    // OpenRouter selection stays usable with only an OpenRouter key.
     sourceId: "openrouter:openai/o3-mini",
-    targetId: "gpt-5.6-sol",
-    replacementModelId: "gpt-5.6-sol",
-    verifiedAgainst: "gpt-5.6-sol",
-    lastVerifiedAt: "2026-11-09",
+    targetId: "gpt-6.1-sol",
+    replacementModelId: "gpt-6.1-sol",
+    verifiedAgainst: "openai/gpt-6.1-sol",
+    lastVerifiedAt: "2026-11-11",
   },
   {
     sourceId: "openrouter:openai/o4-mini",
-    targetId: "gpt-5.6-terra",
-    replacementModelId: "gpt-5.6-terra",
-    verifiedAgainst: "gpt-5.6-terra",
-    lastVerifiedAt: "2026-11-09",
+    targetId: "gpt-6.1-terra",
+    replacementModelId: "gpt-6.1-terra",
+    verifiedAgainst: "openai/gpt-6.1-terra",
+    lastVerifiedAt: "2026-11-11",
   },
   {
-    // Mistral retired mistral-small-2506 on 2026-07-31.
+    // Mistral retired mistral-small-2506 on 2026-07-31; its hidden route
+    // record stays for lifecycle metadata, but chats resolve past it.
+    sourceId: "mistral-small-2506",
+    targetId: "mistral-small-2603",
+    replacementModelId: "mistral-small-2603",
+    verifiedAgainst: "mistral-small-2603",
+    lastVerifiedAt: "2026-11-11",
+  },
+  {
     sourceId: "mistral-small-2503",
     targetId: "mistral-small-2603",
     replacementModelId: "mistral-small-2603",

@@ -260,9 +260,9 @@ function resolveReasoningOptions(
         },
       }
     case "xai":
-      // Only grok-4.3 declares effortLevels (the other catalogued Grok 4
-      // models reason unconditionally and reject the parameter), so effort
-      // is undefined for them and the option is never sent.
+      // Only grok-4.3 and grok-4.7 declare effortLevels (the other catalogued
+      // Grok 4 models reason unconditionally and reject the parameter), so
+      // effort is undefined for them and the option is never sent.
       return effort !== undefined ? { xai: { reasoningEffort: effort } } : {}
     case "mistral":
       // Mistral reasoning is off unless reasoning_effort is "high" (the only

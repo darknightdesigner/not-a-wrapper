@@ -72,6 +72,21 @@ describe("project conversation previews", () => {
       pinnedAt: undefined,
       updatedAt: 20,
     })
+    const latestPin = createChat({
+      _id: asId<"chats">("latest-pin"),
+      userId: user._id,
+      projectId: project._id,
+      pinnedAt: 8,
+      updatedAt: 1,
+    })
+    const oldest = createChat({
+      _id: asId<"chats">("oldest"),
+      userId: user._id,
+      projectId: project._id,
+      pinned: false,
+      pinnedAt: undefined,
+      updatedAt: 2,
+    })
     const previewMessages = new Map<string, Array<Partial<Doc<"messages">>>>([
       [newer._id, [{ role: "user", content: "newer preview", selected: true }]],
       [
@@ -98,7 +113,7 @@ describe("project conversation previews", () => {
                   },
                 }
                 buildQuery(query)
-                let chats = [older, newer]
+                let chats = [oldest, older, newer, latestPin]
                 const resultApi = {
                   filter: (buildFilter: (filter: FilterBuilder) => unknown) => {
                     let fieldName = ""
@@ -160,15 +175,19 @@ describe("project conversation previews", () => {
 
     const result = await getProjectChatDirectoryForProject(ctx, project)
 
-    // The pinned chat leads even though the other one is newer.
-    expect(result.map(({ chat, preview }) => [chat._id, preview])).toEqual([
-      [older._id, "older preview"],
-      [newer._id, "newer preview"],
-    ])
-    expect(messageReads).toEqual([
-      { chatId: older._id, limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT },
-      { chatId: newer._id, limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT },
-    ])
+    // Pins lead newest pin first, even over newer activity; the rest follow
+    // by activity.
+    const order = [latestPin, older, newer, oldest].map((chat) => chat._id)
+    expect(result.map(({ chat }) => chat._id)).toEqual(order)
+    expect(result.find(({ chat }) => chat._id === older._id)?.preview).toBe(
+      "older preview"
+    )
+    expect(messageReads).toEqual(
+      order.map((chatId) => ({
+        chatId,
+        limit: PROJECT_CHAT_PREVIEW_SCAN_LIMIT,
+      }))
+    )
   })
 
   const directoryOwner = createUser("directory-owner")

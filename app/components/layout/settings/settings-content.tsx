@@ -1,11 +1,11 @@
 "use client"
 
 import { useScrollAttributes } from "@/app/hooks/use-scroll-attributes"
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -130,14 +130,13 @@ export function SettingsContent() {
                 />
                 {searchQuery ? (
                   <InputGroupAddon align="inline-end">
-                    <Button
-                      variant="ghost"
+                    <InputGroupButton
                       size="icon-xs"
                       aria-label="Clear search"
                       onClick={clearSearch}
                     >
                       <Icon icon={RiCloseLine} slotSize={18} glyphInset={0} />
-                    </Button>
+                    </InputGroupButton>
                   </InputGroupAddon>
                 ) : null}
               </InputGroup>

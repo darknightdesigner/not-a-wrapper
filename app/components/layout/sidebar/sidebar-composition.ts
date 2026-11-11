@@ -1,5 +1,8 @@
 import type { Doc } from "@/convex/_generated/dataModel"
-import { sortByRecency } from "@/lib/chat-store/chats/sidebar-window"
+import {
+  partitionSidebarChats,
+  sortByRecency,
+} from "@/lib/chat-store/chats/sidebar-window"
 import type { Chat } from "@/lib/chat-store/types"
 
 export type SidebarProjectModel = Doc<"projects">
@@ -40,10 +43,7 @@ export function deriveSidebarComposition({
   // Project chats live on their project's page, not in the global Chats list.
   const globalChats = chats.filter((chat) => !chat.project_id)
   // Newest pin first, so a just-pinned chat lands at the very top.
-  const pinnedChats = globalChats
-    .filter((chat) => chat.pinned)
-    .sort((a, b) => pinTime(b) - pinTime(a))
-  const recentChats = sortByRecency(globalChats.filter((chat) => !chat.pinned))
+  const { pinned, nonPinned } = partitionSidebarChats(globalChats)
   // Projects have no pin time; both groups keep newest-created first.
   const sortedProjects = [...projects].sort(
     (a, b) => b._creationTime - a._creationTime
@@ -54,10 +54,6 @@ export function deriveSidebarComposition({
       ...sortedProjects.filter((project) => project.pinned),
       ...sortedProjects.filter((project) => !project.pinned),
     ],
-    chats: [...pinnedChats, ...recentChats],
+    chats: [...pinned, ...sortByRecency(nonPinned)],
   }
-}
-
-function pinTime(chat: Chat) {
-  return chat.pinned_at ? +new Date(chat.pinned_at) : 0
 }

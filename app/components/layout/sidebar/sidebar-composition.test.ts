@@ -62,6 +62,10 @@ describe("sidebar grouping composition", () => {
           pinned_at: "2026-01-07T00:00:00.000Z",
           updated_at: "2026-01-10T00:00:00.000Z",
         }),
+        chat("in-project-recent", {
+          project_id: "alpha",
+          updated_at: "2026-01-11T00:00:00.000Z",
+        }),
       ],
       projects: [
         project("alpha", { created: 1 }),

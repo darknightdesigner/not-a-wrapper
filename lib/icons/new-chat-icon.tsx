@@ -10,5 +10,5 @@ export const NewChatIcon = createIcon(
     stroke="currentColor"
     strokeWidth="2"
   />,
-  { displayName: "NewChatIcon" }
+  { defaultSize: 18, displayName: "NewChatIcon" }
 )
