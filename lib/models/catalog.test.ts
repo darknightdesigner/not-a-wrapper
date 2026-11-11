@@ -649,6 +649,11 @@ describe("resolveModelSelection", () => {
     expect(resolveModelSelection("deepseek-r1")).toEqual({
       modelId: "openrouter:openai/gpt-oss-120b",
     })
+    // A retired OpenRouter selection keeps its OpenRouter route hint.
+    expect(resolveModelSelection("openrouter:openai/o3-mini")).toEqual({
+      modelId: "gpt-6.1-sol",
+      legacyRouteHint: "openrouter:openai/gpt-6.1-sol",
+    })
   })
 
   it("passes unknown ids through unchanged", () => {

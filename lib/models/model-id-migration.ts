@@ -215,18 +215,18 @@ const MODEL_ID_SUCCESSIONS = [
   {
     // OpenAI shut down o3-mini and o4-mini on 2026-10-23. Its deprecations
     // page names gpt-5.6-sol/terra, which are now Legacy and direct-only, so
-    // these move to the current tier with an OpenRouter route: a saved
-    // OpenRouter selection stays usable with only an OpenRouter key.
+    // these move to the current tier's OpenRouter routes: the route id keeps
+    // the saved selection's OpenRouter hint (resolveModelSelection).
     sourceId: "openrouter:openai/o3-mini",
-    targetId: "gpt-6.1-sol",
-    replacementModelId: "gpt-6.1-sol",
+    targetId: "openrouter:openai/gpt-6.1-sol",
+    replacementModelId: "openrouter:openai/gpt-6.1-sol",
     verifiedAgainst: "openai/gpt-6.1-sol",
     lastVerifiedAt: "2026-11-11",
   },
   {
     sourceId: "openrouter:openai/o4-mini",
-    targetId: "gpt-6.1-terra",
-    replacementModelId: "gpt-6.1-terra",
+    targetId: "openrouter:openai/gpt-6.1-terra",
+    replacementModelId: "openrouter:openai/gpt-6.1-terra",
     verifiedAgainst: "openai/gpt-6.1-terra",
     lastVerifiedAt: "2026-11-11",
   },
