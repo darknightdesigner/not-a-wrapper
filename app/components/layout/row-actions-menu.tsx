@@ -11,7 +11,8 @@ import { Icon, type IconProps } from "@/components/ui/icon"
 import { useIntentPrefetch } from "@/components/ui/intent-prefetch"
 import { MenuLeadingIcon } from "@/components/ui/menu-leading-icon"
 import { useBreakpoint } from "@/hooks/use-breakpoint"
-import { RiLoader4Line, RiMoreFill } from "@remixicon/react"
+import { Spinner } from "@/components/ui/spinner"
+import { RiMoreFill } from "@remixicon/react"
 import { Fragment, type ReactElement } from "react"
 import {
   trailingIconButtonClassName,
@@ -119,11 +120,7 @@ function RowActionMenuItem({ item }: { item: RowActionItem }) {
       }}
     >
       {item.loading ? (
-        <Icon
-          icon={RiLoader4Line}
-          slotSize="var(--floating-menu-leading-slot-size)"
-          className="animate-spin"
-        />
+        <Spinner slotSize="var(--floating-menu-leading-slot-size)" />
       ) : (
         <MenuLeadingIcon icon={item.icon} />
       )}

@@ -98,16 +98,25 @@ type ButtonPlusMenuProps = {
 
 type PlusMenuRowContentProps = {
   icon: React.ComponentProps<typeof Icon>["icon"]
+  /** The action's idle tint (compact rows; touch chips stay plain). */
+  iconClassName?: string
   label: string
   touchOptimized: boolean
 }
 
 function PlusMenuRowContent({
   icon,
+  iconClassName,
   label,
   touchOptimized,
 }: PlusMenuRowContentProps) {
-  const glyph = <Icon icon={icon} slotSize={20} />
+  const glyph = (
+    <Icon
+      icon={icon}
+      iconClassName={touchOptimized ? undefined : iconClassName}
+      slotSize={20}
+    />
+  )
 
   return touchOptimized ? (
     <>
@@ -230,6 +239,10 @@ function PlusMenuContent({
                   ? touchMenuActionIcons[item.itemId]
                   : item.action.icon
               }
+              // Selected inherits the row's accent instead of its idle tint.
+              iconClassName={
+                item.selected ? undefined : item.action.iconClassName
+              }
               label={
                 touchOptimized
                   ? (item.action.touchLabel ?? item.label)
@@ -268,6 +281,9 @@ function PlusMenuContent({
                     touchOptimized
                       ? touchMenuActionIcons[item.itemId]
                       : item.action.icon
+                  }
+                  iconClassName={
+                    item.selected ? undefined : item.action.iconClassName
                   }
                   label={item.label}
                   touchOptimized={touchOptimized}

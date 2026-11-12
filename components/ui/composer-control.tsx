@@ -6,7 +6,8 @@ type ComposerControlProps = Omit<ButtonProps, "variant">
 /**
  * Shared type and height for labeled composer controls (model trigger,
  * effort pill), so joined halves keep one hover surface. Height matches the
- * 36px icon buttons; callers own padding and corners.
+ * 36px icon buttons on fine pointers; on coarse pointers Button's 40px touch
+ * minimum wins. Callers own padding and corners.
  */
 const composerTextControlClassName =
   "h-9 py-0 text-sm leading-5 font-normal"

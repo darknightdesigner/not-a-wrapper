@@ -11,7 +11,7 @@ describe("getReasoningEffortLabel", () => {
     // claude.ai's menu, verbatim (2026-11-11).
     const claude = ["Low", "Medium", "High", "Extra", "Max"]
     expect(label("claude-sonnet-5-5")).toEqual(claude)
-    expect(label("openrouter:anthropic/claude-opus-5.5")).toEqual(claude)
+    expect(label("openrouter:anthropic/claude-sonnet-5.5")).toEqual(claude)
     // Overrides are per maker, never global.
     expect(getReasoningEffortLabel("xhigh", "gpt-5.6-sol")).toBe("Extra High")
   })

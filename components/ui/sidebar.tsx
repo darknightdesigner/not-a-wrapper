@@ -293,19 +293,37 @@ function SidebarResizeHandle() {
   } | null>(null)
   const current = width ?? SIDEBAR_WIDTH_MIN
 
-  const endDrag = () => {
+  // Clears drag chrome; returns the drag it ended, if any.
+  const releaseDrag = React.useCallback(() => {
     const active = drag.current
-    if (!active) return
+    if (!active) return null
     drag.current = null
     delete active.frame.dataset.resizing
     document.documentElement.style.removeProperty("cursor")
     document.documentElement.style.removeProperty("user-select")
+    return active
+  }, [])
+  // Collapsing mid-drag unmounts the handle before pointerup; its stable ref
+  // cleanup still releases the document cursor and selection lock.
+  const handleRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return
+      return () => void releaseDrag()
+    },
+    [releaseDrag]
+  )
+
+  const endDrag = () => {
+    const active = releaseDrag()
     // A press without movement (e.g. half of a double-click) persists nothing.
-    if (active.width !== Math.round(active.startWidth)) setWidth(active.width)
+    if (active && active.width !== Math.round(active.startWidth)) {
+      setWidth(active.width)
+    }
   }
 
   return (
     <div
+      ref={handleRef}
       role="separator"
       aria-label="Resize sidebar"
       aria-orientation="vertical"
@@ -329,7 +347,7 @@ function SidebarResizeHandle() {
           startWidth,
           direction:
             getComputedStyle(frame).direction === "rtl" ? -1 : 1,
-          width: startWidth,
+          width: Math.round(startWidth),
         }
         frame.dataset.resizing = ""
         document.documentElement.style.cursor = "col-resize"
@@ -357,8 +375,12 @@ function SidebarResizeHandle() {
               : null
         if (event.key === "Home") setWidth(SIDEBAR_WIDTH_MIN)
         else if (event.key === "End") setWidth(SIDEBAR_WIDTH_MAX)
-        else if (step !== null) setWidth(current + step)
-        else return
+        else if (step !== null) {
+          // With no stored width, step from the rendered (rem-based) default.
+          const rendered =
+            event.currentTarget.parentElement?.getBoundingClientRect().width
+          setWidth((width ?? Math.round(rendered ?? current)) + step)
+        } else return
         event.preventDefault()
       }}
     />

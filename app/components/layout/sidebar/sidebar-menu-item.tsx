@@ -92,11 +92,13 @@ export const SidebarMenuItem = forwardRef<
     </div>
   ) : null
 
+  // On the element that carries [data-sidebar-item] (the Link in split rows).
+  const toneClassName =
+    tone === "muted" && "text-(--sidebar-label-foreground) hover:text-foreground"
   const combinedClassName = cn(
     baseClassName,
     hasTrailing && "justify-between",
-    tone === "muted" &&
-      "text-(--sidebar-label-foreground) hover:text-foreground",
+    toneClassName,
     isActive &&
       "bg-sidebar-row hover:bg-sidebar-row",
     className
@@ -112,7 +114,10 @@ export const SidebarMenuItem = forwardRef<
           ref={ref as Ref<HTMLAnchorElement>}
           href={href}
           onClick={onClick as MouseEventHandler<HTMLAnchorElement> | undefined}
-          className="sidebar-row-primary-control after:absolute after:inset-0 flex h-full min-w-0 grow items-center rounded-(--sidebar-row-radius) focus-visible:outline-none"
+          className={cn(
+            "sidebar-row-primary-control after:absolute after:inset-0 flex h-full min-w-0 grow items-center rounded-(--sidebar-row-radius) focus-visible:outline-none",
+            toneClassName
+          )}
           data-testid={testId}
           data-sidebar-item="true"
           data-active={isActive ? "true" : undefined}
