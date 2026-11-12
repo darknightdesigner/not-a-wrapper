@@ -573,7 +573,9 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
   )
 
   // One + menu at every width: a Base UI dropdown. Typed "@"/"/" keep
-  // the editor-owned, composer-wide menu below.
+  // the editor-owned, composer-wide menu below. Non-modal like the model
+  // and effort menus: a modal scroll lock relayouts the page on open and
+  // close, and the thread should stay scrollable while an answer streams.
   const commandItems = triggerMenuItems.filter(
     (item) => item.action.behavior === "command"
   )
@@ -586,7 +588,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
       <DropdownMenu
         open={isTriggerMenuOpen}
         onOpenChange={handleTriggerMenuOpenChange}
-        modal
+        modal={false}
       >
         <Tooltip disableHoverablePopup disabled={isMenuOpen || tooltipDisabled}>
           <TooltipTrigger render={<span className="inline-flex" />}>
