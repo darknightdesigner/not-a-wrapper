@@ -290,6 +290,9 @@ function SidebarResizeHandle() {
     startWidth: number
     direction: 1 | -1
     width: number
+    /** Document inline styles from before the drag, restored on release. */
+    prevCursor: string
+    prevUserSelect: string
   } | null>(null)
   const current = width ?? SIDEBAR_WIDTH_MIN
 
@@ -299,8 +302,9 @@ function SidebarResizeHandle() {
     if (!active) return null
     drag.current = null
     delete active.frame.dataset.resizing
-    document.documentElement.style.removeProperty("cursor")
-    document.documentElement.style.removeProperty("user-select")
+    const rootStyle = document.documentElement.style
+    rootStyle.cursor = active.prevCursor
+    rootStyle.userSelect = active.prevUserSelect
     return active
   }, [])
   // Collapsing mid-drag unmounts the handle before pointerup; its stable ref
@@ -348,6 +352,8 @@ function SidebarResizeHandle() {
           direction:
             getComputedStyle(frame).direction === "rtl" ? -1 : 1,
           width: Math.round(startWidth),
+          prevCursor: document.documentElement.style.cursor,
+          prevUserSelect: document.documentElement.style.userSelect,
         }
         frame.dataset.resizing = ""
         document.documentElement.style.cursor = "col-resize"
