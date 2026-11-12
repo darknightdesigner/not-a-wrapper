@@ -26,6 +26,11 @@
 @custom-variant keyboard-focused (&:is(html [data-focus-mode="keyboard"]:focus-visible));
 /* prettier-ignore */
 @custom-variant not-keyboard-focused (&:not(:is(html [data-focus-mode="keyboard"]:focus-visible)));
+/* Hover-reveal companion: keyboard focus on the element or inside it. Never use
+   plain focus-within for reveals: a mouse click leaves focus behind, pinning the
+   revealed controls after the pointer leaves (lint-enforced in eslint.config.mjs). */
+/* prettier-ignore */
+@custom-variant keyboard-focus-within (&:is(html [data-focus-mode="keyboard"]:focus-visible, :has([data-focus-mode="keyboard"]:focus-visible)));
 
 @custom-variant tall (@media (min-height: 40rem));
 @custom-variant not-tall (@media (max-height: 39.99rem));
@@ -1455,7 +1460,7 @@
     padding-inline: var(--sidebar-row-content-inline);
   }
 
-  .sidebar-row-primary-control:focus-visible {
+  .sidebar-row-primary-control[data-focus-mode="keyboard"]:focus-visible {
     outline: 1.5px solid var(--foreground);
     outline-offset: -1.5px;
     border-radius: var(--sidebar-row-radius);
@@ -1526,7 +1531,9 @@
     outline: none;
   }
 
-  .sidebar-row-action-rail :is(button, a):focus-visible .trailing-icon-chip {
+  .sidebar-row-action-rail
+    :is(button, a)[data-focus-mode="keyboard"]:focus-visible
+    .trailing-icon-chip {
     outline: 1.5px solid var(--foreground);
     outline-offset: 2.5px;
   }
@@ -1596,15 +1603,25 @@
     justify-content: center;
   }
 
-  .sidebar-row:where(:focus-within),
+  /* Engaged = hover, keyboard focus (same contract as the
+     keyboard-focus-within variant), or an open/pressed child. Not plain
+     :focus-within: the row IS the link, so a click would pin the reveal. */
+  .sidebar-row:where(
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  ),
   .sidebar-row:has([data-popup-open]),
   .sidebar-row:has([data-pressed]) {
     background-color: var(--sidebar-row-active-background);
     color: var(--foreground);
   }
 
-  .sidebar-row:where(:hover, :focus-within)
-    .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  )
+  .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
   .sidebar-row:has([data-popup-open])
     .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
   .sidebar-row:has([data-pressed])
@@ -1620,8 +1637,12 @@
     pointer-events: auto;
   }
 
-  .sidebar-row:where(:hover, :focus-within)
-    .sidebar-row-action-rail[data-sidebar-row-actions="card"],
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  )
+  .sidebar-row-action-rail[data-sidebar-row-actions="card"],
   .sidebar-row:has([data-popup-open])
     .sidebar-row-action-rail[data-sidebar-row-actions="card"],
   .sidebar-row:has([data-pressed])
@@ -1632,7 +1653,11 @@
     pointer-events: auto;
   }
 
-  .sidebar-row:where(:hover, :focus-within) .sidebar-row-status-slot,
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  ) .sidebar-row-status-slot,
   .sidebar-row:has([data-popup-open]) .sidebar-row-status-slot,
   .sidebar-row:has([data-pressed]) .sidebar-row-status-slot {
     display: none;

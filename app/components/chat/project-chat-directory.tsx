@@ -125,7 +125,7 @@ function ProjectConversationRow({ entry }: { entry: DirectoryEntry }) {
             <span
               aria-hidden="true"
               className={cn(
-                "whitespace-nowrap pointer-fine:group-focus-within/project-conversation:opacity-0 pointer-fine:group-hover/project-conversation:opacity-0",
+                "whitespace-nowrap pointer-fine:group-keyboard-focus-within/project-conversation:opacity-0 pointer-fine:group-hover/project-conversation:opacity-0",
                 isActionsOpen && "opacity-0"
               )}
               data-testid="project-conversation-date"
@@ -135,7 +135,7 @@ function ProjectConversationRow({ entry }: { entry: DirectoryEntry }) {
           ) : null}
           <div
             className={cn(
-              "flex items-center gap-1.5 pointer-fine:pointer-events-none pointer-fine:absolute pointer-fine:inset-y-0 pointer-fine:end-0 pointer-fine:opacity-0 pointer-fine:group-focus-within/project-conversation:pointer-events-auto pointer-fine:group-focus-within/project-conversation:opacity-100 pointer-fine:group-hover/project-conversation:pointer-events-auto pointer-fine:group-hover/project-conversation:opacity-100",
+              "flex items-center gap-1.5 pointer-fine:pointer-events-none pointer-fine:absolute pointer-fine:inset-y-0 pointer-fine:end-0 pointer-fine:opacity-0 pointer-fine:group-keyboard-focus-within/project-conversation:pointer-events-auto pointer-fine:group-keyboard-focus-within/project-conversation:opacity-100 pointer-fine:group-hover/project-conversation:pointer-events-auto pointer-fine:group-hover/project-conversation:opacity-100",
               isActionsOpen &&
                 "pointer-events-auto opacity-100 pointer-fine:pointer-events-auto pointer-fine:opacity-100"
             )}

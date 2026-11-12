@@ -201,7 +201,10 @@ function ModelOptionContent({
         <div className="flex min-w-0 items-baseline gap-1.5">
           <span
             data-slot="model-name"
-            className={cn("truncate", isMobile ? "text-base" : "text-sm")}
+            className={cn(
+              "truncate font-[450]",
+              isMobile ? "text-base" : "text-sm"
+            )}
           >
             {getModelDisplayName(model)}
           </span>
@@ -235,7 +238,7 @@ function ModelOptionContent({
             decorative={false}
             className={cn(
               canPin &&
-                "group-focus-within/model-option:opacity-0 group-hover/model-option:opacity-0"
+                "group-keyboard-focus-within/model-option:opacity-0 group-hover/model-option:opacity-0"
             )}
           />
         ) : isSelected ? (
@@ -246,7 +249,7 @@ function ModelOptionContent({
             data-slot="selected-model-check"
             className={cn(
               canPin &&
-                "group-focus-within/model-option:opacity-0 group-hover/model-option:opacity-0"
+                "group-keyboard-focus-within/model-option:opacity-0 group-hover/model-option:opacity-0"
             )}
           />
         ) : null}
@@ -256,7 +259,7 @@ function ModelOptionContent({
               render={
                 <button
                   type="button"
-                  className="group/pin text-muted-foreground hover:text-foreground focus-visible:text-foreground pointer-events-none absolute -inset-2 flex items-center justify-center rounded-lg opacity-0 outline-none group-focus-within/model-option:pointer-events-auto group-focus-within/model-option:opacity-100 group-hover/model-option:pointer-events-auto group-hover/model-option:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                  className="group/pin text-muted-foreground hover:text-foreground focus-visible:text-foreground pointer-events-none absolute -inset-2 flex items-center justify-center rounded-lg opacity-0 outline-none group-keyboard-focus-within/model-option:pointer-events-auto group-keyboard-focus-within/model-option:opacity-100 group-hover/model-option:pointer-events-auto group-hover/model-option:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                   aria-label={`${isPinned ? "Unpin" : "Pin"} ${getModelDisplayName(model)}`}
                   onPointerDown={(event) => {
                     event.preventDefault()

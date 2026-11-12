@@ -24,7 +24,7 @@ type SidebarMenuItemProps = Omit<
   trailing?: ReactNode
   /**
    * Set when `trailing` is an interactive control (not a passive hint): keeps
-   * it reachable by revealing on focus-within and on touch devices, where
+   * it reachable by revealing on keyboard focus and on touch devices, where
    * hover-only reveal would make it inoperable.
    */
   trailingInteractive?: boolean
@@ -85,7 +85,7 @@ export const SidebarMenuItem = forwardRef<
       className={cn(
         "shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover/menu-item:opacity-100",
         trailingInteractive &&
-          "relative z-10 group-focus-within/menu-item:opacity-100 pointer-coarse:opacity-100"
+          "relative z-10 group-keyboard-focus-within/menu-item:opacity-100 pointer-coarse:opacity-100"
       )}
     >
       {trailing}
