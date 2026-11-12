@@ -219,7 +219,7 @@ function SearchWorkItem({
         aria-label={entry.title}
         disabled={entry.sources.length === 0 && entry.status !== "approval"}
         onClick={entry.status === "approval" ? onOpenActivity : undefined}
-        className="focus-visible:ring-focus-ring hover:text-foreground flex min-h-8 w-full items-start gap-2 text-left text-base leading-6 font-normal text-[var(--text-tertiary)] outline-none focus-visible:ring-2"
+        className="group/search-trigger focus-visible:ring-focus-ring hover:text-foreground flex min-h-8 w-full items-start gap-2 text-left text-base leading-6 font-normal text-[var(--text-tertiary)] outline-none focus-visible:ring-2"
       >
         <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--background-tertiary)]">
           {marker}
@@ -236,7 +236,7 @@ function SearchWorkItem({
             glyphInset={0}
             className={cn(
               CHEVRON,
-              "-ms-1 mt-0.5 opacity-0 group-keyboard-focus-within/search:opacity-100 group-hover/search:opacity-100 pointer-coarse:opacity-100",
+              "-ms-1 mt-0.5 opacity-0 group-keyboard-focused/search-trigger:opacity-100 group-hover/search:opacity-100 pointer-coarse:opacity-100",
               open && "rotate-90 opacity-100"
             )}
           />

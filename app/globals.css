@@ -28,7 +28,10 @@
 @custom-variant not-keyboard-focused (&:not(:is(html [data-focus-mode="keyboard"]:focus-visible)));
 /* Hover-reveal companion: keyboard focus on the element or inside it. Never use
    plain focus-within for reveals: a mouse click leaves focus behind, pinning the
-   revealed controls after the pointer leaves (lint-enforced in eslint.config.mjs). */
+   revealed controls after the pointer leaves (lint-enforced in eslint.config.mjs).
+   It compiles to :has(), so apply it to the revealed control's own small
+   container, never a group that wraps streamed content (each insertion would
+   re-run it; see ADR-0049 notes on :has() invalidation). */
 /* prettier-ignore */
 @custom-variant keyboard-focus-within (&:is(html [data-focus-mode="keyboard"]:focus-visible, :has([data-focus-mode="keyboard"]:focus-visible)));
 
