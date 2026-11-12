@@ -236,7 +236,7 @@ function SearchWorkItem({
             glyphInset={0}
             className={cn(
               CHEVRON,
-              "-ms-1 mt-0.5 opacity-0 group-keyboard-focus-within/search:opacity-100 group-hover/search:opacity-100",
+              "-ms-1 mt-0.5 opacity-0 group-keyboard-focus-within/search:opacity-100 group-hover/search:opacity-100 pointer-coarse:opacity-100",
               open && "rotate-90 opacity-100"
             )}
           />

@@ -155,7 +155,7 @@ async function main() {
   let sendUrl = baseUrl
   if (MODE === "project") {
     await page.goto(baseUrl, { waitUntil: "domcontentloaded" })
-    await page.locator('[aria-label="New project"]').first().click()
+    await page.locator('[aria-label="New Project"]').first().click()
     await page
       .getByPlaceholder("Project name")
       .fill(`adoption-repro-${Date.now()}`)

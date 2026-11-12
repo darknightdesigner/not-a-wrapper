@@ -143,7 +143,7 @@ OpenRouter routes). `getReasoningEffortLabel(level, modelId)` in
 copied from its UI with the date checked, never derived by spelling out the
 wire value: spelling `xhigh` as "Extra High" invented a name Claude does not
 use ("Extra"). Makers without a recorded override fall back to the API value
-spelled out.
+spelled out, except `none`, which reads "Off".
 
 ### Gating
 

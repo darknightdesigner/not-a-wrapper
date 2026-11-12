@@ -1092,7 +1092,10 @@
       :has([data-popup-open]),
       [data-active],
       [aria-current="page"]
-    ) {
+    ),
+  /* Split rows (link + trailing control): hovering the control engages the
+     row, so the link inks up too. */
+  .sidebar-menu-row:hover > [data-sidebar-item] {
     color: var(--foreground);
   }
 
@@ -2472,13 +2475,13 @@ code {
   color: var(--link-hover);
 }
 .user-message-collapse-toggle {
-  color: color-mix(in oklab, var(--theme-user-msg-text) 78%, var(--theme-user-msg-bg));
+  color: color-mix(in oklab, var(--foreground) 78%, var(--user-message-bg));
 }
 .user-message-collapse-toggle:hover {
-  color: var(--theme-user-msg-text);
+  color: var(--foreground);
 }
 .user-message-collapse-toggle:focus-visible {
-  outline: 2px solid var(--theme-user-msg-text);
+  outline: 2px solid var(--foreground);
   outline-offset: 2px;
 }
 .user-message-edit-input [data-composer-surface] {

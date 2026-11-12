@@ -124,6 +124,20 @@ function PlusMenuRowContent({
   )
 }
 
+/** Placeholder row while the user's connectors load (both menus). */
+function ConnectorRowSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="skeleton group relative mx-1.5 flex min-h-(--floating-menu-item-height) w-auto items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 [--skeleton-opacity:0.75]"
+      data-composer-menu-skeleton=""
+    >
+      <div className="skeleton-child icon shrink-0 rounded-md" />
+      <div className="skeleton-child h-4 w-40 max-w-[70%] rounded-md" />
+    </div>
+  )
+}
+
 type PlusMenuContentProps = {
   touchOptimized: boolean
   acceptsImages: boolean
@@ -237,18 +251,36 @@ function PlusMenuContent({
             className={cn(rowClassName, composerMenuRowCheckedClassName)}
             onClick={() => onActivate(item.itemId)}
           >
-            <PlusMenuRowContent
-              icon={
-                touchOptimized
-                  ? touchMenuActionIcons[item.itemId]
-                  : item.action.icon
-              }
-              label={item.label}
-              touchOptimized={touchOptimized}
-            />
+            {/* A disabled toggle explains itself, as in the typed @ menu. */}
+            <Tooltip disabled={!item.disabled}>
+              <TooltipTrigger
+                render={
+                  <span
+                    className={cn(
+                      "flex min-w-0 grow items-center",
+                      touchOptimized && "gap-3"
+                    )}
+                  />
+                }
+              >
+                <PlusMenuRowContent
+                  icon={
+                    touchOptimized
+                      ? touchMenuActionIcons[item.itemId]
+                      : item.action.icon
+                  }
+                  label={item.label}
+                  touchOptimized={touchOptimized}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={4}>
+                {item.disabledMessage}
+              </TooltipContent>
+            </Tooltip>
           </DropdownMenuRadioItem>
         ))}
       </DropdownMenuRadioGroup>
+      {connectors === undefined && <ConnectorRowSkeleton />}
       {connectors?.map((connector) => (
         <DropdownMenuCheckboxItem
           key={connector.id}
@@ -477,16 +509,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
           />
         ))}
       </div>
-      {isConnectorsLoading && (
-        <div
-          aria-hidden="true"
-          className="skeleton group relative mx-1.5 flex min-h-(--floating-menu-item-height) w-auto items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 [--skeleton-opacity:0.75]"
-          data-composer-menu-skeleton=""
-        >
-          <div className="skeleton-child icon shrink-0 rounded-md" />
-          <div className="skeleton-child h-4 w-40 max-w-[70%] rounded-md" />
-        </div>
-      )}
+      {isConnectorsLoading && <ConnectorRowSkeleton />}
       {connectorItems.length > 0 && (
         <div role="group">
           {connectorItems.map((item) => (

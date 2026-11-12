@@ -44,17 +44,19 @@ function DotMatrixGlyph(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-/** Glyph is 75% of the slot: the reference's matrix-to-text proportion. */
+/** Glyph is 75% of the slot by default (the reference's matrix-to-text
+ * proportion), expressed as an inset so `glyphInset` and `glyphSize` both
+ * override it. */
 function Spinner({
   slotSize = 16,
-  glyphSize = "calc(var(--icon-slot-size) * 0.75)",
+  glyphInset = "calc(var(--icon-slot-size) * 0.25)",
   ...props
 }: Omit<IconProps, "icon">) {
   return (
     <Icon
       icon={DotMatrixGlyph}
       slotSize={slotSize}
-      glyphSize={glyphSize}
+      glyphInset={glyphInset}
       role="status"
       aria-label="Loading"
       {...props}

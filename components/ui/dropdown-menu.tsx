@@ -48,12 +48,12 @@ function DropdownMenuTrigger({
   )
 }
 
-// Only a keyboard close hands focus back to the trigger. A pointer close leaves
-// it alone, so a mouse pick never strands a focus ring or a `:focus-within`
-// row tint (sidebar rows) on the trigger.
-const keyboardOnlyFinalFocus: MenuPrimitive.Popup.Props["finalFocus"] = (
+// A mouse close leaves focus alone, so a mouse pick never strands a focus ring
+// or row tint on the trigger. Keyboard, touch, and assistive-tech closes
+// (empty type) hand focus back so users keep their place.
+const skipMouseFinalFocus: MenuPrimitive.Popup.Props["finalFocus"] = (
   closeType
-) => closeType === "keyboard"
+) => closeType !== "mouse"
 
 function DropdownMenuContent({
   anchor,
@@ -64,7 +64,7 @@ function DropdownMenuContent({
   className,
   animated = false,
   geometry = "menu",
-  finalFocus = keyboardOnlyFinalFocus,
+  finalFocus = skipMouseFinalFocus,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<

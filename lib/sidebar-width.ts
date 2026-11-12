@@ -3,6 +3,9 @@
  * in `app/globals.css`) and is also the minimum, so the frame only grows; a
  * stored width overrides the token on the frame. The cookie lets the server
  * render the chosen width with no post-hydration jump.
+ *
+ * Widths are px. `SIDEBAR_WIDTH_MIN` mirrors `--sidebar-width: 15rem` at the
+ * default 16px root size; keep the two in sync.
  */
 export const SIDEBAR_WIDTH_COOKIE = "sidebar_width"
 export const SIDEBAR_WIDTH_MIN = 240

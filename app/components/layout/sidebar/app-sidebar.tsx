@@ -276,8 +276,14 @@ function MobileAppSidebarDrawer() {
 }
 
 function useAppSidebarData() {
-  const { chats, isLoading, loadMore, canLoadMore, persistedProjects } =
-    useChats()
+  const {
+    chats,
+    isLoading,
+    loadMore,
+    canLoadMore,
+    isLoadingMore,
+    persistedProjects,
+  } = useChats()
   const { chatId } = useChatSession()
   const { user } = useUser()
   const isLoggedIn = !!user
@@ -318,6 +324,7 @@ function useAppSidebarData() {
     user,
     loadMore,
     canLoadMore,
+    isLoadingMore,
   }
 }
 
@@ -452,6 +459,7 @@ function SidebarExpandedNav({
                   showHeaderActions
                   onNewChat={onMobileClose}
                   canLoadMore={data.canLoadMore}
+                  isLoadingMore={data.isLoadingMore}
                   onLoadMore={data.loadMore}
                 />
               </div>
