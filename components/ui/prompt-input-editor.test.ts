@@ -14,7 +14,6 @@ import {
   readPromptInputDocument,
   readPromptInputEntities,
   replacePromptInputActionQuery,
-  toggleSyntheticPromptInputActionQuery,
   type PromptInputEntity,
 } from "./prompt-input-editor"
 
@@ -168,7 +167,6 @@ describe("PromptInput structured document", () => {
       query,
       to,
       trigger: "@",
-      isSynthetic: false,
     })
 
     expect(readPromptInputActionQuery(withSelectionAtEnd("@web"))).toEqual(
@@ -193,7 +191,6 @@ describe("PromptInput structured document", () => {
       query: "web s",
       to: 7,
       trigger: "+",
-      isSynthetic: false,
     })
     expect(readPromptInputActionQuery(withSelectionAtEnd("2+2"))).toBeNull()
   })
@@ -217,7 +214,6 @@ describe("PromptInput structured document", () => {
       query: "web",
       to: 5,
       trigger: "/",
-      isSynthetic: false,
     })
     // Space ends the slash query entirely — unlike "@" it never spans words.
     expect(readPromptInputActionQuery(withSelectionAtEnd("/web s"))).toBeNull()
@@ -229,69 +225,12 @@ describe("PromptInput structured document", () => {
         query: "web",
         to: 10,
         trigger: "/",
-        isSynthetic: false,
       }
     )
     expect(
       readPromptInputActionQuery(withSelectionAtEnd("@add /web s"))
     ).toBeNull()
     expect(readPromptInputActionQuery(withSelectionAtEnd("a/b"))).toBeNull()
-  })
-
-  it("runs synthetic sessions from a mapped anchor until adoption or close", () => {
-    let state = EditorState.create({
-      doc: createPromptInputDocument("hello "),
-      plugins: createPromptInputPlugins(() => "Ask anything"),
-      schema: promptInputSchema,
-    })
-    const dispatch = (transaction: Parameters<typeof state.apply>[0]) => {
-      state = state.apply(transaction)
-    }
-    state = state.apply(
-      state.tr.setSelection(
-        TextSelection.create(state.doc, state.doc.content.size - 1)
-      )
-    )
-
-    toggleSyntheticPromptInputActionQuery(state, dispatch)
-    expect(readPromptInputActionQuerySession(state)).toMatchObject({
-      active: true,
-      isSynthetic: true,
-      query: "",
-      trigger: "@",
-    })
-
-    dispatch(state.tr.insertText("add photos"))
-    expect(readPromptInputActionQuerySession(state)).toMatchObject({
-      active: true,
-      isSynthetic: true,
-      query: "add photos",
-    })
-
-    // Typing a trigger at/after the anchor converts the session to typed.
-    dispatch(state.tr.insertText(" @web"))
-    expect(readPromptInputActionQuerySession(state)).toMatchObject({
-      active: true,
-      isSynthetic: false,
-      query: "web",
-      trigger: "@",
-    })
-
-    // Toggling while typed opens a fresh synthetic session at the caret;
-    // toggling while synthetic closes it.
-    toggleSyntheticPromptInputActionQuery(state, dispatch)
-    expect(readPromptInputActionQuerySession(state)).toMatchObject({
-      active: true,
-      isSynthetic: true,
-      query: "",
-    })
-    toggleSyntheticPromptInputActionQuery(state, dispatch)
-    expect(readPromptInputActionQuerySession(state).active).toBe(false)
-
-    // A caret before the anchor closes the session.
-    toggleSyntheticPromptInputActionQuery(state, dispatch)
-    dispatch(state.tr.setSelection(TextSelection.create(state.doc, 1)))
-    expect(readPromptInputActionQuerySession(state).active).toBe(false)
   })
 
   it("keys session identity to trigger position and symbol", () => {
@@ -323,40 +262,6 @@ describe("PromptInput structured document", () => {
     })
     dispatch(state.tr.insertText("@"))
     expect(readPromptInputActionQuerySession(state).id).toBe(opened.id + 1)
-  })
-
-  it("consumes a synthetic query range without expecting a trigger character", () => {
-    let state = EditorState.create({
-      doc: createPromptInputDocument(""),
-      plugins: createPromptInputPlugins(() => "Ask anything"),
-      schema: promptInputSchema,
-    })
-    const dispatch = (transaction: Parameters<typeof state.apply>[0]) => {
-      state = state.apply(transaction)
-    }
-    toggleSyntheticPromptInputActionQuery(state, dispatch)
-    dispatch(state.tr.insertText("web sea"))
-    const session = readPromptInputActionQuerySession(state)
-    expect(session).toMatchObject({ isSynthetic: true, query: "web sea" })
-
-    expect(
-      replacePromptInputActionQuery(
-        state,
-        dispatch,
-        {
-          id: 1,
-          from: session.range!.from,
-          to: session.range!.to,
-          query: session.query,
-          trigger: session.trigger,
-          isSynthetic: true,
-        },
-        webSearchEntity
-      )
-    ).toBe(true)
-    expect(readPromptInputDocument(state.doc)).toBe("")
-    expect(readPromptInputEntities(state.doc)).toEqual([webSearchEntity])
-    expect(readPromptInputActionQuerySession(state).active).toBe(false)
   })
 
   it("keeps activation valid for the published range after the caret moves", () => {

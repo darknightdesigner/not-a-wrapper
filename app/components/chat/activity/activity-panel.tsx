@@ -14,7 +14,7 @@ import type {
   AssistantActivitySearchEntry,
   AssistantActivityToolEntry,
 } from "@/lib/chat-messages/assistant-activity"
-import { REASONING_EFFORT_LABELS } from "@/lib/reasoning-effort"
+import { getReasoningEffortLabel } from "@/lib/reasoning-effort"
 import { resolveSourceLinkDestination } from "@/lib/url-safety"
 import { RiCheckLine, RiCodeLine, RiFileCopyLine } from "@remixicon/react"
 import Image from "next/image"
@@ -308,7 +308,7 @@ function ActivityEntryRow({
         {entry.title}
         {entry.kind === "completion" && entry.effort !== undefined ? (
           <span className="text-muted-foreground ms-1.5 font-normal">
-            · {REASONING_EFFORT_LABELS[entry.effort]} effort
+            · {getReasoningEffortLabel(entry.effort, entry.modelId)} effort
           </span>
         ) : null}
       </StepTitle>

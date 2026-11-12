@@ -102,7 +102,7 @@ const apiRows = [
     type: "boolean",
     defaultValue: "false",
     description:
-      "Set when trailing is a control: keeps it reachable via focus-within and on touch devices.",
+      "Set when trailing is a control: keeps it reachable via keyboard focus and on touch devices.",
   },
   {
     prop: "isActive",

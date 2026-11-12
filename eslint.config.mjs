@@ -110,6 +110,16 @@ const eslintConfig = [
           message:
             "Do not import usePaginatedQuery from convex/react directly. Use usePerUserPaginatedQuery from @/lib/convex/use-per-user-query, which owns the isConvexAuthenticated subscribe gate. See ADR-0004.",
         },
+        // Lives in this block because flat config replaces, not merges,
+        // no-restricted-syntax options for the same files.
+        ...[
+          "Literal[value=/group-focus-within/]",
+          "TemplateElement[value.raw=/group-focus-within/]",
+        ].map((selector) => ({
+          selector,
+          message:
+            "Hover reveals must not use group-focus-within: a mouse click leaves focus inside the group and pins the reveal after the pointer leaves. Use group-keyboard-focus-within (app/globals.css).",
+        })),
       ],
     },
   },

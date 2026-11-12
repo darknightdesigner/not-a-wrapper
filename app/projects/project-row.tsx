@@ -104,7 +104,7 @@ export function ProjectRow({
             data-testid="project-row-pin"
             className={cn(
               "pointer-events-none absolute inset-0 flex items-center justify-center text-[var(--text-tertiary)] transition-opacity duration-150 motion-reduce:transition-none",
-              "opacity-100 group-hover/project-row:opacity-0 group-focus-within/project-row:opacity-0",
+              "opacity-100 group-hover/project-row:opacity-0 group-keyboard-focus-within/project-row:opacity-0",
               "max-sm:opacity-0 pointer-coarse:opacity-0",
               isMenuOpen && "opacity-0"
             )}
@@ -114,9 +114,9 @@ export function ProjectRow({
             <span className="sr-only">Pinned</span>
           </div>
         ) : null}
-        {/* Desktop reveal on row hover / focus-within; always visible on touch;
+        {/* Desktop reveal on row hover / keyboard focus; always visible on touch;
             pinned visible while the menu is open (focus moves into the popup,
-            so focus-within alone would hide the open menu's trigger). */}
+            so keyboard focus alone would hide the open menu's trigger). */}
         <div
           data-testid="project-row-actions"
           data-menu-open={isMenuOpen || undefined}
@@ -124,7 +124,7 @@ export function ProjectRow({
             "absolute inset-y-0 end-0 flex size-9 items-center justify-end transition-opacity duration-150 motion-reduce:transition-none",
             "pointer-events-none opacity-0",
             "group-hover/project-row:pointer-events-auto group-hover/project-row:opacity-100",
-            "group-focus-within/project-row:pointer-events-auto group-focus-within/project-row:opacity-100",
+            "group-keyboard-focus-within/project-row:pointer-events-auto group-keyboard-focus-within/project-row:opacity-100",
             "max-sm:pointer-events-auto max-sm:opacity-100",
             "pointer-coarse:pointer-events-auto pointer-coarse:opacity-100",
             isMenuOpen && "pointer-events-auto opacity-100"

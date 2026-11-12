@@ -32,7 +32,7 @@ const systemMessageVariants = cva(
       {
         variant: "error",
         fill: true,
-        class: "bg-destructive/10 border-transparent",
+        class: "bg-destructive-surface border-transparent",
       },
       {
         variant: "warning",

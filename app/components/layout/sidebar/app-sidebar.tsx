@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Icon, type IconProps } from "@/components/ui/icon"
 import { Kbd, KbdGroup } from "@/components/ui/kbd"
+import { MenuLeadingIcon } from "@/components/ui/menu-leading-icon"
 import {
   Popover,
   PopoverContent,
@@ -65,17 +66,12 @@ import Link from "next/link"
 import React, { useMemo, useRef } from "react"
 import { PopoverContentAuth } from "../../chat-input/popover-content-auth"
 import { HistoryTrigger } from "../../history/history-trigger"
-import { useInfiniteScroll } from "../../history/use-history-view"
 import { UserMenu } from "../user-menu"
-import {
-  deriveSidebarComposition,
-  deriveSidebarSelection,
-} from "./sidebar-composition"
+import { deriveSidebarComposition } from "./sidebar-composition"
 import { SidebarItem } from "./sidebar-item"
 import { SidebarLeadingIcon } from "./sidebar-leading-icon"
 import { SidebarList } from "./sidebar-list"
 import { SidebarMenuItem } from "./sidebar-menu-item"
-import { SidebarPaginationState } from "./sidebar-pagination-skeleton"
 import { SidebarProject } from "./sidebar-project"
 
 export function AppSidebar() {
@@ -176,7 +172,6 @@ function DesktopAppSidebar() {
                 <Kbd>O</Kbd>
               </>
             }
-            isActive={sidebarData.isNewChatActive}
           />
           {sidebarData.isLoggedIn ? (
             <HistoryTrigger
@@ -284,18 +279,17 @@ function useAppSidebarData() {
   const {
     chats,
     isLoading,
-    isLoadingMore,
     loadMore,
     canLoadMore,
+    isLoadingMore,
     persistedProjects,
   } = useChats()
-  const { chatId, isNewChatSurface } = useChatSession()
+  const { chatId } = useChatSession()
   const { user } = useUser()
   const isLoggedIn = !!user
-  const { currentChatId, isNewChatActive } = deriveSidebarSelection({
-    isNewChatSurface,
-    sessionChatId: chatId,
-  })
+  // ChatSession is the only selection authority: a first turn commits its
+  // client-minted id before the sidebar row exists (ADR-0033).
+  const currentChatId = chatId ?? undefined
   const { data: liveProjectDocs } = usePerUserQuery(
     api.projects.getForCurrentUser
   )
@@ -324,14 +318,13 @@ function useAppSidebarData() {
     composition,
     currentChatId,
     isLoading: isLoading || (isLoggedIn && projectDocs === undefined),
-    isLoadingMore,
     isLoggedIn,
-    isNewChatActive,
     isProjectPinPending: isPinPending,
     toggleProjectPinned: togglePinned,
     user,
     loadMore,
     canLoadMore,
+    isLoadingMore,
   }
 }
 
@@ -346,11 +339,6 @@ function SidebarExpandedNav({
 }) {
   const scrollRef = useRef<HTMLElement>(null)
   const scrollStateRef = useScrollAttributes(scrollRef)
-
-  // Bounded sidebar (ADR-0005): load more window pages as the user nears the
-  // bottom.
-  const { canLoadMore, loadMore } = data
-  useInfiniteScroll(scrollRef, canLoadMore, loadMore)
 
   return (
     <>
@@ -368,7 +356,7 @@ function SidebarExpandedNav({
               <Link
                 href="/"
                 onClick={onMobileClose}
-                className="focus-visible:ring-focus-ring flex h-9 w-auto items-center justify-center rounded-[8px] px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                className="text-foreground focus-visible:ring-focus-ring flex h-9 w-auto items-center justify-center rounded-[8px] px-2.5 outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                 data-sidebar-item="true"
                 aria-label="Home"
               >
@@ -408,7 +396,6 @@ function SidebarExpandedNav({
               label="New"
               href="/"
               testId="new-chat-button"
-              isActive={data.isNewChatActive}
               onClick={onMobileClose}
               trailing={
                 <KbdGroup>
@@ -457,7 +444,7 @@ function SidebarExpandedNav({
             <div className="h-full" />
           ) : data.isLoggedIn ? (
             <>
-              <div className="sidebar-section-stack">
+              <div className="sidebar-section-stack pb-5">
                 <SidebarProject
                   isAuthenticated={data.isLoggedIn}
                   projects={data.composition.projects}
@@ -471,12 +458,11 @@ function SidebarExpandedNav({
                   storageKey="sidebar-section-your-chats"
                   showHeaderActions
                   onNewChat={onMobileClose}
+                  canLoadMore={data.canLoadMore}
+                  isLoadingMore={data.isLoadingMore}
+                  onLoadMore={data.loadMore}
                 />
               </div>
-              <SidebarPaginationState
-                isLoadingMore={data.isLoadingMore}
-                seed={data.composition.chats.length}
-              />
             </>
           ) : null}
         </div>
@@ -509,7 +495,7 @@ function SidebarExpandedNav({
         {data.isLoggedIn ? (
           <div
             className={cn(
-              "bg-sidebar sticky bottom-0 z-30 px-2 py-(--sidebar-footer-inset) empty:hidden",
+              "bg-sidebar sticky bottom-0 z-30 px-(--sidebar-row-outer-inset) py-(--sidebar-footer-inset) empty:hidden",
               "scroll-state-shadow-bottom"
             )}
           >
@@ -594,14 +580,15 @@ function CollapsedHeaderToggle() {
             size="icon"
             shape="square"
             onClick={toggleSidebar}
-            className="group/open-sidebar text-foreground relative cursor-e-resize rtl:cursor-w-resize"
+            className="group/open-sidebar relative cursor-e-resize text-[var(--text-tertiary)] rtl:cursor-w-resize"
             aria-label="Open sidebar"
             aria-expanded={false}
             aria-controls={SIDEBAR_CONTAINER_ID}
           />
         }
       >
-        <NawIcon className="absolute inset-0 m-auto size-5 opacity-100 transition-opacity duration-[1ms] group-hover/tiny-bar:opacity-0 group-focus-visible/open-sidebar:opacity-0" />
+        {/* Glyph matches the expanded toggle (tertiary); the logo stays full ink. */}
+        <NawIcon className="text-foreground absolute inset-0 m-auto size-5 opacity-100 transition-opacity duration-[1ms] group-hover/tiny-bar:opacity-0 group-focus-visible/open-sidebar:opacity-0" />
         <Icon
           icon={RiSideBarLine}
           slotSize={20}
@@ -653,7 +640,6 @@ function CollapsedMenuItem({
       : "w-(--sidebar-collapsed-item-width)",
     "cursor-pointer",
     "hover:bg-sidebar-row active:bg-sidebar-row",
-    isActive && "text-foreground",
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
   )
 
@@ -732,7 +718,7 @@ function CollapsedRecentsMenu({
                 <button
                   type="button"
                   className={cn(
-                    "menu-item-hoverable text-foreground flex h-(--sidebar-row-height) w-full items-center justify-center rounded-(--sidebar-row-radius)",
+                    "menu-item-hoverable flex h-(--sidebar-row-height) w-full items-center justify-center rounded-(--sidebar-row-radius)",
                     "hover:bg-sidebar-row active:bg-sidebar-row focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
                     open && "bg-sidebar-row"
                   )}
@@ -765,7 +751,7 @@ function CollapsedRecentsMenu({
           onClickCapture={handleContentClick}
         >
           <div className="w-(--sidebar-width)">
-            <div className="mx-1.5 flex h-(--sidebar-row-height) items-center px-2.5 text-sm leading-5 font-normal text-[var(--text-tertiary)]">
+            <div className="mx-1.5 flex h-(--sidebar-row-height) items-center px-2.5 text-sm leading-5 font-normal text-(--sidebar-label-foreground)">
               {label}
             </div>
             {recentChats.map((chat) => (
@@ -793,7 +779,6 @@ function SignedOutCollapsedSearchPopover({
     "menu-item-hoverable flex h-(--sidebar-row-height) w-(--sidebar-collapsed-item-width) items-center justify-center rounded-(--sidebar-row-radius)",
     "cursor-pointer",
     "hover:bg-sidebar-row active:bg-sidebar-row",
-    open && "text-foreground",
     "focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
   )
 
@@ -883,7 +868,7 @@ function SignedOutCollapsedAccountPopover({
             data-sidebar-item="true"
             data-testid="accounts-profile-button"
             className={cn(
-              "menu-item-hoverable text-foreground mx-auto flex h-10 w-10 items-center justify-center rounded-(--sidebar-row-radius)",
+              "menu-item-hoverable mx-auto flex h-10 w-10 items-center justify-center rounded-(--sidebar-row-radius)",
               "hover:bg-sidebar-row active:bg-sidebar-row focus-visible:ring-focus-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
               open && "bg-sidebar-row"
             )}
@@ -912,38 +897,35 @@ function SignedOutAccountPopoverContent() {
   return (
     <>
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiSparklingLine} slotSize={20} />}
+        icon={RiSparklingLine}
         label="See plans and pricing"
         showTrailingIcon
       />
-      <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiSettings3Line} slotSize={20} />}
-        label="Settings"
-      />
+      <SignedOutAccountDropdownItem icon={RiSettings3Line} label="Settings" />
       <DropdownMenuSeparator />
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiQuestionLine} slotSize={20} />}
+        icon={RiQuestionLine}
         label="Help center"
         showTrailingIcon
       />
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiQuillPenLine} slotSize={20} />}
+        icon={RiQuillPenLine}
         label="Release notes"
         showTrailingIcon
       />
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiDownloadLine} slotSize={20} />}
+        icon={RiDownloadLine}
         label="Download apps"
         showTrailingIcon
       />
       <DropdownMenuSeparator />
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiFileTextLine} slotSize={20} />}
+        icon={RiFileTextLine}
         label="Terms of Service"
         showTrailingIcon
       />
       <SignedOutAccountDropdownItem
-        icon={<Icon icon={RiInformationLine} slotSize={20} />}
+        icon={RiInformationLine}
         label="Privacy Policy"
         showTrailingIcon
       />
@@ -956,7 +938,7 @@ function SignedOutAccountDropdownItem({
   label,
   showTrailingIcon,
 }: {
-  icon: React.ReactNode
+  icon: IconProps["icon"]
   label: string
   showTrailingIcon?: boolean
 }) {
@@ -969,7 +951,7 @@ function SignedOutAccountDropdownItem({
       }}
       className="gap-1.5"
     >
-      <div className="flex shrink-0 items-center justify-center">{icon}</div>
+      <MenuLeadingIcon icon={icon} />
       <span className="min-w-0 flex-1 truncate">{label}</span>
       {showTrailingIcon && (
         <Icon
@@ -993,8 +975,8 @@ function SignedOutHelpPopover() {
           <button
             type="button"
             className={cn(
-              "menu-item-hoverable group/help text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row focus-visible:ring-focus-ring relative mx-1.5 inline-flex h-(--sidebar-row-height) w-[calc(100%-var(--spacing)*3)] cursor-pointer items-center rounded-(--sidebar-row-radius) bg-transparent px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-              open && "bg-sidebar-row text-foreground"
+              "menu-item-hoverable group/help hover:bg-sidebar-row active:bg-sidebar-row focus-visible:ring-focus-ring relative mx-1.5 inline-flex h-(--sidebar-row-height) w-[calc(100%-var(--spacing)*3)] cursor-pointer items-center rounded-(--sidebar-row-radius) bg-transparent px-2.5 py-1.5 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+              open && "bg-sidebar-row"
             )}
             data-sidebar-item="true"
             aria-label="Help"

@@ -13,7 +13,6 @@ import {
   createActionQueryPublisher,
   createPromptInputDocument,
   createPromptInputPlugins,
-  endPromptInputActionQuery,
   promptInputEntitiesEqual,
   promptInputSchema,
   readPromptInputDocument,
@@ -21,7 +20,6 @@ import {
   replacePromptInputActionQuery,
   replacePromptInputDocument,
   setPromptInputSelection,
-  toggleSyntheticPromptInputActionQuery,
   type PromptInputActionQuery,
   type PromptInputEntity,
 } from "@/components/ui/prompt-input-editor"
@@ -57,11 +55,6 @@ export type PromptInputEditorHandle = {
     actionQuery: PromptInputActionQuery,
     entity?: PromptInputEntity
   ) => boolean
-  /** Open a synthetic action-query session at the caret (the + button), or
-   * close the current one when it is already synthetic. */
-  toggleSyntheticActionQuery: () => void
-  /** End the active action-query session (synthetic Escape / focus-out). */
-  endActionQuery: () => void
   setSelectionRange: (selectionStart: number, selectionEnd: number) => void
 }
 
@@ -267,7 +260,7 @@ function PromptInput({
             className={cn("group/composer relative z-1 w-full", className)}
             style={
               {
-                "--composer-border-radius": "28px",
+                "--composer-border-radius": "29px",
                 viewTransitionName: "var(--vt-composer)",
               } as React.CSSProperties
             }
@@ -293,12 +286,12 @@ function PromptInput({
               <motion.div
                 layout
                 layoutDependency={layoutDependency}
-                style={{ borderRadius: 28 }}
+                style={{ borderRadius: 29 }}
                 data-composer-surface="true"
                 data-expanded-composer={isExpandedComposer ? "" : undefined}
                 data-slot="prompt-input-surface"
                 className={cn(
-                  "shadow-short-composer border-border-subtle relative grid cursor-text grid-cols-[minmax(0,1fr)] grid-rows-[max-content_0_auto] flex-col overflow-clip border-0 bg-[var(--composer-surface-primary)] bg-clip-padding contain-inline-size [corner-shape:superellipse(1.1)] [grid-template-areas:'eyebrow'_'controls'_'body'] group-not-data-expanded/composer:min-h-[52px] motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-in-out max-sm:not-dark:shadow-[0_0_0_1px_rgba(0,_0,_0,_0.04),0_2px_8px_0_rgba(0,_0,_0,_0.04),0px_4px_40px_8px_rgba(0,_0,_0,_0.025)]",
+                  "shadow-short-composer border-border-subtle relative grid cursor-text grid-cols-[minmax(0,1fr)] grid-rows-[max-content_0_auto] flex-col overflow-clip border-0 bg-[var(--composer-surface-primary)] bg-clip-padding contain-inline-size [corner-shape:superellipse(1.1)] [grid-template-areas:'eyebrow'_'controls'_'body'] group-not-data-expanded/composer:min-h-[58px] motion-safe:transition-colors motion-safe:duration-200 motion-safe:ease-in-out",
                   isExpandedComposer &&
                     "my-4 h-[min(calc(100svh-var(--header-height)-8rem),48rem)] max-h-[calc(100svh-var(--header-height)-8rem)]"
                 )}
@@ -311,51 +304,60 @@ function PromptInput({
                   data-composer-controls-anchor=""
                 >
                   {canExpandComposer && (
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={
-                          <ComposerIconButton
-                            aria-label={
-                              isExpandedComposer ? "Collapse" : "Expand"
-                            }
-                            aria-pressed={isExpandedComposer}
-                            className="absolute end-2.5 top-2.5 z-10"
-                            type="button"
-                            pressMotion="none"
-                            onPointerDown={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                            }}
-                            onClick={(event) => {
-                              event.preventDefault()
-                              event.stopPropagation()
-                              setExpandedComposer((current) => !current)
-                              editorRef.current?.focus({ preventScroll: true })
-                            }}
-                          >
-                            <Icon
-                              className="text-[var(--text-secondary)]"
-                              icon={
-                                isExpandedComposer
-                                  ? RiCollapseDiagonalLine
-                                  : RiExpandDiagonalLine
+                    // The surface animates size by scaling. This sized layout
+                    // box gets Motion's counter-scale; the 0px anchor can't.
+                    <motion.div
+                      layout="position"
+                      layoutDependency={layoutDependency}
+                      className="absolute end-[11px] top-[11px] z-10"
+                    >
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <ComposerIconButton
+                              aria-label={
+                                isExpandedComposer ? "Collapse" : "Expand"
                               }
-                              slotSize={20}
-                            />
-                          </ComposerIconButton>
-                        }
-                      />
-                      <TooltipContent side="bottom">
-                        {isExpandedComposer ? "Collapse" : "Expand"}
-                      </TooltipContent>
-                    </Tooltip>
+                              aria-pressed={isExpandedComposer}
+                              type="button"
+                              pressMotion="none"
+                              onPointerDown={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                              }}
+                              onClick={(event) => {
+                                event.preventDefault()
+                                event.stopPropagation()
+                                setExpandedComposer((current) => !current)
+                                editorRef.current?.focus({
+                                  preventScroll: true,
+                                })
+                              }}
+                            >
+                              <Icon
+                                className="text-[var(--text-secondary)]"
+                                icon={
+                                  isExpandedComposer
+                                    ? RiCollapseDiagonalLine
+                                    : RiExpandDiagonalLine
+                                }
+                                slotSize={20}
+                              />
+                            </ComposerIconButton>
+                          }
+                        />
+                        <TooltipContent side="bottom">
+                          {isExpandedComposer ? "Collapse" : "Expand"}
+                        </TooltipContent>
+                      </Tooltip>
+                    </motion.div>
                   )}
                 </div>
                 <div
                   data-composer-body=""
                   data-composer-grid=""
                   data-composer-layout="true"
-                  className="col-start-1 col-end-2 row-start-3 row-end-4 grid min-h-0 min-w-0 flex-1 grid-cols-[auto_1fr_auto] px-2 py-[9px] [--composer-compact-editor-padding-end:6px] [--composer-compact-editor-padding-start:7px] [grid-template-areas:'header_header_header'_'leading_primary_trailing'_'._footer_.'] group-not-data-expanded/composer:py-[5px] group-data-expanded/composer:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] group-data-expanded-composer/composer:grid-rows-[auto_minmax(0,1fr)_auto] max-sm:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] max-sm:group-not-data-expanded/composer:pb-2 @max-[520px]/main:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing']"
+                  className="col-start-1 col-end-2 row-start-3 row-end-4 grid min-h-0 min-w-0 flex-1 grid-cols-[auto_1fr_auto] px-[11px] py-[11px] [--composer-compact-editor-padding-end:6px] [--composer-compact-editor-padding-start:7px] [grid-template-areas:'header_header_header'_'leading_primary_trailing'_'._footer_.'] group-not-data-expanded/composer:py-[8px] group-data-expanded/composer:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] group-data-expanded-composer/composer:grid-rows-[auto_minmax(0,1fr)_auto] max-sm:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing'] max-sm:group-not-data-expanded/composer:pb-[11px] @max-[520px]/main:[grid-template-areas:'header_header_header'_'primary_primary_primary'_'leading_footer_trailing']"
                 >
                   {children}
                 </div>
@@ -958,9 +960,8 @@ const PromptInputEditor = React.forwardRef<
             const nextState = view.state.apply(transaction)
             view.updateState(nextState)
             paintController?.onEditorUpdate()
-            // The action-query plugin owns re-evaluation rules
-            // (typed sessions on doc changes, synthetic sessions every
-            // transaction); publishing just diffs its state.
+            // The action-query plugin owns re-evaluation rules;
+            // publishing just diffs its state.
             publishActionQuery(nextState)
             if (
               !transaction.docChanged ||
@@ -1035,13 +1036,6 @@ const PromptInputEditor = React.forwardRef<
             actionQuery,
             entity
           )
-        },
-        toggleSyntheticActionQuery() {
-          toggleSyntheticPromptInputActionQuery(view.state, view.dispatch)
-          view.focus()
-        },
-        endActionQuery() {
-          endPromptInputActionQuery(view.state, view.dispatch)
         },
         setSelectionRange(selectionStart, selectionEnd) {
           setPromptInputSelection(view, selectionStart, selectionEnd)

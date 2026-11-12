@@ -1,3 +1,4 @@
+import { Spinner } from "@/components/ui/spinner"
 import type { SidebarChatStatus } from "@/lib/chat-store/status/sidebar-chat-status"
 import { cn } from "@/lib/utils"
 
@@ -22,7 +23,7 @@ type SidebarChatStatusIndicatorProps = {
  * from the action columns.
  *
  * The slot is a fixed 16px square so the title baseline never shifts as the
- * indicator swaps between a ring and a dot.
+ * indicator swaps between the spinner and a dot.
  */
 export function SidebarChatStatusIndicator({
   status,
@@ -38,9 +39,10 @@ export function SidebarChatStatusIndicator({
       )}
     >
       {status === "streaming" ? (
-        <span
-          className="text-muted-foreground size-3.5 animate-spin rounded-full border-[1.5px] border-current border-t-transparent"
-          aria-hidden
+        <Spinner
+          aria-hidden="true"
+          aria-label={undefined}
+          className="text-[var(--item-foreground)]"
         />
       ) : status === "awaiting" ? (
         // Pulsing amber dot — a clear "needs your attention" cue while blocked

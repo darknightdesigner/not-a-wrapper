@@ -43,7 +43,7 @@ export function SidebarProject({
             <SidebarCollectionItem>
               <SidebarMenuItem
                 icon={RiFolderAddLine}
-                label="New project"
+                label="New Project"
                 testId="sidebar-new-project"
                 onClick={() => setIsDialogOpen(true)}
               />

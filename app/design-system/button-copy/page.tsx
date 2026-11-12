@@ -68,8 +68,9 @@ export default function ButtonCopyPage() {
         <DsApiTable columnWidths={[14, 26, 14, 46]} rows={apiRows} />
         <DsParagraph className="mt-3">
           The table variant stays invisible until its surrounding
-          group/markdown-table container is hovered or focused (always visible
-          on coarse pointers), so it only makes sense inside that context.
+          group/markdown-table container is hovered or the chip itself has
+          keyboard focus (always visible on coarse pointers), so it only makes
+          sense inside that context.
         </DsParagraph>
       </DsSection>
     </DsPage>

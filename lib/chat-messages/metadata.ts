@@ -113,6 +113,12 @@ export function getMessageProvider(metadata: unknown): string | undefined {
   return typeof metadata.provider === "string" ? metadata.provider : undefined
 }
 
+/** The model id that ran this turn (server-owned durable field). */
+export function getMessageModel(metadata: unknown): string | undefined {
+  if (!isRecord(metadata)) return undefined
+  return typeof metadata.model === "string" ? metadata.model : undefined
+}
+
 /** The generation run whose durable copy this is (server-owned). */
 export function getGenerationRunId(metadata: unknown): string | undefined {
   if (!isRecord(metadata)) return undefined

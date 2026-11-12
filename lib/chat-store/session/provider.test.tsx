@@ -3,7 +3,11 @@
 import React, { act } from "react"
 import { createRoot, type Root } from "react-dom/client"
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest"
-import { ChatSessionProvider, useChatIdHandoff, useChatSession } from "./provider"
+import {
+  ChatSessionProvider,
+  useChatIdHandoff,
+  useChatSession,
+} from "./provider"
 
 const navigationMocks = vi.hoisted(() => ({ pathname: "/" }))
 
@@ -12,12 +16,7 @@ vi.mock("next/navigation", () => ({
 }))
 
 function SessionProbe() {
-  const {
-    chatId,
-    isNewChatSurface,
-    commitChatIdentity,
-    resetChatIdentity,
-  } = useChatSession()
+  const { chatId, commitChatIdentity, resetChatIdentity } = useChatSession()
   const isChatIdHandoff = useChatIdHandoff()
 
   return (
@@ -25,7 +24,6 @@ function SessionProbe() {
       <button
         type="button"
         data-testid="commit"
-        data-new-chat={String(isNewChatSurface)}
         data-chat-id-handoff={String(isChatIdHandoff)}
         onClick={() => commitChatIdentity("chat-minted")}
       >
@@ -63,24 +61,22 @@ describe("ChatSessionProvider route identity", () => {
     }
 
     act(() => {
-      root?.render(
-        <ChatSessionProvider>
-          {children}
-        </ChatSessionProvider>
-      )
+      root?.render(<ChatSessionProvider>{children}</ChatSessionProvider>)
     })
   }
 
-  const probe = () => container!.querySelector<HTMLButtonElement>("[data-testid=commit]")!
+  const probe = () =>
+    container!.querySelector<HTMLButtonElement>("[data-testid=commit]")!
   const click = (testId: string) =>
     act(() => {
-      container?.querySelector<HTMLButtonElement>(`[data-testid=${testId}]`)?.click()
+      container
+        ?.querySelector<HTMLButtonElement>(`[data-testid=${testId}]`)
+        ?.click()
     })
 
   it("commits the route synchronously when the identity is set", () => {
     renderSession()
     expect(probe().textContent).toBe("new-chat")
-    expect(probe().dataset.newChat).toBe("true")
 
     const historyLength = window.history.length
     click("commit")
@@ -90,7 +86,6 @@ describe("ChatSessionProvider route identity", () => {
     expect(window.location.pathname).toBe("/c/chat-minted")
     expect(window.history.length).toBe(historyLength + 1)
     expect(probe().textContent).toBe("chat-minted")
-    expect(probe().dataset.newChat).toBe("false")
     expect(probe().dataset.chatIdHandoff).toBe("true")
 
     navigationMocks.pathname = "/c/chat-minted"
@@ -163,7 +158,6 @@ describe("ChatSessionProvider route identity", () => {
     // Next still reports the pushed pathname for a render; the session
     // already presents the origin so no consumer resolves the abandoned id.
     expect(probe().textContent).toBe("new-chat")
-    expect(probe().dataset.newChat).toBe("true")
 
     navigationMocks.pathname = "/"
     renderSession()
@@ -180,6 +174,5 @@ describe("ChatSessionProvider route identity", () => {
     renderSession()
 
     expect(probe().textContent).toBe("new-chat")
-    expect(probe().dataset.newChat).toBe("true")
   })
 })

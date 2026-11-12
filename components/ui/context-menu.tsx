@@ -1,14 +1,16 @@
 import {
   floatingMenuContentClassName,
   floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
   floatingMenuLabelClassName,
   floatingMenuSeparatorClassName,
   floatingSurfaceClassName,
 } from "@/components/ui/floating-surface"
 import { Icon } from "@/components/ui/icon"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
-import { RiArrowRightSLine, RiCheckLine } from "@remixicon/react"
+import { RiArrowRightSLine } from "@remixicon/react"
 import * as React from "react"
 
 function ContextMenu({ ...props }: ContextMenuPrimitive.Root.Props) {
@@ -113,7 +115,7 @@ function ContextMenuItem({
       data-variant={variant}
       className={cn(
         floatingMenuItemClassName,
-        "menu-item-hoverable group/context-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 focus:*:[svg]:text-foreground data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "menu-item-hoverable group/context-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-surface data-[variant=destructive]:focus:text-destructive focus:*:[svg]:text-foreground data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
@@ -185,11 +187,11 @@ function ContextMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute right-2">
-        <ContextMenuPrimitive.CheckboxItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </ContextMenuPrimitive.CheckboxItemIndicator>
-      </span>
+      <ContextMenuPrimitive.CheckboxItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
+      >
+        <MenuCheckIcon />
+      </ContextMenuPrimitive.CheckboxItemIndicator>
       {children}
     </ContextMenuPrimitive.CheckboxItem>
   )
@@ -225,11 +227,11 @@ function ContextMenuRadioItem({
       )}
       {...props}
     >
-      <span className="pointer-events-none absolute right-2">
-        <ContextMenuPrimitive.RadioItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </ContextMenuPrimitive.RadioItemIndicator>
-      </span>
+      <ContextMenuPrimitive.RadioItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
+      >
+        <MenuCheckIcon />
+      </ContextMenuPrimitive.RadioItemIndicator>
       {children}
     </ContextMenuPrimitive.RadioItem>
   )

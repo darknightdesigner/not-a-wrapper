@@ -123,8 +123,10 @@ const userMessageFooterRevealClassName = cn(
   "group-hover/turn-messages:duration-[50ms]",
   "group-hover/turn-messages:pointer-events-auto",
   "group-hover/turn-messages:opacity-100",
-  "group-focus-within/turn-messages:pointer-events-auto",
-  "group-focus-within/turn-messages:opacity-100",
+  // Keyboard reveal is scoped to the footer: the turn group wraps streamed
+  // content, and its :has() would re-run on every streamed insertion.
+  "keyboard-focus-within:pointer-events-auto",
+  "keyboard-focus-within:opacity-100",
   "has-[[data-state=open]]:pointer-events-auto",
   "has-[[data-state=open]]:opacity-100",
   "focus-within:transition-none hover:transition-none",

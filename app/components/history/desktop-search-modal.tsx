@@ -184,14 +184,14 @@ export function DesktopSearchModal({
     <DialogPrimitive.Root open={isOpen} onOpenChange={handleOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-50 bg-(--modal-centered-scrim) transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0"
           onClick={() => handleOpenChange(false)}
         />
         <DialogPrimitive.Popup
           className={cn(
             "pointer-events-none fixed inset-0 z-50 outline-none",
             "grid grid-cols-[10px_1fr_10px] grid-rows-[minmax(10px,1fr)_auto_minmax(10px,1fr)]",
-            "md:grid-rows-[minmax(20px,1fr)_auto_minmax(20px,1fr)]"
+            "md:grid-rows-[minmax(20px,18dvh)_auto_minmax(20px,1fr)]"
           )}
         >
           <DialogPrimitive.Title className="sr-only">
@@ -206,12 +206,12 @@ export function DesktopSearchModal({
           {isAuthenticated ? (
             <div
               className={cn(
-                "pointer-events-auto col-start-2 row-start-2 mx-auto flex h-[462px] max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden",
+                "pointer-events-auto col-start-2 row-start-2 mx-auto flex h-[448px] max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden",
                 desktopSearchSurfaceClassName,
                 "max-w-md md:max-w-[720px] md:min-w-[720px]"
               )}
             >
-              <div className="me-4 flex h-16 shrink-0 items-center justify-between">
+              <div className="flex h-14 shrink-0 items-center">
                 <input
                   ref={inputRef}
                   type="text"
@@ -231,25 +231,22 @@ export function DesktopSearchModal({
                   aria-expanded={isOpen}
                   role="combobox"
                   className={cn(
-                    "text-foreground h-full w-full border-none bg-transparent ps-5 text-base",
+                    "text-foreground h-full w-full border-none bg-transparent px-[18px] text-[15px]",
                     "placeholder:text-placeholder focus:ring-0 focus:outline-none"
                   )}
                 />
-                <DialogCloseButton className="ms-4 shrink-0" />
               </div>
-
-              <hr className="border-border" />
 
               <div
                 ref={scrollRef}
-                className="my-2 min-h-0 grow overflow-y-auto"
+                className="min-h-0 grow overflow-y-auto pb-2.5"
               >
                 <div
                   ref={listRef}
                   id={listboxId}
                   role="listbox"
                   aria-label="Chats"
-                  className="mx-2"
+                  className="mx-2.5"
                 >
                   {!view.isSearching && (
                     <SearchRow
@@ -259,7 +256,7 @@ export function DesktopSearchModal({
                       href="/"
                       label="New chat"
                       icon={
-                        <RiAddLine className="size-5 shrink-0" aria-hidden />
+                        <RiAddLine className="size-4 shrink-0" aria-hidden />
                       }
                       onClick={() => handleOpenChange(false)}
                       onMouseEnter={() => setActiveIndex(0)}
@@ -269,7 +266,7 @@ export function DesktopSearchModal({
                   {visibleGroups.map((group) => (
                     <div key={group.name}>
                       <div
-                        className="text-muted-foreground relative my-2 px-4 pt-2 text-xs leading-4"
+                        className="relative mt-3 mb-1 px-2.5 text-sm leading-6 font-medium text-[var(--text-tertiary)]"
                         aria-hidden="true"
                       >
                         {group.name}
@@ -290,7 +287,7 @@ export function DesktopSearchModal({
                             label={getChatTitle(chat)}
                             icon={
                               <RiChat3Line
-                                className="size-5 shrink-0"
+                                className="size-4 shrink-0"
                                 aria-hidden
                               />
                             }
@@ -372,13 +369,13 @@ function SearchRow({
     >
       <div
         className={cn(
-          "group text-foreground relative flex h-12 items-center rounded-xl px-3 py-2",
+          "group text-foreground relative flex h-10 items-center rounded-xl px-2.5",
           "hover:bg-modal-search-row-active hover:text-foreground active:bg-modal-search-row-active",
           active && "bg-modal-search-row-active text-foreground"
         )}
       >
         {icon}
-        <div className="relative min-w-0 grow overflow-hidden ps-2 whitespace-nowrap">
+        <div className="relative min-w-0 grow overflow-hidden ps-2.5 whitespace-nowrap">
           <div className="truncate text-sm">{label}</div>
         </div>
       </div>

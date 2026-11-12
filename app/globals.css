@@ -26,6 +26,14 @@
 @custom-variant keyboard-focused (&:is(html [data-focus-mode="keyboard"]:focus-visible));
 /* prettier-ignore */
 @custom-variant not-keyboard-focused (&:not(:is(html [data-focus-mode="keyboard"]:focus-visible)));
+/* Hover-reveal companion: keyboard focus on the element or inside it. Never use
+   plain focus-within for reveals: a mouse click leaves focus behind, pinning the
+   revealed controls after the pointer leaves (lint-enforced in eslint.config.mjs).
+   It compiles to :has(), so apply it to the revealed control's own small
+   container, never a group that wraps streamed content (each insertion would
+   re-run it; see ADR-0049 notes on :has() invalidation). */
+/* prettier-ignore */
+@custom-variant keyboard-focus-within (&:is(html [data-focus-mode="keyboard"]:focus-visible, :has([data-focus-mode="keyboard"]:focus-visible)));
 
 @custom-variant tall (@media (min-height: 40rem));
 @custom-variant not-tall (@media (max-height: 39.99rem));
@@ -57,10 +65,18 @@
       :disabled,
       [aria-disabled="true"],
       [data-disabled],
-      [data-visually-disabled]
+      [data-visually-disabled],
+      [data-popup-open]
     ) {
     scale: var(--press-motion-scale);
     transition-duration: 0ms;
+  }
+
+  /* A popup measures its trigger on open (menus open on mousedown), so the
+     trigger must be full size then: an open trigger never scales, and any
+     in-flight release is cut short, or the popup drifts as it settles. */
+  &[data-popup-open] {
+    transition: none;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -424,6 +440,12 @@
   --color-floating-menu-item-active: var(--floating-menu-item-active);
   --color-floating-menu-divider: var(--floating-menu-divider);
   --color-composer-capability-accent: var(--composer-capability-accent);
+  --color-composer-capability-accent-hover: var(
+    --composer-capability-accent-hover
+  );
+  --color-composer-capability-accent-hover-surface: var(
+    --composer-capability-accent-hover-surface
+  );
   --color-modal-centered: var(--modal-centered-surface);
   --color-modal-centered-foreground: var(--modal-centered-foreground);
   --color-modal-search: var(--modal-search-surface);
@@ -438,6 +460,7 @@
   --color-border-strong: var(--border-strong);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-surface: var(--destructive-surface);
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
@@ -507,22 +530,22 @@
     -apple-system-body, ui-sans-serif, -apple-system, system-ui, "Segoe UI",
     Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji",
     "Segoe UI Symbol";
-  --background-tertiary: #f3f3f3;
+  --background-tertiary: #f1f0ee;
   --header-height: calc(13 * var(--spacing));
   --stage-scroll-gutter: stable both-edges;
-  --sidebar-width: 16.25rem;
+  --sidebar-width: 15rem;
   --sidebar-header-height: 3.25rem;
   --sidebar-section-first-margin-top: 0.5rem;
-  --sidebar-section-margin-top: 1.25rem;
+  --sidebar-section-margin-top: 1.5rem;
   --sidebar-section-stack-margin-top: calc(
     var(--sidebar-section-margin-top) - var(--sidebar-section-first-margin-top)
   );
   --sidebar-section-stack-gap: var(--sidebar-section-margin-top);
   --sidebar-item-gap: 0.375rem;
   --sidebar-row-height: 2.5rem;
-  --sidebar-row-outer-inset: 0.375rem;
+  --sidebar-row-outer-inset: 0.5rem;
   --sidebar-row-content-block: 0.375rem;
-  --sidebar-row-content-inline: 0.625rem;
+  --sidebar-row-content-inline: 0.75rem;
   --sidebar-row-inner-content-block: calc(
     var(--sidebar-row-content-block) - var(--sidebar-row-separator-size)
   );
@@ -538,6 +561,8 @@
   --sidebar-row-card-action-rail-width: 3.625rem;
   --sidebar-row-separator-size: 1px;
   --sidebar-row-radius: 0.75rem;
+  /* 24px action chips (row ⋯/pin, section header +): Grok's 6px corner. */
+  --sidebar-action-chip-radius: 6px;
   --sidebar-leading-slot-size: 1.25rem;
   --sidebar-collapsed-item-width: calc(
     var(--sidebar-leading-slot-size) + 2 * var(--sidebar-row-content-inline)
@@ -570,23 +595,26 @@
 
   --header-z-index: 20;
 
-  --background: oklch(0.991 0 0);
-  --foreground: oklch(0.159 0 0);
-  --card: oklch(1 0 0);
+  --background: #f9f8f7;
+  --foreground: #2c2c2b;
+  --card: #fefefc;
   --card-foreground: var(--foreground);
-  --popover: oklch(1 0 0);
+  --popover: #fefefc;
   --popover-foreground: var(--foreground);
-  --floating-surface: oklch(1 0 0);
-  --floating-surface-foreground: #0d0d0d;
+  --floating-surface: #fefefc;
+  --floating-surface-foreground: var(--foreground);
+  /* Grok's warm soft lift, shared by the composer and floating menus. */
+  --surface-soft-shadow:
+    0 2px 6px rgb(70 36 0 / 0.03), 0 8px 12px rgb(70 36 0 / 0.03);
   --floating-surface-edge-shadow:
-    0 0 0 1px #0000000a, 0 2px 8px #0000000a, 0 4px 80px 8px #00000006;
+    0 0 0 1px #e6e5e3, var(--surface-soft-shadow);
   --floating-select-edge-shadow:
     0 8px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.62);
-  --floating-menu-touch-surface: #ffffff;
+  --floating-menu-touch-surface: #fefefc;
   --floating-menu-touch-edge-shadow: var(--floating-select-edge-shadow);
-  --floating-menu-item-active: rgba(0, 0, 0, 0.04);
+  --floating-menu-item-active: rgb(39 20 0 / 0.05);
   --floating-menu-divider: var(--border-default);
-  --floating-menu-touch-tertiary: #f3f3f3;
+  --floating-menu-touch-tertiary: #f1f0ee;
   --floating-menu-radius: 1.25rem;
   --floating-menu-item-radius: 0.75rem;
   --floating-menu-item-height: calc(var(--spacing) * 9);
@@ -594,67 +622,96 @@
     var(--spacing) * 4 + var(--floating-menu-item-height) * 10
   );
   --floating-menu-leading-slot-size: 1.25rem;
-  --composer-capability-accent: oklch(0.626 0.188 259.456);
-  --composer-capability-accent-hover: oklch(0.528 0.173 255.046);
-  --composer-capability-accent-hover-surface: color(
-    display-p3 0.909804 0.952941 0.996078
+  /* Blue and red follow Linear's shipped palette (linear.app). Tinted
+     surfaces use Linear's accent-tint rule: the color at 10% (light) or
+     15% (dark). */
+  --blue: #4ea7fc;
+  --composer-capability-accent: var(--blue);
+  --composer-capability-accent-hover: var(--composer-capability-accent);
+  --composer-capability-accent-hover-surface: color-mix(
+    in srgb,
+    var(--composer-capability-accent) 10%,
+    transparent
   );
-  --composer-selection-background: oklch(0.684 0.157 256.21 / 0.35);
+  --composer-selection-background: color-mix(
+    in srgb,
+    var(--blue) 36%,
+    transparent
+  );
   --web-search-icon-surface: oklch(0.941 0.043 218.859);
   --web-search-icon-foreground: oklch(0.795 0.131 222.887);
-  --modal-centered-surface: #ffffff;
-  --modal-centered-foreground: #0d0d0d;
+  --modal-centered-surface: #fefefc;
+  --modal-centered-foreground: var(--foreground);
   --modal-centered-edge-shadow:
     0 8px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.62);
   --modal-centered-radius: 1rem;
-  --modal-centered-scrim: oklab(0.915826 0.0000416 0.0000184 / 0.5);
-  --modal-centered-backdrop-blur: 1px;
-  --modal-search-surface: #ffffff;
-  --modal-search-foreground: #0d0d0d;
-  --modal-search-border: rgba(0, 0, 0, 0.1);
-  --modal-search-row-active: rgba(0, 0, 0, 0.05);
-  --modal-search-edge-shadow: 0 14px 62px rgba(0, 0, 0, 0.25);
-  --modal-search-radius: 1rem;
+  --modal-centered-scrim: rgb(5 5 5 / 0.2);
+  --modal-centered-backdrop-blur: 0px;
+  --modal-search-surface: #fefefc;
+  --modal-search-foreground: var(--foreground);
+  --modal-search-border: #e6e5e3;
+  --modal-search-row-active: rgb(39 20 0 / 0.05);
+  --modal-search-edge-shadow:
+    0 12px 40px rgb(9 9 8 / 0.18), 0 2px 8px rgb(9 9 8 / 0.08);
+  --modal-search-radius: 1.5rem;
   --primary: #0d0d0d;
   --primary-foreground: oklch(1 0 0);
   --primary-bg-hover: oklch(0.31 0 0);
-  --secondary: oklch(0.931 0 0);
+  --secondary: #ecebe8;
   --secondary-foreground: var(--foreground);
-  --secondary-bg-hover: oklch(0.89 0 0);
-  --muted: oklch(0.964 0 0);
+  --secondary-bg-hover: #e2e1de;
+  --muted: #f1f0ee;
   --muted-foreground: var(--text-secondary);
   --accent: var(--interactive-bg-selected);
   --accent-foreground: var(--foreground);
   --text-primary: var(--foreground);
-  --text-secondary: oklch(0.478 0 0);
-  --text-tertiary: oklch(0.65 0 0);
-  --inline-work-source-surface: #f4f4f4;
+  --text-secondary: #737270;
+  --text-tertiary: #9f9e9c;
+  --inline-work-source-surface: #f1f0ee;
   --text-placeholder: var(--text-tertiary);
-  --text-quaternary: rgba(0, 0, 0, 0.188);
-  --text-disabled: oklch(0.65 0 0);
+  --text-quaternary: rgb(44 44 43 / 0.2);
+  --text-disabled: var(--text-tertiary);
   --main-surface-secondary: var(--secondary);
-  --link: oklch(0.501 0.127 254.712);
-  --link-hover: oklch(0.419 0.106 255.109);
+  --link: var(--blue);
+  --link-hover: var(--foreground);
   --projects-content-max-width: 50.625rem;
   --projects-toolbar-min-height: 3.75rem;
-  --row-hover-surface: oklch(0.981 0 0);
-  --interactive-bg-hover: oklch(0 0 0 / 0.05);
-  --interactive-bg-selected: oklch(0 0 0 / 0.05);
-  --interactive-bg-pressed: oklch(0 0 0 / 0.1);
-  --interactive-bg-secondary-hover: oklch(0 0 0 / 0.05);
-  --interactive-bg-secondary-pressed: oklch(0 0 0 / 0.05);
-  --sidebar-row-bg: oklch(0 0 0 / 0.05);
+  --row-hover-surface: #f3f2f0;
+  --interactive-bg-hover: rgb(39 20 0 / 0.05);
+  --interactive-bg-selected: rgb(39 20 0 / 0.05);
+  --interactive-bg-pressed: rgb(39 20 0 / 0.1);
+  --interactive-bg-secondary-hover: rgb(39 20 0 / 0.05);
+  --interactive-bg-secondary-pressed: rgb(39 20 0 / 0.05);
+  --sidebar-row-bg: rgb(39 20 0 / 0.05);
+  /* Sidebar items and the composer model trigger rest at 76% ink and go
+     full on hover, focus, open, or the current page (both themes). */
+  --item-foreground: color-mix(in oklab, var(--foreground) 76%, transparent);
+  /* Sidebar group labels and "Show more" sit one clear step below items
+     (Grok: labels at ~2/3 of row ink), so sections read as headings. */
+  --sidebar-label-foreground: color-mix(
+    in oklab,
+    var(--foreground) 50%,
+    transparent
+  );
   --surface-hover: var(--interactive-bg-hover);
-  --popover-bg-hover: oklch(0.964 0 0);
-  --muted-bg-hover: oklch(0.931 0 0);
-  --bg-tooltip: #1b1b1b;
-  --border-tooltip: rgba(255, 255, 255, 0.05);
-  --tooltip-edge-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+  --popover-bg-hover: #f1f0ee;
+  --muted-bg-hover: #ecebe8;
+  /* Tooltips follow the theme: light surface here, dark under .dark. */
+  --bg-tooltip: var(--floating-surface);
+  --tooltip-foreground: var(--foreground);
+  --border-tooltip: #e6e5e3;
+  --tooltip-edge-shadow: var(--surface-soft-shadow);
+  --tooltip-shortcut-surface: rgb(39 20 0 / 0.05);
   --tooltip-multiline-radius: 0.75rem;
   --tooltip-radius: 9999px;
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --info: oklch(0.626 0.188 259.456);
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  --destructive-surface: color-mix(
+    in srgb,
+    var(--destructive) 10%,
+    transparent
+  );
+  --info: var(--blue);
   --warning: oklch(0.769 0.188 70.08);
   --warning-foreground: oklch(0.52 0.13 65);
   --status-success-bg: oklch(0.945 0.029 156.629);
@@ -668,9 +725,9 @@
   /* Perplexity logo color (--fg-primary on perplexity.ai) */
   --perplexity-logo: #27251e;
 
-  --border-subtle: oklch(0 0 0 / 0.05);
-  --border-default: oklch(0 0 0 / 0.1);
-  --border-strong: oklch(0 0 0 / 0.15);
+  --border-subtle: rgb(15 13 10 / 0.06);
+  --border-default: rgb(15 13 10 / 0.1);
+  --border-strong: rgb(15 13 10 / 0.15);
   --border: var(--border-subtle);
   --border-heavy: var(--border-strong);
   --input-bg: transparent;
@@ -679,13 +736,11 @@
   --input: var(--input-border);
   --focus-ring: var(--foreground);
   --ring: var(--focus-ring);
-  --scrim-modal: oklch(0.916 0 0 / 0.5);
-  --scrim-sidebar: oklch(0.982 0 0 / 0.5);
+  --scrim-modal: var(--modal-centered-scrim);
+  --scrim-sidebar: rgb(249 248 247 / 0.5);
   --control-track-bg: var(--secondary);
   --drawer-handle-bg: var(--secondary);
-  --user-message-bg: oklch(0.934 0 0 / 0.502);
-  --theme-user-msg-bg: #e8f3fe;
-  --theme-user-msg-text: #0c274a;
+  --user-message-bg: rgb(51 34 0 / 0.06);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -738,7 +793,11 @@
     rgba(0, 0, 0, 0.06) 0px 32px 45.25px -2.5px,
     rgba(0, 0, 0, 0.04) 0px 52px 73.54px -3px;
 
-  --composer-surface-primary: oklch(1 0 0);
+  --composer-surface-primary: #fefefc;
+  --composer-border: #e6e5e3;
+  /* Filled composer control (the + button): a warm tint chip, not a ghost. */
+  --composer-control-filled-bg: rgb(38 26 0 / 0.05);
+  --composer-control-filled-bg-hover: rgb(41 25 0 / 0.12);
   --composer-bg: var(--composer-surface-primary);
   --default-theme-submit-btn-bg: var(--primary);
   --default-theme-submit-btn-text: var(--primary-foreground);
@@ -768,11 +827,11 @@
   --sharp-edge-left-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.05);
   --activity-sheet-shadow:
     0 8px 12px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.62);
-  --activity-panel-surface: oklch(0.991 0 0);
-  --activity-panel-border: oklch(0 0 0 / 0.05);
+  --activity-panel-surface: var(--background);
+  --activity-panel-border: var(--border-subtle);
   --activity-panel-raised-surface: var(--muted);
   --overlay-scrim-mobile: var(--scrim-modal);
-  --overlay-scrim-tablet: oklch(0.92 0.004 286 / 0.5);
+  --overlay-scrim-tablet: var(--scrim-modal);
 }
 
 @media (pointer: coarse) {
@@ -785,40 +844,50 @@
 .dark {
   --scrollbar-color: #ffffff1a;
   --scrollbar-color-hover: #fff3;
-  --background: oklch(0 0 0);
+  /* Warm dark scale inspired by Grok (grok.com page #1e1d1d, pane #282726),
+     kept a step darker. Unlike Grok, the composer sits above the page. */
+  --dark-surface-0: #141313; /* page, sidebar */
+  --dark-surface-1: #222120; /* menus, tooltips, modals, row hover */
+  --dark-surface-2: #282726; /* composer, cards */
+  --dark-surface-3: #31302e; /* secondary, muted, inputs */
+  --dark-surface-4: #403f3c; /* hover on surface-3 */
+  --background: var(--dark-surface-0);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.248 0 0);
+  --card: var(--dark-surface-2);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.222 0 0);
+  --popover: var(--dark-surface-1);
   --popover-foreground: var(--foreground);
   /* Every dark floating menu uses this shared surface token instead of
    * repeating per-menu colors. */
-  --floating-surface: oklch(0.329 0 0);
+  /* Shared with tooltips. */
+  --floating-surface: var(--dark-surface-1);
   --floating-surface-foreground: #ffffff;
   --floating-surface-edge-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
   --floating-select-edge-shadow:
     0 8px 16px rgba(0, 0, 0, 0.32), inset 0 0 1px rgba(255, 255, 255, 0.2),
     0 0 1px rgba(0, 0, 0, 0.62);
-  --floating-menu-touch-surface: #303030;
+  --floating-menu-touch-surface: var(--floating-surface);
   --floating-menu-touch-edge-shadow: var(--floating-select-edge-shadow);
   --floating-menu-item-active: rgba(255, 255, 255, 0.1);
   --floating-menu-divider: var(--border-default);
-  --floating-menu-touch-tertiary: #414141;
-  --background-tertiary: #414141;
-  --composer-capability-accent: oklch(0.72 0.137 253.307);
-  --composer-capability-accent-hover: oklch(0.8 0.12 253.307);
-  --composer-capability-accent-hover-surface: color(
-    display-p3 0.07451 0.203922 0.388235
+  --floating-menu-touch-tertiary: var(--floating-menu-item-active);
+  --background-tertiary: var(--dark-surface-4);
+  /* Linear's dark selection: the accent darkened 10%, with white text. */
+  --composer-capability-accent-hover-surface: color-mix(
+    in srgb,
+    var(--composer-capability-accent) 15%,
+    transparent
   );
+  --composer-selection-background: color-mix(in lch, var(--blue), black 10%);
   --web-search-icon-surface: oklch(0.334 0.02 221.692);
   --web-search-icon-foreground: oklch(0.801 0.131 222.79);
-  --modal-centered-surface: #212121;
+  --modal-centered-surface: var(--dark-surface-1);
   --modal-centered-foreground: #ffffff;
   --modal-centered-edge-shadow:
     0 8px 16px rgba(0, 0, 0, 0.32), inset 0 0 1px rgba(255, 255, 255, 0.2),
     0 0 1px rgba(0, 0, 0, 0.62);
   --modal-centered-scrim: rgba(0, 0, 0, 0.5);
-  --modal-search-surface: #212121;
+  --modal-search-surface: var(--dark-surface-1);
   --modal-search-foreground: #ffffff;
   --modal-search-border: rgba(255, 255, 255, 0.15);
   --modal-search-row-active: rgba(255, 255, 255, 0.05);
@@ -826,24 +895,22 @@
   --primary: #f9f9f9;
   --primary-foreground: oklch(0.159 0 0);
   --primary-bg-hover: oklch(0.922 0 0);
-  --secondary: oklch(0.309 0 0);
+  --secondary: var(--dark-surface-3);
   --secondary-foreground: var(--foreground);
-  --secondary-bg-hover: oklch(0.375 0 0);
-  --muted: oklch(0.309 0 0);
+  --secondary-bg-hover: var(--dark-surface-4);
+  --muted: var(--dark-surface-3);
   --muted-foreground: var(--text-secondary);
   --accent: var(--interactive-bg-selected);
   --accent-foreground: var(--foreground);
   --text-primary: var(--foreground);
   --text-secondary: oklch(0.848 0 0);
   --text-tertiary: oklch(0.754 0 0);
-  --inline-work-source-surface: #303030;
+  --inline-work-source-surface: var(--dark-surface-3);
   --text-placeholder: var(--text-tertiary);
   --text-quaternary: rgba(255, 255, 255, 0.412);
   --text-disabled: oklch(1 0 0 / 0.412);
   --main-surface-secondary: var(--composer-surface-primary);
-  --row-hover-surface: oklch(0.2 0 0);
-  --link: oklch(0.767 0.122 253.354);
-  --link-hover: var(--link);
+  --row-hover-surface: var(--dark-surface-1);
   --interactive-bg-hover: oklch(1 0 0 / 0.1);
   --interactive-bg-selected: oklch(1 0 0 / 0.1);
   --interactive-bg-pressed: oklch(1 0 0 / 0.15);
@@ -851,13 +918,18 @@
   --interactive-bg-secondary-pressed: oklch(1 0 0 / 0.05);
   --sidebar-row-bg: oklch(1 0 0 / 0.1);
   --surface-hover: var(--interactive-bg-hover);
-  --popover-bg-hover: oklch(0.309 0 0);
-  --muted-bg-hover: oklch(0.375 0 0);
-  --bg-tooltip: #1b1b1b;
+  --popover-bg-hover: var(--dark-surface-3);
+  --muted-bg-hover: var(--dark-surface-4);
+  --bg-tooltip: var(--floating-surface);
+  --tooltip-foreground: #ffffff;
   --border-tooltip: rgba(255, 255, 255, 0.05);
-  --destructive: oklch(0.6 0.18 15);
-  --destructive-foreground: oklch(0.95 0.01 20);
-  --info: oklch(0.72 0.137 253.307);
+  --tooltip-edge-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
+  --tooltip-shortcut-surface: rgba(255, 255, 255, 0.25);
+  --destructive-surface: color-mix(
+    in srgb,
+    var(--destructive) 15%,
+    transparent
+  );
   --warning: oklch(0.828 0.189 84.429);
   --warning-foreground: oklch(0.85 0.16 84);
   --status-success-bg: oklch(0.38 0.085 146.171);
@@ -875,8 +947,8 @@
   --border-strong: oklch(1 0 0 / 0.2);
   --border: var(--border-subtle);
   --border-heavy: var(--border-default);
-  --input-bg: oklch(0.309 0 0);
-  --input-bg-hover: oklch(0.375 0 0);
+  --input-bg: var(--dark-surface-3);
+  --input-bg-hover: var(--dark-surface-4);
   --input-border: var(--border-default);
   --input: var(--input-border);
   --focus-ring: var(--foreground);
@@ -885,9 +957,7 @@
   --scrim-sidebar: oklch(0 0 0 / 0.5);
   --control-track-bg: var(--secondary);
   --drawer-handle-bg: var(--secondary);
-  --user-message-bg: oklch(0.317 0 0 / 0.851);
-  --theme-user-msg-bg: #173e76;
-  --theme-user-msg-text: #f6fafe;
+  --user-message-bg: var(--dark-surface-3);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -942,7 +1012,10 @@
     rgba(0, 0, 0, 0.16) 0px 32px 45.25px -2.5px,
     rgba(0, 0, 0, 0.12) 0px 52px 73.54px -3px;
 
-  --composer-surface-primary: oklch(0.248 0 0);
+  --composer-surface-primary: var(--dark-surface-2);
+  --composer-border: transparent;
+  --composer-control-filled-bg: oklch(1 0 0 / 0.05);
+  --composer-control-filled-bg-hover: oklch(1 0 0 / 0.12);
   --composer-bg: var(--composer-surface-primary);
   --sharp-edge-top-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
   --sharp-edge-top-shadow-placeholder: 0 1px 0 transparent;
@@ -952,7 +1025,7 @@
   --activity-sheet-shadow:
     0 8px 12px rgba(0, 0, 0, 0.18), 0 0 1px rgba(255, 255, 255, 0.24);
   --activity-panel-surface: var(--background);
-  --activity-panel-border: oklch(0.248 0 0);
+  --activity-panel-border: var(--dark-surface-2);
   --activity-panel-raised-surface: var(--card);
 
   --overlay-scrim-mobile: var(--scrim-modal);
@@ -1008,6 +1081,27 @@
 }
 
 @layer components {
+  /* The one ink owner for sidebar items, expanded rows and collapsed rail
+     alike (Grok): rest at row ink, full ink on hover, focus, an open row
+     menu, or the current page. Hover is instant: no transition. Components
+     layer, so a call-site utility (logo, muted "Show more") still wins. */
+  [data-sidebar-item] {
+    color: var(--item-foreground);
+  }
+
+  [data-sidebar-item]:is(
+      :hover,
+      :focus-visible,
+      :has([data-popup-open]),
+      [data-active],
+      [aria-current="page"]
+    ),
+  /* Split rows (link + trailing control): hovering the control engages the
+     row, so the link inks up too. */
+  .sidebar-menu-row:hover > [data-sidebar-item] {
+    color: var(--foreground);
+  }
+
   .interactive-label-danger-soft {
     color: var(--destructive);
   }
@@ -1184,7 +1278,7 @@
 
   .composer-parent {
     --composer-footer_height: var(--composer-bar_footer-current-height, 32px);
-    --composer-bar_height: var(--composer-bar_current-height, 52px);
+    --composer-bar_height: var(--composer-bar_current-height, 58px);
     --composer-bar_width: var(--composer-bar_current-width, 768px);
     --mask-fill: linear-gradient(to bottom, white 0%, white 100%);
     --mask-erase: linear-gradient(to bottom, black 0%, black 100%);
@@ -1405,7 +1499,7 @@
     padding-inline: var(--sidebar-row-content-inline);
   }
 
-  .sidebar-row-primary-control:focus-visible {
+  .sidebar-row-primary-control[data-focus-mode="keyboard"]:focus-visible {
     outline: 1.5px solid var(--foreground);
     outline-offset: -1.5px;
     border-radius: var(--sidebar-row-radius);
@@ -1476,7 +1570,9 @@
     outline: none;
   }
 
-  .sidebar-row-action-rail :is(button, a):focus-visible .trailing-icon-chip {
+  .sidebar-row-action-rail
+    :is(button, a)[data-focus-mode="keyboard"]:focus-visible
+    .trailing-icon-chip {
     outline: 1.5px solid var(--foreground);
     outline-offset: 2.5px;
   }
@@ -1488,6 +1584,22 @@
   .sidebar-group-header-action:focus-visible .sidebar-group-header-action-chip {
     outline: 1.5px solid var(--foreground);
     outline-offset: 2.5px;
+  }
+
+  /* Grok: the 24px action chip takes the row tint on hover and while its menu
+     is open, instantly. On a hovered row it stacks one step darker. */
+  @media (hover: hover) {
+    .sidebar-row-trailing-button:hover .trailing-icon-chip,
+    .sidebar-group-header-action:hover .sidebar-group-header-action-chip {
+      background-color: var(--sidebar-row-bg);
+    }
+  }
+
+  .sidebar-row-trailing-button:is([data-popup-open], [aria-expanded="true"])
+    .trailing-icon-chip,
+  .sidebar-group-header-action:is([data-popup-open], [aria-expanded="true"])
+    .sidebar-group-header-action-chip {
+    background-color: var(--sidebar-row-bg);
   }
 
   .sidebar-row-action-rail[data-sidebar-row-actions="compact"] {
@@ -1530,15 +1642,25 @@
     justify-content: center;
   }
 
-  .sidebar-row:where(:focus-within),
+  /* Engaged = hover, keyboard focus (same contract as the
+     keyboard-focus-within variant), or an open/pressed child. Not plain
+     :focus-within: the row IS the link, so a click would pin the reveal. */
+  .sidebar-row:where(
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  ),
   .sidebar-row:has([data-popup-open]),
   .sidebar-row:has([data-pressed]) {
     background-color: var(--sidebar-row-active-background);
     color: var(--foreground);
   }
 
-  .sidebar-row:where(:hover, :focus-within)
-    .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  )
+  .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
   .sidebar-row:has([data-popup-open])
     .sidebar-row-action-rail[data-sidebar-row-actions="compact"],
   .sidebar-row:has([data-pressed])
@@ -1554,8 +1676,12 @@
     pointer-events: auto;
   }
 
-  .sidebar-row:where(:hover, :focus-within)
-    .sidebar-row-action-rail[data-sidebar-row-actions="card"],
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  )
+  .sidebar-row-action-rail[data-sidebar-row-actions="card"],
   .sidebar-row:has([data-popup-open])
     .sidebar-row-action-rail[data-sidebar-row-actions="card"],
   .sidebar-row:has([data-pressed])
@@ -1566,7 +1692,11 @@
     pointer-events: auto;
   }
 
-  .sidebar-row:where(:hover, :focus-within) .sidebar-row-status-slot,
+  .sidebar-row:where(
+    :hover,
+    [data-focus-mode="keyboard"]:focus-visible,
+    :has([data-focus-mode="keyboard"]:focus-visible)
+  ) .sidebar-row-status-slot,
   .sidebar-row:has([data-popup-open]) .sidebar-row-status-slot,
   .sidebar-row:has([data-pressed]) .sidebar-row-status-slot {
     display: none;
@@ -1663,18 +1793,26 @@
     background-color: var(--interactive-bg-secondary-pressed);
   }
 
-  /* Search is a persistent selected label, not an open or pressed surface. */
-  .composer-btn.web-search-control[aria-pressed="true"] {
-    background-color: transparent;
+  /* The filled tone (the + button) rests on a tint chip and deepens on
+     hover/open; plain controls stay ghost. */
+  .composer-btn[data-composer-control-tone="filled"] {
+    background-color: var(--composer-control-filled-bg);
   }
 
   @media (hover: hover) {
-    .composer-btn.web-search-control[data-search-toggleable][aria-pressed="true"]:where(
-        :not(:active)
+    .composer-btn[data-composer-control-tone="filled"]:where(
+        :not(:disabled)
       ):hover {
-      color: var(--composer-capability-accent-hover);
-      background-color: var(--composer-capability-accent-hover-surface);
+      background-color: var(--composer-control-filled-bg-hover);
     }
+  }
+
+  .composer-btn[data-composer-control-tone="filled"]:where(
+      :active,
+      [aria-expanded="true"],
+      [data-popup-open]
+    ) {
+    background-color: var(--composer-control-filled-bg-hover);
   }
 
   @media (pointer: fine) {
@@ -1815,8 +1953,7 @@
   .shadow-short-composer,
   .shadow-composer {
     --tw-shadow:
-      0px 0px 0px 1px rgba(0, 0, 0, 0.04), 0px 2px 8px 0px rgba(0, 0, 0, 0.04),
-      0px 4px 80px 8px rgba(0, 0, 0, 0.024);
+      0px 0px 0px 1px var(--composer-border), var(--surface-soft-shadow);
     --tw-inset-shadow: 0 0 transparent;
     box-shadow:
       var(--tw-inset-shadow, 0 0 transparent),
@@ -1979,6 +2116,12 @@ code {
   max-width: unset;
   font-size: 1rem;
   line-height: var(--text-body-regular--line-height);
+  /* Vertical rhythm, measured from grok.com responses 2026-11-11. */
+  --markdown-block-gap: 1rem;
+  --markdown-heading-gap-before: 2rem;
+  --markdown-heading-gap-after: 0.5rem;
+  --markdown-item-gap: 0.5rem;
+  --markdown-rule-gap: 2rem;
   --markdown-border-light: color-mix(
     in srgb,
     var(--foreground) 5%,
@@ -2025,20 +2168,15 @@ code {
   }
 }
 
-.markdown p {
-  margin-top: 0.5rem;
-  margin-bottom: 0.25rem;
+.markdown :is(p, ul, ol, blockquote) {
+  margin-block: 0 var(--markdown-block-gap);
 }
-.markdown p:first-child {
-  margin-top: 0;
-}
-.markdown p + p {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: var(--markdown-heading-gap-before)
+    var(--markdown-heading-gap-after);
 }
 
 .markdown h1 {
-  margin: 0 0 0.5rem;
   font-size: 1.5rem;
   line-height: 2rem;
   font-weight: 600;
@@ -2046,7 +2184,6 @@ code {
 }
 .markdown h2,
 .markdown h3 {
-  margin: 1rem 0 0.25rem;
   font-weight: 600;
 }
 .markdown h2 {
@@ -2058,18 +2195,15 @@ code {
   line-height: 1.75rem;
 }
 .markdown h4 {
-  margin: 1rem 0 0;
   font-size: 1rem;
   line-height: 1.5rem;
   font-weight: 600;
 }
-.markdown h4 + p,
 .markdown hr + * {
   margin-top: 0;
 }
 .markdown h5,
 .markdown h6 {
-  margin: 0;
   font-size: 1rem;
   line-height: 1.625rem;
   letter-spacing: normal;
@@ -2081,16 +2215,12 @@ code {
 .markdown h6 {
   font-weight: 400;
 }
-.markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+.markdown > :first-child {
   margin-top: 0;
-}
-.markdown :is(ul, ol) + :is(h1, h2, h3, h4, h5, h6) {
-  margin-top: 1rem;
 }
 
 .markdown ul,
 .markdown ol {
-  margin: 0;
   padding-inline-start: 1.625em;
 }
 .markdown li {
@@ -2115,8 +2245,12 @@ code {
   margin-top: 1rem;
   margin-bottom: 1rem;
 }
-.markdown p + :is(ol, ul) {
-  margin-top: 0;
+.markdown li + li,
+.markdown li > :is(ul, ol) {
+  margin-top: var(--markdown-item-gap);
+}
+.markdown li > :is(ul, ol) {
+  margin-bottom: 0;
 }
 
 .markdown .contains-task-list input[type="checkbox"] {
@@ -2148,7 +2282,6 @@ code {
 
 .markdown blockquote {
   position: relative;
-  margin: 0 0 0.5rem;
   border-width: 0;
   padding-block: 0.5rem;
   padding-inline-start: 1.5rem;
@@ -2176,7 +2309,7 @@ code {
 }
 
 .markdown hr {
-  margin-block: 1.75rem;
+  margin-block: var(--markdown-rule-gap);
   border-color: var(--markdown-border-medium);
   clear: both;
 }
@@ -2222,6 +2355,7 @@ code {
   --thread-gutter-size: calc((100cqw - var(--thread-content-width)) / 2);
   width: 100cqw;
   margin-inline: calc(-1 * var(--thread-gutter-size));
+  margin-bottom: var(--markdown-block-gap);
   scrollbar-width: thin;
   overflow-x: auto;
 }
@@ -2257,9 +2391,6 @@ code {
 .markdown tr:not(:last-child) td {
   border-bottom: 1px solid var(--markdown-border-light);
 }
-.markdown tr:last-child td {
-  padding-bottom: 1.5rem;
-}
 
 .threadScrollVars {
   --thread-stream-context-height: max(
@@ -2287,6 +2418,11 @@ code {
   --tw-prose-bold: currentColor;
   --tw-prose-counters: currentColor;
   --tw-prose-bullets: currentColor;
+}
+.user-message-markdown {
+  --markdown-heading-gap-before: 1rem;
+  --markdown-heading-gap-after: 0.25rem;
+  --markdown-item-gap: 0;
 }
 .user-message-markdown > p {
   margin-block: 0;
@@ -2342,13 +2478,13 @@ code {
   color: var(--link-hover);
 }
 .user-message-collapse-toggle {
-  color: color-mix(in oklab, var(--theme-user-msg-text) 78%, var(--theme-user-msg-bg));
+  color: color-mix(in oklab, var(--foreground) 78%, var(--user-message-bg));
 }
 .user-message-collapse-toggle:hover {
-  color: var(--theme-user-msg-text);
+  color: var(--foreground);
 }
 .user-message-collapse-toggle:focus-visible {
-  outline: 2px solid var(--theme-user-msg-text);
+  outline: 2px solid var(--foreground);
   outline-offset: 2px;
 }
 .user-message-edit-input [data-composer-surface] {
@@ -2387,7 +2523,6 @@ code {
 
 /* Rich composer formatting uses the same editor metrics in every surface. */
 .composer-prosemirror {
-  --composer-selection-background: oklab(0.683658 -0.0373435 -0.152251 / 0.35);
   font-family:
     -apple-system-body,
     ui-sans-serif,
@@ -2463,7 +2598,7 @@ code {
 .composer-format-toolbar {
   --composer-format-surface: #fff;
   --composer-format-hover: #f5f5f5;
-  --composer-format-accent: #3a83f7;
+  --composer-format-accent: var(--composer-capability-accent);
   position: fixed;
   z-index: 80;
   display: flex;
@@ -2480,8 +2615,8 @@ code {
   line-height: 20px;
 }
 .dark .composer-format-toolbar {
-  --composer-format-surface: #353535;
-  --composer-format-hover: #454545;
+  --composer-format-surface: var(--floating-surface);
+  --composer-format-hover: var(--floating-menu-item-active);
 }
 .composer-format-toolbar[hidden] {
   display: none;
@@ -2646,9 +2781,6 @@ code {
 .composer-format-preserved-selection {
   background: var(--composer-selection-background);
   color: inherit;
-}
-.dark .composer-prosemirror {
-  --composer-selection-background: oklab(0.625496 -0.0344569 -0.185237 / 0.6);
 }
 .dark .composer-format-preserved-selection {
   color: white;

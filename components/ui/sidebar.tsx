@@ -3,6 +3,12 @@
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { useIsMobile } from "@/hooks/use-mobile"
+import {
+  clampSidebarWidth,
+  SIDEBAR_WIDTH_COOKIE,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+} from "@/lib/sidebar-width"
 import { cn } from "@/lib/utils"
 import { RiLayoutLeft2Line, RiSideBarLine } from "@remixicon/react"
 import * as React from "react"
@@ -14,18 +20,21 @@ import * as React from "react"
  * This file deliberately owns NO row/menu vocabulary. The canonical sidebar
  * rows are the components in `app/components/layout/sidebar/`
  * (`SidebarMenuItem`, `SidebarRow`, `SidebarLeadingIcon`, …), styled by the
- * `--sidebar-*` token contract in `app/globals.css` and pinned by
- * `sidebar-geometry.test.ts`. Do not reintroduce a parallel menu system here.
+ * `--sidebar-*` token contract in `app/globals.css`. Do not reintroduce a
+ * parallel menu system here.
  *
  * Widths are owned by `app/globals.css` (`--sidebar-width`,
- * `--sidebar-rail-width`), not by TS constants, so the single frame and its
- * collapsed rail derive from one source.
+ * `--sidebar-rail-width`), so the single frame and its collapsed rail derive
+ * from one source. A user-resized width (`lib/sidebar-width.ts`) only
+ * overrides `--sidebar-width` on the frame.
  */
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_KEYBOARD_SHORTCUT = "s"
 const SIDEBAR_CONTAINER_ID = "stage-slideover-sidebar"
+const SIDEBAR_WIDTH_COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+const SIDEBAR_RESIZE_KEY_STEP = 16
 
 function getSidebarStateFromCookie(): boolean | undefined {
   if (typeof document === "undefined") return undefined
@@ -44,6 +53,9 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  /** User-resized expanded width in px; null keeps the CSS default. */
+  width: number | null
+  setWidth: (width: number | null) => void
   /** See useSidebarShortcutScope — consumers don't call this directly. */
   registerShortcutScope: () => () => void
 }
@@ -61,17 +73,29 @@ function useSidebar() {
 
 function SidebarProvider({
   defaultOpen = true,
+  defaultWidth = null,
   open: openProp,
   onOpenChange: setOpenProp,
   children,
 }: {
   children: React.ReactNode
   defaultOpen?: boolean
+  /** Server-read width cookie, so the first paint is already resized. */
+  defaultWidth?: number | null
   open?: boolean
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
+  const [width, _setWidth] = React.useState(defaultWidth)
+  const setWidth = React.useCallback((next: number | null) => {
+    const value = next === null ? null : clampSidebarWidth(next)
+    _setWidth(value)
+    document.cookie =
+      value === null
+        ? `${SIDEBAR_WIDTH_COOKIE}=; path=/; max-age=0`
+        : `${SIDEBAR_WIDTH_COOKIE}=${value}; path=/; max-age=${SIDEBAR_WIDTH_COOKIE_MAX_AGE}`
+  }, [])
 
   const [_open, _setOpen] = React.useState(defaultOpen)
   const open = openProp ?? _open
@@ -148,6 +172,8 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
+      setWidth,
       registerShortcutScope,
     }),
     [
@@ -158,6 +184,8 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      width,
+      setWidth,
       registerShortcutScope,
     ]
   )
@@ -199,7 +227,7 @@ function Sidebar({
 }: React.ComponentProps<"div"> & {
   collapsible?: "icon" | "none"
 }) {
-  const { open } = useSidebar()
+  const { open, width } = useSidebar()
 
   if (collapsible === "none") {
     return (
@@ -222,16 +250,19 @@ function Sidebar({
       id={SIDEBAR_CONTAINER_ID}
       className={cn(
         "border-sidebar-border bg-sidebar text-sidebar-foreground relative z-21 h-full shrink-0 overflow-hidden border-r max-md:hidden print:hidden",
-        "motion-safe:transition-[width] motion-safe:duration-[450ms] motion-safe:ease-[linear(0,0.126,0.3555,0.5713,0.7361,0.8485,0.9191,0.9603,0.9828,0.9941,0.9992,1.0011,1.0015,1.0013,1.001,1.0007,1.0004,1.0002,1.0001)]",
+        "motion-safe:transition-[width] motion-safe:duration-[450ms] motion-safe:ease-[linear(0,0.126,0.3555,0.5713,0.7361,0.8485,0.9191,0.9603,0.9828,0.9941,0.9992,1.0011,1.0015,1.0013,1.001,1.0007,1.0004,1.0002,1.0001)] data-resizing:transition-none",
         "stage-sidebar-pure-surface",
         className
       )}
       data-state={open ? "open" : "closed"}
       data-slot="sidebar"
-      style={{
-        ...style,
-        width: open ? "var(--sidebar-width)" : "var(--sidebar-rail-width)",
-      }}
+      style={
+        {
+          ...style,
+          ...(width === null ? {} : { "--sidebar-width": `${width}px` }),
+          width: open ? "var(--sidebar-width)" : "var(--sidebar-rail-width)",
+        } as React.CSSProperties
+      }
       {...props}
     >
       <div
@@ -241,7 +272,140 @@ function Sidebar({
       >
         {children}
       </div>
+      {open ? <SidebarResizeHandle /> : null}
     </div>
+  )
+}
+
+/**
+ * Drag (or arrow-key) handle on the expanded frame's edge. Dragging writes
+ * `--sidebar-width` straight onto the frame and commits once on release, so a
+ * drag re-renders nothing. Double-click restores the default width.
+ */
+function SidebarResizeHandle() {
+  const { width, setWidth } = useSidebar()
+  const drag = React.useRef<{
+    frame: HTMLElement
+    pointerId: number
+    startX: number
+    startWidth: number
+    direction: 1 | -1
+    width: number
+    /** Inline styles from before the drag, restored on release; a committed
+     * width then re-renders through state. */
+    prevFrameWidth: string
+    prevCursor: string
+    prevUserSelect: string
+  } | null>(null)
+  const current = width ?? SIDEBAR_WIDTH_MIN
+
+  // Clears drag chrome; returns the drag it ended, if any.
+  const releaseDrag = React.useCallback(() => {
+    const active = drag.current
+    if (!active) return null
+    drag.current = null
+    delete active.frame.dataset.resizing
+    if (active.prevFrameWidth) {
+      active.frame.style.setProperty("--sidebar-width", active.prevFrameWidth)
+    } else {
+      active.frame.style.removeProperty("--sidebar-width")
+    }
+    const rootStyle = document.documentElement.style
+    rootStyle.cursor = active.prevCursor
+    rootStyle.userSelect = active.prevUserSelect
+    return active
+  }, [])
+  // Collapsing mid-drag unmounts the handle before pointerup; its stable ref
+  // cleanup still releases the document cursor and selection lock.
+  const handleRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return
+      return () => void releaseDrag()
+    },
+    [releaseDrag]
+  )
+
+  const endDrag = (event: React.PointerEvent) => {
+    if (drag.current?.pointerId !== event.pointerId) return
+    const active = releaseDrag()
+    // A press without movement (e.g. half of a double-click) persists nothing.
+    if (active && active.width !== Math.round(active.startWidth)) {
+      setWidth(active.width)
+    }
+  }
+
+  return (
+    <div
+      ref={handleRef}
+      role="separator"
+      aria-label="Resize sidebar"
+      aria-orientation="vertical"
+      aria-controls={SIDEBAR_CONTAINER_ID}
+      aria-valuemin={SIDEBAR_WIDTH_MIN}
+      aria-valuemax={SIDEBAR_WIDTH_MAX}
+      aria-valuenow={current}
+      tabIndex={0}
+      data-slot="sidebar-resize-handle"
+      className="absolute inset-y-0 end-0 z-40 w-1.5 cursor-col-resize touch-none outline-none keyboard-focused:bg-border-strong"
+      onPointerDown={(event) => {
+        // One drag at a time: a second pointer must not overwrite the saved
+        // pre-drag styles.
+        if (event.button !== 0 || drag.current) return
+        const frame = event.currentTarget.parentElement
+        if (!frame) return
+        event.preventDefault()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        const startWidth = frame.getBoundingClientRect().width
+        drag.current = {
+          frame,
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startWidth,
+          direction:
+            getComputedStyle(frame).direction === "rtl" ? -1 : 1,
+          width: Math.round(startWidth),
+          prevFrameWidth: frame.style.getPropertyValue("--sidebar-width"),
+          prevCursor: document.documentElement.style.cursor,
+          prevUserSelect: document.documentElement.style.userSelect,
+        }
+        frame.dataset.resizing = ""
+        document.documentElement.style.cursor = "col-resize"
+        document.documentElement.style.userSelect = "none"
+      }}
+      onPointerMove={(event) => {
+        const active = drag.current
+        if (active?.pointerId !== event.pointerId) return
+        active.width = clampSidebarWidth(
+          active.startWidth +
+            (event.clientX - active.startX) * active.direction
+        )
+        active.frame.style.setProperty("--sidebar-width", `${active.width}px`)
+      }}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      onLostPointerCapture={endDrag}
+      onDoubleClick={() => setWidth(null)}
+      onKeyDown={(event) => {
+        // Arrows move the separator the way they point, so RTL inverts them.
+        const direction =
+          getComputedStyle(event.currentTarget).direction === "rtl" ? -1 : 1
+        const step =
+          event.key === "ArrowRight"
+            ? SIDEBAR_RESIZE_KEY_STEP * direction
+            : event.key === "ArrowLeft"
+              ? -SIDEBAR_RESIZE_KEY_STEP * direction
+              : null
+        if (event.key === "Home") setWidth(SIDEBAR_WIDTH_MIN)
+        else if (event.key === "End") setWidth(SIDEBAR_WIDTH_MAX)
+        else if (step !== null) {
+          // With no stored width, step from the rendered (rem-based) default.
+          const rendered =
+            event.currentTarget.parentElement?.getBoundingClientRect().width
+          setWidth((width ?? Math.round(rendered ?? current)) + step)
+        } else return
+        event.preventDefault()
+      }}
+    />
   )
 }
 

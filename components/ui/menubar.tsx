@@ -13,12 +13,14 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { floatingMenuItemClassName } from "@/components/ui/floating-surface"
-import { Icon } from "@/components/ui/icon"
+import {
+  floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
+} from "@/components/ui/floating-surface"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
 import { Menubar as MenubarPrimitive } from "@base-ui/react/menubar"
-import { RiCheckLine } from "@remixicon/react"
 import * as React from "react"
 
 function Menubar({ className, ...props }: MenubarPrimitive.Props) {
@@ -97,7 +99,7 @@ function MenubarItem({
       data-inset={inset}
       data-variant={variant}
       className={cn(
-        "group/menubar-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:*:[svg]:text-destructive! gap-2 text-sm data-disabled:opacity-50 data-inset:pl-8 [&_svg:not([class*='size-'])]:size-5",
+        "group/menubar-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-surface data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:text-destructive! gap-2 text-sm data-disabled:opacity-50 data-inset:pl-8 [&_svg:not([class*='size-'])]:size-5",
         className
       )}
       {...props}
@@ -126,11 +128,11 @@ function MenubarCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-5 items-center justify-center [&_svg:not([class*='size-'])]:size-5">
-        <MenuPrimitive.CheckboxItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </MenuPrimitive.CheckboxItemIndicator>
-      </span>
+      <MenuPrimitive.CheckboxItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "left-2")}
+      >
+        <MenuCheckIcon />
+      </MenuPrimitive.CheckboxItemIndicator>
       {children}
     </MenuPrimitive.CheckboxItem>
   )
@@ -161,11 +163,11 @@ function MenubarRadioItem({
       )}
       {...props}
     >
-      <span className="pointer-events-none absolute left-2 flex size-5 items-center justify-center [&_svg:not([class*='size-'])]:size-5">
-        <MenuPrimitive.RadioItemIndicator>
-          <Icon icon={RiCheckLine} />
-        </MenuPrimitive.RadioItemIndicator>
-      </span>
+      <MenuPrimitive.RadioItemIndicator
+        className={cn(floatingMenuItemIndicatorClassName, "left-2")}
+      >
+        <MenuCheckIcon />
+      </MenuPrimitive.RadioItemIndicator>
       {children}
     </MenuPrimitive.RadioItem>
   )

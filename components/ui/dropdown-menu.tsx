@@ -4,15 +4,17 @@ import {
   floatingMenuContentClassName,
   floatingMenuItemActiveClassName,
   floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
   floatingMenuLabelClassName,
   floatingMenuSeparatorClassName,
   floatingSurfaceClassName,
 } from "@/components/ui/floating-surface"
 import { Icon } from "@/components/ui/icon"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { useOpenIntentPriority } from "@/lib/chat-performance/interaction-priority"
 import { cn } from "@/lib/utils"
 import { Menu as MenuPrimitive } from "@base-ui/react/menu"
-import { RiArrowRightSLine, RiCheckLine } from "@remixicon/react"
+import { RiArrowRightSLine } from "@remixicon/react"
 import * as React from "react"
 
 function DropdownMenu({
@@ -46,6 +48,13 @@ function DropdownMenuTrigger({
   )
 }
 
+// A mouse close leaves focus alone, so a mouse pick never strands a focus ring
+// or row tint on the trigger. Keyboard, touch, and assistive-tech closes
+// (empty type) hand focus back so users keep their place.
+const skipMouseFinalFocus: MenuPrimitive.Popup.Props["finalFocus"] = (
+  closeType
+) => closeType !== "mouse"
+
 function DropdownMenuContent({
   anchor,
   align = "start",
@@ -55,6 +64,7 @@ function DropdownMenuContent({
   className,
   animated = false,
   geometry = "menu",
+  finalFocus = skipMouseFinalFocus,
   ...props
 }: MenuPrimitive.Popup.Props &
   Pick<
@@ -87,6 +97,7 @@ function DropdownMenuContent({
           style={
             animated ? { transition: "opacity 100ms ease-out" } : undefined
           }
+          finalFocus={finalFocus}
           {...props}
         />
       </MenuPrimitive.Positioner>
@@ -139,7 +150,7 @@ function DropdownMenuItem({
         geometry === "menu"
           ? floatingMenuItemClassName
           : floatingMenuItemActiveClassName,
-        "menu-item-hoverable group/dropdown-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
+        "menu-item-hoverable group/dropdown-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-surface data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-5",
         className
       )}
       {...props}
@@ -201,12 +212,10 @@ function DropdownMenuCheckboxItem({
   className,
   children,
   checked,
-  indicator,
   inset,
   ...props
 }: MenuPrimitive.CheckboxItem.Props & {
   inset?: boolean
-  indicator?: React.ReactNode
 }) {
   return (
     <MenuPrimitive.CheckboxItem
@@ -220,14 +229,12 @@ function DropdownMenuCheckboxItem({
       checked={checked}
       {...props}
     >
-      <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
+      <MenuPrimitive.CheckboxItemIndicator
         data-slot="dropdown-menu-checkbox-item-indicator"
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
       >
-        <MenuPrimitive.CheckboxItemIndicator>
-          {indicator ?? <Icon icon={RiCheckLine} />}
-        </MenuPrimitive.CheckboxItemIndicator>
-      </span>
+        <MenuCheckIcon />
+      </MenuPrimitive.CheckboxItemIndicator>
       {children}
     </MenuPrimitive.CheckboxItem>
   )
@@ -245,12 +252,10 @@ function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
 function DropdownMenuRadioItem({
   className,
   children,
-  indicator,
   inset,
   ...props
 }: MenuPrimitive.RadioItem.Props & {
   inset?: boolean
-  indicator?: React.ReactNode
 }) {
   return (
     <MenuPrimitive.RadioItem
@@ -263,14 +268,12 @@ function DropdownMenuRadioItem({
       )}
       {...props}
     >
-      <span
-        className="pointer-events-none absolute right-2 flex items-center justify-center"
+      <MenuPrimitive.RadioItemIndicator
         data-slot="dropdown-menu-radio-item-indicator"
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
       >
-        <MenuPrimitive.RadioItemIndicator>
-          {indicator ?? <Icon icon={RiCheckLine} />}
-        </MenuPrimitive.RadioItemIndicator>
-      </span>
+        <MenuCheckIcon />
+      </MenuPrimitive.RadioItemIndicator>
       {children}
     </MenuPrimitive.RadioItem>
   )

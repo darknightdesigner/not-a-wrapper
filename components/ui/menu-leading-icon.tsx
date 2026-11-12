@@ -1,4 +1,5 @@
 import { Icon, type IconProps } from "@/components/ui/icon"
+import { RiCheckLine } from "@remixicon/react"
 
 type MenuLeadingIconProps = {
   icon: IconProps["icon"]
@@ -12,4 +13,14 @@ function MenuLeadingIcon({ icon }: MenuLeadingIconProps) {
   return <Icon icon={icon} slotSize="var(--floating-menu-leading-slot-size)" />
 }
 
-export { MenuLeadingIcon }
+/** Selected-state check for menu rows; shares the leading icon geometry. */
+function MenuCheckIcon() {
+  return (
+    <Icon
+      icon={RiCheckLine}
+      slotSize="var(--floating-menu-leading-slot-size)"
+    />
+  )
+}
+
+export { MenuCheckIcon, MenuLeadingIcon }

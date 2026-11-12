@@ -346,7 +346,7 @@ function UserMessageBubble({
       <div className="contents w-full">
         <div
           className={cn(
-            "corner-superellipse/0.98 user-message-bubble-color relative w-full min-w-0 overflow-hidden rounded-[22px] [background-color:var(--theme-user-msg-bg,var(--user-message-bg))] px-4 py-2.5 leading-6 [color:var(--theme-user-msg-text,var(--foreground))]",
+            "corner-superellipse/0.98 user-message-bubble-color relative w-full min-w-0 overflow-hidden bg-user-message text-foreground rounded-3xl px-4 py-3 leading-6",
             containsAttachments && "rounded-se-lg"
           )}
         >

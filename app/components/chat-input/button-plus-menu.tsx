@@ -1,5 +1,6 @@
 "use client"
 
+import { AuthModal } from "@/app/auth/_components/auth-modal"
 import { ComposerIconButton } from "@/components/ui/composer-icon-button"
 import {
   DropdownMenu,
@@ -17,7 +18,6 @@ import { Kbd } from "@/components/ui/kbd"
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
 } from "@/components/ui/popover"
 import type { PromptInputActionQuery } from "@/components/ui/prompt-input"
 import {
@@ -26,9 +26,9 @@ import {
   TooltipShortcut,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useBreakpoint } from "@/hooks/use-breakpoint"
 import { useIsMobileDeviceOs } from "@/hooks/use-mobile-device-os"
 import type { SearchMode } from "@/lib/models/types"
+import { cn } from "@/lib/utils"
 import {
   RiAddLargeLine,
   RiAttachment2,
@@ -38,15 +38,17 @@ import {
   RiImageLine,
   RiPlugLine,
 } from "@remixicon/react"
-import { memo, useCallback, useMemo, useRef } from "react"
+import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { type ComposerActionId } from "./composer-action-registry"
 import {
   type ComposerActionAvailability,
   type ComposerActionMenuItem,
   type ComposerMenuConnector,
 } from "./composer-menu-items"
-import { composerMenuRow } from "./composer-menu-row"
-import { PopoverContentAuth } from "./popover-content-auth"
+import {
+  composerMenuRow,
+  composerMenuRowCheckedClassName,
+} from "./composer-menu-row"
 import { useComposerActionMenu } from "./use-composer-action-menu"
 
 const composerPlusIcon = <Icon icon={RiAddLargeLine} slotSize={20} />
@@ -61,14 +63,13 @@ const composerPlusTooltip = (
 const touchMenuRowClassName =
   "mx-1.5 h-auto min-h-(--floating-menu-item-height) cursor-auto scroll-m-1.5 gap-3 rounded-[28px] border-y-0! [corner-shape:superellipse(1.1)] px-1.5 py-1.5 text-sm hover:bg-(--floating-menu-touch-tertiary) focus:bg-(--floating-menu-touch-tertiary) data-highlighted:bg-(--floating-menu-touch-tertiary)"
 const compactMenuRowClassName =
-  "mx-2.5 min-h-9 justify-between gap-6 rounded-[12px] px-2.5 py-1.5 text-sm"
+  "mx-2 min-h-9 justify-between gap-6 rounded-[12px] px-2.5 py-1.5 text-sm"
 const touchMenuChipClassName =
-  "flex size-9 shrink-0 items-center justify-center rounded-full bg-(--floating-menu-touch-tertiary) text-foreground"
+  "flex size-9 shrink-0 items-center justify-center rounded-full bg-(--floating-menu-touch-tertiary) text-foreground in-aria-checked:text-inherit"
 const touchMenuActionIcons = {
   "add-files": RiAttachment2,
   "web-search": RiGlobalLine,
 } as const
-const touchMenuCheck = <Icon icon={RiCheckLine} slotSize={16} />
 
 type ButtonPlusMenuProps = {
   isUserAuthenticated: boolean
@@ -90,28 +91,32 @@ type ButtonPlusMenuProps = {
   ) => boolean
   /** Toggle an MCP connector from the direct mobile trigger menu. */
   onToggleConnector?: (connectorId: string) => void
-  /** Open (or toggle off) a synthetic action-query session in the editor —
-   * the desktop + button drives the same menu as typing "@". */
-  onOpenActionMenu?: () => void
-  /** End the active action-query session (synthetic Escape / focus-out). */
-  onCloseActionQuery?: () => void
   /** Coordinates every background tooltip owned by the composer. */
   tooltipDisabled?: boolean
   onMenuOpenChange?: (open: boolean) => void
 }
 
-type NativeMobileMenuRowContentProps = {
+type PlusMenuRowContentProps = {
   icon: React.ComponentProps<typeof Icon>["icon"]
+  /** The action's idle tint (compact rows; touch chips stay plain). */
+  iconClassName?: string
   label: string
   touchOptimized: boolean
 }
 
-function NativeMobileMenuRowContent({
+function PlusMenuRowContent({
   icon,
+  iconClassName,
   label,
   touchOptimized,
-}: NativeMobileMenuRowContentProps) {
-  const glyph = <Icon icon={icon} slotSize={20} />
+}: PlusMenuRowContentProps) {
+  const glyph = (
+    <Icon
+      icon={icon}
+      iconClassName={touchOptimized ? undefined : iconClassName}
+      slotSize={20}
+    />
+  )
 
   return touchOptimized ? (
     <>
@@ -128,7 +133,21 @@ function NativeMobileMenuRowContent({
   )
 }
 
-type NativeMobileMenuContentProps = {
+/** Placeholder row while the user's connectors load (both menus). */
+function ConnectorRowSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="skeleton group relative mx-1.5 flex min-h-(--floating-menu-item-height) w-auto items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 [--skeleton-opacity:0.75]"
+      data-composer-menu-skeleton=""
+    >
+      <div className="skeleton-child icon shrink-0 rounded-md" />
+      <div className="skeleton-child h-4 w-40 max-w-[70%] rounded-md" />
+    </div>
+  )
+}
+
+type PlusMenuContentProps = {
   touchOptimized: boolean
   acceptsImages: boolean
   commandItems: readonly ComposerActionMenuItem[]
@@ -140,7 +159,7 @@ type NativeMobileMenuContentProps = {
   onOpenPhotos: () => void
 }
 
-function NativeMobileMenuContent({
+function PlusMenuContent({
   touchOptimized,
   acceptsImages,
   commandItems,
@@ -150,7 +169,7 @@ function NativeMobileMenuContent({
   onToggleConnector,
   onOpenCamera,
   onOpenPhotos,
-}: NativeMobileMenuContentProps) {
+}: PlusMenuContentProps) {
   const rowClassName = touchOptimized
     ? touchMenuRowClassName
     : compactMenuRowClassName
@@ -173,7 +192,7 @@ function NativeMobileMenuContent({
       className={
         touchOptimized
           ? "shadow-floating-menu-touch max-h-[min(var(--available-height,50svh),calc(var(--spacing)*1.5+var(--min-items,6.8)*var(--floating-menu-item-height)))] w-max max-w-xs min-w-60 [scrollbar-width:none] overflow-y-auto [overscroll-behavior:contain] rounded-[28px] bg-(--floating-menu-touch-surface) py-1.5 select-none [corner-shape:superellipse(1.1)]"
-          : "max-h-(--available-height) w-max max-w-xs [scrollbar-width:none] overflow-y-auto rounded-[20px] py-2.5"
+          : "max-h-(--available-height) w-max max-w-xs [scrollbar-width:none] overflow-y-auto rounded-[20px] py-2"
       }
       onKeyDownCapture={(event) => {
         if (event.key === "Tab") event.preventDefault()
@@ -186,7 +205,7 @@ function NativeMobileMenuContent({
             className={rowClassName}
             onClick={onOpenCamera}
           >
-            <NativeMobileMenuRowContent
+            <PlusMenuRowContent
               icon={RiCameraLine}
               label="Camera"
               touchOptimized
@@ -199,7 +218,7 @@ function NativeMobileMenuContent({
             className={rowClassName}
             onClick={onOpenPhotos}
           >
-            <NativeMobileMenuRowContent
+            <PlusMenuRowContent
               icon={RiImageLine}
               label="Photos"
               touchOptimized
@@ -214,11 +233,15 @@ function NativeMobileMenuContent({
             className={rowClassName}
             onClick={() => onActivate(item.itemId)}
           >
-            <NativeMobileMenuRowContent
+            <PlusMenuRowContent
               icon={
                 touchOptimized
                   ? touchMenuActionIcons[item.itemId]
                   : item.action.icon
+              }
+              // Selected inherits the row's accent instead of its idle tint.
+              iconClassName={
+                item.selected ? undefined : item.action.iconClassName
               }
               label={
                 touchOptimized
@@ -238,31 +261,50 @@ function NativeMobileMenuContent({
             key={item.itemId}
             value={item.itemId}
             disabled={item.disabled}
-            indicator={touchOptimized ? touchMenuCheck : undefined}
-            className={rowClassName}
+            className={cn(rowClassName, composerMenuRowCheckedClassName)}
             onClick={() => onActivate(item.itemId)}
           >
-            <NativeMobileMenuRowContent
-              icon={
-                touchOptimized
-                  ? touchMenuActionIcons[item.itemId]
-                  : item.action.icon
-              }
-              label={item.label}
-              touchOptimized={touchOptimized}
-            />
+            {/* A disabled toggle explains itself, as in the typed @ menu. */}
+            <Tooltip disabled={!item.disabled}>
+              <TooltipTrigger
+                render={
+                  <span
+                    className={cn(
+                      "flex min-w-0 grow items-center",
+                      touchOptimized && "gap-3"
+                    )}
+                  />
+                }
+              >
+                <PlusMenuRowContent
+                  icon={
+                    touchOptimized
+                      ? touchMenuActionIcons[item.itemId]
+                      : item.action.icon
+                  }
+                  iconClassName={
+                    item.selected ? undefined : item.action.iconClassName
+                  }
+                  label={item.label}
+                  touchOptimized={touchOptimized}
+                />
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={4}>
+                {item.disabledMessage}
+              </TooltipContent>
+            </Tooltip>
           </DropdownMenuRadioItem>
         ))}
       </DropdownMenuRadioGroup>
+      {connectors === undefined && <ConnectorRowSkeleton />}
       {connectors?.map((connector) => (
         <DropdownMenuCheckboxItem
           key={connector.id}
           checked={connector.enabled}
-          indicator={touchOptimized ? touchMenuCheck : undefined}
           className={rowClassName}
           onCheckedChange={() => onToggleConnector?.(connector.id)}
         >
-          <NativeMobileMenuRowContent
+          <PlusMenuRowContent
             icon={RiPlugLine}
             label={connector.name}
             touchOptimized={touchOptimized}
@@ -305,7 +347,10 @@ function ComposerActionMenuRow({
                 <span className="relative flex size-5 shrink-0 items-center justify-center">
                   <Icon
                     icon={item.action.icon}
-                    iconClassName={item.action.iconClassName}
+                    // Selected inherits the row's accent instead of its idle tint.
+                    iconClassName={
+                      item.selected ? undefined : item.action.iconClassName
+                    }
                     slotSize={20}
                   />
                 </span>
@@ -313,7 +358,7 @@ function ComposerActionMenuRow({
                   <span className="me-24 flex min-w-0 flex-1 items-baseline gap-3">
                     <span
                       ref={primaryTextRef}
-                      className="text-foreground max-w-full min-w-0 shrink-0 truncate"
+                      className="text-foreground max-w-full min-w-0 shrink-0 truncate in-aria-checked:text-inherit"
                       data-composer-action-tooltip-anchor=""
                     >
                       {item.label}
@@ -356,13 +401,14 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
   connectors,
   onActivateConnector,
   onToggleConnector,
-  onOpenActionMenu,
-  onCloseActionQuery,
   tooltipDisabled = false,
   onMenuOpenChange,
 }: ButtonPlusMenuProps) {
   const { openFilePicker, addFiles } = useFileUpload()
-  const isMobile = useBreakpoint(768)
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  // Guests share the menu (web search stays usable); only file sources
+  // require an account.
+  const showsMediaSources = acceptsImages && isUserAuthenticated
   // The touch treatment keys on the user-agent OS (iOS, Android, or
   // iPadOS-as-Mac), not pointer coarseness or width. A narrow
   // desktop window keeps the compact plain-glyph popover.
@@ -409,14 +455,15 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     (actionId: ComposerActionId) => {
       switch (actionId) {
         case "add-files":
-          openFilePicker()
+          if (isUserAuthenticated) openFilePicker()
+          else setIsAuthModalOpen(true)
           break
         case "web-search":
           if (searchMode === "optional") onToggleSearch(!enableSearch)
           break
       }
     },
-    [enableSearch, onToggleSearch, openFilePicker, searchMode]
+    [enableSearch, isUserAuthenticated, onToggleSearch, openFilePicker, searchMode]
   )
 
   const {
@@ -425,8 +472,6 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     connectorItems,
     dismissActionQuery,
     handleActionQueryOpenChange,
-    handleAuthPopoverOpenChange,
-    handleSyntheticSessionToggle,
     handleTriggerMenuOpenChange,
     isActionQueryOpen,
     isConnectorSectionVisible,
@@ -446,45 +491,9 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     availability,
     onActivateActionQuery,
     onActivateConnector,
-    onOpenActionMenu,
-    onCloseActionQuery,
     onRunAction: runAction,
     onMenuOpenChange,
   })
-
-  // Unauthenticated: show auth popover instead of dropdown
-  if (!isUserAuthenticated) {
-    return (
-      <Popover open={isTriggerMenuOpen} onOpenChange={handleAuthPopoverOpenChange}>
-        <Tooltip
-          disableHoverablePopup
-          disabled={isTriggerMenuOpen || tooltipDisabled}
-        >
-          <TooltipTrigger render={<span className="inline-flex" />}>
-            {/* The id goes on the Trigger: Base UI matches the open trigger by
-                its DOM id, so an id on the render element hides the open state. */}
-            <PopoverTrigger
-              id="composer-plus-btn"
-              render={
-                <ComposerIconButton
-                  ref={setTriggerNode}
-                  type="button"
-                  data-testid="composer-plus-btn"
-                  aria-label="Add files and more"
-                />
-              }
-            >
-              {composerPlusIcon}
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" hideArrow>
-            {composerPlusTooltip}
-          </TooltipContent>
-        </Tooltip>
-        <PopoverContentAuth portalContainer={overlayContainerRef} />
-      </Popover>
-    )
-  }
 
   const editorOwnedContent = (
     <PopoverContent
@@ -500,7 +509,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
       initialFocus={false}
       finalFocus={false}
       geometry="custom"
-      className="max-h-[min(var(--available-height,50svh),var(--floating-menu-max-height))] w-(--anchor-width) max-w-[calc(100vw-12px)] overflow-y-auto rounded-(--floating-menu-radius) py-2 [scrollbar-width:none]"
+      className="max-h-[min(var(--available-height,50svh),var(--floating-menu-max-height))] w-(--anchor-width) max-w-[calc(100vw-12px)] [scrollbar-width:none] overflow-y-auto rounded-(--floating-menu-radius) py-2"
     >
       <div
         role="group"
@@ -516,16 +525,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
           />
         ))}
       </div>
-      {isConnectorsLoading && (
-        <div
-          aria-hidden="true"
-          className="skeleton group relative mx-1.5 flex min-h-(--floating-menu-item-height) w-auto items-center gap-1.5 rounded-[10px] px-2.5 py-1.5 [--skeleton-opacity:0.75]"
-          data-composer-menu-skeleton=""
-        >
-          <div className="skeleton-child icon shrink-0 rounded-md" />
-          <div className="skeleton-child h-4 w-40 max-w-[70%] rounded-md" />
-        </div>
-      )}
+      {isConnectorsLoading && <ConnectorRowSkeleton />}
       {connectorItems.length > 0 && (
         <div role="group">
           {connectorItems.map((item) => (
@@ -539,10 +539,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
                 children: (
                   <>
                     <span className="relative flex size-5 shrink-0 items-center justify-center">
-                      <Icon
-                        icon={RiPlugLine}
-                        slotSize={20}
-                      />
+                      <Icon icon={RiPlugLine} slotSize={20} />
                     </span>
                     <span className="flex min-w-0 grow items-baseline gap-3">
                       <span className="text-foreground max-w-full min-w-0 shrink-0 truncate">
@@ -575,133 +572,100 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     </PopoverContent>
   )
 
-  if (isMobile) {
-    const commandItems = triggerMenuItems.filter(
-      (item) => item.action.behavior === "command"
-    )
-    const toggleItems = triggerMenuItems.filter(
-      (item) => item.action.behavior === "toggle"
-    )
+  // One + menu at every width: a Base UI dropdown. Typed "@"/"/" keep
+  // the editor-owned, composer-wide menu below.
+  const commandItems = triggerMenuItems.filter(
+    (item) => item.action.behavior === "command"
+  )
+  const toggleItems = triggerMenuItems.filter(
+    (item) => item.action.behavior === "toggle"
+  )
 
-    return (
-      <>
-        <DropdownMenu
-          open={isTriggerMenuOpen}
-          onOpenChange={handleTriggerMenuOpenChange}
-          modal
-        >
-          <Tooltip
-            disableHoverablePopup
-            disabled={isMenuOpen || tooltipDisabled}
-          >
-            <TooltipTrigger render={<span className="inline-flex" />}>
-              {/* id on the Trigger, not the render element (see above). */}
-              <DropdownMenuTrigger
-                id="composer-plus-btn"
-                render={
-                  <ComposerIconButton
-                    ref={setTriggerNode}
-                    type="button"
-                    data-testid="composer-plus-btn"
-                    aria-label="Add files and more"
-                    aria-expanded={isTriggerMenuOpen}
-                    onClick={dismissActionQuery}
-                  />
-                }
-              >
-                {composerPlusIcon}
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" hideArrow>
-              {composerPlusTooltip}
-            </TooltipContent>
-          </Tooltip>
-          {/* Mobile OSes add touch-sized chips and native media sources;
-              narrow fine-pointer windows keep the compact presentation. */}
-          <NativeMobileMenuContent
-            touchOptimized={isTouchMenu}
-            acceptsImages={acceptsImages}
-            commandItems={commandItems}
-            toggleItems={toggleItems}
-            connectors={connectors}
-            onActivate={activateItem}
-            onToggleConnector={onToggleConnector}
-            onOpenCamera={() => cameraInputRef.current?.click()}
-            onOpenPhotos={() => photosInputRef.current?.click()}
-          />
-        </DropdownMenu>
-        {isTouchMenu && acceptsImages && (
-          /* Camera and photo-library sources are hidden file inputs mounted
-             outside the menu so they survive row activation closing it. */
-          <>
-            <input
-              ref={photosInputRef}
-              className="sr-only select-none"
-              type="file"
-              tabIndex={-1}
-              aria-hidden="true"
-              data-testid="composer-upload-photos-input"
-              id="upload-photos"
-              accept="image/*"
-              multiple
-              onChange={handleTouchFileInputChange}
-            />
-            <input
-              ref={cameraInputRef}
-              className="sr-only select-none"
-              type="file"
-              tabIndex={-1}
-              aria-hidden="true"
-              data-testid="composer-upload-camera-input"
-              id="upload-camera"
-              accept="image/*"
-              capture="environment"
-              multiple
-              onChange={handleTouchFileInputChange}
-            />
-          </>
-        )}
-        <Popover
-          open={isActionQueryOpen}
-          onOpenChange={handleActionQueryOpenChange}
-        >
-          {editorOwnedContent}
-        </Popover>
-      </>
-    )
-  }
-
-  // Desktop: the + button and typed "@"/"/" drive one editor-owned query
-  // session. Clicking + opens the same menu that typing "@" does, and typing
-  // filters it.
   return (
-    <Popover open={isActionQueryOpen} onOpenChange={handleActionQueryOpenChange}>
-      <Tooltip
-        disableHoverablePopup
-        disabled={isActionQueryOpen || tooltipDisabled}
+    <>
+      <DropdownMenu
+        open={isTriggerMenuOpen}
+        onOpenChange={handleTriggerMenuOpenChange}
+        modal
       >
-        <TooltipTrigger
-          render={<span className="inline-flex" />}
-        >
-          <ComposerIconButton
-            ref={setTriggerNode}
-            type="button"
-            id="composer-plus-btn"
-            data-testid="composer-plus-btn"
-            aria-label="Add files and more"
-            aria-expanded={isActionQueryOpen}
-            aria-haspopup="menu"
-            onClick={handleSyntheticSessionToggle}
-            onPointerDown={(event) => event.preventDefault()}
-          >
-            {composerPlusIcon}
-          </ComposerIconButton>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" hideArrow>
-          {composerPlusTooltip}
-        </TooltipContent>
-      </Tooltip>
-      {editorOwnedContent}
-    </Popover>
+        <Tooltip disableHoverablePopup disabled={isMenuOpen || tooltipDisabled}>
+          <TooltipTrigger render={<span className="inline-flex" />}>
+            {/* id on the Trigger, not the render element (see above). */}
+            <DropdownMenuTrigger
+              id="composer-plus-btn"
+              render={
+                <ComposerIconButton
+                  ref={setTriggerNode}
+                  type="button"
+                  tone="filled"
+                  data-testid="composer-plus-btn"
+                  aria-label="Add files and more"
+                  aria-expanded={isTriggerMenuOpen}
+                  onClick={dismissActionQuery}
+                />
+              }
+            >
+              {composerPlusIcon}
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" hideArrow>
+            {composerPlusTooltip}
+          </TooltipContent>
+        </Tooltip>
+        {/* Mobile OSes add touch-sized chips and native media sources;
+            narrow fine-pointer windows keep the compact presentation. */}
+        <PlusMenuContent
+          touchOptimized={isTouchMenu}
+          acceptsImages={showsMediaSources}
+          commandItems={commandItems}
+          toggleItems={toggleItems}
+          connectors={connectors}
+          onActivate={activateItem}
+          onToggleConnector={onToggleConnector}
+          onOpenCamera={() => cameraInputRef.current?.click()}
+          onOpenPhotos={() => photosInputRef.current?.click()}
+        />
+      </DropdownMenu>
+      {isTouchMenu && showsMediaSources && (
+        /* Camera and photo-library sources are hidden file inputs mounted
+           outside the menu so they survive row activation closing it. */
+        <>
+          <input
+            ref={photosInputRef}
+            className="sr-only select-none"
+            type="file"
+            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="composer-upload-photos-input"
+            id="upload-photos"
+            accept="image/*"
+            multiple
+            onChange={handleTouchFileInputChange}
+          />
+          <input
+            ref={cameraInputRef}
+            className="sr-only select-none"
+            type="file"
+            tabIndex={-1}
+            aria-hidden="true"
+            data-testid="composer-upload-camera-input"
+            id="upload-camera"
+            accept="image/*"
+            capture="environment"
+            multiple
+            onChange={handleTouchFileInputChange}
+          />
+        </>
+      )}
+      <Popover
+        open={isActionQueryOpen}
+        onOpenChange={handleActionQueryOpenChange}
+      >
+        {editorOwnedContent}
+      </Popover>
+      {!isUserAuthenticated && (
+        <AuthModal open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen} />
+      )}
+    </>
   )
 })

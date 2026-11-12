@@ -24,13 +24,15 @@ type SidebarMenuItemProps = Omit<
   trailing?: ReactNode
   /**
    * Set when `trailing` is an interactive control (not a passive hint): keeps
-   * it reachable by revealing on focus-within and on touch devices, where
+   * it reachable by revealing on keyboard focus and on touch devices, where
    * hover-only reveal would make it inoperable.
    */
   trailingInteractive?: boolean
   testId?: string
   className?: string
   isActive?: boolean
+  /** `muted` is the quiet disclosure row (e.g. "Show more"). */
+  tone?: "default" | "muted"
 }
 
 const baseClassName = cn(
@@ -38,7 +40,7 @@ const baseClassName = cn(
   "cursor-pointer",
   "disabled:cursor-not-allowed disabled:hover:bg-transparent",
   "aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent",
-  "text-foreground hover:bg-sidebar-row hover:text-foreground active:bg-sidebar-row",
+  "hover:bg-sidebar-row active:bg-sidebar-row",
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2"
 )
 
@@ -57,6 +59,7 @@ export const SidebarMenuItem = forwardRef<
     testId,
     className,
     isActive,
+    tone = "default",
     ...buttonProps
   },
   ref
@@ -82,18 +85,22 @@ export const SidebarMenuItem = forwardRef<
       className={cn(
         "shrink-0 text-[var(--text-tertiary)] opacity-0 group-hover/menu-item:opacity-100",
         trailingInteractive &&
-          "relative z-10 group-focus-within/menu-item:opacity-100 pointer-coarse:opacity-100"
+          "relative z-10 group-keyboard-focus-within/menu-item:opacity-100 pointer-coarse:opacity-100"
       )}
     >
       {trailing}
     </div>
   ) : null
 
+  // On the element that carries [data-sidebar-item] (the Link in split rows).
+  const toneClassName =
+    tone === "muted" && "text-(--sidebar-label-foreground) hover:text-foreground"
   const combinedClassName = cn(
     baseClassName,
     hasTrailing && "justify-between",
+    toneClassName,
     isActive &&
-      "bg-sidebar-row text-foreground hover:bg-sidebar-row",
+      "bg-sidebar-row hover:bg-sidebar-row",
     className
   )
 
@@ -107,7 +114,10 @@ export const SidebarMenuItem = forwardRef<
           ref={ref as Ref<HTMLAnchorElement>}
           href={href}
           onClick={onClick as MouseEventHandler<HTMLAnchorElement> | undefined}
-          className="sidebar-row-primary-control after:absolute after:inset-0 flex h-full min-w-0 grow items-center rounded-(--sidebar-row-radius) focus-visible:outline-none"
+          className={cn(
+            "sidebar-row-primary-control after:absolute after:inset-0 flex h-full min-w-0 grow items-center rounded-(--sidebar-row-radius) focus-visible:outline-none",
+            toneClassName
+          )}
           data-testid={testId}
           data-sidebar-item="true"
           data-active={isActive ? "true" : undefined}

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import {
   floatingMenuContentClassName,
   floatingMenuItemClassName,
+  floatingMenuItemIndicatorClassName,
   floatingMenuLabelClassName,
   floatingMenuSeparatorClassName,
   floatingSurfaceClassName,
@@ -15,9 +16,10 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group"
+import { MenuCheckIcon } from "@/components/ui/menu-leading-icon"
 import { cn } from "@/lib/utils"
 import { Combobox as ComboboxPrimitive } from "@base-ui/react"
-import { RiArrowDownSLine, RiCheckLine, RiCloseLine } from "@remixicon/react"
+import { RiArrowDownSLine, RiCloseLine } from "@remixicon/react"
 import * as React from "react"
 
 const Combobox = ComboboxPrimitive.Root
@@ -142,7 +144,7 @@ function ComboboxList({ className, ...props }: ComboboxPrimitive.List.Props) {
       data-slot="combobox-list"
       className={cn(
         floatingMenuContentClassName,
-        "no-scrollbar max-h-[min(calc(--spacing(72)---spacing(9)),calc(var(--available-height)---spacing(9)))] scroll-py-2.5 overflow-y-auto overscroll-contain data-empty:p-0",
+        "no-scrollbar max-h-[min(calc(--spacing(72)---spacing(9)),calc(var(--available-height)---spacing(9)))] scroll-py-2 overflow-y-auto overscroll-contain data-empty:p-0",
         className
       )}
       {...props}
@@ -167,11 +169,9 @@ function ComboboxItem({
     >
       {children}
       <ComboboxPrimitive.ItemIndicator
-        render={
-          <span className="pointer-events-none absolute right-2 flex size-4 items-center justify-center" />
-        }
+        className={cn(floatingMenuItemIndicatorClassName, "right-2")}
       >
-        <Icon icon={RiCheckLine} className="pointer-events-none" />
+        <MenuCheckIcon />
       </ComboboxPrimitive.ItemIndicator>
     </ComboboxPrimitive.Item>
   )

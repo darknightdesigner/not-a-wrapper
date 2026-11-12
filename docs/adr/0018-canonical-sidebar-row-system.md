@@ -53,8 +53,17 @@ The app's CSS-contract row system is THE sidebar component system.
   link to it (2026-11-11). Do not add one back or delete the route.
 - Widths are CSS-owned: `--sidebar-width` and
   `--sidebar-width-icon: var(--sidebar-rail-width)` live in `app/globals.css`
-  `:root`; the collapsed frame equals the rail by construction, pinned in
-  `sidebar-geometry.test.ts`. No TS width constants.
+  `:root`; the collapsed frame equals the rail by construction.
+- The expanded frame is resizable (2026-11-11, after Grok). The CSS default is
+  also the minimum; `lib/sidebar-width.ts` owns only the resize bounds and the
+  `sidebar_width` cookie, which the root layout reads so the server renders the
+  chosen width. A stored width overrides `--sidebar-width` on the frame
+  subtree only; portaled menus and the mobile drawer keep the default. Collapse
+  still goes to the rail, never to zero.
+- The Chats list reveals 5 rows, then 5 more per "Show more" press
+  (2026-11-11, after Grok). Pins count toward the reveal. The press fetches the
+  next window page (ADR-0005) before the reveal outruns what is loaded; the
+  sidebar no longer infinite-scrolls.
 - The design-system registry is a consumer and verification surface for
   production components: its chrome composes `SidebarMenuItem`, and its
   catalog pages document the production row components — never a parallel

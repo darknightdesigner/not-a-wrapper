@@ -88,7 +88,7 @@ describe("SidebarProject empty state", () => {
       '[data-testid="sidebar-new-project"]'
     )
 
-    expect(newProject?.textContent).toContain("New project")
+    expect(newProject?.textContent).toContain("New Project")
     expect(
       newProject?.querySelector('[data-slot="sidebar-leading-icon"] svg')
     ).not.toBeNull()

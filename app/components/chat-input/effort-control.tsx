@@ -1,6 +1,9 @@
 "use client"
 
-import { ComposerControl } from "@/components/ui/composer-control"
+import {
+  ComposerControl,
+  composerTextControlClassName,
+} from "@/components/ui/composer-control"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,14 +18,16 @@ import {
 } from "@/components/ui/tooltip"
 import type { ModelReasoningEffort } from "@/lib/models/types"
 import {
+  getReasoningEffortLabel,
   isReasoningEffortControlEnabled,
-  REASONING_EFFORT_LABELS,
 } from "@/lib/reasoning-effort"
 import { cn } from "@/lib/utils"
 import { RiCheckLine } from "@remixicon/react"
 import { memo, useRef, useState } from "react"
 
 type EffortControlProps = {
+  /** Selected model: level names follow its maker's own words. */
+  modelId: string
   /** The selected model's level menu (logical union across routes). */
   levels: readonly ModelReasoningEffort[]
   /** Effective per-turn effort; undefined = Default. */
@@ -75,6 +80,7 @@ function EffortRow({
  * model. Memoized so Composer keystrokes skip it.
  */
 const EffortControl = memo(function EffortControl({
+  modelId,
   levels,
   value,
   defaultLevel,
@@ -102,7 +108,7 @@ const EffortControl = memo(function EffortControl({
       : undefined)
   const effectiveLabel =
     effectiveLevel !== undefined
-      ? REASONING_EFFORT_LABELS[effectiveLevel]
+      ? getReasoningEffortLabel(effectiveLevel, modelId)
       : undefined
 
   const select = (level: ModelReasoningEffort) => {
@@ -139,15 +145,17 @@ const EffortControl = memo(function EffortControl({
                         : "Thinking effort"
                     }
                     aria-expanded={isOpen}
-                    // Geometry and type mirror the composer model trigger. This
+                    // Type and height come from composerTextControlClassName,
+                    // shared with the composer model trigger. This
                     // pill always renders joined flush to the model trigger as
                     // one segmented control: tight facing padding and a squared
                     // inner corner on the shared edge (the model trigger mirrors
                     // both when this control is present). No hover bridge — the
                     // seam has no gap to cover, and an extended hit area would
-                    // steal the model trigger's trailing clicks. Always the quiet
-                    // tertiary grey — an override changes the label, not the
-                    // color.
+                    // steal the model trigger's trailing clicks. Rests in the
+                    // quiet tertiary grey (an override changes the label, not the
+                    // color) and lifts to foreground on hover or open, like the
+                    // other composer buttons.
                     // Both radii are FINITE (18px trailing = half the height, so
                     // it reads as the pill's full round): pairing a finite corner
                     // with rounded-full's near-infinite radius triggers the CSS
@@ -171,7 +179,10 @@ const EffortControl = memo(function EffortControl({
                     // since hover and pin target the same value the handoff never
                     // animates. Touch devices have no hover to reveal the seam,
                     // so they sit flush permanently.
-                    className="can-hover:-ms-1.5 can-hover:group-hover/segmented:translate-x-[3px] can-hover:group-has-[[aria-expanded=true]]/segmented:translate-x-[3px] h-9 shrink-0 overflow-visible rounded-s-md rounded-e-2xl py-0 ps-1.5 pe-3 text-base leading-[26px] font-normal text-[var(--text-tertiary)] transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                    className={cn(
+                      composerTextControlClassName,
+                      "can-hover:-ms-1.5 can-hover:group-hover/segmented:translate-x-[3px] can-hover:group-has-[[aria-expanded=true]]/segmented:translate-x-[3px] shrink-0 overflow-visible rounded-s-md rounded-e-2xl ps-1.5 pe-2.5 text-[var(--text-tertiary)] can-hover:hover:text-foreground aria-expanded:text-foreground transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                    )}
                   />
                 }
               >
@@ -187,14 +198,16 @@ const EffortControl = memo(function EffortControl({
         </div>
         <DropdownMenuContent
           anchor={anchorRef}
-          side="top"
-          align="start"
+          // Same placement as the composer model selector.
+          side="bottom"
+          align="end"
+          sideOffset={4}
           className="min-w-44"
         >
           {levels.map((level) => (
             <EffortRow
               key={level}
-              label={REASONING_EFFORT_LABELS[level]}
+              label={getReasoningEffortLabel(level, modelId)}
               selected={level === effectiveLevel}
               onSelect={() => select(level)}
             />

@@ -110,7 +110,7 @@ function TooltipShortcut({
           <span>{label}</span>
           <span
             data-slot="tooltip-shortcut-keys"
-            className="-me-1.5 inline-flex h-[18px] items-center rounded-full bg-white/25 px-1.5 text-sm leading-[18px] font-semibold whitespace-pre text-[var(--text-secondary)] [text-box:trim-both_text] pointer-coarse:hidden [&_kbd]:h-[18px] [&_kbd]:min-w-0 [&_kbd]:[align-items:normal] [&_kbd]:justify-normal [&_kbd]:[font-family:inherit] [&_kbd]:text-sm [&_kbd]:leading-[18px] [&_kbd>span]:min-w-[1em]"
+            className="-me-1.5 inline-flex h-[18px] items-center rounded-full bg-[var(--tooltip-shortcut-surface)] px-1.5 text-sm leading-[18px] whitespace-pre text-[var(--text-secondary)] [text-box:trim-both_text] pointer-coarse:hidden [&_kbd]:h-[18px] [&_kbd]:min-w-0 [&_kbd]:[align-items:normal] [&_kbd]:justify-normal [&_kbd]:[font-family:inherit] [&_kbd]:text-sm [&_kbd]:leading-[18px] [&_kbd>span]:min-w-[1em]"
           >
             {children}
           </span>
@@ -118,7 +118,7 @@ function TooltipShortcut({
       </span>
       <span
         data-slot="tooltip-shortcut-detail"
-        className="font-medium text-[var(--text-tertiary)] empty:hidden"
+        className="text-[var(--text-tertiary)] empty:hidden"
       >
         {detail}
       </span>
@@ -209,7 +209,7 @@ function TooltipContent({
           className={cn(
             "z-50 w-max max-w-[min(var(--container-xs),calc(100dvw-2*var(--spacing)))] overflow-hidden rounded-(--tooltip-radius) px-3 py-[5px] [font-family:-apple-system-body,ui-sans-serif,-apple-system,system-ui,'Segoe_UI',Helvetica,'Apple_Color_Emoji',Arial,sans-serif,'Segoe_UI_Emoji','Segoe_UI_Symbol'] transition-opacity duration-150 ease-[cubic-bezier(0.4,0,0.2,1)] select-none has-[[data-slot=tooltip-multiline]]:rounded-(--tooltip-multiline-radius) pointer-coarse:sr-only",
             variant === "default"
-              ? "dark shadow-tooltip border border-[var(--border-tooltip)] bg-[var(--bg-tooltip)] text-white"
+              ? "shadow-tooltip border border-[var(--border-tooltip)] bg-[var(--bg-tooltip)] text-[var(--tooltip-foreground)]"
               : "bg-popover text-popover-foreground shadow-floating-surface",
             className
           )}
@@ -217,10 +217,7 @@ function TooltipContent({
         >
           <div
             data-slot="tooltip-content-text"
-            className={cn(
-              "text-center text-sm leading-[18px] tracking-[-0.15px] whitespace-pre-wrap",
-              variant === "default" ? "font-semibold" : "font-medium"
-            )}
+            className="text-center text-sm leading-[18px] font-normal tracking-[-0.15px] whitespace-pre-wrap"
           >
             {children}
           </div>
