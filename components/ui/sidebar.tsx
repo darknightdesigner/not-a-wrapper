@@ -346,7 +346,9 @@ function SidebarResizeHandle() {
       data-slot="sidebar-resize-handle"
       className="absolute inset-y-0 end-0 z-40 w-1.5 cursor-col-resize touch-none outline-none keyboard-focused:bg-border-strong"
       onPointerDown={(event) => {
-        if (event.button !== 0) return
+        // One drag at a time: a second pointer must not overwrite the saved
+        // pre-drag styles.
+        if (event.button !== 0 || drag.current) return
         const frame = event.currentTarget.parentElement
         if (!frame) return
         event.preventDefault()
