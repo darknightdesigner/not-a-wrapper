@@ -411,24 +411,11 @@ every run; the paired PR gate fails when the candidate exceeds the merge base.
 
 Interactions: `composer-typing` (26 characters into the idle home composer) and
 `composer-menu-open` (guest + menu, after its hover tooltip settles; since PR #218
-guests open the same dropdown as signed-in users, so commits stepped up from the old
-sign-in popover, 14 to 17 in paired CI run 43147187011). PR #218 shipped that
-dropdown modal, which also took layouts 3 to 7 and style recalcs 12 to 16: Base UI's
-modal scroll lock flips `<html>` overflow and reads layout on open and close. The
-menu is now `modal={false}`, like the composer's model and effort menus, which
-measures 3 layouts and 12 recalcs locally. Counts are per interaction, never per
-second. The hook stub runs only in the benchmark browser; production builds never
-install it.
-
-PR #218 `interact-constrained` finding (2026-11-12). Its paired runs on unchanged
-product code disagreed in direction: run 43151554816 (ad7bbf54) had head slower on
-`typingToFrameLateMs` (46 to 70 ms) and `deltaToContentFrameLateMs` (111 to 154 ms),
-while run 43155444794 (689dc798, docs-only change) had head faster on both (60 to 50,
-135 to 121) and slower only on `menuToFrameLateMs` (148 to 280). Pooled over both
-runs the medians are 54 to 57, 123 to 131 and 206 to 241 ms with overlapping samples,
-and early typing and early menu are flat. A local source-mapped guest stream
-(390px, 4x CPU) showed parity in script, style, layout and paint. The one real
-cost was the modal menu: with a long answer streaming, a modal open plus close
-spent 5 more forced layouts (about 3.5 ms each) and about 15 to 20 ms more at 4x
-than `modal={false}`, which the menu now uses. The earlier real regression in run 43147187011
-(`typingToFrameLateMs` 53 to 127 ms) was the `:has()` reveal fixed in 387c896a.
+guests open the same dropdown as signed-in users, so the paired CI run 43147187011
+measured commits 14 to 17 and layouts 3 to 7 against the old sign-in popover; the
+paired gate rebases on the merge base after merge). The layout step was the
+dropdown's modal scroll lock. PR #219 made the menu `modal={false}`; a local count
+A/B measured 7 vs 3 layouts and 16 vs 12 style recalcs, see
+[2026-11-12-pr218-interact-constrained.md](./2026-11-12-pr218-interact-constrained.md).
+Counts are per interaction, never per second. The hook stub runs only in the
+benchmark browser; production builds never install it.
