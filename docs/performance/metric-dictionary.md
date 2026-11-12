@@ -410,6 +410,8 @@ every run; the paired PR gate fails when the candidate exceeds the merge base.
 | `preDispatchApiRequests`    | same-origin `/api/*` requests that start after the Send click and answer (or fail) before the `/api/chat` POST starts, per responsiveness run (browser harness): the round trips dispatch can have awaited; one still in flight at dispatch is not counted | yes: the paired comparison fails when head's max exceeds base's (zero tolerance); 0 for signed-in sends | existing (ADR-0045 amendment) |
 
 Interactions: `composer-typing` (26 characters into the idle home composer) and
-`composer-menu-open` (guest plus popover, after its hover tooltip settles). Counts
+`composer-menu-open` (guest + menu, after its hover tooltip settles; since PR #218
+guests open the same modal dropdown as signed-in users, so counts stepped up from the
+old sign-in popover: commits 14 to 17, layouts 3 to 7). Counts
 are per interaction, never per second. The hook stub runs only in the benchmark
 browser; production builds never install it.
