@@ -412,6 +412,7 @@ every run; the paired PR gate fails when the candidate exceeds the merge base.
 Interactions: `composer-typing` (26 characters into the idle home composer) and
 `composer-menu-open` (guest + menu, after its hover tooltip settles; since PR #218
 guests open the same modal dropdown as signed-in users, so counts stepped up from the
-old sign-in popover: commits 14 to 17, layouts 3 to 7). Counts
+old sign-in popover; the paired CI run 43147187011 measured commits 14 to 17 and
+layouts 3 to 7, and the paired gate rebases on the merge base after merge). Counts
 are per interaction, never per second. The hook stub runs only in the benchmark
 browser; production builds never install it.
