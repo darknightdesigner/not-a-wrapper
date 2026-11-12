@@ -304,31 +304,6 @@ function useComposerActionMenu({
     setHighlightedItemId(null)
   }
 
-  const handleAuthPopoverOpenChange: PopoverOpenChangeHandler = (
-    open,
-    eventDetails
-  ) => {
-    if (
-      !open &&
-      eventDetails.reason === "focus-out" &&
-      document.activeElement?.matches("#prompt-textarea")
-    ) {
-      eventDetails.cancel()
-      return
-    }
-    // Defer opening until the virtual keyboard collapses in both auth states.
-    if (open && isVirtualKeyboardOpen()) {
-      closeVirtualKeyboard(() => {
-        setIsTriggerMenuOpen(true)
-        onMenuOpenChange?.(true)
-      })
-      return
-    }
-    setIsTriggerMenuOpen(open)
-    onMenuOpenChange?.(open)
-    if (open) focusEditor()
-  }
-
   const handleTriggerMenuOpenChange = (open: boolean) => {
     // With the on-screen keyboard up, blur the editor and wait for the
     // keyboard-closed signal (500ms fallback) before opening.
@@ -352,7 +327,6 @@ function useComposerActionMenu({
     dismissActionQuery,
     focusEditor,
     handleActionQueryOpenChange,
-    handleAuthPopoverOpenChange,
     handleTriggerMenuOpenChange,
     isActionQueryOpen,
     isConnectorSectionVisible,

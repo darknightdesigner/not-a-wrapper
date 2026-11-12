@@ -1,5 +1,6 @@
 "use client"
 
+import { AuthModal } from "@/app/auth/_components/auth-modal"
 import { ComposerIconButton } from "@/components/ui/composer-icon-button"
 import {
   DropdownMenu,
@@ -17,7 +18,6 @@ import { Kbd } from "@/components/ui/kbd"
 import {
   Popover,
   PopoverContent,
-  PopoverTrigger,
 } from "@/components/ui/popover"
 import type { PromptInputActionQuery } from "@/components/ui/prompt-input"
 import {
@@ -38,7 +38,7 @@ import {
   RiImageLine,
   RiPlugLine,
 } from "@remixicon/react"
-import { memo, useCallback, useMemo, useRef } from "react"
+import { memo, useCallback, useMemo, useRef, useState } from "react"
 import { type ComposerActionId } from "./composer-action-registry"
 import {
   type ComposerActionAvailability,
@@ -49,7 +49,6 @@ import {
   composerMenuRow,
   composerMenuRowCheckedClassName,
 } from "./composer-menu-row"
-import { PopoverContentAuth } from "./popover-content-auth"
 import { useComposerActionMenu } from "./use-composer-action-menu"
 
 const composerPlusIcon = <Icon icon={RiAddLargeLine} slotSize={20} />
@@ -358,6 +357,10 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
   onMenuOpenChange,
 }: ButtonPlusMenuProps) {
   const { openFilePicker, addFiles } = useFileUpload()
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false)
+  // Guests share the menu (web search stays usable); only file sources
+  // require an account.
+  const showsMediaSources = acceptsImages && isUserAuthenticated
   // The touch treatment keys on the user-agent OS (iOS, Android, or
   // iPadOS-as-Mac), not pointer coarseness or width. A narrow
   // desktop window keeps the compact plain-glyph popover.
@@ -404,14 +407,15 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     (actionId: ComposerActionId) => {
       switch (actionId) {
         case "add-files":
-          openFilePicker()
+          if (isUserAuthenticated) openFilePicker()
+          else setIsAuthModalOpen(true)
           break
         case "web-search":
           if (searchMode === "optional") onToggleSearch(!enableSearch)
           break
       }
     },
-    [enableSearch, onToggleSearch, openFilePicker, searchMode]
+    [enableSearch, isUserAuthenticated, onToggleSearch, openFilePicker, searchMode]
   )
 
   const {
@@ -420,7 +424,6 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     connectorItems,
     dismissActionQuery,
     handleActionQueryOpenChange,
-    handleAuthPopoverOpenChange,
     handleTriggerMenuOpenChange,
     isActionQueryOpen,
     isConnectorSectionVisible,
@@ -443,44 +446,6 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
     onRunAction: runAction,
     onMenuOpenChange,
   })
-
-  // Unauthenticated: show auth popover instead of dropdown
-  if (!isUserAuthenticated) {
-    return (
-      <Popover
-        open={isTriggerMenuOpen}
-        onOpenChange={handleAuthPopoverOpenChange}
-      >
-        <Tooltip
-          disableHoverablePopup
-          disabled={isTriggerMenuOpen || tooltipDisabled}
-        >
-          <TooltipTrigger render={<span className="inline-flex" />}>
-            {/* The id goes on the Trigger: Base UI matches the open trigger by
-                its DOM id, so an id on the render element hides the open state. */}
-            <PopoverTrigger
-              id="composer-plus-btn"
-              render={
-                <ComposerIconButton
-                  ref={setTriggerNode}
-                  type="button"
-                  tone="filled"
-                  data-testid="composer-plus-btn"
-                  aria-label="Add files and more"
-                />
-              }
-            >
-              {composerPlusIcon}
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" hideArrow>
-            {composerPlusTooltip}
-          </TooltipContent>
-        </Tooltip>
-        <PopoverContentAuth portalContainer={overlayContainerRef} />
-      </Popover>
-    )
-  }
 
   const editorOwnedContent = (
     <PopoverContent
@@ -612,7 +577,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
             narrow fine-pointer windows keep the compact presentation. */}
         <PlusMenuContent
           touchOptimized={isTouchMenu}
-          acceptsImages={acceptsImages}
+          acceptsImages={showsMediaSources}
           commandItems={commandItems}
           toggleItems={toggleItems}
           connectors={connectors}
@@ -622,7 +587,7 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
           onOpenPhotos={() => photosInputRef.current?.click()}
         />
       </DropdownMenu>
-      {isTouchMenu && acceptsImages && (
+      {isTouchMenu && showsMediaSources && (
         /* Camera and photo-library sources are hidden file inputs mounted
            outside the menu so they survive row activation closing it. */
         <>
@@ -659,6 +624,9 @@ export const ButtonPlusMenu = memo(function ButtonPlusMenu({
       >
         {editorOwnedContent}
       </Popover>
+      {!isUserAuthenticated && (
+        <AuthModal open={isAuthModalOpen} onOpenChange={setIsAuthModalOpen} />
+      )}
     </>
   )
 })

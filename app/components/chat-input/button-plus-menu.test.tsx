@@ -11,7 +11,10 @@ const breakpointMocks = vi.hoisted(() => ({ isTouch: false }))
 vi.mock("@/hooks/use-mobile-device-os", () => ({
   useIsMobileDeviceOs: () => breakpointMocks.isTouch,
 }))
-vi.mock("./popover-content-auth", () => ({ PopoverContentAuth: () => null }))
+vi.mock("@/app/auth/_components/auth-modal", () => ({
+  AuthModal: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="auth-modal" /> : null,
+}))
 
 describe("ButtonPlusMenu editor-owned interaction", () => {
   let container: HTMLDivElement
@@ -373,6 +376,50 @@ describe("ButtonPlusMenu editor-owned interaction", () => {
     expect(connectorRow.getAttribute("aria-checked")).toBe("false")
     act(() => connectorRow.click())
     expect(onToggleConnector).toHaveBeenCalledWith("github")
+  })
+
+  it("lets guests toggle web search and asks them to sign in for files", () => {
+    breakpointMocks.isTouch = true
+    const onToggleSearch = vi.fn()
+    const onFilesAdded = vi.fn()
+
+    act(() => {
+      root.render(
+        <FileUpload onFilesAdded={onFilesAdded}>
+          <form data-type="unified-composer">
+            <div id="prompt-textarea" role="textbox" tabIndex={0} />
+            <ButtonPlusMenu
+              connectors={[]}
+              enableSearch={false}
+              acceptsImages
+              searchMode="optional"
+              isUserAuthenticated={false}
+              onToggleSearch={onToggleSearch}
+            />
+            <div data-composer-overlay-host />
+          </form>
+        </FileUpload>
+      )
+    })
+
+    const trigger = container.querySelector(
+      '[aria-label="Add files and more"]'
+    ) as HTMLButtonElement
+    const findRow = (label: string) =>
+      [...document.body.querySelectorAll<HTMLElement>('[role^="menuitem"]')].find(
+        (row) => row.textContent?.includes(label)
+      )
+
+    act(() => trigger.click())
+    expect(findRow("Camera")).toBeUndefined()
+    act(() => findRow("Web search")?.click())
+    expect(onToggleSearch).toHaveBeenCalledWith(true)
+
+    act(() => trigger.click())
+    act(() => findRow("Files")?.click())
+    expect(
+      document.body.querySelector('[data-testid="auth-modal"]')
+    ).not.toBeNull()
   })
 
   it("keeps @ discovery editor-owned across filtering, Escape, and Tab activation", () => {
