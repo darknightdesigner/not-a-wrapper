@@ -286,6 +286,7 @@ function SidebarResizeHandle() {
   const { width, setWidth } = useSidebar()
   const drag = React.useRef<{
     frame: HTMLElement
+    pointerId: number
     startX: number
     startWidth: number
     direction: 1 | -1
@@ -324,7 +325,8 @@ function SidebarResizeHandle() {
     [releaseDrag]
   )
 
-  const endDrag = () => {
+  const endDrag = (event: React.PointerEvent) => {
+    if (drag.current?.pointerId !== event.pointerId) return
     const active = releaseDrag()
     // A press without movement (e.g. half of a double-click) persists nothing.
     if (active && active.width !== Math.round(active.startWidth)) {
@@ -356,6 +358,7 @@ function SidebarResizeHandle() {
         const startWidth = frame.getBoundingClientRect().width
         drag.current = {
           frame,
+          pointerId: event.pointerId,
           startX: event.clientX,
           startWidth,
           direction:
@@ -371,7 +374,7 @@ function SidebarResizeHandle() {
       }}
       onPointerMove={(event) => {
         const active = drag.current
-        if (!active) return
+        if (active?.pointerId !== event.pointerId) return
         active.width = clampSidebarWidth(
           active.startWidth +
             (event.clientX - active.startX) * active.direction
@@ -383,11 +386,14 @@ function SidebarResizeHandle() {
       onLostPointerCapture={endDrag}
       onDoubleClick={() => setWidth(null)}
       onKeyDown={(event) => {
+        // Arrows move the separator the way they point, so RTL inverts them.
+        const direction =
+          getComputedStyle(event.currentTarget).direction === "rtl" ? -1 : 1
         const step =
           event.key === "ArrowRight"
-            ? SIDEBAR_RESIZE_KEY_STEP
+            ? SIDEBAR_RESIZE_KEY_STEP * direction
             : event.key === "ArrowLeft"
-              ? -SIDEBAR_RESIZE_KEY_STEP
+              ? -SIDEBAR_RESIZE_KEY_STEP * direction
               : null
         if (event.key === "Home") setWidth(SIDEBAR_WIDTH_MIN)
         else if (event.key === "End") setWidth(SIDEBAR_WIDTH_MAX)
