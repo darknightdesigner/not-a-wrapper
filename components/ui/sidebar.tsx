@@ -290,7 +290,9 @@ function SidebarResizeHandle() {
     startWidth: number
     direction: 1 | -1
     width: number
-    /** Document inline styles from before the drag, restored on release. */
+    /** Inline styles from before the drag, restored on release; a committed
+     * width then re-renders through state. */
+    prevFrameWidth: string
     prevCursor: string
     prevUserSelect: string
   } | null>(null)
@@ -302,6 +304,11 @@ function SidebarResizeHandle() {
     if (!active) return null
     drag.current = null
     delete active.frame.dataset.resizing
+    if (active.prevFrameWidth) {
+      active.frame.style.setProperty("--sidebar-width", active.prevFrameWidth)
+    } else {
+      active.frame.style.removeProperty("--sidebar-width")
+    }
     const rootStyle = document.documentElement.style
     rootStyle.cursor = active.prevCursor
     rootStyle.userSelect = active.prevUserSelect
@@ -352,6 +359,7 @@ function SidebarResizeHandle() {
           direction:
             getComputedStyle(frame).direction === "rtl" ? -1 : 1,
           width: Math.round(startWidth),
+          prevFrameWidth: frame.style.getPropertyValue("--sidebar-width"),
           prevCursor: document.documentElement.style.cursor,
           prevUserSelect: document.documentElement.style.userSelect,
         }
