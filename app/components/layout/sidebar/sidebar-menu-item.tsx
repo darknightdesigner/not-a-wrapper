@@ -95,7 +95,8 @@ export const SidebarMenuItem = forwardRef<
   const combinedClassName = cn(
     baseClassName,
     hasTrailing && "justify-between",
-    tone === "muted" && "text-[var(--text-tertiary)] hover:text-foreground",
+    tone === "muted" &&
+      "text-(--sidebar-label-foreground) hover:text-foreground",
     isActive &&
       "bg-sidebar-row hover:bg-sidebar-row",
     className

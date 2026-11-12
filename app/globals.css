@@ -457,6 +457,7 @@
   --color-border-strong: var(--border-strong);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-surface: var(--destructive-surface);
   --color-info: var(--info);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
@@ -618,12 +619,22 @@
     var(--spacing) * 4 + var(--floating-menu-item-height) * 10
   );
   --floating-menu-leading-slot-size: 1.25rem;
-  --composer-capability-accent: oklch(0.626 0.188 259.456);
-  --composer-capability-accent-hover: oklch(0.528 0.173 255.046);
-  --composer-capability-accent-hover-surface: color(
-    display-p3 0.909804 0.952941 0.996078
+  /* Blue and red follow Linear's shipped palette (linear.app). Tinted
+     surfaces use Linear's accent-tint rule: the color at 10% (light) or
+     15% (dark). */
+  --blue: #4ea7fc;
+  --composer-capability-accent: var(--blue);
+  --composer-capability-accent-hover: var(--composer-capability-accent);
+  --composer-capability-accent-hover-surface: color-mix(
+    in srgb,
+    var(--composer-capability-accent) 10%,
+    transparent
   );
-  --composer-selection-background: oklch(0.684 0.157 256.21 / 0.35);
+  --composer-selection-background: color-mix(
+    in srgb,
+    var(--blue) 36%,
+    transparent
+  );
   --web-search-icon-surface: oklch(0.941 0.043 218.859);
   --web-search-icon-foreground: oklch(0.795 0.131 222.887);
   --modal-centered-surface: #fefefc;
@@ -658,8 +669,8 @@
   --text-quaternary: rgb(44 44 43 / 0.2);
   --text-disabled: var(--text-tertiary);
   --main-surface-secondary: var(--secondary);
-  --link: oklch(0.501 0.127 254.712);
-  --link-hover: oklch(0.419 0.106 255.109);
+  --link: var(--blue);
+  --link-hover: var(--foreground);
   --projects-content-max-width: 50.625rem;
   --projects-toolbar-min-height: 3.75rem;
   --row-hover-surface: #f3f2f0;
@@ -672,6 +683,13 @@
   /* Sidebar items and the composer model trigger rest at 76% ink and go
      full on hover, focus, open, or the current page (both themes). */
   --item-foreground: color-mix(in oklab, var(--foreground) 76%, transparent);
+  /* Sidebar group labels and "Show more" sit one clear step below items
+     (Grok: labels at ~2/3 of row ink), so sections read as headings. */
+  --sidebar-label-foreground: color-mix(
+    in oklab,
+    var(--foreground) 50%,
+    transparent
+  );
   --surface-hover: var(--interactive-bg-hover);
   --popover-bg-hover: #f1f0ee;
   --muted-bg-hover: #ecebe8;
@@ -683,9 +701,14 @@
   --tooltip-shortcut-surface: rgb(39 20 0 / 0.05);
   --tooltip-multiline-radius: 0.75rem;
   --tooltip-radius: 9999px;
-  --destructive: #ff263c;
-  --destructive-foreground: oklch(0.985 0 0);
-  --info: oklch(0.626 0.188 259.456);
+  --destructive: #eb5757;
+  --destructive-foreground: #ffffff;
+  --destructive-surface: color-mix(
+    in srgb,
+    var(--destructive) 10%,
+    transparent
+  );
+  --info: var(--blue);
   --warning: oklch(0.769 0.188 70.08);
   --warning-foreground: oklch(0.52 0.13 65);
   --status-success-bg: oklch(0.945 0.029 156.629);
@@ -818,40 +841,50 @@
 .dark {
   --scrollbar-color: #ffffff1a;
   --scrollbar-color-hover: #fff3;
-  --background: oklch(0 0 0);
+  /* Warm dark scale inspired by Grok (grok.com page #1e1d1d, pane #282726),
+     kept a step darker. Unlike Grok, the composer sits above the page. */
+  --dark-surface-0: #141313; /* page, sidebar */
+  --dark-surface-1: #222120; /* menus, tooltips, modals, row hover */
+  --dark-surface-2: #282726; /* composer, cards */
+  --dark-surface-3: #31302e; /* secondary, muted, inputs */
+  --dark-surface-4: #403f3c; /* hover on surface-3 */
+  --background: var(--dark-surface-0);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.248 0 0);
+  --card: var(--dark-surface-2);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.222 0 0);
+  --popover: var(--dark-surface-1);
   --popover-foreground: var(--foreground);
   /* Every dark floating menu uses this shared surface token instead of
    * repeating per-menu colors. */
-  --floating-surface: oklch(0.329 0 0);
+  /* Shared with tooltips. */
+  --floating-surface: var(--dark-surface-1);
   --floating-surface-foreground: #ffffff;
   --floating-surface-edge-shadow: inset 0 0 1px rgba(255, 255, 255, 0.2);
   --floating-select-edge-shadow:
     0 8px 16px rgba(0, 0, 0, 0.32), inset 0 0 1px rgba(255, 255, 255, 0.2),
     0 0 1px rgba(0, 0, 0, 0.62);
-  --floating-menu-touch-surface: #303030;
+  --floating-menu-touch-surface: var(--floating-surface);
   --floating-menu-touch-edge-shadow: var(--floating-select-edge-shadow);
   --floating-menu-item-active: rgba(255, 255, 255, 0.1);
   --floating-menu-divider: var(--border-default);
-  --floating-menu-touch-tertiary: #414141;
-  --background-tertiary: #414141;
-  --composer-capability-accent: oklch(0.72 0.137 253.307);
-  --composer-capability-accent-hover: oklch(0.8 0.12 253.307);
-  --composer-capability-accent-hover-surface: color(
-    display-p3 0.07451 0.203922 0.388235
+  --floating-menu-touch-tertiary: var(--floating-menu-item-active);
+  --background-tertiary: var(--dark-surface-4);
+  /* Linear's dark selection: the accent darkened 10%, with white text. */
+  --composer-capability-accent-hover-surface: color-mix(
+    in srgb,
+    var(--composer-capability-accent) 15%,
+    transparent
   );
+  --composer-selection-background: color-mix(in lch, var(--blue), black 10%);
   --web-search-icon-surface: oklch(0.334 0.02 221.692);
   --web-search-icon-foreground: oklch(0.801 0.131 222.79);
-  --modal-centered-surface: #212121;
+  --modal-centered-surface: var(--dark-surface-1);
   --modal-centered-foreground: #ffffff;
   --modal-centered-edge-shadow:
     0 8px 16px rgba(0, 0, 0, 0.32), inset 0 0 1px rgba(255, 255, 255, 0.2),
     0 0 1px rgba(0, 0, 0, 0.62);
   --modal-centered-scrim: rgba(0, 0, 0, 0.5);
-  --modal-search-surface: #212121;
+  --modal-search-surface: var(--dark-surface-1);
   --modal-search-foreground: #ffffff;
   --modal-search-border: rgba(255, 255, 255, 0.15);
   --modal-search-row-active: rgba(255, 255, 255, 0.05);
@@ -859,24 +892,22 @@
   --primary: #f9f9f9;
   --primary-foreground: oklch(0.159 0 0);
   --primary-bg-hover: oklch(0.922 0 0);
-  --secondary: oklch(0.309 0 0);
+  --secondary: var(--dark-surface-3);
   --secondary-foreground: var(--foreground);
-  --secondary-bg-hover: oklch(0.375 0 0);
-  --muted: oklch(0.309 0 0);
+  --secondary-bg-hover: var(--dark-surface-4);
+  --muted: var(--dark-surface-3);
   --muted-foreground: var(--text-secondary);
   --accent: var(--interactive-bg-selected);
   --accent-foreground: var(--foreground);
   --text-primary: var(--foreground);
   --text-secondary: oklch(0.848 0 0);
   --text-tertiary: oklch(0.754 0 0);
-  --inline-work-source-surface: #303030;
+  --inline-work-source-surface: var(--dark-surface-3);
   --text-placeholder: var(--text-tertiary);
   --text-quaternary: rgba(255, 255, 255, 0.412);
   --text-disabled: oklch(1 0 0 / 0.412);
   --main-surface-secondary: var(--composer-surface-primary);
-  --row-hover-surface: oklch(0.2 0 0);
-  --link: oklch(0.767 0.122 253.354);
-  --link-hover: var(--link);
+  --row-hover-surface: var(--dark-surface-1);
   --interactive-bg-hover: oklch(1 0 0 / 0.1);
   --interactive-bg-selected: oklch(1 0 0 / 0.1);
   --interactive-bg-pressed: oklch(1 0 0 / 0.15);
@@ -884,16 +915,18 @@
   --interactive-bg-secondary-pressed: oklch(1 0 0 / 0.05);
   --sidebar-row-bg: oklch(1 0 0 / 0.1);
   --surface-hover: var(--interactive-bg-hover);
-  --popover-bg-hover: oklch(0.309 0 0);
-  --muted-bg-hover: oklch(0.375 0 0);
-  --bg-tooltip: #1b1b1b;
+  --popover-bg-hover: var(--dark-surface-3);
+  --muted-bg-hover: var(--dark-surface-4);
+  --bg-tooltip: var(--floating-surface);
   --tooltip-foreground: #ffffff;
   --border-tooltip: rgba(255, 255, 255, 0.05);
   --tooltip-edge-shadow: 0 8px 18px rgba(15, 23, 42, 0.2);
   --tooltip-shortcut-surface: rgba(255, 255, 255, 0.25);
-  --destructive: oklch(0.6 0.18 15);
-  --destructive-foreground: oklch(0.95 0.01 20);
-  --info: oklch(0.72 0.137 253.307);
+  --destructive-surface: color-mix(
+    in srgb,
+    var(--destructive) 15%,
+    transparent
+  );
   --warning: oklch(0.828 0.189 84.429);
   --warning-foreground: oklch(0.85 0.16 84);
   --status-success-bg: oklch(0.38 0.085 146.171);
@@ -911,8 +944,8 @@
   --border-strong: oklch(1 0 0 / 0.2);
   --border: var(--border-subtle);
   --border-heavy: var(--border-default);
-  --input-bg: oklch(0.309 0 0);
-  --input-bg-hover: oklch(0.375 0 0);
+  --input-bg: var(--dark-surface-3);
+  --input-bg-hover: var(--dark-surface-4);
   --input-border: var(--border-default);
   --input: var(--input-border);
   --focus-ring: var(--foreground);
@@ -921,7 +954,7 @@
   --scrim-sidebar: oklch(0 0 0 / 0.5);
   --control-track-bg: var(--secondary);
   --drawer-handle-bg: var(--secondary);
-  --user-message-bg: oklch(0.317 0 0 / 0.851);
+  --user-message-bg: var(--dark-surface-3);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -976,7 +1009,7 @@
     rgba(0, 0, 0, 0.16) 0px 32px 45.25px -2.5px,
     rgba(0, 0, 0, 0.12) 0px 52px 73.54px -3px;
 
-  --composer-surface-primary: oklch(0.248 0 0);
+  --composer-surface-primary: var(--dark-surface-2);
   --composer-border: transparent;
   --composer-control-filled-bg: oklch(1 0 0 / 0.05);
   --composer-control-filled-bg-hover: oklch(1 0 0 / 0.12);
@@ -989,7 +1022,7 @@
   --activity-sheet-shadow:
     0 8px 12px rgba(0, 0, 0, 0.18), 0 0 1px rgba(255, 255, 255, 0.24);
   --activity-panel-surface: var(--background);
-  --activity-panel-border: oklch(0.248 0 0);
+  --activity-panel-border: var(--dark-surface-2);
   --activity-panel-raised-surface: var(--card);
 
   --overlay-scrim-mobile: var(--scrim-modal);
@@ -2077,6 +2110,12 @@ code {
   max-width: unset;
   font-size: 1rem;
   line-height: var(--text-body-regular--line-height);
+  /* Vertical rhythm, measured from grok.com responses 2026-11-11. */
+  --markdown-block-gap: 1rem;
+  --markdown-heading-gap-before: 2rem;
+  --markdown-heading-gap-after: 0.5rem;
+  --markdown-item-gap: 0.5rem;
+  --markdown-rule-gap: 2rem;
   --markdown-border-light: color-mix(
     in srgb,
     var(--foreground) 5%,
@@ -2123,20 +2162,15 @@ code {
   }
 }
 
-.markdown p {
-  margin-top: 0.5rem;
-  margin-bottom: 0.25rem;
+.markdown :is(p, ul, ol, blockquote) {
+  margin-block: 0 var(--markdown-block-gap);
 }
-.markdown p:first-child {
-  margin-top: 0;
-}
-.markdown p + p {
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+.markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: var(--markdown-heading-gap-before)
+    var(--markdown-heading-gap-after);
 }
 
 .markdown h1 {
-  margin: 0 0 0.5rem;
   font-size: 1.5rem;
   line-height: 2rem;
   font-weight: 600;
@@ -2144,7 +2178,6 @@ code {
 }
 .markdown h2,
 .markdown h3 {
-  margin: 1rem 0 0.25rem;
   font-weight: 600;
 }
 .markdown h2 {
@@ -2156,18 +2189,15 @@ code {
   line-height: 1.75rem;
 }
 .markdown h4 {
-  margin: 1rem 0 0;
   font-size: 1rem;
   line-height: 1.5rem;
   font-weight: 600;
 }
-.markdown h4 + p,
 .markdown hr + * {
   margin-top: 0;
 }
 .markdown h5,
 .markdown h6 {
-  margin: 0;
   font-size: 1rem;
   line-height: 1.625rem;
   letter-spacing: normal;
@@ -2179,16 +2209,12 @@ code {
 .markdown h6 {
   font-weight: 400;
 }
-.markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+.markdown > :first-child {
   margin-top: 0;
-}
-.markdown :is(ul, ol) + :is(h1, h2, h3, h4, h5, h6) {
-  margin-top: 1rem;
 }
 
 .markdown ul,
 .markdown ol {
-  margin: 0;
   padding-inline-start: 1.625em;
 }
 .markdown li {
@@ -2213,8 +2239,12 @@ code {
   margin-top: 1rem;
   margin-bottom: 1rem;
 }
-.markdown p + :is(ol, ul) {
-  margin-top: 0;
+.markdown li + li,
+.markdown li > :is(ul, ol) {
+  margin-top: var(--markdown-item-gap);
+}
+.markdown li > :is(ul, ol) {
+  margin-bottom: 0;
 }
 
 .markdown .contains-task-list input[type="checkbox"] {
@@ -2246,7 +2276,6 @@ code {
 
 .markdown blockquote {
   position: relative;
-  margin: 0 0 0.5rem;
   border-width: 0;
   padding-block: 0.5rem;
   padding-inline-start: 1.5rem;
@@ -2274,7 +2303,7 @@ code {
 }
 
 .markdown hr {
-  margin-block: 1.75rem;
+  margin-block: var(--markdown-rule-gap);
   border-color: var(--markdown-border-medium);
   clear: both;
 }
@@ -2320,6 +2349,7 @@ code {
   --thread-gutter-size: calc((100cqw - var(--thread-content-width)) / 2);
   width: 100cqw;
   margin-inline: calc(-1 * var(--thread-gutter-size));
+  margin-bottom: var(--markdown-block-gap);
   scrollbar-width: thin;
   overflow-x: auto;
 }
@@ -2355,9 +2385,6 @@ code {
 .markdown tr:not(:last-child) td {
   border-bottom: 1px solid var(--markdown-border-light);
 }
-.markdown tr:last-child td {
-  padding-bottom: 1.5rem;
-}
 
 .threadScrollVars {
   --thread-stream-context-height: max(
@@ -2385,6 +2412,11 @@ code {
   --tw-prose-bold: currentColor;
   --tw-prose-counters: currentColor;
   --tw-prose-bullets: currentColor;
+}
+.user-message-markdown {
+  --markdown-heading-gap-before: 1rem;
+  --markdown-heading-gap-after: 0.25rem;
+  --markdown-item-gap: 0;
 }
 .user-message-markdown > p {
   margin-block: 0;
@@ -2485,7 +2517,6 @@ code {
 
 /* Rich composer formatting uses the same editor metrics in every surface. */
 .composer-prosemirror {
-  --composer-selection-background: oklab(0.683658 -0.0373435 -0.152251 / 0.35);
   font-family:
     -apple-system-body,
     ui-sans-serif,
@@ -2561,7 +2592,7 @@ code {
 .composer-format-toolbar {
   --composer-format-surface: #fff;
   --composer-format-hover: #f5f5f5;
-  --composer-format-accent: #3a83f7;
+  --composer-format-accent: var(--composer-capability-accent);
   position: fixed;
   z-index: 80;
   display: flex;
@@ -2578,8 +2609,8 @@ code {
   line-height: 20px;
 }
 .dark .composer-format-toolbar {
-  --composer-format-surface: #353535;
-  --composer-format-hover: #454545;
+  --composer-format-surface: var(--floating-surface);
+  --composer-format-hover: var(--floating-menu-item-active);
 }
 .composer-format-toolbar[hidden] {
   display: none;
@@ -2744,9 +2775,6 @@ code {
 .composer-format-preserved-selection {
   background: var(--composer-selection-background);
   color: inherit;
-}
-.dark .composer-prosemirror {
-  --composer-selection-background: oklab(0.625496 -0.0344569 -0.185237 / 0.6);
 }
 .dark .composer-format-preserved-selection {
   color: white;

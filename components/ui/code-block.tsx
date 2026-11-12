@@ -75,14 +75,14 @@ export type CodeBlockProps = {
 function CodeBlock({ children, className, ref, ...props }: CodeBlockProps) {
   const boxRef = useRef<HTMLDivElement>(null)
   const composedRef = useComposedRef(boxRef, ref)
-  // Source-fidelity box: 24px radius and asymmetric flow margins. The derived
-  // 3xl token is 22px, so the literal radius is intentional.
+  // Source-fidelity box: 24px radius; flow margin matches the markdown block
+  // gap. The derived 3xl token is 22px, so the literal radius is intentional.
   return (
     <CodeBlockBoxContext.Provider value={boxRef}>
       <div
         ref={composedRef}
         className={cn(
-          "not-prose relative mt-4 mb-1 flex w-full flex-col overflow-clip border",
+          "not-prose relative mb-4 flex w-full flex-col overflow-clip border",
           "border-border bg-card text-card-foreground rounded-[24px]",
           className
         )}

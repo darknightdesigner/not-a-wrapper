@@ -9,7 +9,7 @@ import type { DOMOutputSpec, Node as ProseMirrorNode } from "prosemirror-model"
  */
 
 const selectedEntityClassName =
-  "data-[inline-selection-pill-selected]:bg-(--composer-selection-background) selection:bg-transparent selection:text-inherit"
+  "data-[inline-selection-pill-selected]:bg-(--composer-selection-background) dark:data-[inline-selection-pill-selected]:text-white selection:bg-transparent selection:text-inherit"
 
 function parseComposerEntityPill(node: HTMLElement | string) {
   if (!(node instanceof HTMLElement)) return false

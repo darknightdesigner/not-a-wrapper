@@ -743,7 +743,7 @@ function CollapsedRecentsMenu({
           onClickCapture={handleContentClick}
         >
           <div className="w-(--sidebar-width)">
-            <div className="mx-1.5 flex h-(--sidebar-row-height) items-center px-2.5 text-sm leading-5 font-normal text-[var(--text-tertiary)]">
+            <div className="mx-1.5 flex h-(--sidebar-row-height) items-center px-2.5 text-sm leading-5 font-normal text-(--sidebar-label-foreground)">
               {label}
             </div>
             {recentChats.map((chat) => (

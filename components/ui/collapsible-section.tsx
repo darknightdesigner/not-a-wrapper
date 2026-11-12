@@ -85,7 +85,7 @@ export function CollapsibleSection({
               // Title starts on the row text line (inset + content inline).
               "w-full min-w-0 justify-start gap-[0.5px] py-0.5 ps-[calc(var(--sidebar-row-outer-inset)+var(--sidebar-row-content-inline))] pe-4",
               hasSidebarHeaderActions && "rounded-none",
-              "text-[var(--text-tertiary)] transition-none",
+              "text-(--sidebar-label-foreground) transition-none",
             ]
           : [
               "w-full gap-1 px-2 py-1.5",

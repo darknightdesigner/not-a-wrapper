@@ -115,7 +115,7 @@ function ContextMenuItem({
       data-variant={variant}
       className={cn(
         floatingMenuItemClassName,
-        "menu-item-hoverable group/context-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:focus:text-destructive dark:data-[variant=destructive]:focus:bg-destructive/20 focus:*:[svg]:text-foreground data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "menu-item-hoverable group/context-menu-item focus:text-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-destructive-surface data-[variant=destructive]:focus:text-destructive focus:*:[svg]:text-foreground data-[variant=destructive]:*:[svg]:text-destructive relative flex cursor-pointer items-center gap-2 text-sm outline-hidden select-none data-disabled:cursor-not-allowed data-disabled:opacity-50 data-inset:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}
