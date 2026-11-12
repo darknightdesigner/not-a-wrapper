@@ -177,7 +177,7 @@ async function runOnce(browser: Browser, baseUrl: string, cpuThrottle: number) {
     // Settle the trigger's hover tooltip first so its delay cannot race the window.
     await page.getByTestId("composer-plus-btn").hover()
     const menu = await measure(page, cdp, async () => {
-      // Guests get the sign-in popover; members get the composer menu.
+      // Guests open the same + menu as members.
       await page.getByTestId("composer-plus-btn").click()
       await page.locator('[data-testid="composer-plus-btn"][aria-expanded="true"]').waitFor()
     })

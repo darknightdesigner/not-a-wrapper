@@ -411,8 +411,11 @@ every run; the paired PR gate fails when the candidate exceeds the merge base.
 
 Interactions: `composer-typing` (26 characters into the idle home composer) and
 `composer-menu-open` (guest + menu, after its hover tooltip settles; since PR #218
-guests open the same modal dropdown as signed-in users, so counts stepped up from the
-old sign-in popover; the paired CI run 43147187011 measured commits 14 to 17 and
-layouts 3 to 7, and the paired gate rebases on the merge base after merge). Counts
-are per interaction, never per second. The hook stub runs only in the benchmark
-browser; production builds never install it.
+guests open the same dropdown as signed-in users, so the paired CI run 43147187011
+measured commits 14 to 17 and layouts 3 to 7 against the old sign-in popover; the
+paired gate compares the candidate against the merge base). The layout step was the
+dropdown's modal scroll lock. PR #219 made the menu `modal={false}`; a local count
+A/B measured 7 vs 3 layouts and 16 vs 12 style recalcs, see
+[2026-11-12-pr218-interact-constrained.md](./2026-11-12-pr218-interact-constrained.md).
+Counts are per interaction, never per second. The hook stub runs only in the
+benchmark browser; production builds never install it.
