@@ -363,6 +363,10 @@ vi.mock("./file-list", () => ({
   FileList: () => null,
 }))
 
+vi.mock("./composer-suggestions", () => ({
+  ComposerSuggestions: () => null,
+}))
+
 describe("Composer primary action", () => {
   let container: HTMLDivElement | null = null
   let root: Root | null = null

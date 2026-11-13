@@ -36,13 +36,16 @@ import { authenticatedMutation } from "./lib/authedFunctions"
 export const API_RATE_LIMIT_POLICIES = {
   mcp_test: { limit: 10, windowMs: 60_000 },
   profile_image_upload: { limit: 10, windowMs: 60_000 },
+  // New-chat autocomplete: ~1 call per typing pause. Bounds platform spend.
+  prompt_autocomplete: { limit: 60, windowMs: 60_000 },
 } as const
 
 export type RateLimitBucket = keyof typeof API_RATE_LIMIT_POLICIES
 
 const rateLimitBucketValidator = v.union(
   v.literal("mcp_test"),
-  v.literal("profile_image_upload")
+  v.literal("profile_image_upload"),
+  v.literal("prompt_autocomplete")
 )
 
 export function getRateLimitPolicy(bucket: RateLimitBucket): {

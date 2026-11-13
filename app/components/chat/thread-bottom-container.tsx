@@ -75,7 +75,10 @@ const ThreadBottomContainer = forwardRef<
           ? "group/thread-bottom-container fixed inset-x-4 bottom-0 z-30 mx-auto max-w-(--project-detail-composer-width) bg-[linear-gradient(to_top,var(--background)_75%,transparent)] pt-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] md:static md:inset-auto md:z-auto md:mt-6 md:w-full md:bg-none md:p-0 md:max-lg:px-4"
           : cn(
               `group/thread-bottom-container content-fade pointer-events-none sticky bottom-0 isolate z-10 flex min-h-0 w-full basis-auto flex-col [--thread-component-gap:1.5rem] [--thread-scroll-control-offset:1.5rem] [--thread-scroll-to-bottom-banner-offset:0px] has-data-[has-thread-error]:pt-2 has-data-[has-thread-error]:[box-shadow:var(--sharp-edge-bottom-shadow)] md:pt-0 print:hidden ${THREAD_GUTTER_VARS} ${THREAD_MAXWIDTH_VARS}`,
-              isOnboarding && "sm:grow"
+              // Grok's new-chat split: the headline block grows 1, this
+              // footer grows 2 from the composer's own height, so the
+              // composer sits a third of the way down the free space.
+              isOnboarding && "sm:grow-2"
             ),
         className
       )}
@@ -138,7 +141,10 @@ const ThreadBottomContainer = forwardRef<
             className={
               isProjectOnboarding
                 ? "pointer-events-auto w-full"
-                : `pointer-events-auto mb-[var(--thread-component-gap)] ${threadColumnClassName}`
+                : cn(
+                    `pointer-events-auto mb-[var(--thread-component-gap)] ${threadColumnClassName}`,
+                    isOnboarding && "sm:mb-0"
+                  )
             }
           >
             <div

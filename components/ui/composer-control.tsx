@@ -10,7 +10,7 @@ type ComposerControlProps = Omit<ButtonProps, "variant">
  * minimum wins. Callers own padding and corners.
  */
 const composerTextControlClassName =
-  "h-9 py-0 text-sm leading-5 font-normal"
+  "h-9 py-0 text-[0.9375rem] leading-5 font-normal"
 
 /** Glyph size for a labeled composer control's leading icon. */
 const COMPOSER_TEXT_CONTROL_ICON_SIZE = 16

@@ -56,6 +56,15 @@ export type PromptInputEditorHandle = {
     entity?: PromptInputEntity
   ) => boolean
   setSelectionRange: (selectionStart: number, selectionEnd: number) => void
+  /** Point the editor at a suggestion listbox it drives (null to detach). */
+  setCombobox: (combobox: PromptInputCombobox | null) => void
+}
+
+/** Combobox wiring for a suggestion listbox the editor drives: the editor
+ * keeps focus while arrows move the listbox's active option. */
+export type PromptInputCombobox = {
+  controls: string
+  activeDescendant?: string
 }
 
 export type { PromptInputActionQuery, PromptInputEntity }
@@ -265,6 +274,8 @@ function PromptInput({
               } as React.CSSProperties
             }
             data-expanded={isExpanded ? "" : undefined}
+            // The fallback keys script may set data-expanded before hydration.
+            suppressHydrationWarning
             data-expanded-composer={isExpandedComposer ? "" : undefined}
             data-expanded-composer-mode-button={
               canExpandComposer ? "" : undefined
@@ -547,6 +558,20 @@ function measureTextareaScrollHeight(
 
 const COLLAPSED_EDITOR_HEIGHT = 42
 
+/** Set on the fallback textarea when Enter or Send was pressed before
+ * hydration; the editor sends the adopted text at the handoff. */
+const SUBMIT_PENDING_ATTRIBUTE = "data-submit-pending"
+
+/**
+ * Runs from the server HTML, before hydration (ADR-0047). A textarea inserts a
+ * newline on Enter, where the editor sends, and cannot switch the composer to
+ * its multi-line layout. So: plain Enter and Send mark a pending send instead
+ * (any later input clears it), and text with a newline sets the form's
+ * `data-expanded` and `data-expanded-composer-mode-button`, the attributes
+ * the editor's layout sets for multi-line text (layout and Expand control).
+ */
+const FALLBACK_KEYS_SCRIPT = `(function(s){var t=s&&s.previousElementSibling,f=t&&t.closest("form"),p="${SUBMIT_PENDING_ATTRIBUTE}";if(!t||!f)return;function pend(){if(!t.hidden&&t.value.trim())t.setAttribute(p,"")}t.addEventListener("keydown",function(e){if(e.key!=="Enter"||e.shiftKey||e.isComposing||e.keyCode===229)return;e.preventDefault();pend()});t.addEventListener("input",function(){if(t.hidden)return;t.removeAttribute(p);var n=t.value.indexOf("\\n")>=0;f.toggleAttribute("data-expanded",n);f.toggleAttribute("data-expanded-composer-mode-button",n)});f.addEventListener("submit",pend)})(document.currentScript)`
+
 /** Shared by the editor and its pre-hydration fallback so both lay out alike. */
 const EDITOR_CLASS_NAME =
   "composer-prosemirror text-foreground block whitespace-break-spaces text-base leading-[26px] outline-none"
@@ -593,6 +618,9 @@ export type PromptInputTextareaProps = {
   onActionQueryChange?: (query: PromptInputActionQuery | null) => void
   onKeyDown?: (event: KeyboardEvent) => void
   onPaste?: (event: ClipboardEvent) => void
+  /** Enter or Send was pressed before hydration; the adopted text is the
+   * draft by now, so the owner sends it once Send is available. */
+  onPrehydrationSubmit?: () => void
 }
 
 const PromptInputEditor = React.forwardRef<
@@ -606,6 +634,7 @@ const PromptInputEditor = React.forwardRef<
     onActionQueryChange,
     onKeyDown,
     onPaste,
+    onPrehydrationSubmit,
     disableAutosize = false,
     submitOnEnter = true,
     style,
@@ -658,6 +687,7 @@ const PromptInputEditor = React.forwardRef<
     onActionQueryChange,
     onKeyDown,
     onPaste,
+    onPrehydrationSubmit,
     submitOnEnter,
     onSubmit,
     placeholder,
@@ -678,6 +708,7 @@ const PromptInputEditor = React.forwardRef<
       onActionQueryChange,
       onKeyDown,
       onPaste,
+      onPrehydrationSubmit,
       submitOnEnter,
       onSubmit,
       placeholder,
@@ -703,6 +734,7 @@ const PromptInputEditor = React.forwardRef<
     onActionQueryChange,
     onKeyDown,
     onPaste,
+    onPrehydrationSubmit,
     submitOnEnter,
     onSubmit,
     placeholder,
@@ -1040,6 +1072,19 @@ const PromptInputEditor = React.forwardRef<
         setSelectionRange(selectionStart, selectionEnd) {
           setPromptInputSelection(view, selectionStart, selectionEnd)
         },
+        // Written straight to the DOM so moving a suggestion highlight never
+        // re-renders the composer; ProseMirror only manages attributes it set.
+        setCombobox(combobox) {
+          const attributes = {
+            "aria-autocomplete": combobox ? "list" : null,
+            "aria-controls": combobox?.controls ?? null,
+            "aria-activedescendant": combobox?.activeDescendant ?? null,
+          }
+          for (const [name, value] of Object.entries(attributes)) {
+            if (value === null) view.dom.removeAttribute(name)
+            else view.dom.setAttribute(name, value)
+          }
+        },
       }
       const handoffSelection = handoffSelectionRef.current
       let adoptedValue = initialValue
@@ -1062,8 +1107,17 @@ const PromptInputEditor = React.forwardRef<
       if (adoptedValue !== renderedValue) {
         // Pre-hydration text wins over the stored draft and becomes the draft.
         adoptedFallbackValueRef.current = true
-        handoffLayoutValueRef.current = adoptedValue
+        // Compact text keeps its painted layout; text with a newline was
+        // painted expanded by the keys script, so it expands now and React
+        // takes over that attribute.
+        handoffLayoutValueRef.current = adoptedValue.includes("\n")
+          ? null
+          : adoptedValue
         callbacks.current.setValue(adoptedValue)
+      }
+      if (fallback?.hasAttribute(SUBMIT_PENDING_ATTRIBUTE)) {
+        fallback.removeAttribute(SUBMIT_PENDING_ATTRIBUTE)
+        if (adoptedValue.trim()) callbacks.current.onPrehydrationSubmit?.()
       }
 
       editorHandleRef.current = handle
@@ -1175,7 +1229,14 @@ const PromptInputEditor = React.forwardRef<
           spellCheck="true"
           defaultValue={value}
           rows={1}
+          // The keys script below may mark a pending send before hydration.
+          suppressHydrationWarning
         />
+        {/* Server HTML only: it runs as the page parses. Client mounts never
+            render it (and a client-inserted script would not run anyway). */}
+        {!isHydrated && (
+          <script dangerouslySetInnerHTML={{ __html: FALLBACK_KEYS_SCRIPT }} />
+        )}
         <div ref={mountEditor} style={style} />
       </div>
     </motion.div>

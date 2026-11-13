@@ -57,11 +57,22 @@ Option 2, in `components/ui/prompt-input.tsx`.
   next commit. A Strict Mode remount reads the mirrored text and reapplies
   the saved caret.
 - **Layout hold.** The fallback cannot run the JS expansion measurement, so
-  wrapped or multi-line pre-hydration text is painted in the compact layout.
-  Adopted text keeps that layout until the value changes: the editor skips
-  the expansion latch for exactly the adopted value, so the handoff moves
-  nothing and the first edit after it expands the composer with input, as
-  normal typing does.
+  wrapped pre-hydration text is painted in the compact layout. Adopted text
+  keeps that layout until the value changes: the editor skips the expansion
+  latch for exactly the adopted value, so the handoff moves nothing and the
+  first edit after it expands the composer with input, as normal typing does.
+- **Fallback keys (amended 2026-11-13).** A small inline script rendered
+  after the textarea (server HTML only) makes the fallback behave like the
+  editor. Plain Enter, or Send, sets `data-submit-pending` on the textarea
+  instead of inserting a newline; any later input clears it. At the handoff
+  the editor reports a pending send (`onPrehydrationSubmit`), and the
+  Composer sends the adopted text once Send is available, if the text is
+  unchanged by then. A newline (Shift+Enter or a paste) sets the form's
+  `data-expanded` and `data-expanded-composer-mode-button`, the attributes
+  the editor sets for multi-line text, so it is painted expanded (with the
+  Expand control's space) before hydration and stays so after it. Before
+  this, an agent's Enter over a slow ngrok load left a newline painted in
+  the one-row layout until hydration, and nothing was sent.
 - **No native submit.** The composer form uses `method="dialog"`. Outside a
   `<dialog>` that makes native submission a no-op, so clicking Send (an
   `aria-disabled`, not natively disabled, submit button) before hydration
@@ -76,11 +87,11 @@ Option 2, in `components/ui/prompt-input.tsx`.
   draft write persists the typed text.
 - With nothing typed, nothing is adopted and the stored draft loads as
   before (after hydration, as before).
-- Enter before hydration inserts a newline (a textarea has no implicit
-  submit) and the newline is kept as a second paragraph. Send before
-  hydration does nothing (see "No native submit"). Paste before hydration
-  is a plain-text paste; the large-paste-to-attachment handling starts after
-  hydration.
+- Enter or Send before hydration sends once hydrated (see "Fallback keys");
+  `method="dialog"` still keeps the native submission from navigating.
+  Shift+Enter inserts a newline, kept as a second paragraph. Paste before
+  hydration is a plain-text paste; the large-paste-to-attachment handling
+  starts after hydration.
 - The server render's value must stay empty: React's textarea hydration
   writes a non-empty server default back over typed text. Drafts are client
   state, so the server value is always `""` today.
@@ -89,17 +100,22 @@ Option 2, in `components/ui/prompt-input.tsx`.
 
 - `benchmarks/chat-performance/browser/composer-handoff.ts` (guest, no
   password) holds every `/_next/*.js` request so the page cannot hydrate,
-  then runs three cases at 375, 768, 1280 and 1920 px:
+  then runs five cases at 375, 768, 1280 and 1920 px:
   - _through_: types at a fixed cadence, releases hydration mid-sequence and
     keeps typing past the handoff; fails on any lost or reordered key, a
     draft that does not hold the typed text, or an editor box more than 1 px
     from the fallback box at the handoff.
-  - _quiet-line_ and _quiet-wrapped_: types one line, or until the fallback
-    wraps, clicks Send (fails on navigation), stops, then releases; fails
-    when the editor or the composer surface moves more than 1 px at the
-    handoff or once settled, or on any composer layout shift from release to
-    settle. No input happens in that window, so `hadRecentInput` cannot hide
-    a shift.
+  - _quiet-line_, _quiet-wrapped_ and _quiet-newline_: types one line, until
+    the fallback wraps, or two lines split by Shift+Enter; clicks Send (fails
+    on navigation) and types one key, which cancels the send that click
+    queued; stops, then releases; fails when the editor or the composer
+    surface moves more than 1 px at the handoff or once settled, or on any
+    composer layout shift from release to settle. No input happens in that
+    window, so `hadRecentInput` cannot hide a shift.
+  - _enter-send_: types one line and presses Enter; fails if the field
+    gains a newline or no send follows the release (the new thread holds the
+    text and the composer is empty, or the sign-in dialog once the network's
+    guest cap is spent). `/api/chat` is aborted, so no model runs.
 - The same script reports time to typeable against editor-editable (the
   pre-ADR typeable point). With the layout hold or `method="dialog"`
   removed, the quiet cases fail (229 px field move at 1280 px; navigation
@@ -116,9 +132,10 @@ Option 2, in `components/ui/prompt-input.tsx`.
   The quiet cases also hold 0 px surface movement and zero composer layout
   shift, including wrapped pre-hydration text; the through case keeps typing,
   so it does not measure those. Production numbers are measured separately.
-- Pre-hydration typing cannot expand the composer (expansion is
+- Pre-hydration wrapping cannot expand the composer (expansion is
   JS-measured), so wrapped text stays compact through the handoff and
-  expands on the first edit after it. Until that edit the Expand control is
+  expands on the first edit after it. A newline does expand it (see
+  "Fallback keys"). Until that edit the Expand control is
   not offered for adopted text.
 - Writing the guardrail exposed a measurement mismatch: the expansion
   measurement treated the editor as sharing a row with its actions whenever

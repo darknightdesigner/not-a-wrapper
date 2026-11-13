@@ -261,8 +261,9 @@ failure therefore fails the capture; measured runs are never dropped.
 
 `composer-shell.ts` remains the specialized saved-label/CLS/TTFB check.
 `composer-handoff.ts` (ADR-0047) checks the pre-hydration composer on the guest
-path: time to typeable versus editor editable, and that typing across the
-fallback-to-editor handoff loses no keys and shifts nothing. Run it against a
+path: time to typeable versus editor editable, that typing across the
+fallback-to-editor handoff loses no keys and shifts nothing (wrapped and
+multi-line text included), and that Enter before hydration sends. Run it against a
 running server (`BASE_URL=http://localhost:3000 bun run
 benchmarks/chat-performance/browser/composer-handoff.ts`) or a production build
 (`NEXT_DIST_DIR`/`PERF_PORT`, as for `composer-shell.ts`). It exits 1 on a

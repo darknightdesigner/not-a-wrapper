@@ -34,6 +34,7 @@ import {
   PromptInputFooter,
   PromptInputTextarea,
   type PromptInputActionQuery,
+  type PromptInputCombobox,
   type PromptInputEditorHandle,
 } from "@/components/ui/prompt-input"
 import { toast } from "@/components/ui/toast"
@@ -68,6 +69,10 @@ import {
 import { flushSync } from "react-dom"
 import { ButtonPlusMenu } from "./button-plus-menu"
 import type { ComposerActionId } from "./composer-action-registry"
+import {
+  ComposerSuggestions,
+  type ComposerSuggestionKeyHandler,
+} from "./composer-suggestions"
 import { runComposerSlideTransition } from "./composer-view-transition"
 import { EffortControl } from "./effort-control"
 import { FileList } from "./file-list"
@@ -125,6 +130,8 @@ type ComposerProps = {
   ariaLabel?: string
   /** Surface-owned spacing below the composer shell. */
   bottomSpacing?: "default" | "none"
+  /** Starters and autocomplete below the composer (the new-chat surface). */
+  suggestions?: boolean
 }
 
 const isOnlyWhitespace = (text: string) => !/[^\s]/.test(text)
@@ -289,6 +296,7 @@ export const Composer = memo(
       placeholder = "Ask anything",
       ariaLabel = placeholder,
       bottomSpacing = "default",
+      suggestions = false,
     },
     ref
   ) {
@@ -565,6 +573,31 @@ export const Composer = memo(
       send()
     }, [chatId, handleSend, primaryAction.disabled, primaryAction.intent])
 
+    // Enter or Send pressed before hydration (ADR-0047) queues one send of
+    // the adopted text. It fires once Send is available, and only if the
+    // text is unchanged by then.
+    const [queuedSendText, setQueuedSendText] = useState<string | null>(null)
+    const queueSend = useCallback(
+      () => setQueuedSendText(valueRef.current),
+      [valueRef]
+    )
+    useEffect(() => {
+      if (queuedSendText === null || primaryAction.disabled) return
+      if (primaryAction.intent !== "send") return
+      // A fresh task, outside React's commit, so the send's flushSync applies.
+      const timer = window.setTimeout(() => {
+        setQueuedSendText(null)
+        if (valueRef.current === queuedSendText) handleComposerSubmit()
+      })
+      return () => window.clearTimeout(timer)
+    }, [
+      handleComposerSubmit,
+      primaryAction.disabled,
+      primaryAction.intent,
+      queuedSendText,
+      valueRef,
+    ])
+
     const handlePaste = useCallback(
       (e: ClipboardEvent) => {
         const items = e.clipboardData?.items
@@ -649,6 +682,38 @@ export const Composer = memo(
         retryAttachment(attachment)
       },
       [retryAttachment]
+    )
+
+    // The suggestion list drives the editor as a combobox: it sees keys
+    // first and points aria-activedescendant at the selected option.
+    const suggestionKeyHandlerRef = useRef<ComposerSuggestionKeyHandler | null>(
+      null
+    )
+    const handleEditorKeyDown = useCallback((event: KeyboardEvent) => {
+      suggestionKeyHandlerRef.current?.(event)
+    }, [])
+    const handleSuggestionCombobox = useCallback(
+      (combobox: PromptInputCombobox | null) =>
+        editorRef.current?.setCombobox(combobox),
+      []
+    )
+    const handleSuggestionFill = useCallback(
+      (text: string) => {
+        handleValueChange(text)
+        requestAnimationFrame(() => {
+          const editor = editorRef.current
+          editor?.focus()
+          editor?.setSelectionRange(text.length, text.length)
+        })
+      },
+      [handleValueChange]
+    )
+    const handleSuggestionSend = useCallback(
+      (text: string) => {
+        handleValueChange(text)
+        handleComposerSubmit()
+      },
+      [handleComposerSubmit, handleValueChange]
     )
 
     useImperativeHandle(
@@ -748,7 +813,9 @@ export const Composer = memo(
                 placeholder={placeholder}
                 aria-label={ariaLabel}
                 onActionQueryChange={handleActionQueryChange}
+                onKeyDown={handleEditorKeyDown}
                 onPaste={handlePaste}
+                onPrehydrationSubmit={queueSend}
                 containerClassName="[grid-area:primary]"
               />
               <PromptInputFooter aria-hidden="true" />
@@ -829,6 +896,16 @@ export const Composer = memo(
             </p>
           </div>
         </InputDropZone>
+        {suggestions && (
+          <ComposerSuggestions
+            text={localValue}
+            autocomplete={isUserAuthenticated}
+            keyHandlerRef={suggestionKeyHandlerRef}
+            onComboboxChange={handleSuggestionCombobox}
+            onFill={handleSuggestionFill}
+            onSend={handleSuggestionSend}
+          />
+        )}
       </div>
     )
   })

@@ -407,6 +407,7 @@ const ChatInner = memo(function ChatInner({
       placeholder={projectComposerPlaceholder}
       ariaLabel={projectComposerLabel}
       bottomSpacing="none"
+      suggestions={chrome.surface === "home-onboarding"}
       onTurn={submit}
       isSubmitting={isSubmitting}
       isSendReady={isSendReady}
@@ -462,6 +463,10 @@ const ChatInner = memo(function ChatInner({
           data-project-detail-surface={projectOnboarding ? "true" : undefined}
           className={cn(
             "composer-parent flex flex-1 flex-col focus-visible:outline-0",
+            // Grok pads the new-chat column by its 56px chrome height from the
+            // viewport edges; the app header already covers part of the top.
+            chrome.surface === "home-onboarding" &&
+              "sm:pt-[max(0px,calc(3.5rem-var(--spacing-app-header)))] sm:pb-14",
             projectOnboarding &&
               // This wrapper also contains the shared Composer. Project chrome
               // must not override interaction styles owned by its descendants.
@@ -474,22 +479,17 @@ const ChatInner = memo(function ChatInner({
               onStartChat={() => composerRef.current?.focus()}
             />
           ) : showOnboarding ? (
-            <div className="relative flex shrink basis-auto flex-col justify-end max-sm:grow max-sm:justify-center sm:min-h-[calc(42svh-var(--spacing-app-header))]">
-              <div
-                className="flex justify-center"
-                data-splash-headline-option="WHATS_ON_YOUR_MIND"
-              >
-                <div className="hidden text-center [view-transition-name:var(--vt-splash-screen-headline)] sm:mb-[22px] sm:block">
-                  <h1 className="inline-flex min-h-[42px] items-baseline px-1 text-2xl leading-9 font-normal text-balance">
-                    What&apos;s on your mind?
-                  </h1>
-                </div>
-                <div className="flex h-full w-full shrink flex-col items-center justify-center px-4 text-center [view-transition-name:var(--vt-splash-screen-headline)] sm:hidden">
-                  <h1 className="inline-flex min-h-[42px] items-baseline px-1 text-2xl leading-9 font-normal text-balance">
-                    What&apos;s on your mind?
-                  </h1>
-                </div>
-              </div>
+            // Grok's new-chat block: the headline rides the bottom of a
+            // grow-1 block (the footer below grows 2), 1/33 of the viewport
+            // above the composer. Phones keep it centered over a docked
+            // composer.
+            <div
+              className="flex shrink basis-auto flex-col justify-end max-sm:grow max-sm:justify-center sm:grow"
+              data-splash-headline-option="WHATS_ON_YOUR_MIND"
+            >
+              <h1 className="font-heading text-heading-5 sm:text-heading-4 w-full sm:leading-[1.2] px-4 text-center text-balance [view-transition-name:var(--vt-splash-screen-headline)] sm:mb-[calc(100svh/33)] sm:px-0 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-[6px] motion-safe:fill-mode-both motion-safe:delay-40 motion-safe:duration-120 motion-safe:ease-[cubic-bezier(0.2,0,0,1)]">
+                What&apos;s on your mind?
+              </h1>
             </div>
           ) : (
             <Conversation {...conversationProps} />

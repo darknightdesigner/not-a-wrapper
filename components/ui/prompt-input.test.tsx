@@ -452,10 +452,12 @@ describe("PromptInput responsive expansion", () => {
     const form = host.querySelector("form") as HTMLFormElement
     expect(form.getAttribute("method")).toBe("dialog")
 
-    // Enter before hydration is a newline (no submit handler exists yet).
+    // Shift+Enter before hydration: the keys script (not run by jsdom) paints
+    // newline text expanded.
     fallback.focus()
     fallback.value = "typed before\nhydration"
     fallback.setSelectionRange(5, 5)
+    form.setAttribute("data-expanded", "")
 
     let hydrated: Root | undefined
     await act(async () => {
@@ -469,18 +471,43 @@ describe("PromptInput responsive expansion", () => {
       Array.from(editor.querySelectorAll("p"), (p) => p.textContent)
     ).toEqual(["typed before", "hydration"])
     expect(fallback.value).toBe("typed before\nhydration")
-    // The handoff keeps the painted compact layout; the next edit expands it.
-    expect(form.hasAttribute("data-expanded")).toBe(false)
-    act(() => {
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          bubbles: true,
-          key: "Enter",
-          shiftKey: true,
-        })
-      )
-    })
+    // The handoff keeps the expanded layout, and React now owns it.
     expect(form.hasAttribute("data-expanded")).toBe(true)
+
+    act(() => hydrated?.unmount())
+    host.remove()
+  })
+
+  it("reports a send pressed before hydration at the handoff", async () => {
+    const onPrehydrationSubmit = vi.fn()
+    function Draft() {
+      const [value, setValue] = React.useState("")
+      return (
+        <PromptInput value={value} onValueChange={setValue}>
+          <PromptInputTextarea
+            aria-label="Ask anything"
+            onPrehydrationSubmit={onPrehydrationSubmit}
+          />
+        </PromptInput>
+      )
+    }
+    const host = document.createElement("div")
+    host.innerHTML = renderToString(<Draft />)
+    document.body.appendChild(host)
+    const fallback = host.querySelector(
+      ".composer-fallback-textarea"
+    ) as HTMLTextAreaElement
+    // What the keys script does on a pre-hydration Enter.
+    fallback.value = "send me"
+    fallback.setAttribute("data-submit-pending", "")
+
+    let hydrated: Root | undefined
+    await act(async () => {
+      hydrated = hydrateRoot(host, <Draft />)
+    })
+
+    expect(onPrehydrationSubmit).toHaveBeenCalledTimes(1)
+    expect(fallback.hasAttribute("data-submit-pending")).toBe(false)
 
     act(() => hydrated?.unmount())
     host.remove()

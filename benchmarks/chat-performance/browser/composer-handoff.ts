@@ -11,12 +11,17 @@
  *      through the handoff. Requires the exact typed text in the editor and
  *      the draft (no lost or reordered key) and the editor box within 1 px of
  *      the fallback box at the handoff.
- *    - quiet-line / quiet-wrapped: type one line, or until the fallback wraps,
- *      click Send (must not navigate), stop typing, then release. Requires the
- *      editor and composer surface boxes within 1 px of the pre-handoff boxes,
- *      both at the handoff and once settled, and zero composer layout shift
- *      from release to settle. No input happens in that window, so every
- *      shift counts. Typing then resumes and the text must still match.
+ *    - quiet-line / quiet-wrapped / quiet-newline: type one line, until the
+ *      fallback wraps, or two lines split by Shift+Enter; click Send (must not
+ *      navigate; one more key cancels the send it queues), stop typing, then
+ *      release. Requires the editor and composer surface boxes within 1 px of
+ *      the pre-handoff boxes, both at the handoff and once settled, and zero
+ *      composer layout shift from release to settle. No input happens in that
+ *      window, so every shift counts. Typing then resumes and the text must
+ *      still match.
+ *    - enter-send: type one line and press Enter. The field must not gain a
+ *      newline, and after release the turn must be sent with the typed text
+ *      (the `/api/chat` request is aborted, so no model runs).
  *
  *   BASE_URL=http://localhost:3000 bun run benchmarks/chat-performance/browser/composer-handoff.ts
  *   NEXT_DIST_DIR=.next-perf bun run build:next && bun run benchmarks/chat-performance/browser/composer-handoff.ts
@@ -52,7 +57,13 @@ const EDITOR = '#prompt-textarea[contenteditable="true"]'
 const SURFACE = '[data-slot="prompt-input-surface"]'
 const SEND = "#composer-submit-button"
 
-const CASES = ["through", "quiet-line", "quiet-wrapped"] as const
+const CASES = [
+  "through",
+  "quiet-line",
+  "quiet-wrapped",
+  "quiet-newline",
+  "enter-send",
+] as const
 type HandoffCase = (typeof CASES)[number]
 
 function log(message: string) {
@@ -267,6 +278,63 @@ async function runHandoffCase(
     let keysBeforeRelease = 0
     let releaseAt = Number.NaN
 
+    if (handoffCase === "enter-send") {
+      // No model run; the per-network guest cap may also skip the request.
+      await page.route("**/api/chat**", (route) => route.abort())
+      while (typed.length < KEYS_BEFORE_RELEASE["quiet-line"]) {
+        typed = await typeKey(page, typed)
+      }
+      keysBeforeRelease = typed.length
+      await page.keyboard.press("Enter")
+      if ((await fallback.inputValue()) !== typed) {
+        failures.push("Enter before hydration changed the typed text")
+      }
+      release()
+      // The send path opens the new thread, then shows the sign-in dialog
+      // instead of answering once this network's guest cap (ADR-0045) is
+      // spent; either proves the send ran.
+      const sent = await page
+        .waitForFunction(
+          () =>
+            location.pathname.startsWith("/c/") ||
+            document.querySelector('[role="dialog"]') !== null,
+          undefined,
+          { timeout: 60000 }
+        )
+        .then(() => page.waitForTimeout(1000))
+        .then(() => true)
+        .catch(() => false)
+      const outcome = await page.evaluate(
+        ([editorSelector, text]) => ({
+          guestCapped: document.querySelector('[role="dialog"]') !== null,
+          inThread:
+            document.querySelector("#thread")?.textContent?.includes(text) ??
+            false,
+          composer: document.querySelector(editorSelector)?.textContent ?? "",
+        }),
+        [EDITOR, typed.trim()] as const
+      )
+      if (!sent) failures.push("Enter before hydration never sent")
+      else if (outcome.guestCapped)
+        log(`${width}px enter-send: guest cap reached`)
+      else if (!outcome.inThread || outcome.composer !== "") {
+        failures.push("the thread lacks the sent text or the composer kept it")
+      }
+      return {
+        width,
+        handoffCase,
+        ok: failures.length === 0,
+        failures,
+        typed: typed.length,
+        keysBeforeRelease,
+        autofocused,
+        fieldHandoffDeltaPx: Number.NaN,
+        surfaceSettledDeltaPx: Number.NaN,
+        composerCls: Number.NaN,
+        state: await readState(page),
+      }
+    }
+
     if (handoffCase === "through") {
       let keysAfterHandoff = -1
       while (typed.length < MAX_KEYS && keysAfterHandoff < KEYS_AFTER_HANDOFF) {
@@ -291,6 +359,15 @@ async function runHandoffCase(
       const lineHeight = await fieldHeight()
       if (handoffCase === "quiet-line") {
         while (typed.length < KEYS_BEFORE_RELEASE["quiet-line"]) {
+          typed = await typeKey(page, typed)
+        }
+      } else if (handoffCase === "quiet-newline") {
+        while (typed.length < KEYS_BEFORE_RELEASE["quiet-line"]) {
+          typed = await typeKey(page, typed)
+        }
+        await page.keyboard.press("Shift+Enter")
+        typed += "\n"
+        for (let index = 0; index < 5; index += 1) {
           typed = await typeKey(page, typed)
         }
       } else {
@@ -327,6 +404,9 @@ async function runHandoffCase(
         node.focus()
         node.setSelectionRange(node.value.length, node.value.length)
       })
+      // That click queued a send for the handoff (enter-send covers it); a
+      // keystroke cancels it, keeping this a no-send handoff.
+      typed = await typeKey(page, typed)
 
       // Past the 500 ms hadRecentInput window, then release with no input.
       await page.waitForTimeout(600)
