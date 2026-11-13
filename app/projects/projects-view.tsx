@@ -310,7 +310,7 @@ export function ProjectsView() {
       >
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {hasSidebar && <HeaderSidebarTrigger />}
-          <h1 className="text-foreground min-w-0 truncate text-2xl leading-[30px] font-semibold tracking-[-0.5px]">
+          <h1 className="text-foreground font-heading text-heading-5 min-w-0 truncate">
             Projects
           </h1>
         </div>
@@ -329,7 +329,7 @@ export function ProjectsView() {
           keeps a full-width search row under the compact bar). */}
       <div className="mx-auto flex w-full max-w-(--projects-content-max-width) flex-col px-4 pt-4 pb-6 md:pt-10 md:pb-10">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-4 md:mt-9 md:min-h-19 md:items-end">
-          <h1 className="text-heading-app text-foreground hidden min-w-0 flex-1 font-normal md:flex md:h-9 md:items-center">
+          <h1 className="font-heading text-heading-4 text-foreground hidden min-w-0 flex-1 md:flex md:h-9 md:items-center">
             Projects
           </h1>
           <div className="flex w-full min-w-0 flex-nowrap items-center gap-3 md:ms-auto md:w-auto">

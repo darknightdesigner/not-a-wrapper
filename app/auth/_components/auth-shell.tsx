@@ -34,7 +34,7 @@ export function AuthShell({ title, description, children }: AuthShellProps) {
       <div className="flex flex-1 items-center justify-center px-4 py-10 sm:py-12">
         <section className="mx-auto w-full max-w-[388px]">
           <div className="mb-8 space-y-3 text-center">
-            <h1 className="text-[32px] leading-10 font-normal tracking-normal">
+            <h1 className="font-heading text-heading-3">
               {title}
             </h1>
             {description ? (

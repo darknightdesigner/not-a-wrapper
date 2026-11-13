@@ -34,6 +34,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 })
 
+// Headline font (see the font-heading utility). Sentient's license allows the
+// Fontshare API but not committing its files to this public repo; `@1` is the
+// upright variable font.
+const SENTIENT_STYLESHEET =
+  "https://api.fontshare.com/v2/css?f[]=sentient@1&display=swap"
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -65,6 +71,14 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <link
+          rel="preconnect"
+          href="https://cdn.fontshare.com"
+          crossOrigin=""
+        />
+        <link rel="stylesheet" href={SENTIENT_STYLESHEET} />
+      </head>
       {isOfficialDeployment ? (
         <Script
           defer

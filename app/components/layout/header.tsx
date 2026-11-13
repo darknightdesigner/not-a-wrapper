@@ -47,7 +47,7 @@ export function Header({
         {!hasSidebar && (
           <Link
             href="/"
-            className="pointer-events-auto inline-flex items-center text-lg font-medium tracking-tight"
+            className="font-heading text-heading-6 pointer-events-auto inline-flex items-center"
           >
             <NawIcon className="mr-1 size-4" />
             {APP_NAME}

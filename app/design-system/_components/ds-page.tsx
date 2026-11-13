@@ -44,9 +44,7 @@ export function DsPageHeader({ slug, title, description }: DsPageHeaderProps) {
   return (
     <header className="flex items-start justify-between gap-6 pl-(--ds-align-spacer)">
       <div>
-        <h1 className="text-[28px] leading-8 font-semibold tracking-tight">
-          {title}
-        </h1>
+        <h1 className="font-heading text-heading-4">{title}</h1>
         <p className="text-muted-foreground mt-2 text-base leading-6">
           {description}
         </p>
