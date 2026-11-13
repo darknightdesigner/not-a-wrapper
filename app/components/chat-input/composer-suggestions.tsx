@@ -12,8 +12,18 @@ import {
   RiPlayFill,
   type RemixiconComponentType,
 } from "@remixicon/react"
-import { useId, useState, type ReactNode, type RefObject } from "react"
+import { useBreakpoint } from "@/hooks/use-breakpoint"
+import {
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import { usePromptAutocomplete } from "./use-prompt-autocomplete"
+
+/** Tailwind's `sm`: the list is hidden below it (`max-sm:hidden`). */
+const SM_BREAKPOINT = 640
 
 /** Starters fill an open-ended prefix; the autocomplete then finishes it. */
 const STARTERS: ReadonlyArray<{
@@ -66,9 +76,12 @@ export function ComposerSuggestions({
   const baseId = useId()
   const startersId = `${baseId}-starters`
   const completionsId = `${baseId}-completions`
+  const rootRef = useRef<HTMLDivElement>(null)
+  // Hidden lists must not fetch, claim keys, or wire the combobox.
+  const isNarrow = useBreakpoint(SM_BREAKPOINT)
   const { typed, completions } = usePromptAutocomplete({
     text,
-    enabled: autocomplete,
+    enabled: autocomplete && !isNarrow,
   })
 
   const isEmpty = text.trim() === ""
@@ -119,6 +132,8 @@ export function ComposerSuggestions({
   const handleKeyDown: ComposerSuggestionKeyHandler = (event) => {
     if (count === 0 || event.altKey || event.ctrlKey || event.metaKey) return
     if (event.shiftKey) return
+    // Not rendered (narrow viewport or keyboard-open): leave keys alone.
+    if (!rootRef.current?.getClientRects().length) return
     const move = (index: number) => {
       event.preventDefault()
       setActive({
@@ -167,9 +182,9 @@ export function ComposerSuggestions({
     selectedIndex >= 0 ? optionId(selectedIndex) : undefined
   useBrowserLayoutEffect(() => {
     onComboboxChange(
-      count > 0 ? { controls: listId, activeDescendant } : null
+      count > 0 && !isNarrow ? { controls: listId, activeDescendant } : null
     )
-  }, [activeDescendant, count, listId, onComboboxChange])
+  }, [activeDescendant, count, isNarrow, listId, onComboboxChange])
   useBrowserLayoutEffect(
     () => () => onComboboxChange(null),
     [onComboboxChange]
@@ -188,6 +203,7 @@ export function ComposerSuggestions({
 
   return (
     <div
+      ref={rootRef}
       data-slot="composer-suggestions-root"
       // Out of flow so the footer keeps the composer's height as its flex
       // basis (the Grok split); keyboard-pinned composers drop the list.
