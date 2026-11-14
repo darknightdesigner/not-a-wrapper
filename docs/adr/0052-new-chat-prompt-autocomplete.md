@@ -40,13 +40,14 @@ platform credits were depleted.
   lowest-latency host, with the request policy options and hashed actor id.
   `streamCompletions` yields each line as soon as it ends; the client reads
   it with React Query's `streamedQuery`, so rows appear one by one.
-- Bucket `prompt_autocomplete` allows 60 calls a minute. The route runs the
+- Bucket `prompt_autocomplete` allows 60 calls a minute and 2,000 a UTC
+  day per user (amended 2026-11-13); a call must pass both. The route runs the
   Convex rate-limit round trip concurrently with the model call (it cost
   0.1-0.35 s serially) and aborts the model if the call is refused.
 - Calls are not metered against the chat allowance (ADR-0021 lists this
-  route as subsidized). The rate limit bounds spend per user: at most 60
-  answered calls a minute (86,400 a day in theory, each capped at 120
-  output tokens), which is accepted pre-launch. Because the rate-limit check overlaps the model call, a
+  route as subsidized). The daily window bounds spend per user: at most
+  2,000 answered calls a day, each capped at 120 output tokens. Because the
+  rate-limit check overlaps the model call, a
   refused call can still open an OpenRouter request; it is aborted when the
   check returns (0.1-0.35 s), so it costs at most its input tokens.
 - Guests get starters but no autocomplete.

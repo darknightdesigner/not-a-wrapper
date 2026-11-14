@@ -1,7 +1,7 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
 import { describe, expect, it } from "vitest"
-import { internal } from "./_generated/api"
+import { api, internal } from "./_generated/api"
 import {
   API_RATE_LIMIT_MAX_WINDOW_MS,
   TOOL_LIMIT_ROW_RETENTION_MS,
@@ -79,5 +79,37 @@ describe("sweepExpiredLimiterRows", () => {
       leases: ["running"],
       retiredCounters: 0,
     })
+  })
+})
+
+describe("consume", () => {
+  it("refuses at the daily window without counting the minute window", async () => {
+    const t = convexTest(schema, modules)
+    const userId = await t.run((ctx) =>
+      ctx.db.insert("users", {
+        workosUserId: "workos_1",
+        anonymous: false,
+        premium: false,
+      })
+    )
+    const day = API_RATE_LIMIT_MAX_WINDOW_MS
+    await t.run((ctx) =>
+      ctx.db.insert("apiRateLimits", {
+        actorKey: `user:${userId}`,
+        bucket: "prompt_autocomplete:1",
+        windowStartMs: Math.floor(Date.now() / day) * day,
+        count: 2_000,
+      })
+    )
+
+    const result = await t
+      .withIdentity({ subject: "workos_1" })
+      .mutation(api.rateLimits.consume, { bucket: "prompt_autocomplete" })
+
+    expect(result.allowed).toBe(false)
+    const rows = await t.run((ctx) => ctx.db.query("apiRateLimits").collect())
+    expect(rows.map((row) => [row.bucket, row.count])).toEqual([
+      ["prompt_autocomplete:1", 2_000],
+    ])
   })
 })
