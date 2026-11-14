@@ -380,7 +380,7 @@ balance negative. Estimation is admission control, not the final charge.
 | Automatic title generation                   | metered (executed title or fallback route's pinned snapshot; `generateChatTitle` returns usage + route identity)                                                                                                          |
 | Exa search / extract on the platform key     | **subsidized**, bounded by the existing per-tool `toolLimitBuckets` budgets (platform key mode)                                                                                                                           |
 | Anonymous turns on `NON_AUTH_ALLOWED_MODELS` | **subsidized**, bounded by ADR-0045 guest admission (5/day per signed guest cookie and per client network, running-answer caps, one daily ceiling across all guests) + anonymous step cap; no cash-like wallet is created |
-| New-chat prompt autocomplete (ADR-0052)      | **subsidized**, bounded by the `prompt_autocomplete` rate limit (60 calls/min per signed-in user; no daily ceiling, exposure accepted pre-launch); guests excluded                                                        |
+| New-chat prompt autocomplete (ADR-0052)      | **subsidized**, bounded by the `prompt_autocomplete` rate limit (60 calls/min and 2,000/day per signed-in user); guests excluded                                                                                          |
 | Image/audio generation                       | not applicable today (no platform-listed route bills non-token modalities); a future one must add rates or be explicitly subsidized                                                                                       |
 
 ## Provider retention and attribution (amended 2026-09-27)

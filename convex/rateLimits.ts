@@ -33,12 +33,22 @@ import { authenticatedMutation } from "./lib/authedFunctions"
  * returns.
  */
 
+/** The longest window any `apiRateLimits` bucket may use (guest days). */
+export const API_RATE_LIMIT_MAX_WINDOW_MS = 24 * 60 * 60 * 1000
+
+type RateLimitWindow = { limit: number; windowMs: number }
+
+/** Every window must allow a call; one refusal refuses it and counts none. */
 export const API_RATE_LIMIT_POLICIES = {
-  mcp_test: { limit: 10, windowMs: 60_000 },
-  profile_image_upload: { limit: 10, windowMs: 60_000 },
-  // New-chat autocomplete: ~1 call per typing pause. Bounds platform spend.
-  prompt_autocomplete: { limit: 60, windowMs: 60_000 },
-} as const
+  mcp_test: [{ limit: 10, windowMs: 60_000 }],
+  profile_image_upload: [{ limit: 10, windowMs: 60_000 }],
+  // New-chat autocomplete: ~1 call per typing pause. The daily window caps
+  // platform spend per user (ADR-0052).
+  prompt_autocomplete: [
+    { limit: 60, windowMs: 60_000 },
+    { limit: 2_000, windowMs: API_RATE_LIMIT_MAX_WINDOW_MS },
+  ],
+} as const satisfies Record<string, readonly RateLimitWindow[]>
 
 export type RateLimitBucket = keyof typeof API_RATE_LIMIT_POLICIES
 
@@ -48,15 +58,17 @@ const rateLimitBucketValidator = v.union(
   v.literal("prompt_autocomplete")
 )
 
-export function getRateLimitPolicy(bucket: RateLimitBucket): {
-  limit: number
-  windowMs: number
-} {
+export function getRateLimitPolicy(
+  bucket: RateLimitBucket
+): readonly RateLimitWindow[] {
   return API_RATE_LIMIT_POLICIES[bucket]
 }
 
-/** The longest window any `apiRateLimits` bucket may use (guest days). */
-export const API_RATE_LIMIT_MAX_WINDOW_MS = 24 * 60 * 60 * 1000
+/** Row key per window. Windows need their own rows: a shorter window's sweep
+ * would delete a longer window's current row. The first keeps the bare name. */
+function windowRowBucket(bucket: RateLimitBucket, index: number): string {
+  return index === 0 ? bucket : `${bucket}:${index}`
+}
 
 export type WindowBucket<Id> = {
   _id: Id
@@ -172,26 +184,36 @@ export const consume = authenticatedMutation({
     bucket: rateLimitBucketValidator,
   },
   handler: async (ctx, { bucket }) => {
-    const read = await readFixedWindow(ctx, {
-      actorKey: `user:${ctx.user._id}`,
-      bucket,
-      ...getRateLimitPolicy(bucket),
-      now: Date.now(),
-    })
+    const now = Date.now()
+    const reads = await Promise.all(
+      getRateLimitPolicy(bucket).map((window, index) =>
+        readFixedWindow(ctx, {
+          actorKey: `user:${ctx.user._id}`,
+          bucket: windowRowBucket(bucket, index),
+          ...window,
+          now,
+        })
+      )
+    )
 
-    if (!read.allowed) {
-      await Promise.all(read.staleBucketIds.map((id) => ctx.db.delete(id)))
+    const refused = reads.filter((read) => !read.allowed)
+    if (refused.length > 0) {
+      await Promise.all(
+        reads.flatMap((read) =>
+          read.staleBucketIds.map((id) => ctx.db.delete(id))
+        )
+      )
       return {
         allowed: false,
         remaining: 0,
-        retryAfterMs: read.retryAfterMs,
+        retryAfterMs: Math.max(...refused.map((read) => read.retryAfterMs)),
       }
     }
 
-    await commitFixedWindow(ctx, read)
+    for (const read of reads) await commitFixedWindow(ctx, read)
     return {
       allowed: true,
-      remaining: read.remaining,
+      remaining: Math.min(...reads.map((read) => read.remaining)),
       retryAfterMs: 0,
     }
   },
