@@ -43,8 +43,12 @@ platform credits were depleted.
 - Bucket `prompt_autocomplete` allows 60 calls a minute. The route runs the
   Convex rate-limit round trip concurrently with the model call (it cost
   0.1-0.35 s serially) and aborts the model if the call is refused.
-- Calls are not metered against the chat allowance; the rate limit bounds
-  spend.
+- Calls are not metered against the chat allowance (ADR-0021 lists this
+  route as subsidized). The rate limit bounds spend per user: at most 60
+  answered calls a minute (86,400 a day in theory, each capped at 120
+  output tokens), which is accepted pre-launch. Because the rate-limit check overlaps the model call, a
+  refused call can still open an OpenRouter request; it is aborted when the
+  check returns (0.1-0.35 s), so it costs at most its input tokens.
 - Guests get starters but no autocomplete.
 - The client sends up to 12 recent chat titles; the server reads nothing.
   More titles made models dwell on them.
@@ -54,8 +58,10 @@ platform credits were depleted.
 
 ## Consequences
 
-- Chat titles reach OpenRouter and its host for personalization, as chat
-  content already does for OpenRouter models.
+- The partial prompt (up to 50 characters per typing pause) and recent chat
+  titles reach OpenRouter and its host, as chat content already does for
+  OpenRouter models. Nothing is sent before a 200 ms pause or for `/` and
+  `@` commands.
 - Llama sometimes over-uses recent topics; Haiku 4.5 is the drop-in upgrade
   if phrasing matters more than ~0.2 s. The model id is one constant.
 - If usage grows, revisit option 2.

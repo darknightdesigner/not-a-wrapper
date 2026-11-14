@@ -692,9 +692,21 @@ export const Composer = memo(
     const handleEditorKeyDown = useCallback((event: KeyboardEvent) => {
       suggestionKeyHandlerRef.current?.(event)
     }, [])
+    // The list can report before the editor mounts; the editor applies the
+    // latest state when its handle arrives.
+    const comboboxRef = useRef<PromptInputCombobox | null>(null)
     const handleSuggestionCombobox = useCallback(
-      (combobox: PromptInputCombobox | null) =>
-        editorRef.current?.setCombobox(combobox),
+      (combobox: PromptInputCombobox | null) => {
+        comboboxRef.current = combobox
+        editorRef.current?.setCombobox(combobox)
+      },
+      []
+    )
+    const setEditorHandle = useCallback(
+      (handle: PromptInputEditorHandle | null) => {
+        editorRef.current = handle
+        handle?.setCombobox(comboboxRef.current)
+      },
       []
     )
     const handleSuggestionFill = useCallback(
@@ -809,7 +821,7 @@ export const Composer = memo(
                 />
               </PromptInputActions>
               <PromptInputTextarea
-                ref={editorRef}
+                ref={setEditorHandle}
                 placeholder={placeholder}
                 aria-label={ariaLabel}
                 onActionQueryChange={handleActionQueryChange}

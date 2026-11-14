@@ -38,6 +38,9 @@ describe("prompt autocomplete", () => {
       "how do I fix a flat tire",
       "how do I learn spanish",
     ])
+    expect(await collect(["1. buy milk and eggs\n"], "1. buy")).toEqual([
+      "1. buy milk and eggs",
+    ])
   })
 
   it("appends only the continuation to the draft", () => {
@@ -53,5 +56,6 @@ describe("prompt autocomplete", () => {
       "e",
     ])
     expect(keepShownOrder(["x", "y"], [])).toEqual(["x", "y"])
+    expect(keepShownOrder(["c"], ["a", "b", "c"])).toEqual(["c"])
   })
 })

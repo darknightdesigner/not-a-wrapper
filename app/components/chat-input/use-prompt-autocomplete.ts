@@ -1,7 +1,7 @@
 "use client"
 
-import { CHAT_TITLE_PLACEHOLDER } from "@/lib/chat-title"
 import { useChats } from "@/lib/chat-store/chats/provider"
+import { CHAT_TITLE_PLACEHOLDER } from "@/lib/chat-title"
 import { fetchClient } from "@/lib/fetch"
 import {
   continuesTyped,
@@ -13,8 +13,8 @@ import {
   type PromptAutocompleteRequest,
 } from "@/lib/prompt-autocomplete"
 import {
-  experimental_streamedQuery as streamedQuery,
   keepPreviousData,
+  experimental_streamedQuery as streamedQuery,
   useQuery,
 } from "@tanstack/react-query"
 import { useEffect, useMemo, useState } from "react"
@@ -79,11 +79,13 @@ export function usePromptAutocomplete({
   const topics = useMemo(
     () =>
       chats
-        .flatMap(({ title, created_at }) =>
-          title && title !== CHAT_TITLE_PLACEHOLDER
+        .flatMap(({ title: rawTitle, created_at }) => {
+          // The server rejects blank topics, so trim before checking.
+          const title = rawTitle?.trim()
+          return title && title !== CHAT_TITLE_PLACEHOLDER
             ? [{ title: title.slice(0, 120), createdAt: created_at ?? "" }]
             : []
-        )
+        })
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         .slice(0, PROMPT_AUTOCOMPLETE_MAX_TOPICS)
         .map(({ title }) => title),

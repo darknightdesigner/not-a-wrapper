@@ -12,9 +12,10 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ChatsProvider } from "@/lib/chat-store/chats/provider"
 import { ChatSessionProvider } from "@/lib/chat-store/session/provider"
 import { readComposerShellHint } from "@/lib/composer-shell-hint.server"
-import { readSidebarWidth } from "@/lib/sidebar-width.server"
 import { APP_DOMAIN } from "@/lib/config"
+import { FONTSHARE_ORIGINS, SENTIENT_STYLESHEET } from "@/lib/fontshare"
 import { ModelProvider } from "@/lib/model-store/provider"
+import { readSidebarWidth } from "@/lib/sidebar-width.server"
 import { TanstackQueryProvider } from "@/lib/tanstack-query/tanstack-query-provider"
 import { UserPreferencesProvider } from "@/lib/user-preference-store/provider"
 import { UserProvider } from "@/lib/user-store/provider"
@@ -33,12 +34,6 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 })
-
-// Headline font (see the font-heading utility). Sentient's license allows the
-// Fontshare API but not committing its files to this public repo; `@1` is the
-// upright variable font.
-const SENTIENT_STYLESHEET =
-  "https://api.fontshare.com/v2/css?f[]=sentient@1&display=swap"
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -72,11 +67,9 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link
-          rel="preconnect"
-          href="https://cdn.fontshare.com"
-          crossOrigin=""
-        />
+        {/* The headline stylesheet is render-blocking; warm both hosts. */}
+        <link rel="preconnect" href={FONTSHARE_ORIGINS.api} />
+        <link rel="preconnect" href={FONTSHARE_ORIGINS.cdn} crossOrigin="" />
         <link rel="stylesheet" href={SENTIENT_STYLESHEET} />
       </head>
       {isOfficialDeployment ? (
@@ -117,7 +110,10 @@ export default async function RootLayout({
                             enableSystem
                             disableTransitionOnChange
                           >
-                            <SidebarProvider defaultOpen defaultWidth={sidebarWidth}>
+                            <SidebarProvider
+                              defaultOpen
+                              defaultWidth={sidebarWidth}
+                            >
                               <Toaster position="top-center" />
                               {children}
                             </SidebarProvider>

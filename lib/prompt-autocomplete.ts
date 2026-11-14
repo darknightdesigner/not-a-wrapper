@@ -18,7 +18,9 @@ export const PROMPT_AUTOCOMPLETE_MAX_TOPICS = 12
 export const promptAutocompleteRequestSchema = z.object({
   query: z.string().min(2).max(PROMPT_AUTOCOMPLETE_MAX_QUERY_LENGTH),
   /** Recent chat titles, newest first. Personalizes without a server read. */
-  topics: z.array(z.string().trim().min(1).max(120)).max(PROMPT_AUTOCOMPLETE_MAX_TOPICS),
+  topics: z
+    .array(z.string().trim().min(1).max(120))
+    .max(PROMPT_AUTOCOMPLETE_MAX_TOPICS),
 })
 
 export type PromptAutocompleteRequest = z.infer<
@@ -74,7 +76,8 @@ export function keepShownOrder(
   const keptSet = new Set(kept)
   const fresh = next.filter((row) => !keptSet.has(row))
   const ordered: string[] = []
-  for (const row of shown.slice(0, next.length)) {
+  // Walk every shown slot: a kept row may sit past next.length.
+  for (const row of shown) {
     if (keptSet.has(row)) ordered.push(row)
     else if (fresh.length > 0) ordered.push(fresh.shift()!)
   }
@@ -106,13 +109,18 @@ export function buildPromptAutocompletePrompt({
 /** One model line → a completion that extends the query in the user's own
  * casing, or null. */
 function toCompletion(line: string, query: string): string | null {
-  const cleaned = line
-    .replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")
-    .replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, "")
-    .replace(/[.!?。]+$/u, "")
-    .replace(/\s+/g, " ")
-    .trim()
-  if (!continuesTyped(cleaned, query)) return null
+  const tidy = (text: string) =>
+    text
+      .replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, "")
+      .replace(/[.!?。]+$/u, "")
+      .replace(/\s+/g, " ")
+      .trim()
+  // A list marker is model formatting unless the user typed it too.
+  const cleaned = [
+    tidy(line),
+    tidy(line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")),
+  ].find((candidate) => continuesTyped(candidate, query))
+  if (!cleaned) return null
   const completion = (query + cleaned.slice(query.length)).trimEnd()
   return completion.length > query.trimEnd().length
     ? completion.slice(0, MAX_COMPLETION_LENGTH)

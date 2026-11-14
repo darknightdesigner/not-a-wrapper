@@ -17,7 +17,7 @@ function AuthErrorContent() {
   return (
     <div className="w-full max-w-md space-y-8">
       <div className="text-center">
-        <h1 className="font-heading text-heading-2 text-white">
+        <h1 className="font-heading text-heading-3 sm:text-heading-2 text-white">
           Authentication Error
         </h1>
         <div className="mt-6 rounded-md bg-red-500/10 p-4">

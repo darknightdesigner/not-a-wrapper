@@ -1,6 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
 import { getConvexSiteUrl } from "./app/api/_lib/convex-site-url"
+import { FONTSHARE_ORIGINS } from "./lib/fontshare"
 
 const isProduction = process.env.NODE_ENV === "production"
 
@@ -70,12 +71,6 @@ function contentSecurityPolicy(): string {
   // PostHog loads its recorder/array scripts and ingests events from its own
   // subdomains; the exact region host is env-configured.
   const posthog = ["https://*.posthog.com"]
-  // Sentient headline font: stylesheet from the Fontshare API, files from its
-  // CDN (its license rules out self-hosting in this public repo).
-  const fontshare = {
-    style: "https://api.fontshare.com",
-    font: "https://cdn.fontshare.com",
-  }
 
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -95,7 +90,7 @@ function contentSecurityPolicy(): string {
       ...(isProduction ? [] : ["'unsafe-eval'"]),
       ...posthog,
     ],
-    "style-src": ["'self'", "'unsafe-inline'", fontshare.style],
+    "style-src": ["'self'", "'unsafe-inline'", FONTSHARE_ORIGINS.api],
     // Images are not inert: an image load is a request with no click, so a
     // prompt-injected reply could load `https://host/?d=<chat>` and leak the
     // chat. Markdown renders images as links; this backstops it with only the
@@ -104,7 +99,7 @@ function contentSecurityPolicy(): string {
     // (attachments, uploaded avatars). Password and email-code sign-in carry
     // no identity-provider avatar; add that host here if OAuth sign-in ships.
     "img-src": ["'self'", "data:", "blob:", convexImageSource()],
-    "font-src": ["'self'", "data:", fontshare.font],
+    "font-src": ["'self'", "data:", FONTSHARE_ORIGINS.cdn],
     "connect-src": ["'self'", ...convex, ...posthog],
   }
 

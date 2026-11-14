@@ -303,7 +303,7 @@ export function ProjectsView() {
 
   return (
     <div className="flex w-full flex-col [--projects-content-max-width:50rem] [--projects-control-fill:#f3f3f3] [--projects-control-surface:#fff] dark:[--projects-control-fill:#414141] dark:[--projects-control-surface:#212121]">
-      {/* Mobile compact bar (captured: 52px, menu trigger + bold title + New). */}
+      {/* Mobile compact bar (captured: 52px, menu trigger + headline title + New). */}
       <div
         className="bg-background h-app-header sticky top-0 z-10 flex shrink-0 items-center justify-between gap-2 px-2 [box-shadow:var(--sharp-edge-top-shadow-placeholder)] data-[scrolled]:[box-shadow:var(--sharp-edge-top-shadow)] md:hidden"
         data-scrolled={isScrolled || undefined}

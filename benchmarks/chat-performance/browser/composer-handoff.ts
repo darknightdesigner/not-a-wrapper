@@ -310,7 +310,8 @@ async function runHandoffCase(
           inThread:
             document.querySelector("#thread")?.textContent?.includes(text) ??
             false,
-          composer: document.querySelector(editorSelector)?.textContent ?? "",
+          // null (a missing editor) fails the empty-composer check.
+          composer: document.querySelector(editorSelector)?.textContent ?? null,
         }),
         [EDITOR, typed.trim()] as const
       )
@@ -320,6 +321,16 @@ async function runHandoffCase(
       else if (!outcome.inThread || outcome.composer !== "") {
         failures.push("the thread lacks the sent text or the composer kept it")
       }
+      const state = await readState(page)
+      const fieldHandoffDeltaPx = boxDelta(
+        state.beforeHandoff.field,
+        state.atHandoff?.editor ?? null
+      )
+      if (!(fieldHandoffDeltaPx <= 1)) {
+        failures.push(
+          `handoff moved the field ${fieldHandoffDeltaPx.toFixed(2)} px`
+        )
+      }
       return {
         width,
         handoffCase,
@@ -328,10 +339,10 @@ async function runHandoffCase(
         typed: typed.length,
         keysBeforeRelease,
         autofocused,
-        fieldHandoffDeltaPx: Number.NaN,
+        fieldHandoffDeltaPx,
         surfaceSettledDeltaPx: Number.NaN,
         composerCls: Number.NaN,
-        state: await readState(page),
+        state,
       }
     }
 

@@ -51,7 +51,7 @@
 
 /* The headline face, for headlines only; UI titles (dialog, sheet, card,
    empty) stay sans. Sentient (variable, wght 200-700) loads from the Fontshare
-   API in app/layout.tsx; its license forbids committing the font files to a
+   API (lib/fontshare.ts); its license forbids committing the font files to a
    public repo. 400 is a touch heavier than the Framer site's 350. */
 @utility font-heading {
   font-family: "Sentient", ui-serif, Georgia, "Times New Roman", serif;

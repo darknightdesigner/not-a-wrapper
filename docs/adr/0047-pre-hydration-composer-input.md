@@ -127,16 +127,16 @@ Option 2, in `components/ui/prompt-input.tsx`.
 ## Consequences
 
 - Dev server, 1280 px, guest: time to typeable about 100 ms median vs
-  about 455 ms for editor-editable. All three handoff cases pass at all four
-  widths with the exact typed text and 0 px field movement at the handoff.
+  about 455 ms for editor-editable. The three original handoff cases
+  (_through_, _quiet-line_, _quiet-wrapped_) pass at all four widths with the exact typed text and 0 px field movement at the handoff.
   The quiet cases also hold 0 px surface movement and zero composer layout
   shift, including wrapped pre-hydration text; the through case keeps typing,
   so it does not measure those. Production numbers are measured separately.
 - Pre-hydration wrapping cannot expand the composer (expansion is
   JS-measured), so wrapped text stays compact through the handoff and
-  expands on the first edit after it. A newline does expand it (see
-  "Fallback keys"). Until that edit the Expand control is
-  not offered for adopted text.
+  expands on the first edit after it; until that edit the Expand control is
+  not offered for wrapped adopted text. A newline does expand it and shows
+  the Expand control before hydration (see "Fallback keys").
 - Writing the guardrail exposed a measurement mismatch: the expansion
   measurement treated the editor as sharing a row with its actions whenever
   the viewport was at least 640 px, while the grid also stacks in a `/main`

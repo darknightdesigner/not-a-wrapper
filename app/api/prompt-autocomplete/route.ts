@@ -38,8 +38,9 @@ export const POST = authenticatedRoute(async (req, { session, convex }) => {
       id: session.userId,
     }),
   })
-  // The rate-limit round trip overlaps the model's first token; a refused
-  // call aborts the model before any output is sent.
+  // The rate-limit round trip overlaps the model's first token (it cost
+  // 0.1-0.35 s serially). A refused call may already have reached OpenRouter;
+  // it is aborted before any output is sent (ADR-0052 accepts that cost).
   const refuse = new AbortController()
   const limited = enforceRateLimit(convex, { bucket: "prompt_autocomplete" })
   const result = streamText({
