@@ -1,6 +1,6 @@
 /** @vitest-environment edge-runtime */
 import { convexTest } from "convex-test"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { api, internal } from "./_generated/api"
 import {
   API_RATE_LIMIT_MAX_WINDOW_MS,
@@ -83,7 +83,12 @@ describe("sweepExpiredLimiterRows", () => {
 })
 
 describe("consume", () => {
+  afterEach(() => vi.useRealTimers())
+
   it("refuses at the daily window without counting the minute window", async () => {
+    // A fixed clock keeps the seeded row and consume in the same UTC day.
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date("2026-11-13T12:00:00Z"))
     const t = convexTest(schema, modules)
     const userId = await t.run((ctx) =>
       ctx.db.insert("users", {

@@ -115,12 +115,8 @@ export function authenticatedRoute<Rest extends unknown[]>(
 /**
  * Consume one unit against a per-identity limit. Returns a 429 with a
  * `Retry-After` header when the caller is over the ceiling, otherwise `null`.
- * Latency-critical handlers may call it themselves to overlap the Convex
- * round trip with their own work instead of passing `opts.rateLimit`. Such a
- * caller must await it before committing side effects (or undo them) and
- * return a non-null result as the response; dropping it disables the limit.
  */
-export async function enforceRateLimit(
+async function enforceRateLimit(
   convex: ReturnType<typeof createAuthenticatedConvexClient>,
   { bucket }: RouteRateLimit
 ): Promise<NextResponse | null> {
