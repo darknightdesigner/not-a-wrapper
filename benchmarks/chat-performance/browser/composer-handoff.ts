@@ -307,9 +307,10 @@ async function runHandoffCase(
       const outcome = await page.evaluate(
         ([editorSelector, text]) => ({
           guestCapped: document.querySelector('[role="dialog"]') !== null,
-          inThread:
-            document.querySelector("#thread")?.textContent?.includes(text) ??
-            false,
+          // A thread element holding exactly the sent text (the user turn).
+          inThread: Array.from(document.querySelectorAll("#thread *"), (node) =>
+            node.textContent?.trim()
+          ).includes(text),
           // null (a missing editor) fails the empty-composer check.
           composer: document.querySelector(editorSelector)?.textContent ?? null,
         }),

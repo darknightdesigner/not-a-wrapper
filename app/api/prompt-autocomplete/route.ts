@@ -4,6 +4,7 @@ import {
 } from "@/app/api/_lib/authenticated-route"
 import { jsonError } from "@/app/api/_lib/convex"
 import { getModelInfo } from "@/lib/models"
+import { sanitizeExceptionForTelemetry } from "@/lib/observability/sentry-scrubbing"
 import { createLanguageModel } from "@/lib/openproviders/create-language-model"
 import { resolveRequestPolicyOptions } from "@/lib/openproviders/request-shaping"
 import { deriveProviderSafetyIdentifier } from "@/lib/openproviders/safety-identifier"
@@ -58,7 +59,11 @@ export const POST = authenticatedRoute(async (req, { session, convex }) => {
     },
     onError: ({ error }) => {
       if (!req.signal.aborted && !refuse.signal.aborted) {
-        console.error("Error in /api/prompt-autocomplete:", error)
+        // The raw error can carry the request body (typed text, titles).
+        console.error(
+          "Error in /api/prompt-autocomplete:",
+          sanitizeExceptionForTelemetry(error).message
+        )
       }
     },
   })

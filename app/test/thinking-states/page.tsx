@@ -1058,7 +1058,7 @@ export default function ThinkingStatesTestPage() {
 
                 {/* ─── Onboarding / Empty State ─── */}
                 <AssistantShell>
-                  <h1 className="font-heading text-heading-5 mb-6 text-balance">
+                  <h1 className="font-heading text-heading-5 sm:text-heading-4 mb-6 text-balance sm:leading-[1.2]">
                     What&apos;s on your mind?
                   </h1>
                   <StateAnnotation title="Onboarding — empty state heading">

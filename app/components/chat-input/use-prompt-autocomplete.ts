@@ -1,6 +1,7 @@
 "use client"
 
 import { useChats } from "@/lib/chat-store/chats/provider"
+import { sortByRecency } from "@/lib/chat-store/chats/sidebar-window"
 import { CHAT_TITLE_PLACEHOLDER } from "@/lib/chat-title"
 import { fetchClient } from "@/lib/fetch"
 import {
@@ -76,20 +77,19 @@ export function usePromptAutocomplete({
     return () => window.clearTimeout(timer)
   }, [query])
 
-  // Recent titles, newest first, personalize the completions.
+  // Recently active titles, as the sidebar orders them, personalize the
+  // completions.
   const topics = useMemo(
     () =>
-      chats
-        .flatMap(({ title: rawTitle, created_at }) => {
-          // The server rejects blank topics, so trim before checking.
+      sortByRecency(chats)
+        .flatMap(({ title: rawTitle }) => {
+          // Blank titles carry nothing, so trim before checking.
           const title = rawTitle?.trim()
           return title && title !== CHAT_TITLE_PLACEHOLDER
-            ? [{ title: title.slice(0, 120), createdAt: created_at ?? "" }]
+            ? [title.slice(0, 120)]
             : []
         })
-        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-        .slice(0, PROMPT_AUTOCOMPLETE_MAX_TOPICS)
-        .map(({ title }) => title),
+        .slice(0, PROMPT_AUTOCOMPLETE_MAX_TOPICS),
     [chats]
   )
 

@@ -13,11 +13,31 @@ import {
   RiPlayFill,
   type RemixiconComponentType,
 } from "@remixicon/react"
-import { useId, useRef, useState, type ReactNode, type RefObject } from "react"
+import {
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+  type RefObject,
+} from "react"
 import { usePromptAutocomplete } from "./use-prompt-autocomplete"
 
 /** Tailwind's `sm`: the list is hidden below it (`max-sm:hidden`). */
 const SM_BREAKPOINT = 640
+
+/** The `keyboard-open` class (keyboard-viewport.ts) hides the list. It is set
+ * only while the keyboard takes space, unlike the focus-driven store. */
+function subscribeKeyboardOpenClass(onChange: () => void) {
+  const observer = new MutationObserver(onChange)
+  observer.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  })
+  return () => observer.disconnect()
+}
+const readKeyboardOpenClass = () =>
+  document.documentElement.classList.contains("keyboard-open")
 
 /** Starters fill an open-ended prefix; the autocomplete then finishes it. */
 const STARTERS: ReadonlyArray<{
@@ -75,11 +95,18 @@ export function ComposerSuggestions({
   const startersId = `${baseId}-starters`
   const completionsId = `${baseId}-completions`
   const rootRef = useRef<HTMLDivElement>(null)
-  // Hidden lists must not fetch, claim keys, or wire the combobox.
+  // Hidden lists (max-sm, keyboard-open) must not fetch, claim keys, or
+  // wire the combobox.
   const isNarrow = useBreakpoint(SM_BREAKPOINT)
+  const isKeyboardOpen = useSyncExternalStore(
+    subscribeKeyboardOpenClass,
+    readKeyboardOpenClass,
+    () => false
+  )
+  const isHidden = isNarrow || isKeyboardOpen
   const { typed, completions } = usePromptAutocomplete({
     text,
-    enabled: autocomplete && !isNarrow,
+    enabled: autocomplete && !isHidden,
   })
 
   const isEmpty = text.trim() === ""
@@ -185,9 +212,9 @@ export function ComposerSuggestions({
     selectedIndex >= 0 ? optionId(listId, selectedIndex) : undefined
   useBrowserLayoutEffect(() => {
     onComboboxChange(
-      count > 0 && !isNarrow ? { controls: listId, activeDescendant } : null
+      count > 0 && !isHidden ? { controls: listId, activeDescendant } : null
     )
-  }, [activeDescendant, count, isNarrow, listId, onComboboxChange])
+  }, [activeDescendant, count, isHidden, listId, onComboboxChange])
   useBrowserLayoutEffect(() => () => onComboboxChange(null), [onComboboxChange])
 
   const rowProps = (ownerId: string, index: number) => ({

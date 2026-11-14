@@ -478,6 +478,49 @@ describe("PromptInput responsive expansion", () => {
     host.remove()
   })
 
+  it("keeps wrapped pre-hydration text compact until the next edit", async () => {
+    function Draft() {
+      const [value, setValue] = React.useState("")
+      return (
+        <PromptInput value={value} onValueChange={setValue}>
+          <PromptInputTextarea aria-label="Ask anything" />
+        </PromptInput>
+      )
+    }
+    const host = document.createElement("div")
+    host.innerHTML = renderToString(<Draft />)
+    document.body.appendChild(host)
+    const fallback = host.querySelector(
+      ".composer-fallback-textarea"
+    ) as HTMLTextAreaElement
+    const form = host.querySelector("form") as HTMLFormElement
+    // One line long enough to wrap: the editor would expand it on its own.
+    fallback.value = "typed before hydration ".repeat(6).trim()
+
+    let hydrated: Root | undefined
+    await act(async () => {
+      hydrated = hydrateRoot(host, <Draft />)
+    })
+
+    const editor = host.querySelector("#prompt-textarea") as HTMLElement
+    expect(editor.textContent).toBe(fallback.value)
+    // The handoff keeps the painted compact layout; the next edit expands it.
+    expect(form.hasAttribute("data-expanded")).toBe(false)
+    act(() => {
+      editor.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          bubbles: true,
+          key: "Enter",
+          shiftKey: true,
+        })
+      )
+    })
+    expect(form.hasAttribute("data-expanded")).toBe(true)
+
+    act(() => hydrated?.unmount())
+    host.remove()
+  })
+
   it("reports a send pressed before hydration at the handoff", async () => {
     const onPrehydrationSubmit = vi.fn()
     function Draft() {
