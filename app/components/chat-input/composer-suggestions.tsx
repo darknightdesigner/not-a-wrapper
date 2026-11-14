@@ -14,6 +14,7 @@ import {
   type RemixiconComponentType,
 } from "@remixicon/react"
 import {
+  memo,
   useId,
   useRef,
   useState,
@@ -65,7 +66,10 @@ const NONE: Active = { index: -1, via: "keyboard", glide: false }
 export type ComposerSuggestionKeyHandler = (event: KeyboardEvent) => void
 
 type ComposerSuggestionsProps = {
-  /** The composer's live text. */
+  /** Whether the composer holds any text (starters show only when empty). */
+  hasText: boolean
+  /** The composer's live text, or "" when autocomplete is off: guests then
+   * re-render the list only when hasText flips, not on every key. */
   text: string
   /** Server completions need a signed-in caller; starters show for everyone. */
   autocomplete: boolean
@@ -84,8 +88,10 @@ type ComposerSuggestionsProps = {
  * editor keeps focus throughout (combobox with aria-activedescendant).
  * Keys: ↓/↑ move (↓ past the end returns to the text), Enter picks, Tab
  * fills the active or first completion, Escape clears then dismisses.
+ * Memoized: the Composer re-renders on every keystroke.
  */
-export function ComposerSuggestions({
+export const ComposerSuggestions = memo(function ComposerSuggestions({
+  hasText,
   text,
   autocomplete,
   keyHandlerRef,
@@ -111,7 +117,7 @@ export function ComposerSuggestions({
     enabled: autocomplete && !isHidden,
   })
 
-  const isEmpty = text.trim() === ""
+  const isEmpty = !hasText
   // Escape hides completions until the text changes.
   const [dismissedAt, setDismissedAt] = useState<string | null>(null)
   if (dismissedAt !== null && dismissedAt !== text) setDismissedAt(null)
@@ -278,7 +284,7 @@ export function ComposerSuggestions({
       </SuggestionList>
     </div>
   )
-}
+})
 
 function SuggestionList({
   id,

@@ -917,7 +917,8 @@ export const Composer = memo(
         </InputDropZone>
         {suggestions && (
           <ComposerSuggestions
-            text={localValue}
+            hasText={!isOnlyWhitespace(localValue)}
+            text={isUserAuthenticated ? localValue : ""}
             autocomplete={isUserAuthenticated}
             keyHandlerRef={suggestionKeyHandlerRef}
             onComboboxChange={handleSuggestionCombobox}
