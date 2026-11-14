@@ -26,8 +26,10 @@ import { usePromptAutocomplete } from "./use-prompt-autocomplete"
 /** Tailwind's `sm`: the list is hidden below it (`max-sm:hidden`). */
 const SM_BREAKPOINT = 640
 
-/** The `keyboard-open` class (keyboard-viewport.ts) hides the list. It is set
- * only while the keyboard takes space, unlike the focus-driven store. */
+/** Mirrors the `keyboard-open:hidden` CSS on the list, so fetching stops
+ * exactly when the list is hidden. keyboard-viewport.ts adds the class on
+ * keyboard geometry (and may keep it until focus leaves); its focus-driven
+ * store would also be "open" on desktop Chrome, so it is not used here. */
 function subscribeKeyboardOpenClass(onChange: () => void) {
   const observer = new MutationObserver(onChange)
   observer.observe(document.documentElement, {
