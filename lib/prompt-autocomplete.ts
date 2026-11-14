@@ -18,9 +18,11 @@ export const PROMPT_AUTOCOMPLETE_MAX_TOPICS = 12
 export const promptAutocompleteRequestSchema = z.object({
   query: z.string().min(2).max(PROMPT_AUTOCOMPLETE_MAX_QUERY_LENGTH),
   /** Recent chat titles, newest first. Personalizes without a server read. */
+  // Blank titles are dropped rather than failing the whole request.
   topics: z
-    .array(z.string().trim().min(1).max(120))
-    .max(PROMPT_AUTOCOMPLETE_MAX_TOPICS),
+    .array(z.string().trim().max(120))
+    .max(PROMPT_AUTOCOMPLETE_MAX_TOPICS)
+    .transform((topics) => topics.filter((topic) => topic.length > 0)),
 })
 
 export type PromptAutocompleteRequest = z.infer<
@@ -109,6 +111,8 @@ export function buildPromptAutocompletePrompt({
 /** One model line → a completion that extends the query in the user's own
  * casing, or null. */
 function toCompletion(line: string, query: string): string | null {
+  // Lines are whitespace-normalized, so match against the normalized query.
+  const typed = query.replace(/\s+/g, " ")
   const tidy = (text: string) =>
     text
       .replace(/^["'“”‘’`]+|["'“”‘’`]+$/g, "")
@@ -119,9 +123,10 @@ function toCompletion(line: string, query: string): string | null {
   const cleaned = [
     tidy(line),
     tidy(line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, "")),
-  ].find((candidate) => continuesTyped(candidate, query))
+  ].find((candidate) => continuesTyped(candidate, typed))
   if (!cleaned) return null
-  const completion = (query + cleaned.slice(query.length)).trimEnd()
+  // The user's own spacing and casing stay; only the continuation is new.
+  const completion = (query + cleaned.slice(typed.length)).trimEnd()
   return completion.length > query.trimEnd().length
     ? completion.slice(0, MAX_COMPLETION_LENGTH)
     : null

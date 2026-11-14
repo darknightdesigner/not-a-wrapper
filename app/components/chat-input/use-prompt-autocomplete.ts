@@ -63,7 +63,8 @@ export function usePromptAutocomplete({
 }): { typed: string; completions: readonly string[] } {
   const { chats } = useChats()
   const query = enabled ? toAutocompleteQuery(text) : null
-  const [requested, setRequested] = useState(query)
+  // Starts empty so a draft present on mount also waits for the debounce.
+  const [requested, setRequested] = useState<string | null>(null)
   if (query === null && requested !== null) setRequested(null)
 
   useEffect(() => {

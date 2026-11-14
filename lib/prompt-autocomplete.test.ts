@@ -41,6 +41,9 @@ describe("prompt autocomplete", () => {
     expect(await collect(["1. buy milk and eggs\n"], "1. buy")).toEqual([
       "1. buy milk and eggs",
     ])
+    expect(await collect(["how  do I bake bread\n"], "how  do")).toEqual([
+      "how  do I bake bread",
+    ])
   })
 
   it("appends only the continuation to the draft", () => {

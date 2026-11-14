@@ -574,27 +574,34 @@ export const Composer = memo(
     }, [chatId, handleSend, primaryAction.disabled, primaryAction.intent])
 
     // Enter or Send pressed before hydration (ADR-0047) queues one send of
-    // the adopted text. It fires once Send is available, and only if the
-    // text is unchanged by then.
-    const [queuedSendText, setQueuedSendText] = useState<string | null>(null)
+    // the adopted text for the draft that queued it. It fires once Send is
+    // available, and only if the text and draft are unchanged by then.
+    const draftId = draftIdentity.persistenceId
+    const [queuedSend, setQueuedSend] = useState<{
+      text: string
+      draftId: string | null
+    } | null>(null)
+    if (queuedSend !== null && queuedSend.draftId !== draftId) {
+      setQueuedSend(null)
+    }
     const queueSend = useCallback(
-      () => setQueuedSendText(valueRef.current),
-      [valueRef]
+      () => setQueuedSend({ text: valueRef.current, draftId }),
+      [draftId, valueRef]
     )
     useEffect(() => {
-      if (queuedSendText === null || primaryAction.disabled) return
+      if (queuedSend === null || primaryAction.disabled) return
       if (primaryAction.intent !== "send") return
       // A fresh task, outside React's commit, so the send's flushSync applies.
       const timer = window.setTimeout(() => {
-        setQueuedSendText(null)
-        if (valueRef.current === queuedSendText) handleComposerSubmit()
+        setQueuedSend(null)
+        if (valueRef.current === queuedSend.text) handleComposerSubmit()
       })
       return () => window.clearTimeout(timer)
     }, [
       handleComposerSubmit,
       primaryAction.disabled,
       primaryAction.intent,
-      queuedSendText,
+      queuedSend,
       valueRef,
     ])
 

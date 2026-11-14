@@ -1,8 +1,9 @@
 "use client"
 
+import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
 import { Icon } from "@/components/ui/icon"
 import type { PromptInputCombobox } from "@/components/ui/prompt-input"
-import { useBrowserLayoutEffect } from "@/app/hooks/use-browser-layout-effect"
+import { useBreakpoint } from "@/hooks/use-breakpoint"
 import { acceptCompletion } from "@/lib/prompt-autocomplete"
 import { cn } from "@/lib/utils"
 import {
@@ -12,14 +13,7 @@ import {
   RiPlayFill,
   type RemixiconComponentType,
 } from "@remixicon/react"
-import { useBreakpoint } from "@/hooks/use-breakpoint"
-import {
-  useId,
-  useRef,
-  useState,
-  type ReactNode,
-  type RefObject,
-} from "react"
+import { useId, useRef, useState, type ReactNode, type RefObject } from "react"
 import { usePromptAutocomplete } from "./use-prompt-autocomplete"
 
 /** Tailwind's `sm`: the list is hidden below it (`max-sm:hidden`). */
@@ -31,7 +25,11 @@ const STARTERS: ReadonlyArray<{
   prefix: string
   icon: RemixiconComponentType
 }> = [
-  { label: "Make a website", prefix: "Make a website for ", icon: RiCodeSSlashLine },
+  {
+    label: "Make a website",
+    prefix: "Make a website for ",
+    icon: RiCodeSSlashLine,
+  },
   { label: "Draft an email", prefix: "Draft an email to ", icon: RiMailLine },
   { label: "Plan a trip", prefix: "Plan a trip to ", icon: RiPlaneLine },
 ]
@@ -117,7 +115,9 @@ export function ComposerSuggestions({
   const selectedIndex = active.via === "keyboard" ? activeIndex : -1
 
   const listId = mode === "starters" ? startersId : completionsId
-  const optionId = (index: number) => `${listId}-option-${index}`
+  // Both lists stay mounted, so ids name their own list.
+  const optionId = (ownerId: string, index: number) =>
+    `${ownerId}-option-${index}`
 
   const pick = (index: number) => {
     if (mode === "starters") {
@@ -174,24 +174,24 @@ export function ComposerSuggestions({
   useBrowserLayoutEffect(() => {
     keyHandlerRef.current = handleKeyDown
   })
-  useBrowserLayoutEffect(() => () => {
-    keyHandlerRef.current = null
-  }, [keyHandlerRef])
+  useBrowserLayoutEffect(
+    () => () => {
+      keyHandlerRef.current = null
+    },
+    [keyHandlerRef]
+  )
 
   const activeDescendant =
-    selectedIndex >= 0 ? optionId(selectedIndex) : undefined
+    selectedIndex >= 0 ? optionId(listId, selectedIndex) : undefined
   useBrowserLayoutEffect(() => {
     onComboboxChange(
       count > 0 && !isNarrow ? { controls: listId, activeDescendant } : null
     )
   }, [activeDescendant, count, isNarrow, listId, onComboboxChange])
-  useBrowserLayoutEffect(
-    () => () => onComboboxChange(null),
-    [onComboboxChange]
-  )
+  useBrowserLayoutEffect(() => () => onComboboxChange(null), [onComboboxChange])
 
-  const rowProps = (index: number) => ({
-    id: optionId(index),
+  const rowProps = (ownerId: string, index: number) => ({
+    id: optionId(ownerId, index),
     active: index === activeIndex,
     selected: index === selectedIndex,
     onPick: () => pick(index),
@@ -222,7 +222,7 @@ export function ComposerSuggestions({
           <SuggestionRow
             key={starter.label}
             glyph={<Icon icon={starter.icon} size={18} glyphSize={18} />}
-            {...rowProps(index)}
+            {...rowProps(startersId, index)}
           >
             {starter.label}
           </SuggestionRow>
@@ -238,7 +238,7 @@ export function ComposerSuggestions({
         onPointerLeave={clearPointer}
       >
         {completions.map((completion, index) => (
-          <SuggestionRow key={completion} {...rowProps(index)}>
+          <SuggestionRow key={completion} {...rowProps(completionsId, index)}>
             {/* The typed part reads quieter than the continuation. */}
             <span className="text-placeholder">
               {completion.slice(0, typed.length)}

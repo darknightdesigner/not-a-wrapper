@@ -315,10 +315,15 @@ async function runHandoffCase(
         }),
         [EDITOR, typed.trim()] as const
       )
+      const keptInComposer =
+        outcome.composer?.replace(/\u00a0/g, " ").trim() === typed.trim()
       if (!sent) failures.push("Enter before hydration never sent")
-      else if (outcome.guestCapped)
-        log(`${width}px enter-send: guest cap reached`)
-      else if (!outcome.inThread || outcome.composer !== "") {
+      else if (outcome.guestCapped) {
+        // The capped send must still keep the full text somewhere.
+        if (!outcome.inThread && !keptInComposer) {
+          failures.push("guest cap reached and the typed text was lost")
+        } else log(`${width}px enter-send: guest cap reached`)
+      } else if (!outcome.inThread || outcome.composer !== "") {
         failures.push("the thread lacks the sent text or the composer kept it")
       }
       const state = await readState(page)
