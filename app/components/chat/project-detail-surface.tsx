@@ -169,7 +169,7 @@ export function ProjectDetailSurface({
               <div
                 ref={desktopRenameContainerRef}
                 onClick={onDesktopRenameContainerClick}
-                className="text-heading-app flex min-w-0 flex-1 items-center text-[var(--text-primary)]"
+                className="font-heading text-heading-4 flex min-w-0 flex-1 items-center text-[var(--text-primary)]"
               >
                 <InlineRenameInput
                   {...desktopRenameInputProps}
@@ -178,7 +178,7 @@ export function ProjectDetailSurface({
                 />
               </div>
             ) : (
-              <h1 className="text-heading-app min-w-0 flex-1 truncate text-[var(--text-primary)] md:flex md:h-9 md:items-center">
+              <h1 className="font-heading text-heading-4 min-w-0 flex-1 truncate text-[var(--text-primary)] md:flex md:h-9 md:items-center">
                 <button
                   type="button"
                   onClick={startDesktopEditing}

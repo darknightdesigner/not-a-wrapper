@@ -12,9 +12,10 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { ChatsProvider } from "@/lib/chat-store/chats/provider"
 import { ChatSessionProvider } from "@/lib/chat-store/session/provider"
 import { readComposerShellHint } from "@/lib/composer-shell-hint.server"
-import { readSidebarWidth } from "@/lib/sidebar-width.server"
 import { APP_DOMAIN } from "@/lib/config"
+import { FONTSHARE_ORIGINS, SENTIENT_STYLESHEET } from "@/lib/fontshare"
 import { ModelProvider } from "@/lib/model-store/provider"
+import { readSidebarWidth } from "@/lib/sidebar-width.server"
 import { TanstackQueryProvider } from "@/lib/tanstack-query/tanstack-query-provider"
 import { UserPreferencesProvider } from "@/lib/user-preference-store/provider"
 import { UserProvider } from "@/lib/user-store/provider"
@@ -65,6 +66,12 @@ export default async function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* The headline stylesheet is render-blocking; warm both hosts. */}
+        <link rel="preconnect" href={FONTSHARE_ORIGINS.api} />
+        <link rel="preconnect" href={FONTSHARE_ORIGINS.cdn} crossOrigin="" />
+        <link rel="stylesheet" href={SENTIENT_STYLESHEET} />
+      </head>
       {isOfficialDeployment ? (
         <Script
           defer
@@ -103,7 +110,10 @@ export default async function RootLayout({
                             enableSystem
                             disableTransitionOnChange
                           >
-                            <SidebarProvider defaultOpen defaultWidth={sidebarWidth}>
+                            <SidebarProvider
+                              defaultOpen
+                              defaultWidth={sidebarWidth}
+                            >
                               <Toaster position="top-center" />
                               {children}
                             </SidebarProvider>

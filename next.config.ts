@@ -1,6 +1,7 @@
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
 import { getConvexSiteUrl } from "./app/api/_lib/convex-site-url"
+import { FONTSHARE_ORIGINS } from "./lib/fontshare"
 
 const isProduction = process.env.NODE_ENV === "production"
 
@@ -89,7 +90,7 @@ function contentSecurityPolicy(): string {
       ...(isProduction ? [] : ["'unsafe-eval'"]),
       ...posthog,
     ],
-    "style-src": ["'self'", "'unsafe-inline'"],
+    "style-src": ["'self'", "'unsafe-inline'", FONTSHARE_ORIGINS.api],
     // Images are not inert: an image load is a request with no click, so a
     // prompt-injected reply could load `https://host/?d=<chat>` and leak the
     // chat. Markdown renders images as links; this backstops it with only the
@@ -98,7 +99,7 @@ function contentSecurityPolicy(): string {
     // (attachments, uploaded avatars). Password and email-code sign-in carry
     // no identity-provider avatar; add that host here if OAuth sign-in ships.
     "img-src": ["'self'", "data:", "blob:", convexImageSource()],
-    "font-src": ["'self'", "data:"],
+    "font-src": ["'self'", "data:", FONTSHARE_ORIGINS.cdn],
     "connect-src": ["'self'", ...convex, ...posthog],
   }
 

@@ -46,7 +46,7 @@ export default function Article({
           </time>
         </div>
 
-        <h1 className="mb-4 text-center text-4xl font-medium tracking-tight md:text-5xl">
+        <h1 className="font-heading text-heading-1 mb-4 text-center">
           {title}
         </h1>
 

@@ -321,6 +321,7 @@ vi.mock("@/components/ui/prompt-input", () => ({
         query: import("@/components/ui/prompt-input").PromptInputActionQuery
       ) => boolean
       setSelectionRange: (start: number, end: number) => void
+      setCombobox: () => void
     },
     Omit<
       React.TextareaHTMLAttributes<HTMLTextAreaElement>,
@@ -340,6 +341,7 @@ vi.mock("@/components/ui/prompt-input", () => ({
       replaceActionQuery: composerMocks.replaceActionQuery,
       setSelectionRange: (start, end) =>
         textareaRef.current?.setSelectionRange(start, end),
+      setCombobox: () => {},
     }))
     return (
       <textarea
@@ -361,6 +363,10 @@ vi.mock("./button-plus-menu", async () => ({
 
 vi.mock("./file-list", () => ({
   FileList: () => null,
+}))
+
+vi.mock("./composer-suggestions", () => ({
+  ComposerSuggestions: () => null,
 }))
 
 describe("Composer primary action", () => {

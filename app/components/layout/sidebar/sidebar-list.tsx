@@ -43,18 +43,14 @@ export function SidebarList({
   isLoadingMore = false,
   onLoadMore,
 }: SidebarListProps) {
-  const [revealedCount, setRevealedCount] = useState(SIDEBAR_LIST_STEP)
-  // The open chat is never hidden behind "Show more": round up to its step.
-  const currentIndex = items.findIndex((chat) => chat.id === currentChatId)
-  const visibleCount = Math.max(
-    revealedCount,
-    Math.ceil((currentIndex + 1) / SIDEBAR_LIST_STEP) * SIDEBAR_LIST_STEP
-  )
+  // Every load starts at the five most recent, even when the open chat sits
+  // further down (as Grok's sidebar does).
+  const [visibleCount, setVisibleCount] = useState(SIDEBAR_LIST_STEP)
   const visibleItems = items.slice(0, visibleCount)
   const hasMore = items.length > visibleCount || canLoadMore || isLoadingMore
   const showMore = () => {
     const next = visibleCount + SIDEBAR_LIST_STEP
-    setRevealedCount(next)
+    setVisibleCount(next)
     // Fetch the next window page before the reveal runs past what's loaded.
     if (canLoadMore && next + SIDEBAR_LIST_STEP > items.length) onLoadMore?.()
   }

@@ -605,7 +605,7 @@ export default function ThinkingStatesTestPage() {
           <div className="relative -mb-(--composer-overlap-px) flex w-full grow basis-auto flex-col items-center pt-4 pb-(--composer-overlap-px) [--composer-overlap-px:28px]">
             {threadSurface.surface !== "thread" ? (
               <div className="flex min-h-[calc(42svh-var(--spacing-app-header))] w-full grow flex-col items-center justify-end max-sm:justify-center">
-                <h1 className="inline-flex min-h-[42px] items-baseline px-1 text-2xl leading-9 font-normal text-balance">
+                <h1 className="font-heading text-heading-5 inline-flex min-h-[42px] items-baseline px-1 text-balance">
                   What&apos;s on your mind?
                 </h1>
               </div>
@@ -1058,7 +1058,7 @@ export default function ThinkingStatesTestPage() {
 
                 {/* ─── Onboarding / Empty State ─── */}
                 <AssistantShell>
-                  <h1 className="mb-6 text-3xl font-medium tracking-tight text-balance">
+                  <h1 className="font-heading text-heading-5 sm:text-heading-4 mb-6 text-balance sm:leading-[1.2]">
                     What&apos;s on your mind?
                   </h1>
                   <StateAnnotation title="Onboarding — empty state heading">

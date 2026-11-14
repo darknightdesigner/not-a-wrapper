@@ -360,7 +360,7 @@ function SidebarExpandedNav({
                 data-sidebar-item="true"
                 aria-label="Home"
               >
-                <span className="text-[18px] leading-[26px] font-semibold whitespace-nowrap">
+                <span className="font-heading text-heading-6 whitespace-nowrap">
                   Wrapper
                 </span>
               </Link>
