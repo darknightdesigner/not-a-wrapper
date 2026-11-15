@@ -42,7 +42,7 @@ type MessageAssistantProps = {
   children: string
   isReplaying?: boolean
   /** The Assistant turn view — the single derivation of everything this row
-   * renders from the message's parts/metadata. See CONTEXT.md. */
+   * renders from the message's parts/metadata. See GLOSSARY.md. */
   view: AssistantTurnView
   isLast?: boolean
   copied?: boolean
@@ -77,7 +77,7 @@ export function MessageAssistant({
 }: MessageAssistantProps) {
   const { searchImageResults } = view
   // Regeneration is a server-owned Chat turn, available only on a durable
-  // chat. Matches the turn-controller precondition. See CONTEXT.md "Chat turn".
+  // chat. Matches the turn-controller precondition. See GLOSSARY.md "Chat turn".
   const canRegenerate = Boolean(onReload) && Boolean(isDurableChat)
   const retryModelName =
     getModelInfo(retryModelId ?? "")?.name ?? retryModelId ?? "selected model"

@@ -21,7 +21,7 @@ codebase just fought to keep.
 
 ## Decision
 
-A client-side **Presentation reveal** (see CONTEXT.md) renders a word-boundary
+A client-side **Presentation reveal** (see GLOSSARY.md) renders a word-boundary
 prefix of the canonical text, advanced by a rAF-gated adaptive scheduler, with
 newly revealed words faded in via CSS. It deliberately issues React commits
 more often than the 50 ms throttle delivers canonical updates — that is not a

@@ -63,7 +63,7 @@ across local development, Convex, Vercel previews, and production.
 - `lib/` — Model routing, tools, MCP, state, encryption, and shared logic
 - `components/` — Shared UI primitives
 
-See [CONTEXT.md](./CONTEXT.md) for the domain model and
+See [GLOSSARY.md](./GLOSSARY.md) for the domain model and
 [`docs/adr/`](./docs/adr/) for architectural decisions.
 
 ## Development

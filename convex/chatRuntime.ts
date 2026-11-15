@@ -694,7 +694,7 @@ async function applyMessageResolution(
 // Sidebar status projection — mirror a run's lifecycle phase onto its chat doc
 // so every sidebar row derives its indicator from the chat it already subscribes
 // to, with no separate query/store/hydrator
-// (CONTEXT.md "Sidebar status projection"). These fields are owner-only:
+// (GLOSSARY.md "Sidebar status projection"). These fields are owner-only:
 // chat docs reach only their owner, and the share view (ADR-0043) never
 // carries them.
 //
@@ -1193,7 +1193,7 @@ function resolveRegenerationInputPlan(
   // tail. A mid-conversation regen forks at the target's parent: the branch
   // writes below insert a new selected sibling and deselect the old subtree,
   // and the client renders the fork via the selected-path projection seam.
-  // See CONTEXT.md "Chat turn" (edit/regenerate may target any prior message).
+  // See GLOSSARY.md "Chat turn" (edit/regenerate may target any prior message).
   let pairedUserIndex = -1
   for (let index = targetIndex - 1; index >= 0; index--) {
     if (selectedMessages[index]?.role === "user") {
@@ -3101,7 +3101,7 @@ export async function stopGenerationRunForChat(
   owner: AuthenticatedRunOwner,
   options: { observedText?: string } = {}
 ): Promise<StopGenerationRunResult> {
-  // Structural run ownership (CONTEXT.md "Authenticated handler"): the caller
+  // Structural run ownership (GLOSSARY.md "Authenticated handler"): the caller
   // resolves the chat THROUGH the run (`ownedGenerationRunMutation` /
   // `requireOwnedGenerationRun`), so a mismatched chat/run pair is
   // unrepresentable here — no hand-written cross-check.

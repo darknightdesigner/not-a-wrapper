@@ -52,7 +52,7 @@ function serializeToolOutcomePreview(value: unknown): string | undefined {
 }
 
 /**
- * Tool runtime (see CONTEXT.md): everything a chat request needs to use tools,
+ * Tool runtime (see GLOSSARY.md): everything a chat request needs to use tools,
  * prepared once per request and alive for the whole stream — the merged tool
  * set, per-tool metadata, step gating, budget accounting, and Tool outcome
  * recording.
@@ -66,7 +66,7 @@ function serializeToolOutcomePreview(value: unknown): string | undefined {
  */
 
 /**
- * Tool outcome (see CONTEXT.md): one record per tool call, assembled by the
+ * Tool outcome (see GLOSSARY.md): one record per tool call, assembled by the
  * runtime when the call's step finishes and pushed through the outcome sinks
  * injected at preparation. Every call produces an outcome — failures and
  * unidentifiable tools included — and errors are recorded for all sources.
@@ -908,7 +908,7 @@ async function buildToolRuntime(
     return disposePromise
   }
 
-  // Stream-lifecycle hooks — alive for the whole stream (see CONTEXT.md).
+  // Stream-lifecycle hooks — alive for the whole stream (see GLOSSARY.md).
   //
   // The runtime owns step gating, budget accounting, and Tool outcome
   // recording: `prepareStep` applies the Capability policy step gate plus the
@@ -1023,7 +1023,7 @@ async function buildToolRuntime(
         })
       : undefined
 
-  // Tool outcome recording (see CONTEXT.md). One outcome per call, assembled
+  // Tool outcome recording (see GLOSSARY.md). One outcome per call, assembled
   // at step finish from the call, its result, and its trace, then dispatched
   // to every injected sink. Outcomes accumulate into the request summary.
   const outcomeTotals: ToolOutcomeSummary = {

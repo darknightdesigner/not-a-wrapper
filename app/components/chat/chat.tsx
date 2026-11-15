@@ -129,7 +129,7 @@ const ChatInner = memo(function ChatInner({
   const [hasDialogAuth, setHasDialogAuth] = useState(false)
   // Edit and regeneration are server-owned Chat turns, available only on a
   // durable chat. Drives whether the message tree shows those controls so the
-  // UI agrees with the turn-controller precondition. See CONTEXT.md "Chat turn".
+  // UI agrees with the turn-controller precondition. See GLOSSARY.md "Chat turn".
   const isDurableChat = useMemo(
     () => isRouteDurableChat(chatId, isAuthenticated),
     [chatId, isAuthenticated]
@@ -218,7 +218,7 @@ const ChatInner = memo(function ChatInner({
   useMarkChatReadOnView(chatId, currentChat?.last_run_ended_at)
 
   // The Activity panel store — the seam assistant rows use to reach the single
-  // Chat-hosted panel surface (see CONTEXT.md "Activity panel"). Chat keeps the
+  // Chat-hosted panel surface (see GLOSSARY.md "Activity panel"). Chat keeps the
   // selection derivation (useActivityPanel) and syncs its output into the
   // store; rows subscribe through per-row selectors instead of a controls
   // object threaded down the tree.

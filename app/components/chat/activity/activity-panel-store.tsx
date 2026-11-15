@@ -2,7 +2,7 @@
 
 /**
  * Activity panel store — the seam assistant rows use to reach the single
- * Chat-hosted Activity panel. See CONTEXT.md "Activity panel".
+ * Chat-hosted Activity panel. See GLOSSARY.md "Activity panel".
  *
  * Replaces the `activityPanel` controls object that threaded Chat →
  * Conversation → Message → MessageAssistant. That thread had two structural

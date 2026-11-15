@@ -297,7 +297,7 @@ evidence rule (Section 6, contract C4).
 L1. OpenRouter cannot surface reasoning that arrives after content in a step
 (E27); interleaved Gemini/Claude reasoning through OpenRouter is partially
 lost. The route resolver already prefers direct routes; document it in the
-matrix and CONTEXT.md.
+matrix and GLOSSARY.md.
 
 L2. OpenRouter web search yields sources without tool rows (E27); the
 implied-search evidence item is the correct presentation.
@@ -545,7 +545,7 @@ Files: `app/api/chat/adapters/openai.ts` (+ `__tests__`),
 
 ### Step 7. Documentation sync
 
-Files: `CONTEXT.md` (Turn evidence, Inline assistant work, Request shaping,
+Files: `GLOSSARY.md` (Turn evidence, Inline assistant work, Request shaping,
 History adaptation entries), `docs/adr/0040-inline-assistant-work.md` (amend),
 new `docs/adr/0041-provider-reasoning-boundary.md` (Section 11), the plan's
 status section, `lib/models/types.ts` doc comments.
@@ -643,7 +643,7 @@ Q8. **Anthropic progress-update blocks under `summarized` on Fable 5.** After st
   with the C3/C4 wording and the C5 duration rule; note the OpenRouter L1
   limitation.
 - Amend ADR-0026 consequences: Anthropic adaptive requests carry `display`.
-- CONTEXT.md: update **Request shaping** (display, Mistral), **Turn evidence**
+- GLOSSARY.md: update **Request shaping** (display, Mistral), **Turn evidence**
   (`readTextPhase`, `readReasoningVisibility`), **Inline assistant work**
   (finish-time work summary), **History adaptation** (OpenAI keeps phase), and
   add an _Avoid_ line: "reading `providerMetadata.<provider>.phase` outside

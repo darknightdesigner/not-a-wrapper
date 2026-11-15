@@ -3,7 +3,7 @@
 /**
  * Turn context — the per-chat client module owning the inputs every Chat turn
  * kind needs at run time: selected model, web-search enablement, and system
- * prompt. See CONTEXT.md "Turn context".
+ * prompt. See GLOSSARY.md "Turn context".
  *
  * Before this module the same inputs were owned in three layers (session model
  * selection, Chat's orchestration, and the input's pass-through props) and

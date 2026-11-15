@@ -2,7 +2,7 @@
 
 /**
  * Composer — the deep client module that assembles a Chat turn payload. See
- * CONTEXT.md "Composer".
+ * GLOSSARY.md "Composer".
  *
  * It owns the draft (display state + per-chat persistence + clearing), the
  * pending attachment files, paste/drop capture, and the primary

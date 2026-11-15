@@ -36,7 +36,7 @@ provider facts.
 
 ## Decision
 
-Introduce the **Chat turn runtime** (`CONTEXT.md`): the single server-side module
+Introduce the **Chat turn runtime** (`GLOSSARY.md`): the single server-side module
 that executes one Chat turn for one request, prepared once and alive for the
 whole stream. `route.ts` becomes a thin HTTP adapter — parse → prepare → respond.
 

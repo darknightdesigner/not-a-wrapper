@@ -1,7 +1,7 @@
 import { v, type Infer } from "convex/values"
 
 /**
- * Run timing receipt (CONTEXT.md, ADR-0030): the durable, content-free record
+ * Run timing receipt (GLOSSARY.md, ADR-0030): the durable, content-free record
  * stamped on a generation run at every terminal write of where that run's
  * time went. Durations are milliseconds on a monotonic clock; every field is
  * optional and absent means unobserved — nothing is ever zero-filled. Per
