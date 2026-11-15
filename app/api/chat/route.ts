@@ -49,7 +49,7 @@ function setChatConversationCorrelation(chatId: string): void {
   Sentry.setContext("chat_conversation", { id: chatId })
 }
 
-// Thin HTTP adapter over the Chat turn runtime (CONTEXT.md;
+// Thin HTTP adapter over the Chat turn runtime (GLOSSARY.md;
 // app/api/chat/chat-turn-runtime.ts; docs/adr/0006-chat-turn-runtime.md). The
 // route owns only HTTP concerns: parse, cookie→token (or the signed guest
 // cookie, ADR-0045), validation 400/401, usage admission, and returning the

@@ -113,7 +113,7 @@ export type ProviderInstance = {
 }
 
 /**
- * Provider strategy (CONTEXT.md): the single home for everything STATICALLY
+ * Provider strategy (GLOSSARY.md): the single home for everything STATICALLY
  * true about one provider's @ai-sdk SDK — how to instantiate its client (BYOK
  * key vs default/env credentials), its optional native search tool plus that
  * tool's display metadata, and its platform API-key environment variable.

@@ -1,6 +1,6 @@
 /**
  * Assistant turn view — the single pure derivation of everything renderers
- * need from one assistant message. See CONTEXT.md "Assistant turn view".
+ * need from one assistant message. See GLOSSARY.md "Assistant turn view".
  *
  * Before this module, "is this message thinking?", "which sources?", and
  * "which tool parts?" were re-derived from raw `parts`/`metadata` at three
@@ -133,7 +133,7 @@ export type AssistantTurnView = {
   /**
    * The Turn evidence timeline from this view's single parts walk. Phase and
    * activity derive from it; components never read it (raw facts stay behind
-   * presentation — see CONTEXT.md "Turn evidence").
+   * presentation — see GLOSSARY.md "Turn evidence").
    */
   evidence: TurnEvidence
   inlineContent: AssistantInlineContent

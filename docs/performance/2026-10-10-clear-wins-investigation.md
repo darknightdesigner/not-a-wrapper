@@ -304,7 +304,7 @@ Its result changes only at prepare and terminal transitions.
 Amend **ADR-0027** (this is its deferred "Experiment 2b": the live-tail split,
 the `resolveLiveTail` invariant, the self-check and handshake, the read sets,
 the property test). Amend **ADR-0049** (budgets). Add "Live tail" to
-`CONTEXT.md`. Point the `TODO.md` item "Bound the selected-path read" at the new
+`GLOSSARY.md`. Point the `TODO.md` item "Bound the selected-path read" at the new
 seam.
 
 ### 7. File ownership and sequencing
@@ -320,7 +320,7 @@ One PR, two commits: trim, then split.
 - Client: `lib/chat-store/messages/provider.tsx`, `lib/chat-store/messages/warm.ts`,
   `lib/convex/query-cache.tsx`, `lib/chat-messages/ui-message-adapter.ts`.
 - Route: `app/api/chat/[chatId]/stream/route.ts` and its test.
-- Docs: ADR-0027, ADR-0049, `CONTEXT.md`, `TODO.md`, the metric dictionary.
+- Docs: ADR-0027, ADR-0049, `GLOSSARY.md`, `TODO.md`, the metric dictionary.
 
 **Collisions.** No hands-off file is edited. But `stream/route.ts` is where the
 Redis-replay work plugs in (it calls `readRetainedChatStream` from

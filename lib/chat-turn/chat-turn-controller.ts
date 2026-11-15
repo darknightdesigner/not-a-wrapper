@@ -657,7 +657,7 @@ async function runEditTurn(
 
   // Edit is a server-owned Chat turn: the backend creates the message branch
   // and derives the selected path. It is only available on a durable chat;
-  // guest/local chats are send-only. See CONTEXT.md "Chat turn".
+  // guest/local chats are send-only. See GLOSSARY.md "Chat turn".
   if (!isRouteDurableChat(chatId, snapshot.isAuthenticated)) {
     const message =
       "Editing is available once the chat is saved. Sign in to edit messages."
@@ -795,7 +795,7 @@ async function runRegenerationTurn(
   }
 
   // Regeneration is a server-owned Chat turn, available only on a durable
-  // chat; guest/local chats are send-only. See CONTEXT.md "Chat turn".
+  // chat; guest/local chats are send-only. See GLOSSARY.md "Chat turn".
   if (!isRouteDurableChat(chatId, snapshot.isAuthenticated)) {
     adapters.toastError("Regenerating is available once the chat is saved.")
     return

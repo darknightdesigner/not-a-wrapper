@@ -1,6 +1,6 @@
 /**
  * Turn evidence — the single interpreter of raw AI SDK message-part knowledge
- * for the presentation fold (see CONTEXT.md "Turn evidence"). Everything the
+ * for the presentation fold (see GLOSSARY.md "Turn evidence"). Everything the
  * Assistant turn phase ladder and the Assistant activity presentation need to
  * know about raw parts crosses this seam exactly once: tool lifecycle state
  * semantics, tool classification, search-query recovery, and source

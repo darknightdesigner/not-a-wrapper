@@ -92,7 +92,7 @@ All nine client `useQuery` sites were migrated:
   ungated per-user reads brought under the seam. `getForChat` requires an owned
   chat, so the gate also prevents a throw if it opens before the JWT syncs.
 
-The new term **Per-user subscription** is recorded in `CONTEXT.md` under a
+The new term **Per-user subscription** is recorded in `GLOSSARY.md` under a
 **Client** subheading, as the counterpart to the backend **Authenticated
 handler**.
 

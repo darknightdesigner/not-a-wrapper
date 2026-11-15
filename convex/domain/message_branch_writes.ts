@@ -482,7 +482,7 @@ export function createMessageBranchWriter(
   /**
    * Post-write validate-and-repair pass over the post-write array: re-normalize,
    * assert the target is reachable on the Selected path, and apply any repair
-   * patches. The second pass is deliberate (CONTEXT.md: post-write
+   * patches. The second pass is deliberate (GLOSSARY.md: post-write
    * validation), not accidental rework: it proves the write left the chat in a
    * legal state.
    */

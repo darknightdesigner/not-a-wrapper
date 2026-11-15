@@ -528,7 +528,7 @@ export function createChatTurnRuntime(args: {
   let phase: "idle" | "preparing" | "prepared" | "streaming" | "terminal" =
     "idle"
 
-  // Durable turn runtime (CONTEXT.md; docs/adr/0009-durable-turn-runtime.md):
+  // Durable turn runtime (GLOSSARY.md; docs/adr/0009-durable-turn-runtime.md):
   // the deep module owning ALL durable-persistence knowledge for this turn.
   // Constructed here — non-null from birth, so the parent never branches on
   // durability and `fail()` never null-checks. The selecting factory
@@ -657,7 +657,7 @@ export function createChatTurnRuntime(args: {
     const phClient = deps.getPostHogClient()
     const normalizedChatVersion = normalizeChatVersion(chatVersion, messages)
 
-    // Tool outcome sinks (CONTEXT.md; app/api/chat/outcome-sinks.ts): the
+    // Tool outcome sinks (GLOSSARY.md; app/api/chat/outcome-sinks.ts): the
     // runtime assembles one Tool outcome per call at step finish and dispatches
     // it to each sink. Trace log always; analytics and audit only when their
     // destinations exist for this request.
@@ -686,7 +686,7 @@ export function createChatTurnRuntime(args: {
         : []),
     ]
 
-    // Tool runtime (CONTEXT.md; lib/tools/runtime.ts)
+    // Tool runtime (GLOSSARY.md; lib/tools/runtime.ts)
     //
     // Loads the three Tool layers (Layer 1 provider-native, Layer 2 Exa
     // search/content, Layer 3 MCP), runs both Capability policy phases, enforces
@@ -1103,7 +1103,7 @@ export function createChatTurnRuntime(args: {
       }
     )
 
-    // Request shaping (CONTEXT.md; lib/openproviders/request-shaping.ts):
+    // Request shaping (GLOSSARY.md; lib/openproviders/request-shaping.ts):
     // provider options and beta headers behind one seam. The module owns the
     // pause_turn search downgrade and token-efficient beta gating.
     const { providerOptions, headers: requestHeaders } = shapeRequest(

@@ -36,7 +36,7 @@ diverged on surface shape. This ADR records the adopted hybrid.
 
 ## Decision
 
-Introduce the **Durable turn runtime** (`CONTEXT.md`):
+Introduce the **Durable turn runtime** (`GLOSSARY.md`):
 `app/api/chat/durable-turn-runtime.ts`, absorbing `durable-runtime.ts`'s
 stateful factories (snapshot tracker, approval transform) as internal
 vocabulary. It owns all durable knowledge for one Chat turn; the Chat turn

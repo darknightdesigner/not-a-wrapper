@@ -26,7 +26,7 @@ fidelity. The cores were well covered; the seam callers actually cross was not:
 
 The gap was not hypothetical. Three registrations (`prepareGeneration`,
 `approveToolCall`, `denyToolCall`) had drifted off the ADR-0003 seam onto raw
-`mutation({...})` with inline auth, while CONTEXT.md asserted the opposite.
+`mutation({...})` with inline auth, while GLOSSARY.md asserted the opposite.
 Nothing could catch that, because nothing tested at the registration.
 
 Options considered:

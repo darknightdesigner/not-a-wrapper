@@ -120,7 +120,7 @@ classification stays client-side.
   bounded by Convex's 16 MiB per-function read limit. `prepareGeneration` now
   reads the chat once per turn (it read it about eight times, which failed
   from ~2 MiB chats) and each message is capped at 896 KiB (`capMessagePayload`,
-  CONTEXT.md "Message payload cap"), so both sides hit that bound at the same
+  GLOSSARY.md "Message payload cap"), so both sides hit that bound at the same
   ~16 MiB.
 
 ## Amendment 2026-10-10: the live tail (Experiment 2b)

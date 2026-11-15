@@ -4,7 +4,7 @@ import { isModelReasoningEffort } from "@/lib/models/types"
 import { isGenerationBudget } from "@/lib/openproviders/output-budget"
 import { safeValidateUIMessages, type UIMessage } from "ai"
 
-// Chat turn wire contract (CONTEXT.md): the single statement of the
+// Chat turn wire contract (GLOSSARY.md): the single statement of the
 // POST /api/chat request shape. The Chat turn controller's plan builders
 // (`lib/chat-turn/turn-plans.ts`) produce `ChatTurnBodyFields`;
 // the AI SDK transport merges in `messages`; the chat route validates the
@@ -50,7 +50,7 @@ export type ChatTurnRegenerationRequest = {
 
 /**
  * The forward staleness guard for a new-message turn, derived by the client
- * from the rendered selected path (CONTEXT.md "Selected path token"). Spread
+ * from the rendered selected path (GLOSSARY.md "Selected path token"). Spread
  * flat into the body fields, not nested.
  */
 export type ChatTurnSelectedPathToken = {

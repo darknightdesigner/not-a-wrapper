@@ -125,7 +125,7 @@ export function useChatCore({
 
   // The Turn context — model/search/system-prompt inputs read at run time by
   // the turn runners (adapters.getTurnSnapshot), reactive here only where a
-  // render depends on them. See CONTEXT.md "Turn context".
+  // render depends on them. See GLOSSARY.md "Turn context".
   const {
     getTurnSnapshot,
     isAuthenticated,

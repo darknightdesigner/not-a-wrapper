@@ -28,7 +28,7 @@ function formatDomainLimitCode(
 }
 
 /**
- * Sliding-window tool budget and domain limits (Tool budget, CONTEXT.md).
+ * Sliding-window tool budget and domain limits (Tool budget, GLOSSARY.md).
  *
  * Callable only by the Next server (ADR-0045): every call carries a
  * server-call proof over its arguments, the window policy is resolved here by

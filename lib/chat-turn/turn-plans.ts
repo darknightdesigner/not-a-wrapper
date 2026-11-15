@@ -42,7 +42,7 @@ type BuildChatTurnRequestBodyArgs = {
   regeneration?: ChatTurnRegenerationRequest
 }
 
-// Produces the Chat turn wire contract's body fields (CONTEXT.md;
+// Produces the Chat turn wire contract's body fields (GLOSSARY.md;
 // lib/chat-messages/chat-turn-contract.ts). Closed on purpose: identity is
 // session-derived server-side, so `isAuthenticated` never rides along, and
 // there is no extras spread — a new wire field is added on the contract first.

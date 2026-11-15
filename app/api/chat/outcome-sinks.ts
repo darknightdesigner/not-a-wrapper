@@ -1,4 +1,4 @@
-// Production Tool outcome sinks (see CONTEXT.md). Each factory closes over the
+// Production Tool outcome sinks (see GLOSSARY.md). Each factory closes over the
 // request-scoped context the projection needs and returns a ToolOutcomeSink the
 // route injects into prepareToolRuntime. The runtime assembles outcomes; sinks
 // only project them onto a destination. Tests inject an in-memory sink instead —

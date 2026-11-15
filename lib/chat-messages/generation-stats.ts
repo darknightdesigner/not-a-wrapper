@@ -1,6 +1,6 @@
 /**
  * Generation stats — the user-facing record of how an assistant message's
- * generation performed (CONTEXT.md, ADR-0030). Stored in the message
+ * generation performed (GLOSSARY.md, ADR-0030). Stored in the message
  * metadata blob at finish; provider figures come from the AI SDK's per-step
  * performance, the same clock the run's timing receipt reads. Accumulates
  * across an approval continuation (like work duration). Tokens per second is

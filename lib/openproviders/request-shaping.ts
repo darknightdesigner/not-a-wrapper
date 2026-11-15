@@ -6,7 +6,7 @@ import type { ProviderOptions } from "@ai-sdk/provider-utils"
 import { fixedThinkingBudgetTokens } from "./output-budget"
 
 /**
- * Request shaping (CONTEXT.md): everything provider-specific about issuing
+ * Request shaping (GLOSSARY.md): everything provider-specific about issuing
  * one model request, resolved from the model config plus request context —
  * provider options (thinking/reasoning configuration, per-model thinking
  * budgets, response storage, actor attribution, prompt caching) and provider

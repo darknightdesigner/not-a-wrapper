@@ -531,7 +531,7 @@ export function Conversation({
           try {
             if (message.role === "assistant") {
               // The single per-render derivation of everything the assistant
-              // row renders (see CONTEXT.md "Assistant turn view"). Derived
+              // row renders (see GLOSSARY.md "Assistant turn view"). Derived
               // fresh each render — the AI SDK mutates part objects in place
               // during streaming, so this must never be memoized by message
               // reference. The live row reuses the view the active-turn

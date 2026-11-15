@@ -3,7 +3,7 @@ import { getAllModels } from "./models"
 import { isKnownVendorId, MODEL_PROVIDER_IDENTITY } from "./provider-identity"
 
 /**
- * Inventory-drift guard for the Provider identity module (CONTEXT.md).
+ * Inventory-drift guard for the Provider identity module (GLOSSARY.md).
  * Everything compile-time-total (Record<Provider, …> registries, the icon
  * registry) is deliberately untested here — these are the two facts the type
  * system cannot see across the catalog boundary.
